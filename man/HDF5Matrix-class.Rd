@@ -5,9 +5,29 @@
 \alias{HDF5Matrix-class}
 \alias{HDF5Matrix}
 
+\alias{dim,HDF5Matrix-method}
+\alias{dimnames,HDF5Matrix-method}
+\alias{dimnames<-,HDF5Matrix-method}
+
+\alias{coerce,HDF5Array,HDF5Matrix-method}
+
+\alias{show,HDF5Matrix-method}
+
+\alias{[,HDF5Matrix-method}
+
 \title{HDF5Matrix objects}
 
 \description{
+  The HDF5Matrix class is a container for representing and manipulating an
+  on-disk HDF5 dataset with 2 dimensions, or a 2-dimensional slice of an
+  on-disk HDF5 dataset with 2 or more dimensions.
+
+  HDF5Matrix objects can be manipulated via a \emph{restricted matrix-like
+  interface} i.e. they support common \link[base]{matrix} operations like
+  \code{dim}, \code{nrow}, \code{ncol}, \code{dimnames}, \code{rownames},
+  \code{colnames}, \code{[}, \code{rowSums}, \code{colSums}, etc... as long
+  as the operation doesn't need to alter the content of the underlying
+  (on-disk) dataset or write a new dataset to the disk.
 }
 
 \usage{
@@ -41,6 +61,9 @@ HDF5Matrix(file, group, name)  # constructor function
     \item \link[base]{matrix} objects in base R.
 
     \item \link{HDF5Array} objects.
+
+    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which the
+          \pkg{HDF5Array} package is building.
   }
 }
 

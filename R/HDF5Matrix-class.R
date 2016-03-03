@@ -28,7 +28,7 @@ setClass("HDF5Matrix",
                     ">= 1 and <= 'length(x@index)'"))
     if (x@rowdim >= x@coldim)
         return("'x@rowdim' must be < 'x@coldim'")
-    array_dim <- .get_HDF5Array_dim(x)
+    array_dim <- get_HDF5Array_dim(x)
     if (!all(array_dim[-c(x@rowdim, x@coldim)] == 1L))
         return(wmsg("'x@rowdim' and 'x@coldim' are incompatible with the ",
                     "dimensions of the underlying HDF5Array object"))
@@ -39,7 +39,7 @@ setValidity2("HDF5Matrix", .validate_HDF5Matrix)
 
 .get_HDF5Matrix_dim <- function(x)
 {
-    array_dim <- .get_HDF5Array_dim(x)
+    array_dim <- get_HDF5Array_dim(x)
     array_dim[c(x@rowdim, x@coldim)]
 }
 
@@ -57,7 +57,7 @@ setMethod("dimnames", "HDF5Matrix", .get_HDF5Matrix_dimnames)
 
 .set_HDF5Matrix_dimnames <- function(x, value)
 {
-    value <- .normalize_dimnames_replacement_value(value, 2L)
+    value <- normalize_dimnames_replacement_value(value, 2L)
     ## 'x@index' can be big so avoid copies when possible. With this trick
     ## no-op dimnames(x) <- dimnames(x) is instantaneous.
     if (!identical(names(x@index[[x@rowdim]]), value[[1L]]))
@@ -71,14 +71,14 @@ setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
 
 .from_HDF5Array_to_HDF5Matrix <- function(from)
 {
-    array_dim <- .get_HDF5Array_dim(from)
+    array_dim <- get_HDF5Array_dim(from)
     if (length(array_dim) < 2L)
         stop(wmsg(class(from), " object with less than 2 dimensions ",
                   "cannot be coerced to a HDF5Matrix object at the moment"))
     idx <- which(array_dim != 1L)
     if (length(idx) > 2L)
         stop(wmsg(class(from), " object with more than 2 effective dimensions ",
-                  "cannot be coerced to a HDF5Matrix object. ", .slicing_tip))
+                  "cannot be coerced to a HDF5Matrix object. ", slicing_tip))
     if (length(idx) == 2L) {
         ans_rowdim <- idx[[1L]]
         ans_coldim <- idx[[2L]]

@@ -12,9 +12,9 @@ setClass("HDF5Array",
     )
 )
 
-.get_HDF5Array_dim <- function(x) lengths(x@index)
+get_HDF5Array_dim <- function(x) lengths(x@index)
 
-setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
+setMethod("dim", "HDF5Array", get_HDF5Array_dim)
 
 .get_HDF5Array_dimnames <- function(x)
 {
@@ -26,7 +26,7 @@ setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
 
 setMethod("dimnames", "HDF5Array", .get_HDF5Array_dimnames)
 
-.normalize_dimnames_replacement_value <- function(value, ndim)
+normalize_dimnames_replacement_value <- function(value, ndim)
 {
     if (is.null(value))
         return(vector("list", length=ndim))
@@ -42,7 +42,7 @@ setMethod("dimnames", "HDF5Array", .get_HDF5Array_dimnames)
 
 .set_HDF5Array_dimnames <- function(x, value)
 {
-    value <- .normalize_dimnames_replacement_value(value, length(x@index))
+    value <- normalize_dimnames_replacement_value(value, length(x@index))
     for (n in seq_along(x@index))
         ## 'x@index' can be big so avoid copies when possible. With this trick
         ## no-op dimnames(x) <- dimnames(x) is instantaneous.
@@ -101,7 +101,7 @@ HDF5Array <- function(file, group, name)
 
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 
-.slicing_tip <- c(
+slicing_tip <- c(
     "Consider slicing it first (e.g. x[8, 30, , 2, ]). Make sure that all ",
     "the indices used for the slicing have length 1 except at most 2 of ",
     "them which can be of arbitrary length or missing."
@@ -111,7 +111,7 @@ setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 {
     if (sum(dim(x) != 1L) > 2L)
         stop(wmsg(class(x), " object with more than 2 effective dimensions ",
-                  "cannot be coerced to a matrix. ", .slicing_tip))
+                  "cannot be coerced to a matrix. ", slicing_tip))
     ans <- as.array(x, drop=TRUE)
     as.matrix(ans)
 }
