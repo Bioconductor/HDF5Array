@@ -1,0 +1,53 @@
+import(methods)
+importFrom(stats, setNames)
+import(BiocGenerics)
+import(S4Vectors)
+import(IRanges)
+import(rhdf5)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S4 classes
+###
+
+exportClasses(
+    HDF5Array, HDF5Matrix
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S4 methods for generics not defined in HDF5Array
+###
+
+exportMethods(
+    ## Methods for generics defined in the base package:
+    dim,
+    dimnames, "dimnames<-",
+    as.array, as.matrix,
+    "[",
+
+    ## Methods for generics defined in the methods package:
+    coerce, show
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export non-generic functions
+###
+
+export(
+    HDF5Array, HDF5Matrix
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S4 generics defined in HDF5Array + export corresponding methods
+###
+
+export(
+)
+
+### Exactly the same list as above.
+exportMethods(
+)
+

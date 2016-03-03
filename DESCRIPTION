@@ -8,9 +8,9 @@ Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, Sequencing, Annotation, Coverage, GenomeAnnotation
-Depends: R (>= 3.2), methods
-Imports: BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.25), IRanges (>= 2.5.17),
-	rhdf5
-Suggests: h5vcData, BiocStyle, knitr, rmarkdown
+Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3)
+Imports: stats, S4Vectors (>= 0.9.25), IRanges (>= 2.5.17), rhdf5
+Suggests: h5vcData, SummarizedExperiment, BiocStyle, knitr, rmarkdown
 VignetteBuilder: knitr
 License: Artistic-2.0
+Collate: HDF5Array-class.R HDF5Matrix-class.R zzz.R

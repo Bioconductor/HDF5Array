@@ -1,0 +1,62 @@
+## Should this go in the SummarizedExperiment package? As an additional section
+## in the vignette? As a separate vignette? As a man page? Probably the former.
+
+
+## Introduction
+## ------------
+## When trying to create a SummarizedExperiment object with big dimensions it's
+## critical to use a memory-efficient container for the assay data. The options
+## that are currently available for this are: DataFrame of Rle's, sparse
+## matrix. Other options that might become available in the future: on-disk
+## data container (e.g. HDF5Matrix, currently in development), Rle matrix (not
+## available yet). Each container has its strengths and weaknesses and which
+## one to use exactly depends on several factors.
+
+## DataFrame of Rle's
+## ------------------
+## Works great for coverage data. See ?GPos in GenomicRanges for an example.
+
+## Sparse matrix object from the Matrix package
+## --------------------------------------------
+## This sounds like a natural candidate for RNA-seq count data which tends to
+## be sparse. Unfortunately, because the Matrix package can only store the
+## counts as doubles and not as integers, trying to use it on real RNA-seq
+## count data actually increases the size of the matrix of counts:
+library(airway)
+data(airway)
+head(assay(airway))
+object.size(assay(airway))
+object.size(Matrix(assay(airway), sparse=TRUE))
+
+
+
+
+### -------------------------------------------------------------------------
+
+
+### A lower-level version of h5vc::getSampleData() that doesn't mangle the
+### data.
+get_attrs <- function(filename, group)
+{
+    f <- H5Fopen(filename, flags="H5F_ACC_RDONLY")
+    on.exit(H5Fclose(f))
+    g <- H5Gopen(f, group)
+    on.exit(H5Gclose(g), add=TRUE)
+
+    num_attrs <- H5Oget_num_attrs(g)
+    attrs <- unlist(
+        lapply(seq_len(num_attrs),
+            function(i)
+            {
+                A <- H5Aopen_by_idx(g, n=i-1L)
+                attrname <- H5Aget_name(A)
+                attrval <- H5Aread(A)
+                H5Aclose(A)
+                setNames(list(attrval), attrname)
+            }
+       ),
+       recursive=FALSE
+    )
+    as.data.frame(attrs)
+}
+
