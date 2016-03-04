@@ -36,10 +36,11 @@ HDF5Matrix(file, group, name)  # constructor function
 
 \arguments{
   \item{file}{
+    The path to the HDF5 file where the dataset is located.
   }
-  \item{group}{
-  }
-  \item{name}{
+  \item{group, name}{
+    The HDF5 group and name of the dataset, as reported by
+    \code{\link[rhdf5]{h5ls}}.
   }
 }
 
@@ -62,12 +63,22 @@ HDF5Matrix(file, group, name)  # constructor function
 
     \item \link{HDF5Array} objects.
 
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which the
-          \pkg{HDF5Array} package is building.
+          \pkg{HDF5Array} package is implemented.
   }
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## CONSTRUCTION
+## ---------------------------------------------------------------------
+
+
+## ---------------------------------------------------------------------
+## COERCION FROM HDF5Array TO HDF5Matrix
+## ---------------------------------------------------------------------
 library(rhdf5)
 library(h5vcData)
 
@@ -75,16 +86,35 @@ tallyFile <- system.file("extdata", "example.tally.hfs5",
                          package="h5vcData")
 h5ls(tallyFile)
 
+## Pick up "Coverages" dataset for Human chromosome 16:
 cov0 <- HDF5Array(tallyFile, "/ExampleStudy/16", "Coverages")
-cov1 <- cov0[ , , 29000001:29000007]
-cov2 <- cov0[ , 1, 29000001:29000007]
-
 pcov <- as(cov0[ , 1, ], "HDF5Matrix")  # coverage on plus strand
 mcov <- as(cov0[ , 2, ], "HDF5Matrix")  # coverage on minus strand
 
+nrow(pcov)  # nb of samples
+ncol(pcov)  # length of Human chromosome 16
+
+## ---------------------------------------------------------------------
+## HDF5Matrix OBJECTS AS ASSAYS OF A SummarizedExperiment OBJECT
+## ---------------------------------------------------------------------
+\dontrun{
+## t() NOT ready yet!
 library(SummarizedExperiment)
+
+## The convention for a SummarizedExperiment object is to have 1 column
+## per sample so first we need to transpose 'pcov' and 'mcov':
+pcov <- t(pcov)
+mcov <- t(mcov)
 se <- SummarizedExperiment(list(pcov=pcov, mcov=mcov))
-validObject(se, complete=TRUE)
+se
+stopifnot(validObject(se, complete=TRUE))
+
+## A GPos object can be used to represent the genomic positions along
+## the dataset:
+gpos <- GPos(GRanges("16", IRanges(1, ncol(pcov))))
+gpos
+rowRanges(se) <- gpos
+}
 }
 \keyword{methods}
 \keyword{classes}

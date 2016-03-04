@@ -21,6 +21,7 @@ exportClasses(
 
 exportMethods(
     ## Methods for generics defined in the base package:
+    t,
     dim,
     dimnames, "dimnames<-",
     as.array, as.matrix,

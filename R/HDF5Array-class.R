@@ -5,10 +5,11 @@
 
 setClass("HDF5Array",
     representation(
-        file="character",   # single string
-        group="character",  # single string
-        name="character",   # dataset name
-        index="list"        # list of integer vectors
+        file="character",    # single string
+        group="character",   # single string
+        name="character",    # dataset name
+        index="list",        # list of integer vectors
+        transpose="logical"  # TRUE or FALSE
     )
 )
 
@@ -102,9 +103,10 @@ HDF5Array <- function(file, group, name)
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 
 slicing_tip <- c(
-    "Consider slicing it first (e.g. x[8, 30, , 2, ]). Make sure that all ",
-    "the indices used for the slicing have length 1 except at most 2 of ",
-    "them which can be of arbitrary length or missing."
+    "Consider reducing its number of effective dimensions by slicing it ",
+    "first (e.g. x[8, 30, , 2, ]). Make sure that all the indices used for ",
+    "the slicing have length 1 except at most 2 of them which can be of ",
+    "arbitrary length or missing."
 )
 
 .from_HDF5Array_to_matrix <- function(x)

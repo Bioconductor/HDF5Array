@@ -35,10 +35,11 @@ HDF5Array(file, group, name)  # constructor function
 
 \arguments{
   \item{file}{
+    The path to the HDF5 file where the dataset is located.
   }
-  \item{group}{
-  }
-  \item{name}{
+  \item{group, name}{
+    The HDF5 group and name of the dataset, as reported by
+    \code{\link[rhdf5]{h5ls}}.
   }
 }
 
@@ -61,12 +62,18 @@ HDF5Array(file, group, name)  # constructor function
 
     \item \link{HDF5Matrix} objects.
 
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which the
-          \pkg{HDF5Array} package is building.
+          \pkg{HDF5Array} package is implemented.
   }
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## CONSTRUCTION
+## ---------------------------------------------------------------------
+
 library(rhdf5)
 library(h5vcData)
 
@@ -74,12 +81,34 @@ tallyFile <- system.file("extdata", "example.tally.hfs5",
                          package="h5vcData")
 h5ls(tallyFile)
 
+## Pick up "Coverages" dataset for Human chromosome 16:
 cov0 <- HDF5Array(tallyFile, "/ExampleStudy/16", "Coverages")
 cov0
 
+## ---------------------------------------------------------------------
+## dim/dimnames
+## ---------------------------------------------------------------------
+
+dim(cov0)
+
+dimnames(cov0)
+dimnames(cov0) <- list(paste0("A", 1:6), paste0("B", 1:2))
+dimnames(cov0)
+
+## ---------------------------------------------------------------------
+## SLICING (A.K.A. SUBSETTING)
+## ---------------------------------------------------------------------
+
 cov1 <- cov0[ , , 29000001:29000007]
 cov1
+
+dim(cov1)
 as.array(cov1)
+stopifnot(identical(dim(as.array(cov1)), dim(cov1)))
+
+dimnames(cov1)[[3]] <- paste0("C", 1:7)
+dimnames(cov1)
+stopifnot(identical(dimnames(as.array(cov1)), dimnames(cov1)))
 
 cov2 <- cov0[ , 1, 29000001:29000007]
 cov2
