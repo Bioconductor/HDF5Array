@@ -84,7 +84,7 @@ normalize_dimnames_replacement_value <- function(value, ndim)
 
 setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 
-.get_HDF5dataset_dim <- function(file, group, name)
+.get_h5dataset_dim <- function(file, group, name)
 {
     f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
     on.exit(H5Fclose(f))
@@ -95,19 +95,37 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     H5Sget_simple_extent_dims(H5Dget_space(d))$size
 }
 
-.get_HDF5dataset_type <- function(file, group, name, ndim)
+.read_h5dataset_slice <- function(file, group, name, index)
 {
-    ## Get the 1st value in the dataset. Will fail if the dataset is empty.
-    ## (There must be a better way to obtain the type of an HDF5 dataset.)
+    ## h5read() emits an annoying warning when it loads integer values that
+    ## cannot be represented in R (and thus are converted to NAs).
+    suppressWarnings(
+        h5read(file, paste(group, name, sep="/"), index=index)
+    )
+}
+
+### Will fail if the dataset is empty (i.e. if at least one of its dimensions
+### is 0).
+.read_h5dataset_first_val <- function(file, group, name, ndim)
+{
     index <- rep.int(list(1L), ndim)
-    typeof(h5read(file, paste(group, name, sep="/"), index=index))
+    ans <- .read_h5dataset_slice(file, group, name, index)
+    stopifnot(length(ans) == 1L)  # sanity check
+    ans[[1L]]  # drop any attribute
+}
+
+.get_h5dataset_type <- function(file, group, name, ndim)
+{
+    ## Will fail if the dataset is empty. Is there a better way to obtain
+    ## this information?
+    typeof(.read_h5dataset_first_val(file, group, name, ndim))
 }
 
 ### Constructor.
 HDF5Array <- function(file, group, name)
 {
-    dim0 <- .get_HDF5dataset_dim(file, group, name)
-    type <- .get_HDF5dataset_type(file, group, name, length(dim0))
+    dim0 <- .get_h5dataset_dim(file, group, name)
+    type <- .get_h5dataset_type(file, group, name, length(dim0))
     index <- lapply(dim0, seq_len)
     new2("HDF5Array", file=file, group=group, name=name,
                       type=type, index=index)
@@ -133,7 +151,7 @@ HDF5Array <- function(file, group, name)
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    ans <- h5read(x@file, paste(x@group, x@name, sep="/"), index=x@index)
+    ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@index)
     dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)

@@ -245,17 +245,17 @@ setMethod("[", "HDF5Matrix", .extract_HDF5Matrix_subset)
     x_nrow <- nrow(x)
     x_ncol <- ncol(x)
     if (x_nrow <= nhead + ntail + 1L) {
-        if (x_ncol <= 7L) {
+        if (x_ncol <= 9L) {
             ans <- as.matrix(x)
             storage.mode(ans) <- "character"
         } else {
-            ans <- .csplit_HDF5Matrix(x, 3L, 3L)
+            ans <- .csplit_HDF5Matrix(x, 4L, 4L)
         }
     } else {
-        if (x_ncol <= 7L) {
+        if (x_ncol <= 9L) {
             ans <- .rsplit_HDF5Matrix(x, nhead, ntail)
         } else {
-            ans <- .split_HDF5Matrix(x, nhead, ntail, 3L, 3L)
+            ans <- .split_HDF5Matrix(x, nhead, ntail, 4L, 4L)
         }
     }
     ans
