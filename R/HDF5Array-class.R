@@ -8,20 +8,47 @@ setClass("HDF5Array",
         file="character",    # single string
         group="character",   # single string
         name="character",    # dataset name
-        index="list",        # list of integer vectors
+        index="list",        # list of N integer vectors, one per dimension
         transpose="logical"  # TRUE or FALSE
+    ),
+    prototype(
+        transpose=FALSE
     )
 )
 
-get_HDF5Array_dim <- function(x) lengths(x@index)
+### The transposition of the data is delayed i.e. it will be realized on the
+### fly only when as.array() (or as.matrix()) is called on 'x'.
+setMethod("t", "HDF5Array",
+    function(x)
+    {
+        x@transpose <- !x@transpose
+        x
+    }
+)
+
+get_HDF5Array_dim <- function(x)
+{
+    ans <- lengths(x@index)
+    if (x@transpose)
+        ans <- rev(ans)
+    ans
+}
 
 setMethod("dim", "HDF5Array", get_HDF5Array_dim)
 
-.get_HDF5Array_dimnames <- function(x)
+.get_dimnames0 <- function(x)
 {
     ans <- lapply(x@index, names)
     if (is.null(unlist(ans)))
         return(NULL)
+    ans
+}
+
+.get_HDF5Array_dimnames <- function(x)
+{
+    ans <- .get_dimnames0(x)
+    if (x@transpose)
+        ans <- rev(ans)
     ans
 }
 
@@ -44,6 +71,8 @@ normalize_dimnames_replacement_value <- function(value, ndim)
 .set_HDF5Array_dimnames <- function(x, value)
 {
     value <- normalize_dimnames_replacement_value(value, length(x@index))
+    if (x@transpose)
+        value <- rev(value)
     for (n in seq_along(x@index))
         ## 'x@index' can be big so avoid copies when possible. With this trick
         ## no-op dimnames(x) <- dimnames(x) is instantaneous.
@@ -77,14 +106,14 @@ HDF5Array <- function(file, group, name)
 {
     x_dim <- dim(x)
     x_dimnames <- dimnames(x)
-    edim_idx <- which(x_dim != 1L)  # index of effective dimensions
-    if (length(edim_idx) >= 2L) {
-        dim(x) <- x_dim[edim_idx]
-        dimnames(x) <- x_dimnames[edim_idx]
+    effdim_idx <- which(x_dim != 1L)  # index of effective dimensions
+    if (length(effdim_idx) >= 2L) {
+        dim(x) <- x_dim[effdim_idx]
+        dimnames(x) <- x_dimnames[effdim_idx]
     } else {
         dim(x) <- NULL
-        if (length(edim_idx) == 1L)
-            names(x) <- x_dimnames[[edim_idx]]
+        if (length(effdim_idx) == 1L)
+            names(x) <- x_dimnames[[effdim_idx]]
     }
     x
 }
@@ -94,9 +123,19 @@ HDF5Array <- function(file, group, name)
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
     ans <- h5read(x@file, paste(x@group, x@name, sep="/"), index=x@index)
-    dimnames(ans) <- .get_HDF5Array_dimnames(x)
+    dimnames(ans) <- .get_dimnames0(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
+    ## Base R doesn't support transposition of an array of arbitrary dimension
+    ## (generalized transposition) so the call to t() below will fail if 'ans'
+    ## has more than 2 dimensions. If we want as.array() to work on a
+    ## transposed HDF5Array object of arbitrary dimension, we need to implement
+    ## our own generalized transposition of an ordinary array.
+    if (x@transpose) {
+        if (length(dim(ans)) > 2L)
+            stop("can't do as.array() on this object, sorry")
+        ans <- t(ans)
+    }
     ans
 }
 
@@ -141,25 +180,30 @@ setMethod("show", "HDF5Array",
         ndim <- 0L
     if (ndim != 0L && ndim != length(x@index)) {
         if (ndim == 1L)
-            stop("1D-subsetting is not supported")
+            stop("1D-style subsetting is not supported")
         stop("incorrect number of dimensions")
     }
 
     ## Perform the subsetting.
-    if (!missing(i))
-        x@index[[1L]] <- extractROWS(x@index[[1L]], i)
-    if (!missing(j))
-        x@index[[2L]] <- extractROWS(x@index[[2L]], j)
+    if (!missing(i)) {
+        n <- if (x@transpose) length(x@index) else 1L
+        x@index[[n]] <- extractROWS(x@index[[n]], i)
+    }
+    if (!missing(j)) {
+        n <- if (x@transpose) length(x@index) - 1L else 2L
+        x@index[[n]] <- extractROWS(x@index[[n]], j)
+    }
     ## Hack: missing values in '...' are "name" objects.
     xargs <- substitute(...())  # list of non-evaluated args
     is_missing <- sapply(xargs,
-        function(xarg) { is.name(xarg) && as.character(xarg) == "" }
+        function(k) { is.name(k) && as.character(k) == "" }
     )
-    for (n in seq_along(xargs)) {
-        if (is_missing[[n]])
+    for (n2 in seq_along(xargs)) {
+        if (is_missing[[n2]])
             next
-        xarg <- eval(xargs[[n]], envir=parent.frame(2L))
-        x@index[[2L + n]] <- extractROWS(x@index[[2L + n]], xarg)
+        k <- eval(xargs[[n2]], envir=parent.frame(2L))
+        n <- if (x@transpose) length(x@index) - 1L - n2 else 2L + n2
+        x@index[[n]] <- extractROWS(x@index[[n]], k)
     }
     x
 }

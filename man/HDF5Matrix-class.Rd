@@ -97,8 +97,6 @@ ncol(pcov)  # length of Human chromosome 16
 ## ---------------------------------------------------------------------
 ## HDF5Matrix OBJECTS AS ASSAYS OF A SummarizedExperiment OBJECT
 ## ---------------------------------------------------------------------
-\dontrun{
-## t() NOT ready yet!
 library(SummarizedExperiment)
 
 ## The convention for a SummarizedExperiment object is to have 1 column
@@ -111,10 +109,11 @@ stopifnot(validObject(se, complete=TRUE))
 
 ## A GPos object can be used to represent the genomic positions along
 ## the dataset:
-gpos <- GPos(GRanges("16", IRanges(1, ncol(pcov))))
+gpos <- GPos(GRanges("16", IRanges(1, nrow(se))))
 gpos
 rowRanges(se) <- gpos
-}
+se
+stopifnot(validObject(se))
 }
 \keyword{methods}
 \keyword{classes}

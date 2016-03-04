@@ -5,6 +5,7 @@
 \alias{HDF5Array-class}
 \alias{HDF5Array}
 
+\alias{t,HDF5Array-method}
 \alias{dim,HDF5Array-method}
 \alias{dimnames,HDF5Array-method}
 \alias{dimnames<-,HDF5Array-method}
