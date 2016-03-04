@@ -13,9 +13,9 @@
 \alias{as.array,HDF5Array-method}
 \alias{as.matrix,HDF5Array-method}
 
-\alias{show,HDF5Array-method}
-
 \alias{[,HDF5Array-method}
+
+\alias{show,HDF5Array-method}
 
 \title{HDF5Array objects}
 
@@ -74,44 +74,38 @@ HDF5Array(file, group, name)  # constructor function
 ## ---------------------------------------------------------------------
 ## CONSTRUCTION
 ## ---------------------------------------------------------------------
-
 library(rhdf5)
 library(h5vcData)
 
-tallyFile <- system.file("extdata", "example.tally.hfs5",
-                         package="h5vcData")
-h5ls(tallyFile)
+tally_file <- system.file("extdata", "example.tally.hfs5",
+                          package="h5vcData")
+h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16:
-cov0 <- HDF5Array(tallyFile, "/ExampleStudy/16", "Coverages")
+cov0 <- HDF5Array(tally_file, "/ExampleStudy/16", "Coverages")
 cov0
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames
 ## ---------------------------------------------------------------------
-
 dim(cov0)
 
 dimnames(cov0)
-dimnames(cov0) <- list(paste0("A", 1:6), paste0("B", 1:2))
+dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"))
 dimnames(cov0)
 
 ## ---------------------------------------------------------------------
 ## SLICING (A.K.A. SUBSETTING)
 ## ---------------------------------------------------------------------
-
 cov1 <- cov0[ , , 29000001:29000007]
 cov1
 
 dim(cov1)
 as.array(cov1)
 stopifnot(identical(dim(as.array(cov1)), dim(cov1)))
-
-dimnames(cov1)[[3]] <- paste0("C", 1:7)
-dimnames(cov1)
 stopifnot(identical(dimnames(as.array(cov1)), dimnames(cov1)))
 
-cov2 <- cov0[ , 1, 29000001:29000007]
+cov2 <- cov0[ , "+", 29000001:29000007]
 cov2
 as.matrix(cov2)
 }

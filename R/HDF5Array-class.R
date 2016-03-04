@@ -8,6 +8,7 @@ setClass("HDF5Array",
         file="character",    # single string
         group="character",   # single string
         name="character",    # dataset name
+        type="character",    # single string
         index="list",        # list of N integer vectors, one per dimension
         transpose="logical"  # TRUE or FALSE
     ),
@@ -36,7 +37,7 @@ get_HDF5Array_dim <- function(x)
 
 setMethod("dim", "HDF5Array", get_HDF5Array_dim)
 
-.get_dimnames0 <- function(x)
+.get_HDF5Array_dimnames_before_transpose <- function(x)
 {
     ans <- lapply(x@index, names)
     if (is.null(unlist(ans)))
@@ -46,7 +47,7 @@ setMethod("dim", "HDF5Array", get_HDF5Array_dim)
 
 .get_HDF5Array_dimnames <- function(x)
 {
-    ans <- .get_dimnames0(x)
+    ans <- .get_HDF5Array_dimnames_before_transpose(x)
     if (x@transpose)
         ans <- rev(ans)
     ans
@@ -94,12 +95,22 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     H5Sget_simple_extent_dims(H5Dget_space(d))$size
 }
 
+.get_HDF5dataset_type <- function(file, group, name, ndim)
+{
+    ## Get the 1st value in the dataset. Will fail if the dataset is empty.
+    ## (There must be a better way to obtain the type of an HDF5 dataset.)
+    index <- rep.int(list(1L), ndim)
+    typeof(h5read(file, paste(group, name, sep="/"), index=index))
+}
+
 ### Constructor.
 HDF5Array <- function(file, group, name)
 {
     dim0 <- .get_HDF5dataset_dim(file, group, name)
+    type <- .get_HDF5dataset_type(file, group, name, length(dim0))
     index <- lapply(dim0, seq_len)
-    new2("HDF5Array", file=file, group=group, name=name, index=index)
+    new2("HDF5Array", file=file, group=group, name=name,
+                      type=type, index=index)
 }
 
 .reduce_array_dimensions <- function(x)
@@ -123,7 +134,7 @@ HDF5Array <- function(file, group, name)
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
     ans <- h5read(x@file, paste(x@group, x@name, sep="/"), index=x@index)
-    dimnames(ans) <- .get_dimnames0(x)
+    dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
     ## Base R doesn't support transposition of an array of arbitrary dimension
@@ -159,20 +170,13 @@ slicing_tip <- c(
 
 setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 
-setMethod("show", "HDF5Array",
-    function(object)
-    {
-        cat(paste0(dim(object), collapse=" x "), class(object), "object\n")
-    }
-)
-
 .extract_HDF5Array_subset <- function(x, i, j, ..., drop=TRUE)
 {
     if (missing(x))
         stop("'x' is missing")
 
-    ## Check dimensionality of subsetting i.e whether it's 1D- or 2D- or
-    ## 3D- etc... subsetting.
+    ## Check the dimensionality of the user call i.e whether the function was
+    ## called with 1D-style, or 2D-style, or 3D-style etc... subsetting.
     ndim <- nargs() - 1L
     if (!missing(drop))
         ndim <- ndim - 1L
@@ -209,4 +213,19 @@ setMethod("show", "HDF5Array",
 }
 
 setMethod("[", "HDF5Array", .extract_HDF5Array_subset)
+
+show_HDF5Array_topline <- function(x)
+{
+    x_dim <- dim(x)
+    cat(class(x), " object of ", paste0(x_dim, collapse=" x "),
+        " ", x@type, ifelse(any(x_dim > 1L), "s", ""), sep="")
+}
+
+setMethod("show", "HDF5Array",
+    function(object)
+    {
+        show_HDF5Array_topline(object)
+        cat("\n")
+    }
+)
 

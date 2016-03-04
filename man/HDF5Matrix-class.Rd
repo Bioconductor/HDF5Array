@@ -11,9 +11,9 @@
 
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 
-\alias{show,HDF5Matrix-method}
-
 \alias{[,HDF5Matrix-method}
+
+\alias{show,HDF5Matrix-method}
 
 \title{HDF5Matrix objects}
 
@@ -82,12 +82,14 @@ HDF5Matrix(file, group, name)  # constructor function
 library(rhdf5)
 library(h5vcData)
 
-tallyFile <- system.file("extdata", "example.tally.hfs5",
-                         package="h5vcData")
-h5ls(tallyFile)
+tally_file <- system.file("extdata", "example.tally.hfs5",
+                          package="h5vcData")
+h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16:
-cov0 <- HDF5Array(tallyFile, "/ExampleStudy/16", "Coverages")
+cov0 <- HDF5Array(tally_file, "/ExampleStudy/16", "Coverages")
+dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"))
+
 pcov <- as(cov0[ , 1, ], "HDF5Matrix")  # coverage on plus strand
 mcov <- as(cov0[ , 2, ], "HDF5Matrix")  # coverage on minus strand
 
