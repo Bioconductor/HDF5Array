@@ -3,9 +3,10 @@
 ### -------------------------------------------------------------------------
 
 
-### TODO: Try to also inherit from DataTable. Benefits?
+### Extending DataTable gives us a few things for free (head(), tail(),
+### etc...)
 setClass("HDF5Matrix",
-    contains="HDF5Array",
+    contains=c("HDF5Array", "DataTable"),
     representation(
         ## x@N1 and x@N2 must be 2 integers such that
         ##     1 <= x@N1 < x@N2 <= length(x@index)
