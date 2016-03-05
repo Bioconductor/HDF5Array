@@ -37,9 +37,18 @@ setMethod("t", "HDF5Array",
 ### Accessors
 ###
 
+### Even though prod() always returns a double, it seems that the length()
+### primitive function automatically turns this double into an integer if
+### it's <= .Machine$integer.max
+setMethod("length", "HDF5Array", function(x) prod(lengths(x@index)))
+
+setMethod("isEmpty", "HDF5Array", function(x) any(lengths(x@index) == 0L))
+
+.get_HDF5Array_dim_before_transpose <- function(x) lengths(x@index)
+
 get_HDF5Array_dim <- function(x)
 {
-    ans <- lengths(x@index)
+    ans <- .get_HDF5Array_dim_before_transpose(x)
     if (x@transpose)
         ans <- rev(ans)
     ans
@@ -129,18 +138,13 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     ans[[1L]]  # drop any attribute
 }
 
-.get_h5dataset_type <- function(file, group, name, ndim)
-{
-    ## Will fail if the dataset is empty. Is there a better way to obtain
-    ## this information?
-    typeof(.read_h5dataset_first_val(file, group, name, ndim))
-}
-
 HDF5Array <- function(file, group, name)
 {
-    dim0 <- .get_h5dataset_dim(file, group, name)
-    type <- .get_h5dataset_type(file, group, name, length(dim0))
-    index <- lapply(dim0, seq_len)
+    h5dim <- .get_h5dataset_dim(file, group, name)
+    ## Will fail if the dataset is empty. Is there a better way to obtain
+    ## this information?
+    type <- typeof(.read_h5dataset_first_val(file, group, name, length(h5dim)))
+    index <- lapply(h5dim, seq_len)
     new2("HDF5Array", file=file, group=group, name=name,
                       type=type, index=index)
 }
@@ -172,7 +176,12 @@ HDF5Array <- function(file, group, name)
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@index)
+    if (isEmpty(x)) {
+        ans <- new(x@type)
+        dim(ans) <- .get_HDF5Array_dim_before_transpose(x)
+    } else {
+        ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@index)
+    }
     dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
@@ -275,6 +284,30 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 
 setMethod("[", "HDF5Array", .extract_HDF5Array_subset)
 
+.get_HDF5Array_element <- function(x, i)
+{
+    array_dim <- get_HDF5Array_dim(x)
+    subindex <- as.integer(arrayInd(i, array_dim))
+    if (x@transpose)
+        subindex <- rev(subindex)
+    index <- mapply(`[[`, x@index, subindex, SIMPLIFY=FALSE)
+    ans <- .read_h5dataset_slice(x@file, x@group, x@name, index)
+    stopifnot(length(ans) == 1L)  # sanity check
+    ans[[1L]]  # drop any attribute
+}
+
+setMethod("[[", "HDF5Array",
+    function(x, i, j, ...)
+    {
+        dots <- list(...)
+        if (length(dots) > 0L)
+            dots <- dots[names(dots) != "exact"]
+        if (!missing(j) || length(dots) > 0L)
+            stop("incorrect number of subscripts")
+        .get_HDF5Array_element(x, i)
+    }
+)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Show
@@ -283,8 +316,8 @@ setMethod("[", "HDF5Array", .extract_HDF5Array_subset)
 show_HDF5Array_topline <- function(x)
 {
     x_dim <- dim(x)
-    cat(class(x), " object of ", paste0(x_dim, collapse=" x "),
-        " ", x@type, ifelse(any(x_dim > 1L), "s", ""), sep="")
+    cat(class(x), " object of ", paste0(dim(x), collapse=" x "),
+        " ", x@type, ifelse(any(x_dim >= 2L), "s", ""), sep="")
 }
 
 setMethod("show", "HDF5Array",

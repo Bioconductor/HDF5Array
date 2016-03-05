@@ -21,14 +21,18 @@ exportClasses(
 
 exportMethods(
     ## Methods for generics defined in the base package:
-    t,
+    length,
     dim,
     dimnames, "dimnames<-",
     as.array, as.matrix,
-    "[",
+    "[", "[[",
+    t,
 
     ## Methods for generics defined in the methods package:
-    coerce, show
+    coerce, show,
+
+    ## Methods for generics defined in the S4Vectors package:
+    isEmpty
 )
 
 

@@ -303,9 +303,13 @@ setMethod("show", "HDF5Matrix",
     function(object) 
     {
         show_HDF5Array_topline(object)
-        cat(":\n")
-        out <- .prepare_HDF5Matrix_sample(object)
-        print(out, quote=FALSE, right=TRUE, max=length(out))
+        #if (isEmpty(object)) {
+        #    cat("\n")
+        #} else {
+            cat(":\n")
+            out <- .prepare_HDF5Matrix_sample(object)
+            print(out, quote=FALSE, right=TRUE, max=length(out))
+        #}
     }
 )
 

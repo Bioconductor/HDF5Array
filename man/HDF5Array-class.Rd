@@ -6,6 +6,9 @@
 \alias{HDF5Array}
 
 \alias{t,HDF5Array-method}
+
+\alias{length,HDF5Array-method}
+\alias{isEmpty,HDF5Array-method}
 \alias{dim,HDF5Array-method}
 \alias{dimnames,HDF5Array-method}
 \alias{dimnames<-,HDF5Array-method}
@@ -15,6 +18,7 @@
 \alias{coerce,array,HDF5Array-method}
 
 \alias{[,HDF5Array-method}
+\alias{[[,HDF5Array-method}
 
 \alias{show,HDF5Array-method}
 
