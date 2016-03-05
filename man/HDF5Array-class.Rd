@@ -12,6 +12,7 @@
 
 \alias{as.array,HDF5Array-method}
 \alias{as.matrix,HDF5Array-method}
+\alias{coerce,array,HDF5Array-method}
 
 \alias{[,HDF5Array-method}
 

@@ -15,6 +15,11 @@ setClass("HDF5Matrix",
     )
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Validity
+###
+
 .is_valid_N1 <- function(N1, ndim)
 {
     isSingleInteger(N1) && N1 >= 1L && N1 <= ndim
@@ -36,6 +41,11 @@ setClass("HDF5Matrix",
 }
 
 setValidity2("HDF5Matrix", .validate_HDF5Matrix)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Accessors
+###
 
 .get_HDF5Matrix_dim <- function(x)
 {
@@ -75,6 +85,11 @@ setMethod("dimnames", "HDF5Matrix", .get_HDF5Matrix_dimnames)
 
 setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Coercion
+###
+
 .from_HDF5Array_to_HDF5Matrix <- function(from)
 {
     dim0 <- lengths(from@index)
@@ -105,12 +120,30 @@ setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
 
 setAs("HDF5Array", "HDF5Matrix", .from_HDF5Array_to_HDF5Matrix)
 
-### Constructor.
+### array -> HDF5Array
+
+.from_matrix_to_HDF5Matrix <- function(from)
+{
+    as(as(from, "HDF5Array"), "HDF5Matrix")
+}
+
+setAs("matrix", "HDF5Matrix", .from_matrix_to_HDF5Matrix)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Constructor
+###
+
 HDF5Matrix <- function(file, group, name)
 {
     hdf5array <- HDF5Array(file, group, name)
     as(hdf5array, "HDF5Matrix")
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Subsetting
+###
 
 .extract_HDF5Matrix_subset <- function(x, i, j, ..., drop=TRUE)
 {
@@ -143,6 +176,11 @@ HDF5Matrix <- function(file, group, name)
 }
 
 setMethod("[", "HDF5Matrix", .extract_HDF5Matrix_subset)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Show
+###
 
 .split_rownames <- function(x_rownames, idx1, idx2)
 {

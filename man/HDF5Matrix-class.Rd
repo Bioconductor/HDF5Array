@@ -10,6 +10,7 @@
 \alias{dimnames<-,HDF5Matrix-method}
 
 \alias{coerce,HDF5Array,HDF5Matrix-method}
+\alias{coerce,matrix,HDF5Matrix-method}
 
 \alias{[,HDF5Matrix-method}
 

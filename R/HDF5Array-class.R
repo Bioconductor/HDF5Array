@@ -17,6 +17,11 @@ setClass("HDF5Array",
     )
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Transpose
+###
+
 ### The transposition of the data is delayed i.e. it will be realized on the
 ### fly only when as.array() (or as.matrix()) is called on 'x'.
 setMethod("t", "HDF5Array",
@@ -26,6 +31,11 @@ setMethod("t", "HDF5Array",
         x
     }
 )
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Accessors
+###
 
 get_HDF5Array_dim <- function(x)
 {
@@ -84,6 +94,11 @@ normalize_dimnames_replacement_value <- function(value, ndim)
 
 setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Constructor
+###
+
 .get_h5dataset_dim <- function(file, group, name)
 {
     f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
@@ -121,7 +136,6 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     typeof(.read_h5dataset_first_val(file, group, name, ndim))
 }
 
-### Constructor.
 HDF5Array <- function(file, group, name)
 {
     dim0 <- .get_h5dataset_dim(file, group, name)
@@ -130,6 +144,13 @@ HDF5Array <- function(file, group, name)
     new2("HDF5Array", file=file, group=group, name=name,
                       type=type, index=index)
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Coercion
+###
+
+### HDF5Array -> array
 
 .reduce_array_dimensions <- function(x)
 {
@@ -170,6 +191,8 @@ HDF5Array <- function(file, group, name)
 
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 
+### HDF5Array -> matrix
+
 slicing_tip <- c(
     "Consider reducing its number of effective dimensions by slicing it ",
     "first (e.g. x[8, 30, , 2, ]). Make sure that all the indices used for ",
@@ -187,6 +210,26 @@ slicing_tip <- c(
 }
 
 setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
+
+### array -> HDF5Array
+
+.from_array_to_HDF5Array <- function(from)
+{
+    name <- deparse(substitute(from))
+    file <- paste0(tempfile(), ".h5")
+    h5createFile(file)
+    h5write(from, file, name)
+    ans <- HDF5Array(file, "/", name)
+    dimnames(ans) <- dimnames(from)
+    ans
+}
+
+setAs("array", "HDF5Array", .from_array_to_HDF5Array)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Subsetting
+###
 
 .extract_HDF5Array_subset <- function(x, i, j, ..., drop=TRUE)
 {
@@ -231,6 +274,11 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 }
 
 setMethod("[", "HDF5Array", .extract_HDF5Array_subset)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Show
+###
 
 show_HDF5Array_topline <- function(x)
 {
