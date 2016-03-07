@@ -9,7 +9,8 @@ setClass("HDF5Array",
         group="character",   # single string
         name="character",    # dataset name
         type="character",    # single string
-        index="list",        # list of N integer vectors, one per dimension
+        h5index="list",      # list of N integer vectors, one per dimension in
+                             # the HDF5 dataset
         transpose="logical"  # TRUE or FALSE
     ),
     prototype(
@@ -37,16 +38,31 @@ setMethod("t", "HDF5Array",
 ### Accessors
 ###
 
+### The index() getter and setter are for internal use only and so are NOT
+### exported.
+setGeneric("index",
+    function(x) standardGeneric("index")
+)
+setGeneric("index<-", signature="x",
+    function(x, value) standardGeneric("index<-")
+)
+setMethod("index", "HDF5Array",
+    function(x) x@h5index
+)
+setReplaceMethod("index", "HDF5Array",
+    function(x, value) { x@h5index <- value; x }
+)
+
 ### Even though prod() always returns a double, it seems that the length()
 ### primitive function automatically turns this double into an integer if
 ### it's <= .Machine$integer.max
-setMethod("length", "HDF5Array", function(x) prod(lengths(x@index)))
+setMethod("length", "HDF5Array", function(x) prod(lengths(index(x))))
 
-setMethod("isEmpty", "HDF5Array", function(x) any(lengths(x@index) == 0L))
+setMethod("isEmpty", "HDF5Array", function(x) any(lengths(index(x)) == 0L))
 
-.get_HDF5Array_dim_before_transpose <- function(x) lengths(x@index)
+.get_HDF5Array_dim_before_transpose <- function(x) lengths(index(x))
 
-get_HDF5Array_dim <- function(x)
+.get_HDF5Array_dim <- function(x)
 {
     ans <- .get_HDF5Array_dim_before_transpose(x)
     if (x@transpose)
@@ -54,11 +70,11 @@ get_HDF5Array_dim <- function(x)
     ans
 }
 
-setMethod("dim", "HDF5Array", get_HDF5Array_dim)
+setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
 
 .get_HDF5Array_dimnames_before_transpose <- function(x)
 {
-    ans <- lapply(x@index, names)
+    ans <- lapply(index(x), names)
     if (is.null(unlist(ans)))
         return(NULL)
     ans
@@ -74,7 +90,7 @@ setMethod("dim", "HDF5Array", get_HDF5Array_dim)
 
 setMethod("dimnames", "HDF5Array", .get_HDF5Array_dimnames)
 
-normalize_dimnames_replacement_value <- function(value, ndim)
+.normalize_dimnames_replacement_value <- function(value, ndim)
 {
     if (is.null(value))
         return(vector("list", length=ndim))
@@ -90,14 +106,22 @@ normalize_dimnames_replacement_value <- function(value, ndim)
 
 .set_HDF5Array_dimnames <- function(x, value)
 {
-    value <- normalize_dimnames_replacement_value(value, length(x@index))
+    x_index <- index(x)
+    value <- .normalize_dimnames_replacement_value(value, length(x_index))
     if (x@transpose)
         value <- rev(value)
-    for (n in seq_along(x@index))
-        ## 'x@index' can be big so avoid copies when possible. With this trick
-        ## no-op dimnames(x) <- dimnames(x) is instantaneous.
-        if (!identical(names(x@index[[n]]), value[[n]]))
-            names(x@index[[n]]) <- value[[n]]
+    index_was_touched <- FALSE
+    for (n in seq_along(x_index)) {
+        ## 'x_index' can be big so avoid copies when possible. With this
+        ## trick no-op 'dimnames(x) <- dimnames(x)' is very cheap (i.e. almost
+        ## instantaneous).
+        if (identical(names(x_index[[n]]), value[[n]]))
+            next
+        names(x_index[[n]]) <- value[[n]]
+        index_was_touched <- TRUE
+    }
+    if (index_was_touched)
+        index(x) <- x_index
     x
 }
 
@@ -119,12 +143,12 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     H5Sget_simple_extent_dims(H5Dget_space(d))$size
 }
 
-.read_h5dataset_slice <- function(file, group, name, index)
+.read_h5dataset_slice <- function(file, group, name, h5index)
 {
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     suppressWarnings(
-        h5read(file, paste(group, name, sep="/"), index=index)
+        h5read(file, paste(group, name, sep="/"), index=h5index)
     )
 }
 
@@ -132,8 +156,8 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 ### is 0).
 .read_h5dataset_first_val <- function(file, group, name, ndim)
 {
-    index <- rep.int(list(1L), ndim)
-    ans <- .read_h5dataset_slice(file, group, name, index)
+    h5index <- rep.int(list(1L), ndim)
+    ans <- .read_h5dataset_slice(file, group, name, h5index)
     stopifnot(length(ans) == 1L)  # sanity check
     ans[[1L]]  # drop any attribute
 }
@@ -142,11 +166,12 @@ HDF5Array <- function(file, group, name)
 {
     h5dim <- .get_h5dataset_dim(file, group, name)
     ## Will fail if the dataset is empty. Is there a better way to obtain
-    ## this information?
-    type <- typeof(.read_h5dataset_first_val(file, group, name, length(h5dim)))
-    index <- lapply(h5dim, seq_len)
+    ## the type information?
+    first_val <- .read_h5dataset_first_val(file, group, name, length(h5dim))
+    type <- typeof(first_val)
+    h5index <- lapply(h5dim, seq_len)
     new2("HDF5Array", file=file, group=group, name=name,
-                      type=type, index=index)
+                      type=type, h5index=h5index)
 }
 
 
@@ -180,7 +205,7 @@ HDF5Array <- function(file, group, name)
         ans <- new(x@type)
         dim(ans) <- .get_HDF5Array_dim_before_transpose(x)
     } else {
-        ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@index)
+        ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@h5index)
     }
     dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
     if (drop)
@@ -240,7 +265,28 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 ### Subsetting
 ###
 
-.extract_HDF5Array_subset <- function(x, i, j, ..., drop=TRUE)
+### 'subscript' must be a multidimensional subscript i.e. a list with 1
+### subscript per dimension in 'x'. Missing subscripts are represented by
+### "name" objects.
+.extract_subarray_from_HDF5Array <- function(x, subscript)
+{
+    if (x@transpose)
+        subscript <- rev(subscript)
+    x_index <- index(x)
+    index_was_touched <- FALSE
+    for (n in seq_along(x_index)) {
+        k <- subscript[[n]]
+        if (missing(k))
+            next
+        x_index[[n]] <- extractROWS(x_index[[n]], k)
+        index_was_touched <- TRUE
+    }
+    if (index_was_touched)
+        index(x) <- x_index
+    x
+}
+
+.extract_subarray <- function(x, i, j, ..., drop=TRUE)
 {
     if (missing(x))
         stop("'x' is missing")
@@ -248,50 +294,45 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
     ## Check the dimensionality of the user call i.e whether the function was
     ## called with 1D-style, or 2D-style, or 3D-style etc... subsetting.
     ndim <- nargs() - 1L
+    x_ndim <- length(dim(x))
     if (!missing(drop))
         ndim <- ndim - 1L
     if (ndim == 1L && missing(i))
         ndim <- 0L
-    if (ndim != 0L && ndim != length(x@index)) {
+    if (ndim != 0L && ndim != x_ndim) {
         if (ndim == 1L)
             stop("1D-style subsetting is not supported")
         stop("incorrect number of dimensions")
     }
 
-    ## Perform the subsetting.
-    if (!missing(i)) {
-        n <- if (x@transpose) length(x@index) else 1L
-        x@index[[n]] <- extractROWS(x@index[[n]], i)
+    ## Prepare the multidimensional subscript.
+    dots <- substitute(...())  # list of non-evaluated args
+    subscript <- rep(alist(foo=), x_ndim)
+    names(subscript) <- NULL
+    if (!missing(i))
+        subscript[[1L]] <- i
+    if (!missing(j))
+        subscript[[2L]] <- j
+    for (n2 in seq_along(dots)) {
+        k <- dots[[n2]]
+        if (!missing(k))
+            subscript[[2L + n2]] <- eval(k, envir=parent.frame(2L))
     }
-    if (!missing(j)) {
-        n <- if (x@transpose) length(x@index) - 1L else 2L
-        x@index[[n]] <- extractROWS(x@index[[n]], j)
-    }
-    ## Hack: missing values in '...' are "name" objects.
-    xargs <- substitute(...())  # list of non-evaluated args
-    is_missing <- sapply(xargs,
-        function(k) { is.name(k) && as.character(k) == "" }
-    )
-    for (n2 in seq_along(xargs)) {
-        if (is_missing[[n2]])
-            next
-        k <- eval(xargs[[n2]], envir=parent.frame(2L))
-        n <- if (x@transpose) length(x@index) - 1L - n2 else 2L + n2
-        x@index[[n]] <- extractROWS(x@index[[n]], k)
-    }
-    x
+
+    ## Performs the subsetting.
+    .extract_subarray_from_HDF5Array(x, subscript)
 }
 
-setMethod("[", "HDF5Array", .extract_HDF5Array_subset)
+setMethod("[", "HDF5Array", .extract_subarray)
 
 .get_HDF5Array_element <- function(x, i)
 {
-    array_dim <- get_HDF5Array_dim(x)
-    subindex <- as.integer(arrayInd(i, array_dim))
+    array_dim <- lengths(x@h5index)
+    subscript <- as.integer(arrayInd(i, array_dim))
     if (x@transpose)
-        subindex <- rev(subindex)
-    index <- mapply(`[[`, x@index, subindex, SIMPLIFY=FALSE)
-    ans <- .read_h5dataset_slice(x@file, x@group, x@name, index)
+        subscript <- rev(subscript)
+    h5index <- mapply(`[[`, x@h5index, subscript, SIMPLIFY=FALSE)
+    ans <- .read_h5dataset_slice(x@file, x@group, x@name, h5index)
     stopifnot(length(ans) == 1L)  # sanity check
     ans[[1L]]  # drop any attribute
 }

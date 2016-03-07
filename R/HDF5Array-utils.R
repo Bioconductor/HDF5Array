@@ -3,9 +3,15 @@
 ### -------------------------------------------------------------------------
 ###
 
-SLICE_LENGTH <- 8000000L
 
-setClass("ArraySlicing",
+MAX_BLOCK_LENGTH <- 8000000L
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### ArrayBlocks objects
+###
+
+setClass("ArrayBlocks",
     representation(
         dim="integer",
         N="integer",
@@ -13,34 +19,39 @@ setClass("ArraySlicing",
     )
 )
 
-### Return an ArraySlicing where each slice is guaranteed to have a
-### length <= 'slice_len'.
-ArraySlicing <- function(dim, slice_len)
+### Return an ArrayBlocks object i.e. a collection of subarrays of the
+### original array with the following properties:
+###   (a) The collection of blocks is a partitioning of the original array
+###       i.e. the blocks fully cover it and don't overlap.
+###   (b) Each block is made of adjacent elements in the original array.
+###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
+ArrayBlocks <- function(dim, max_block_len)
 {
     p <- cumprod(dim)
-    stopifnot(p[[length(p)]] > slice_len)
-    N <- which(p >= slice_len)[[1L]]
-    if (p[[N]] == slice_len) {
+    x_len <- p[[length(p)]]
+    stopifnot(x_len > max_block_len)
+    N <- which(p >= max_block_len)[[1L]]
+    if (p[[N]] == max_block_len) {
         N <- N + 1L
         by <- 1L
     } else if (N == 1L) {
-        by <- slice_len
+        by <- max_block_len
     } else {
-        by <- slice_len %/% as.integer(p[[N - 1L]])
+        by <- max_block_len %/% as.integer(p[[N - 1L]])
     }
-    new("ArraySlicing", dim=dim, N=N, by=by)
+    new("ArrayBlocks", dim=dim, N=N, by=by)
 }
 
-.get_ArraySlicing_inner_length <- function(x)
+.get_ArrayBlocks_inner_length <- function(x)
 {
     inner_length <- x@dim[[x@N]] %/% x@by
-    bottom_slice_size <- x@dim[[x@N]] %% x@by
-    if (bottom_slice_size != 0L)
+    last_inner_block_len <- x@dim[[x@N]] %% x@by
+    if (last_inner_block_len != 0L)
         inner_length <- inner_length + 1L
     inner_length
 }
 
-.get_ArraySlicing_outer_length <- function(x)
+.get_ArrayBlocks_outer_length <- function(x)
 {
     if (x@N < length(x@dim)) {
         outer_dim <- x@dim[(x@N + 1L):length(x@dim)]
@@ -51,67 +62,80 @@ ArraySlicing <- function(dim, slice_len)
     outer_length
 }
 
-### Return the number of slices in 'x'.
-setMethod("length", "ArraySlicing",
+### Return the number of blocks in 'x'.
+setMethod("length", "ArrayBlocks",
     function(x)
-        .get_ArraySlicing_inner_length(x) * .get_ArraySlicing_outer_length(x)
+        .get_ArrayBlocks_inner_length(x) * .get_ArrayBlocks_outer_length(x)
 )
 
-.make_array_slice_index <- function(slicing, i)
+### Return a multidimensional subscript as a list with 1 subscript per
+### dimension in the original array.
+.get_array_block_subscript <- function(blocks, i)
 {
-    #index <- vector("list", length(slicing@dim))
-    index <- rep(alist(foo=), length(slicing@dim))
-    names(index) <- NULL
+    subscript <- rep(alist(foo=), length(blocks@dim))
+    names(subscript) <- NULL
 
     i <- i - 1L
-    if (slicing@N < length(slicing@dim)) {
-        inner_length <- .get_ArraySlicing_inner_length(slicing)
+    if (blocks@N < length(blocks@dim)) {
+        inner_length <- .get_ArrayBlocks_inner_length(blocks)
         i1 <- i %% inner_length
         i2 <- i %/% inner_length
     } else {
         i1 <- i
     }
 
-    k1 <- i1 * slicing@by
-    k2 <- k1 + slicing@by
+    k1 <- i1 * blocks@by
+    k2 <- k1 + blocks@by
     k1 <- k1 + 1L
-    if (k2 > slicing@dim[[slicing@N]])
-        k2 <- slicing@dim[[slicing@N]]
-    index[[slicing@N]] <- k1:k2
+    if (k2 > blocks@dim[[blocks@N]])
+        k2 <- blocks@dim[[blocks@N]]
+    subscript[[blocks@N]] <- k1:k2
 
-    if (slicing@N < length(slicing@dim)) {
-        outer_dim <- slicing@dim[(slicing@N + 1L):length(slicing@dim)]
+    if (blocks@N < length(blocks@dim)) {
+        outer_dim <- blocks@dim[(blocks@N + 1L):length(blocks@dim)]
         subindex <- arrayInd(i2 + 1L, outer_dim)
-        index[(slicing@N + 1L):length(slicing@dim)] <- as.list(subindex)
+        subscript[(blocks@N + 1L):length(blocks@dim)] <- as.list(subindex)
     }
-    index
+    subscript
 }
 
-get_array_slice <- function(x, slicing, i)
+extract_array_block <- function(x, blocks, i)
 {
-    index <- .make_array_slice_index(slicing, i)
-    do.call(`[`, c(list(x), index, drop=FALSE))
+    subscript <- .get_array_block_subscript(blocks, i)
+    do.call(`[`, c(list(x), subscript, drop=FALSE))
 }
 
-### Should be a no-op. This is a sanity check for the slicing mechanism.
-.HDF5Array_slice_and_glue <- function(x, slice_len)
+### NOT exported. Used in unit tests.
+break_array_in_blocks <- function(x, max_block_len)
 {
-    slicing <- ArraySlicing(dim(x), slice_len)
-    all_slices <- lapply(seq_along(slicing),
-                         function(i) get_array_slice(x, slicing, i))
-    ans <- unlist(all_slices, recursive=FALSE)
+    blocks <- ArrayBlocks(dim(x), max_block_len)
+    lapply(seq_along(blocks),
+           function(i) extract_array_block(x, blocks, i))
+}
+
+### NOT exported. Used in unit tests.
+### 'rebuild_array_from_blocks(break_array_in_blocks(x, max_block_len), x)'
+### should be a no-op for any 'max_block_len' < 'length(x)'.
+rebuild_array_from_blocks <- function(subarrays, x)
+{
+    ans <- unlist(subarrays, recursive=FALSE)
     dim(ans) <- dim(x)
     ans
 }
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### anyNA()
+###
+
 .HDF5Array_anyNA <- function(x, recursive=FALSE)
 {
-    if (length(x) <= SLICE_LENGTH)
+    if (length(x) <= MAX_BLOCK_LENGTH)
         return(anyNA(as.array(x)))
-    slicing <- ArraySlicing(dim(x), SLICE_LENGTH)
-    for (i in seq_along(slicing)) {
-        slice <- get_array_slice(x, slicing, i)
-        if (anyNA(slice))
+    blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
+    for (i in seq_along(blocks)) {
+        block <- extract_array_block(x, blocks, i)
+        if (anyNA(block))
             return(TRUE)
     }
     FALSE

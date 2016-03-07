@@ -5,14 +5,8 @@
 \alias{HDF5Matrix-class}
 \alias{HDF5Matrix}
 
-\alias{dim,HDF5Matrix-method}
-\alias{dimnames,HDF5Matrix-method}
-\alias{dimnames<-,HDF5Matrix-method}
-
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 \alias{coerce,matrix,HDF5Matrix-method}
-
-\alias{[,HDF5Matrix-method}
 
 \alias{show,HDF5Matrix-method}
 

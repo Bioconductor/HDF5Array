@@ -9,7 +9,7 @@ setClass("HDF5Matrix",
     contains=c("HDF5Array", "DataTable"),
     representation(
         ## x@N1 and x@N2 must be 2 integers such that
-        ##     1 <= x@N1 < x@N2 <= length(x@index)
+        ##     1 <= x@N1 < x@N2 <= length(x@h5index)
         N1="integer",  # single integer
         N2="integer"   # single integer
     )
@@ -27,13 +27,13 @@ setClass("HDF5Matrix",
 
 .validate_HDF5Matrix <- function(x)
 {
-    if (!.is_valid_N1(x@N1, length(x@index))
-     || !.is_valid_N1(x@N2, length(x@index)))
+    if (!.is_valid_N1(x@N1, length(x@h5index))
+     || !.is_valid_N1(x@N2, length(x@h5index)))
         return(wmsg("'x@N1' and 'x@N2' must be single integers ",
-                    ">= 1 and <= 'length(x@index)'"))
+                    ">= 1 and <= 'length(x@h5index)'"))
     if (x@N1 >= x@N2)
         return("'x@N1' must be < 'x@N2'")
-    array_dim <- get_HDF5Array_dim(x)
+    array_dim <- lengths(x@h5index)
     if (!all(array_dim[-c(x@N1, x@N2)] == 1L))
         return(wmsg("'x@N1' and 'x@N2' are incompatible with the ",
                     "dimensions of the underlying HDF5Array object"))
@@ -46,44 +46,16 @@ setValidity2("HDF5Matrix", .validate_HDF5Matrix)
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Accessors
 ###
+### Defining the internal index() getter and setter is enough to make all the
+### HDF5Array accessors (length, isEmpty, dim, dimnames, dimnames<-) work on
+### an HDF5Matrix object.
 
-.get_HDF5Matrix_dim <- function(x)
-{
-    ans <- lengths(x@index)[c(x@N1, x@N2)]
-    if (x@transpose)
-        ans <- rev(ans)
-    ans
-}
-
-setMethod("dim", "HDF5Matrix", .get_HDF5Matrix_dim)
-
-.get_HDF5Matrix_dimnames <- function(x)
-{
-    ans <- lapply(x@index[c(x@N1, x@N2)], names)
-    if (is.null(unlist(ans)))
-        return(NULL)
-    if (x@transpose)
-        ans <- rev(ans)
-    ans
-}
-
-setMethod("dimnames", "HDF5Matrix", .get_HDF5Matrix_dimnames)
-
-.set_HDF5Matrix_dimnames <- function(x, value)
-{
-    value <- normalize_dimnames_replacement_value(value, 2L)
-    if (x@transpose)
-        value <- rev(value)
-    ## 'x@index' can be big so avoid copies when possible. With this trick
-    ## no-op dimnames(x) <- dimnames(x) is instantaneous.
-    if (!identical(names(x@index[[x@N1]]), value[[1L]]))
-        names(x@index[[x@N1]]) <- value[[1L]]
-    if (!identical(names(x@index[[x@N2]]), value[[2L]]))
-        names(x@index[[x@N2]]) <- value[[2L]]
-    x
-}
-
-setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
+setMethod("index", "HDF5Matrix",
+    function(x) x@h5index[c(x@N1, x@N2)]
+)
+setReplaceMethod("index", "HDF5Matrix", 
+    function(x, value) { x@h5index[c(x@N1, x@N2)] <- value; x }
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -92,11 +64,11 @@ setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
 
 .from_HDF5Array_to_HDF5Matrix <- function(from)
 {
-    dim0 <- lengths(from@index)
-    if (length(dim0) < 2L)
+    array_dim <- lengths(from@h5index)
+    if (length(array_dim) < 2L)
         stop(wmsg(class(from), " object with less than 2 dimensions ",
                   "cannot be coerced to an HDF5Matrix object at the moment"))
-    idx <- which(dim0 != 1L)
+    idx <- which(array_dim != 1L)
     if (length(idx) > 2L)
         stop(wmsg(class(from), " object with more than 2 effective dimensions ",
                   "cannot be coerced to an HDF5Matrix object. ", slicing_tip))
@@ -109,7 +81,7 @@ setReplaceMethod("dimnames", "HDF5Matrix", .set_HDF5Matrix_dimnames)
     } else {
         ## length(idx) == 1L
         N1 <- idx[[1L]]
-        if (N1 == length(dim0))
+        if (N1 == length(array_dim))
             stop(wmsg("A ", class(from), " object where the only effective ",
                       "dimension is its last dimension cannot be coerced ",
                       "to a HDF5Matrix object at the moment"))
@@ -139,43 +111,6 @@ HDF5Matrix <- function(file, group, name)
     hdf5array <- HDF5Array(file, group, name)
     as(hdf5array, "HDF5Matrix")
 }
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Subsetting
-###
-
-.extract_HDF5Matrix_subset <- function(x, i, j, ..., drop=TRUE)
-{
-    if (missing(x))
-        stop("'x' is missing")
-
-    ## Check the dimensionality of the user call i.e whether the function was
-    ## called with 1D-style, or 2D-style, or 3D-style etc... subsetting.
-    ndim <- nargs() - 1L
-    if (!missing(drop))
-        ndim <- ndim - 1L
-    if (ndim == 1L && missing(i))
-        ndim <- 0L
-    if (ndim != 0L && ndim != 2L) {
-        if (ndim == 1L)
-            stop("1D-style subsetting is not supported")
-        stop("incorrect number of dimensions")
-    }
-
-    ## Perform the subsetting.
-    if (!missing(i)) {
-        n <- if (x@transpose) x@N2 else x@N1
-        x@index[[n]] <- extractROWS(x@index[[n]], i)
-    }
-    if (!missing(j)) {
-        n <- if (x@transpose) x@N1 else x@N2
-        x@index[[n]] <- extractROWS(x@index[[n]], j)
-    }
-    x
-}
-
-setMethod("[", "HDF5Matrix", .extract_HDF5Matrix_subset)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
