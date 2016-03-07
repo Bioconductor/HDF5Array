@@ -27,6 +27,7 @@ exportMethods(
     as.array, as.matrix,
     "[", "[[",
     t,
+    anyNA,
 
     ## Methods for generics defined in the methods package:
     coerce, show,
