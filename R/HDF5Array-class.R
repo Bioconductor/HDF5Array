@@ -246,11 +246,18 @@ slicing_tip <- c(
 
 .from_HDF5Array_to_matrix <- function(x)
 {
-    if (sum(dim(x) != 1L) > 2L)
+    x_dim <- dim(x)
+    if (sum(x_dim != 1L) > 2L)
         stop(wmsg(class(x), " object with more than 2 effective dimensions ",
                   "cannot be coerced to a matrix. ", slicing_tip))
     ans <- as.array(x, drop=TRUE)
-    as.matrix(ans)
+    if (length(x_dim) == 2L) {
+        dim(ans) <- x_dim
+        dimnames(ans) <- dimnames(x)
+    } else {
+        as.matrix(ans)
+    }
+    ans
 }
 
 setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
