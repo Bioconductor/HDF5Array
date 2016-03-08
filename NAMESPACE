@@ -26,6 +26,7 @@ exportMethods(
     dimnames, "dimnames<-",
     as.array, as.matrix,
     "[", "[[",
+    c,
     t,
     anyNA,
 

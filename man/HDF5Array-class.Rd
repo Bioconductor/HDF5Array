@@ -22,6 +22,8 @@
 
 \alias{show,HDF5Array-method}
 
+\alias{c,HDF5Array-method}
+
 \title{HDF5Array objects}
 
 \description{

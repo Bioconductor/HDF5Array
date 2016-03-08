@@ -265,9 +265,9 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 ### Subsetting
 ###
 
-### 'subscript' must be a multidimensional subscript i.e. a list with 1
+### 'subscript' must be a multidimensional subscript i.e. a list with one
 ### subscript per dimension in 'x'. Missing subscripts are represented by
-### "name" objects.
+### list elements of class "name".
 .extract_subarray_from_HDF5Array <- function(x, subscript)
 {
     if (x@transpose)
@@ -306,13 +306,13 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
     }
 
     ## Prepare the multidimensional subscript.
-    dots <- substitute(...())  # list of non-evaluated args
     subscript <- rep(alist(foo=), x_ndim)
     names(subscript) <- NULL
     if (!missing(i))
         subscript[[1L]] <- i
     if (!missing(j))
         subscript[[2L]] <- j
+    dots <- substitute(...())  # list of non-evaluated args
     for (n2 in seq_along(dots)) {
         k <- dots[[n2]]
         if (!missing(k))
@@ -366,6 +366,44 @@ setMethod("show", "HDF5Array",
     {
         show_HDF5Array_topline(object)
         cat("\n")
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Combining
+###
+### Combining arrays with c() is NOT an endomorphism!
+###
+
+### 'objects' must be a list of array-like objects that support as.array().
+combine_array_objects <- function(objects)
+{
+    if (!is.list(objects))
+        stop("'objects' must be a list")
+
+    NULL_idx <- which(S4Vectors:::sapply_isNULL(objects))
+    if (length(NULL_idx) != 0L)
+        objects <- objects[-NULL_idx]
+    if (length(objects) == 0L)
+        return(NULL)
+
+    unlist(lapply(objects, as.array), recursive=FALSE, use.names=FALSE)
+}
+
+setMethod("c", "HDF5Array",
+    function (x, ..., recursive=FALSE)
+    {
+        if (!identical(recursive, FALSE))
+            stop("\"c\" method for HDF5Array objects ",
+                 "does not support the 'recursive' argument")
+        if (missing(x)) {
+            objects <- list(...)
+            x <- objects[[1L]]
+        } else {
+            objects <- list(x, ...)
+        }
+        combine_array_objects(objects)
     }
 )
 

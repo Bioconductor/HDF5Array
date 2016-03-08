@@ -22,7 +22,7 @@ setClass("ArrayBlocks",
 ### Return an ArrayBlocks object i.e. a collection of subarrays of the
 ### original array with the following properties:
 ###   (a) The collection of blocks is a partitioning of the original array
-###       i.e. the blocks fully cover it and don't overlap.
+###       i.e. the blocks fully cover it and don't overlap each other.
 ###   (b) Each block is made of adjacent elements in the original array.
 ###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
 ArrayBlocks <- function(dim, max_block_len)
@@ -106,7 +106,7 @@ extract_array_block <- function(x, blocks, i)
 }
 
 ### NOT exported. Used in unit tests.
-break_array_in_blocks <- function(x, max_block_len)
+split_array_in_blocks <- function(x, max_block_len)
 {
     blocks <- ArrayBlocks(dim(x), max_block_len)
     lapply(seq_along(blocks),
@@ -114,11 +114,16 @@ break_array_in_blocks <- function(x, max_block_len)
 }
 
 ### NOT exported. Used in unit tests.
-### 'rebuild_array_from_blocks(break_array_in_blocks(x, max_block_len), x)'
+### Rebuild the original array from the subarrays obtained by
+### split_array_in_blocks() as an *ordinary* array.
+### So if 'x' is an ordinary array, then:
+###
+###   unsplit_array_from_blocks(split_array_in_blocks(x, max_block_len), x)
+###
 ### should be a no-op for any 'max_block_len' < 'length(x)'.
-rebuild_array_from_blocks <- function(subarrays, x)
+unsplit_array_from_blocks <- function(subarrays, x)
 {
-    ans <- unlist(subarrays, recursive=FALSE)
+    ans <- combine_array_objects(subarrays)
     dim(ans) <- dim(x)
     ans
 }
