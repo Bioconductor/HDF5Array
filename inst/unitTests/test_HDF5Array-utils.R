@@ -1,32 +1,69 @@
 
-test_ArrayBlocks_class <- function()
+test_split_array_in_blocks <- function()
 {
     split_array_in_blocks <- HDF5Array:::split_array_in_blocks
     unsplit_array_from_blocks <- HDF5Array:::unsplit_array_from_blocks
 
-    a1 <- array(1:300, c(10, 3, 2, 5))
+    a1 <- array(1:300, c(3, 10, 2, 5))
     A1 <- as(a1, "HDF5Array")
-    for (max_block_len in c(1:10, 19:20, 29:30, 39:40, 59:60, 119:120)) {
+
+    for (max_block_len in c(1:7, 29:31, 39:40, 59:60, 119:120)) {
         subarrays <- split_array_in_blocks(a1, max_block_len)
-        a1b <- unsplit_array_from_blocks(subarrays, a1)
-        checkIdentical(a1, a1b)
+        current <- unsplit_array_from_blocks(subarrays, a1)
+        checkIdentical(a1, current)
 
         subarrays <- split_array_in_blocks(A1, max_block_len)
-        A1b <- unsplit_array_from_blocks(subarrays, A1)
-        checkIdentical(a1b, A1b)
+        current <- unsplit_array_from_blocks(subarrays, A1)
+        checkIdentical(a1, current)
     }
+}
 
-    m1 <- a1[c(9, 3:7), 2, 2, -4]
-    M1 <- as(A1[c(9, 3:7), 2, 2, -4], "HDF5Matrix")
-    checkIdentical(m1, as.matrix(M1))
+test_split_matrix_in_blocks <- function()
+{
+    split_array_in_blocks <- HDF5Array:::split_array_in_blocks
+    unsplit_array_from_blocks <- HDF5Array:::unsplit_array_from_blocks
+
+    a1 <- array(1:300, c(3, 10, 2, 5))
+    A1 <- as(a1, "HDF5Array")
+
+    m1 <- a1[2, c(9, 3:7), 2, -4]
+    M1a <- as(A1[2, c(9, 3:7), 2, -4], "HDF5Matrix")
+    checkIdentical(m1, as.matrix(M1a))
+
+    M1b <- as(m1, "HDF5Matrix")
+    checkIdentical(m1, as.matrix(M1b))
+
+    tm1 <- t(m1)
+    tM1a <- t(M1a)
+    checkIdentical(tm1, as.matrix(tM1a))
+
+    tM1b <- t(M1b)
+    checkIdentical(tm1, as.matrix(tM1b))
+
     for (max_block_len in seq_len(length(m1) - 1L)) {
         subarrays <- split_array_in_blocks(m1, max_block_len)
-        m1b <- unsplit_array_from_blocks(subarrays, m1)
-        checkIdentical(m1, m1b)
+        current <- unsplit_array_from_blocks(subarrays, m1)
+        checkIdentical(m1, current)
 
-        subarrays <- split_array_in_blocks(M1, max_block_len)
-        M1b <- unsplit_array_from_blocks(subarrays, M1)
-        checkIdentical(m1b, M1b)
+        subarrays <- split_array_in_blocks(M1a, max_block_len)
+        current <- unsplit_array_from_blocks(subarrays, M1a)
+        checkIdentical(m1, current)
+
+        subarrays <- split_array_in_blocks(M1b, max_block_len)
+        current <- unsplit_array_from_blocks(subarrays, M1b)
+        checkIdentical(m1, current)
+
+        subarrays <- split_array_in_blocks(tm1, max_block_len)
+        current <- unsplit_array_from_blocks(subarrays, tm1)
+        checkIdentical(tm1, current)
+
+        subarrays <- split_array_in_blocks(tM1a, max_block_len)
+        current <- unsplit_array_from_blocks(subarrays, tM1a)
+        checkIdentical(tm1, current)
+
+        subarrays <- split_array_in_blocks(tM1b, max_block_len)
+        current <- unsplit_array_from_blocks(subarrays, tM1b)
+        checkIdentical(tm1, current)
     }
 }
 

@@ -24,7 +24,7 @@ exportMethods(
     length,
     dim,
     dimnames, "dimnames<-",
-    as.array, as.matrix,
+    as.array, as.vector, as.matrix,
     "[", "[[",
     c,
     t,

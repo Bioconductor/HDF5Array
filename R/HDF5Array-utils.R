@@ -4,7 +4,7 @@
 ###
 
 
-MAX_BLOCK_LENGTH <- 8000000L
+MAX_BLOCK_LENGTH <- 50000000L
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -136,10 +136,13 @@ unsplit_array_from_blocks <- function(subarrays, x)
 .HDF5Array_anyNA <- function(x, recursive=FALSE)
 {
     if (length(x) <= MAX_BLOCK_LENGTH)
-        return(anyNA(as.array(x)))
+        return(anyNA(as.vector(x)))
     blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
     for (i in seq_along(blocks)) {
-        block <- extract_array_block(x, blocks, i)
+        #cat(i, "\n")
+        st <- system.time(block <- extract_array_block(x, blocks, i))
+        #print(st)
+        #show(block)
         if (anyNA(block))
             return(TRUE)
     }

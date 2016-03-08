@@ -225,6 +225,16 @@ HDF5Array <- function(file, group, name)
 
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 
+### HDF5Array -> vector
+
+.from_HDF5Array_to_vector <- function(x)
+{
+    ans <- as.array(x, drop=TRUE)
+    as.vector(ans)
+}
+
+setMethod("as.vector", "HDF5Array", .from_HDF5Array_to_vector)
+
 ### HDF5Array -> matrix
 
 slicing_tip <- c(
@@ -376,7 +386,7 @@ setMethod("show", "HDF5Array",
 ### Combining arrays with c() is NOT an endomorphism!
 ###
 
-### 'objects' must be a list of array-like objects that support as.array().
+### 'objects' must be a list of array-like objects that support as.vector().
 combine_array_objects <- function(objects)
 {
     if (!is.list(objects))
@@ -388,7 +398,7 @@ combine_array_objects <- function(objects)
     if (length(objects) == 0L)
         return(NULL)
 
-    unlist(lapply(objects, as.array), recursive=FALSE, use.names=FALSE)
+    unlist(lapply(objects, as.vector), recursive=FALSE, use.names=FALSE)
 }
 
 setMethod("c", "HDF5Array",
