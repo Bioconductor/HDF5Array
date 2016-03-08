@@ -38,12 +38,12 @@ setMethod("t", "HDF5Array",
 ### Accessors
 ###
 
-### The index() getter and setter are for internal use only and so are NOT
-### exported.
-setGeneric("index",
+### The index() getter and setter are for internal use only.
+
+setGeneric("index",                                   # NOT exported
     function(x) standardGeneric("index")
 )
-setGeneric("index<-", signature="x",
+setGeneric("index<-", signature="x",                  # NOT exported
     function(x, value) standardGeneric("index<-")
 )
 setMethod("index", "HDF5Array",
@@ -423,4 +423,50 @@ setMethod("c", "HDF5Array",
         combine_array_objects(objects)
     }
 )
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Put HDF5Array object in a "straight" form
+###
+### Untranspose the HDF5Array object and put its rows and columns in their
+### "native" order. The goal is to put the matrix elements in their "native"
+### order (i.e. in the same order as on disk) so as.vector() is faster on the
+### resulting object is faster than on the original object.
+###
+
+setGeneric("straight", function(x) standardGeneric("straight"))  # NOT exported
+
+.straight_index <- function(i)
+{
+    i_len <- length(i)
+    if (i_len == 0L)
+        return(i)
+    i_max <- max(i)
+    ## Threshold is a rough estimate obtained empirically.
+    ## TODO: Refine this.
+    if (i_max <= 2L * i_len * log(i_len))
+        which(as.logical(tabulate(i, nbins=i_max)))
+    else
+        sort(unique(i))
+}
+
+.straight_HDF5Array <- function(x)
+{
+    x@transpose <- FALSE
+    x_index <- index(x)
+    index_was_touched <- FALSE
+    for (n in seq_along(x_index)) {
+        if (isStrictlySorted(x_index[[n]]))
+            next
+        x_index[[n]] <- .straight_index(x_index[[n]])
+        index_was_touched <- TRUE
+    }
+    if (index_was_touched)
+        index(x) <- x_index
+    x
+}
+
+setMethod("straight", "HDF5Array", .straight_HDF5Array)
+
+setMethod("straight", "array", identity)
 
