@@ -40,10 +40,10 @@ setMethod("t", "HDF5Array",
 
 ### The index() getter and setter are for internal use only.
 
-setGeneric("index",                                   # NOT exported
+setGeneric("index",                                # NOT exported
     function(x) standardGeneric("index")
 )
-setGeneric("index<-", signature="x",                  # NOT exported
+setGeneric("index<-", signature="x",               # NOT exported
     function(x, value) standardGeneric("index<-")
 )
 setMethod("index", "HDF5Array",
@@ -433,7 +433,9 @@ setMethod("c", "HDF5Array",
 ### resulting object is faster than on the original object.
 ###
 
-setGeneric("straight", function(x) standardGeneric("straight"))  # NOT exported
+setGeneric("straight",                             # NOT exported
+    function(x, ...) standardGeneric("straight")
+)
 
 .straight_index <- function(i)
 {
@@ -449,9 +451,12 @@ setGeneric("straight", function(x) standardGeneric("straight"))  # NOT exported
         sort(unique(i))
 }
 
-.straight_HDF5Array <- function(x)
+.straight_HDF5Array <- function(x, untranspose=FALSE, straight.index=FALSE)
 {
-    x@transpose <- FALSE
+    if (untranspose)
+        x@transpose <- FALSE
+    if (!straight.index)
+        return(x)
     x_index <- index(x)
     index_was_touched <- FALSE
     for (n in seq_along(x_index)) {

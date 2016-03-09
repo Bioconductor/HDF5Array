@@ -53,11 +53,11 @@ ArrayBlocks <- function(dim, max_block_len)
     ndim <- length(x@dim)
     if (x@N > ndim)
         return(1L)
-    inner_length <- x@dim[[x@N]] %/% x@by
+    inner_len <- x@dim[[x@N]] %/% x@by
     last_inner_block_len <- x@dim[[x@N]] %% x@by
     if (last_inner_block_len != 0L)
-        inner_length <- inner_length + 1L
-    inner_length
+        inner_len <- inner_len + 1L
+    inner_len
 }
 
 .get_ArrayBlocks_outer_length <- function(x)
@@ -65,11 +65,11 @@ ArrayBlocks <- function(dim, max_block_len)
     ndim <- length(x@dim)
     if (x@N < ndim) {
         outer_dim <- x@dim[(x@N + 1L):ndim]
-        outer_length <- prod(outer_dim)
+        outer_len <- prod(outer_dim)
     } else {
-        outer_length <- 1L
+        outer_len <- 1L
     }
-    outer_length
+    outer_len
 }
 
 ### Return the number of blocks in 'x'.
@@ -94,9 +94,9 @@ setMethod("length", "ArrayBlocks",
 
     i <- i - 1L
     if (blocks@N < ndim) {
-        inner_length <- .get_ArrayBlocks_inner_length(blocks)
-        i1 <- i %% inner_length
-        i2 <- i %/% inner_length
+        inner_len <- .get_ArrayBlocks_inner_length(blocks)
+        i1 <- i %% inner_len
+        i2 <- i %/% inner_len
     } else {
         i1 <- i
     }
@@ -152,7 +152,7 @@ unsplit_array_from_blocks <- function(subarrays, x)
 
 .HDF5Array_anyNA <- function(x, recursive=FALSE)
 {
-    x <- straight(x)
+    x <- straight(x, untranspose=TRUE, straight.index=TRUE)
     blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
     for (i in seq_along(blocks)) {
         block <- extract_array_block(x, blocks, i)
@@ -181,7 +181,11 @@ setMethod("Summary", "HDF5Array",
         }
         ans <- suppressWarnings(callGeneric(NULL))  # init value
         for (x in objects) {
-            x <- straight(x)
+            if (.Generic %in% c("sum", "prod")) {
+                x <- straight(x, untranspose=TRUE)
+            } else {
+                x <- straight(x, untranspose=TRUE, straight.index=TRUE)
+            }
             blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
             for (i in seq_along(blocks)) {
                 block <- extract_array_block(x, blocks, i)
@@ -212,7 +216,7 @@ setMethod("Summary", "HDF5Array",
     if (!identical(trim, 0))
         stop("\"mean\" method for HDF5Array objects ",
              "does not support the 'trim' argument yet")
-    x <- straight(x)
+    x <- straight(x, untranspose=TRUE)
     blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
     sum <- nval <- 0
     for (i in seq_along(blocks)) {
