@@ -16,6 +16,21 @@ exportClasses(
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S3 methods
+###
+
+S3method(mean, HDF5Array)
+
+### We also export them thru the export() directive so that (a) they can be
+### called directly, (b) tab-completion on the name of the generic shows them,
+### and (c) methods() doesn't asterisk them.
+
+export(
+    mean.HDF5Array
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Export S4 methods for generics not defined in HDF5Array
 ###
 
@@ -30,6 +45,8 @@ exportMethods(
     t,
     anyNA,
     max, min, range, sum, prod, any, all,  # Summary group generic
+    mean,
+    #rowSums, colSums, rowMeans, colMeans
 
     ## Methods for generics defined in the methods package:
     coerce, show,

@@ -14,4 +14,4 @@ Suggests: h5vcData, SummarizedExperiment, GenomicRanges,
 	BiocStyle, knitr, rmarkdown
 VignetteBuilder: knitr
 License: Artistic-2.0
-Collate: HDF5Array-class.R HDF5Array-utils.R HDF5Matrix-class.R zzz.R
+Collate: HDF5Array-class.R HDF5Array-utils.R HDF5Matrix-class.R HDF5Matrix-utils.R zzz.R

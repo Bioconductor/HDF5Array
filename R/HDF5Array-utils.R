@@ -201,3 +201,39 @@ setMethod("Summary", "HDF5Array",
     }
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### mean()
+###
+
+### Same arguments as base::mean.default().
+.mean.HDF5Array <- function(x, trim=0, na.rm=FALSE)
+{
+    if (!identical(trim, 0))
+        stop("\"mean\" method for HDF5Array objects ",
+             "does not support the 'trim' argument yet")
+    x <- straight(x)
+    blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
+    sum <- nval <- 0
+    for (i in seq_along(blocks)) {
+        block <- extract_array_block(x, blocks, i)
+        block <- as.vector(block, mode="numeric")
+        block_sum <- sum(block, na.rm=na.rm)
+        if (is.na(block_sum))
+            return(block_sum)
+        if (na.rm) {
+            block_nval <- sum(!is.na(block))
+        } else {
+            block_nval <- length(block)
+        }
+        sum <- sum + block_sum
+        nval <- nval + block_nval
+    }
+    sum / nval
+}
+
+### S3/S4 combo for mean.HDF5Array
+mean.HDF5Array <- function(x, trim=0, na.rm=FALSE, ...)
+    .mean.HDF5Array(x, trim=trim, na.rm=na.rm, ...)
+setMethod("mean", "HDF5Array", .mean.HDF5Array)
+

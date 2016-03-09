@@ -227,10 +227,10 @@ setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
 
 ### HDF5Array -> vector
 
-.from_HDF5Array_to_vector <- function(x)
+.from_HDF5Array_to_vector <- function(x, mode="any")
 {
     ans <- as.array(x, drop=TRUE)
-    as.vector(ans)
+    as.vector(ans, mode=mode)
 }
 
 setMethod("as.vector", "HDF5Array", .from_HDF5Array_to_vector)
