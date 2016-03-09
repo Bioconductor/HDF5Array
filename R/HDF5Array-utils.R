@@ -57,8 +57,8 @@
     x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
     blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
     for (i in seq_along(blocks)) {
-        block <- extract_array_block(x, blocks, i)
-        if (anyNA(as.vector(block)))
+        subarray <- extract_array_block(x, blocks, i)
+        if (anyNA(as.vector(subarray)))
             return(TRUE)
     }
     FALSE
@@ -90,17 +90,17 @@ setMethod("Summary", "HDF5Array",
             }
             blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
             for (i in seq_along(blocks)) {
-                block <- extract_array_block(x, blocks, i)
-                block_ans <- callGeneric(as.vector(block), na.rm=na.rm)
+                subarray <- extract_array_block(x, blocks, i)
+                subarray_ans <- callGeneric(as.vector(subarray), na.rm=na.rm)
                 ## Early bailout for any() and all().
                 if (.Generic == "any") {
-                    if (identical(block_ans, TRUE))
+                    if (identical(subarray_ans, TRUE))
                         return(TRUE)
                 } else if (.Generic == "all") {
-                    if (identical(block_ans, FALSE))
+                    if (identical(subarray_ans, FALSE))
                         return(FALSE)
                 }
-                ans <- callGeneric(ans, block_ans)
+                ans <- callGeneric(ans, subarray_ans)
             }
         }
         ans
@@ -122,18 +122,14 @@ setMethod("Summary", "HDF5Array",
     blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
     sum <- nval <- 0
     for (i in seq_along(blocks)) {
-        block <- extract_array_block(x, blocks, i)
-        block <- as.vector(block, mode="numeric")
-        block_sum <- sum(block, na.rm=na.rm)
-        if (is.na(block_sum))
-            return(block_sum)
-        if (na.rm) {
-            block_nval <- sum(!is.na(block))
-        } else {
-            block_nval <- length(block)
-        }
-        sum <- sum + block_sum
-        nval <- nval + block_nval
+        subarray <- extract_array_block(x, blocks, i)
+        tmp <- as.vector(subarray, mode="numeric")
+        subarray_sum <- sum(tmp, na.rm=na.rm)
+        if (is.na(subarray_sum))
+            return(subarray_sum)
+        subarray_nval <- if (na.rm) sum(!is.na(tmp)) else length(tmp)
+        sum <- sum + subarray_sum
+        nval <- nval + subarray_nval
     }
     sum / nval
 }

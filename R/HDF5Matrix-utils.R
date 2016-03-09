@@ -18,8 +18,9 @@
     blocks <- ArrayBlocks(dim(x), max(get_block_length(type(x)), nrow(x)))
     ans <- integer(nrow(x))  # init value
     for (i in seq_along(blocks)) {
-        block <- extract_array_block(x, blocks, i)
-        ans <- ans + rowSums(as.matrix(block), na.rm=na.rm)
+        subarray <- extract_array_block(x, blocks, i)
+        subarray_rowSums <- rowSums(as.matrix(subarray), na.rm=na.rm)
+        ans <- ans + subarray_rowSums
     }
     ans
 }
@@ -34,8 +35,8 @@
     blocks <- ArrayBlocks(dim(x), max(get_block_length(type(x)), nrow(x)))
     ans <- lapply(seq_along(blocks),
         function(i) {
-            block <- extract_array_block(x, blocks, i)
-            colSums(as.matrix(block), na.rm=na.rm)
+            subarray <- extract_array_block(x, blocks, i)
+            colSums(as.matrix(subarray), na.rm=na.rm)
         })
     unlist(ans)
 }
