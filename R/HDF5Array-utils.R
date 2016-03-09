@@ -4,6 +4,7 @@
 ###
 
 
+### TODO: Let the user control this via a global option.
 MAX_BLOCK_LENGTH <- 10000000L
 
 
@@ -27,23 +28,31 @@ setClass("ArrayBlocks",
 ###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
 ArrayBlocks <- function(dim, max_block_len)
 {
+    ndim <- length(dim)
     p <- cumprod(dim)
-    x_len <- p[[length(p)]]
-    stopifnot(x_len > max_block_len)
-    N <- which(p >= max_block_len)[[1L]]
-    if (p[[N]] == max_block_len) {
-        N <- N + 1L
+    x_len <- p[[ndim]]
+    if (max_block_len > x_len) {
+        N <- ndim + 1L
         by <- 1L
-    } else if (N == 1L) {
-        by <- max_block_len
     } else {
-        by <- max_block_len %/% as.integer(p[[N - 1L]])
+        N <- which(p >= max_block_len)[[1L]]
+        if (p[[N]] == max_block_len) {
+            N <- N + 1L
+            by <- 1L
+        } else if (N == 1L) {
+            by <- max_block_len
+        } else {
+            by <- max_block_len %/% as.integer(p[[N - 1L]])
+        }
     }
     new("ArrayBlocks", dim=dim, N=N, by=by)
 }
 
 .get_ArrayBlocks_inner_length <- function(x)
 {
+    ndim <- length(x@dim)
+    if (x@N > ndim)
+        return(1L)
     inner_length <- x@dim[[x@N]] %/% x@by
     last_inner_block_len <- x@dim[[x@N]] %% x@by
     if (last_inner_block_len != 0L)
@@ -53,8 +62,9 @@ ArrayBlocks <- function(dim, max_block_len)
 
 .get_ArrayBlocks_outer_length <- function(x)
 {
-    if (x@N < length(x@dim)) {
-        outer_dim <- x@dim[(x@N + 1L):length(x@dim)]
+    ndim <- length(x@dim)
+    if (x@N < ndim) {
+        outer_dim <- x@dim[(x@N + 1L):ndim]
         outer_length <- prod(outer_dim)
     } else {
         outer_length <- 1L
@@ -72,11 +82,18 @@ setMethod("length", "ArrayBlocks",
 ### dimension in the original array.
 .get_array_block_subscript <- function(blocks, i)
 {
-    subscript <- rep(alist(foo=), length(blocks@dim))
+    nblock <- length(blocks)
+    stopifnot(isSingleInteger(i), i >= 1, i <= nblock)
+
+    ndim <- length(blocks@dim)
+    subscript <- rep(alist(foo=), ndim)
     names(subscript) <- NULL
 
+    if (nblock == 1L)
+        return(subscript)
+
     i <- i - 1L
-    if (blocks@N < length(blocks@dim)) {
+    if (blocks@N < ndim) {
         inner_length <- .get_ArrayBlocks_inner_length(blocks)
         i1 <- i %% inner_length
         i2 <- i %/% inner_length
@@ -91,10 +108,10 @@ setMethod("length", "ArrayBlocks",
         k2 <- blocks@dim[[blocks@N]]
     subscript[[blocks@N]] <- k1:k2
 
-    if (blocks@N < length(blocks@dim)) {
-        outer_dim <- blocks@dim[(blocks@N + 1L):length(blocks@dim)]
+    if (blocks@N < ndim) {
+        outer_dim <- blocks@dim[(blocks@N + 1L):ndim]
         subindex <- arrayInd(i2 + 1L, outer_dim)
-        subscript[(blocks@N + 1L):length(blocks@dim)] <- as.list(subindex)
+        subscript[(blocks@N + 1L):ndim] <- as.list(subindex)
     }
     subscript
 }
@@ -136,8 +153,6 @@ unsplit_array_from_blocks <- function(subarrays, x)
 .HDF5Array_anyNA <- function(x, recursive=FALSE)
 {
     x <- straight(x)
-    if (length(x) <= MAX_BLOCK_LENGTH)
-        return(anyNA(as.vector(x)))
     blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
     for (i in seq_along(blocks)) {
         block <- extract_array_block(x, blocks, i)
@@ -148,4 +163,41 @@ unsplit_array_from_blocks <- function(subarrays, x)
 }
 
 setMethod("anyNA", "HDF5Array", .HDF5Array_anyNA)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Summary group generic
+###
+### max(), min(), range(), sum(), prod(), any(), all().
+###
+
+setMethod("Summary", "HDF5Array",
+    function(x, ..., na.rm=FALSE)
+    {
+        if (missing(x)) {
+            objects <- list(...)
+        } else {
+            objects <- list(x, ...)
+        }
+        ans <- suppressWarnings(callGeneric(NULL))  # init value
+        for (x in objects) {
+            x <- straight(x)
+            blocks <- ArrayBlocks(dim(x), MAX_BLOCK_LENGTH)
+            for (i in seq_along(blocks)) {
+                block <- extract_array_block(x, blocks, i)
+                block_ans <- callGeneric(as.vector(block), na.rm=na.rm)
+                ## Early bailout for any() and all().
+                if (.Generic == "any") {
+                    if (identical(block_ans, TRUE))
+                        return(TRUE)
+                } else if (.Generic == "all") {
+                    if (identical(block_ans, FALSE))
+                        return(FALSE)
+                }
+                ans <- callGeneric(ans, block_ans)
+            }
+        }
+        ans
+    }
+)
 

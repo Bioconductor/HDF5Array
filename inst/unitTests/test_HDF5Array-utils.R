@@ -40,7 +40,7 @@ test_split_matrix_in_blocks <- function()
     tM1b <- t(M1b)
     checkIdentical(tm1, as.matrix(tM1b))
 
-    for (max_block_len in seq_len(length(m1) - 1L)) {
+    for (max_block_len in seq_len(length(m1) * 2L)) {
         subarrays <- split_array_in_blocks(m1, max_block_len)
         current <- unsplit_array_from_blocks(subarrays, m1)
         checkIdentical(m1, current)

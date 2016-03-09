@@ -416,7 +416,6 @@ setMethod("c", "HDF5Array",
                  "does not support the 'recursive' argument")
         if (missing(x)) {
             objects <- list(...)
-            x <- objects[[1L]]
         } else {
             objects <- list(x, ...)
         }

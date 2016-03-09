@@ -29,6 +29,7 @@ exportMethods(
     c,
     t,
     anyNA,
+    max, min, range, sum, prod, any, all,  # Summary group generic
 
     ## Methods for generics defined in the methods package:
     coerce, show,
