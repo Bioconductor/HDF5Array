@@ -5,16 +5,17 @@
 
 setClass("HDF5Array",
     representation(
-        file="character",    # single string
-        group="character",   # single string
-        name="character",    # dataset name
-        type="character",    # single string
-        h5index="list",      # list of N integer vectors, one per dimension in
-                             # the HDF5 dataset
-        transpose="logical"  # TRUE or FALSE
+        file="character",        # single string
+        group="character",       # single string
+        name="character",        # dataset name
+        type="character",        # single string
+        h5index="list",          # list of N integer vectors, one per dimension
+                                 # in the HDF5 dataset
+        is_transposed="logical"  # is it transposed with respect to the HDF5
+                                 # layout?
     ),
     prototype(
-        transpose=FALSE
+        is_transposed=FALSE
     )
 )
 
@@ -23,12 +24,13 @@ setClass("HDF5Array",
 ### Transpose
 ###
 
-### The transposition of the data is delayed i.e. it will be realized on the
-### fly only when as.array() (or as.matrix()) is called on 'x'.
+### The actual transposition of the data is delayed i.e. it will be realized
+### on the fly only when as.array() (or as.vector() or as.matrix()) is called
+### on 'x'.
 setMethod("t", "HDF5Array",
     function(x)
     {
-        x@transpose <- !x@transpose
+        x@is_transposed <- !x@is_transposed
         x
     }
 )
@@ -37,6 +39,15 @@ setMethod("t", "HDF5Array",
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Accessors
 ###
+
+### The type() getter is for internal use only.
+### If 'x' is an HDF5Array object, 'type(x)' must always return the same
+### as 'typeof(as.array(x))'.
+setGeneric("type",                                 # NOT exported
+    function(x) standardGeneric("type")
+)
+setMethod("type", "HDF5Array", function(x) x@type)
+setMethod("type", "array", function(x) typeof(x))
 
 ### The index() getter and setter are for internal use only.
 
@@ -65,7 +76,7 @@ setMethod("isEmpty", "HDF5Array", function(x) any(lengths(index(x)) == 0L))
 .get_HDF5Array_dim <- function(x)
 {
     ans <- .get_HDF5Array_dim_before_transpose(x)
-    if (x@transpose)
+    if (x@is_transposed)
         ans <- rev(ans)
     ans
 }
@@ -83,7 +94,7 @@ setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
 .get_HDF5Array_dimnames <- function(x)
 {
     ans <- .get_HDF5Array_dimnames_before_transpose(x)
-    if (x@transpose)
+    if (x@is_transposed)
         ans <- rev(ans)
     ans
 }
@@ -108,7 +119,7 @@ setMethod("dimnames", "HDF5Array", .get_HDF5Array_dimnames)
 {
     x_index <- index(x)
     value <- .normalize_dimnames_replacement_value(value, length(x_index))
-    if (x@transpose)
+    if (x@is_transposed)
         value <- rev(value)
     index_was_touched <- FALSE
     for (n in seq_along(x_index)) {
@@ -202,7 +213,7 @@ HDF5Array <- function(file, group, name)
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
     if (isEmpty(x)) {
-        ans <- new(x@type)
+        ans <- new(type(x))
         dim(ans) <- .get_HDF5Array_dim_before_transpose(x)
     } else {
         ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@h5index)
@@ -215,7 +226,7 @@ HDF5Array <- function(file, group, name)
     ## has more than 2 dimensions. If we want as.array() to work on a
     ## transposed HDF5Array object of arbitrary dimension, we need to implement
     ## our own generalized transposition of an ordinary array.
-    if (x@transpose) {
+    if (x@is_transposed) {
         if (length(dim(ans)) > 2L)
             stop("can't do as.array() on this object, sorry")
         ans <- t(ans)
@@ -287,7 +298,7 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 ### list elements of class "name".
 .extract_subarray_from_HDF5Array <- function(x, subscript)
 {
-    if (x@transpose)
+    if (x@is_transposed)
         subscript <- rev(subscript)
     x_index <- index(x)
     index_was_touched <- FALSE
@@ -346,7 +357,7 @@ setMethod("[", "HDF5Array", .extract_subarray)
 {
     array_dim <- lengths(x@h5index)
     subscript <- as.integer(arrayInd(i, array_dim))
-    if (x@transpose)
+    if (x@is_transposed)
         subscript <- rev(subscript)
     h5index <- mapply(`[[`, x@h5index, subscript, SIMPLIFY=FALSE)
     ans <- .read_h5dataset_slice(x@file, x@group, x@name, h5index)
@@ -375,7 +386,7 @@ show_HDF5Array_topline <- function(x)
 {
     x_dim <- dim(x)
     cat(class(x), " object of ", paste0(dim(x), collapse=" x "),
-        " ", x@type, ifelse(any(x_dim >= 2L), "s", ""), sep="")
+        " ", type(x), ifelse(any(x_dim >= 2L), "s", ""), sep="")
 }
 
 setMethod("show", "HDF5Array",
@@ -422,55 +433,4 @@ setMethod("c", "HDF5Array",
         combine_array_objects(objects)
     }
 )
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Put HDF5Array object in a "straight" form
-###
-### Untranspose the HDF5Array object and put its rows and columns in their
-### "native" order. The goal is to put the matrix elements in their "native"
-### order (i.e. in the same order as on disk) so as.vector() is faster on the
-### resulting object is faster than on the original object.
-###
-
-setGeneric("straight",                             # NOT exported
-    function(x, ...) standardGeneric("straight")
-)
-
-.straight_index <- function(i)
-{
-    i_len <- length(i)
-    if (i_len == 0L)
-        return(i)
-    i_max <- max(i)
-    ## Threshold is a rough estimate obtained empirically.
-    ## TODO: Refine this.
-    if (i_max <= 2L * i_len * log(i_len))
-        which(as.logical(tabulate(i, nbins=i_max)))
-    else
-        sort(unique(i))
-}
-
-.straight_HDF5Array <- function(x, untranspose=FALSE, straight.index=FALSE)
-{
-    if (untranspose)
-        x@transpose <- FALSE
-    if (!straight.index)
-        return(x)
-    x_index <- index(x)
-    index_was_touched <- FALSE
-    for (n in seq_along(x_index)) {
-        if (isStrictlySorted(x_index[[n]]))
-            next
-        x_index[[n]] <- .straight_index(x_index[[n]])
-        index_was_touched <- TRUE
-    }
-    if (index_was_touched)
-        index(x) <- x_index
-    x
-}
-
-setMethod("straight", "HDF5Array", .straight_HDF5Array)
-
-setMethod("straight", "array", identity)
 
