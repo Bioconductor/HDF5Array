@@ -127,7 +127,9 @@ setMethod("Summary", "HDF5Array",
         subarray_sum <- sum(tmp, na.rm=na.rm)
         if (is.na(subarray_sum))
             return(subarray_sum)
-        subarray_nval <- if (na.rm) sum(!is.na(tmp)) else length(tmp)
+        subarray_nval <- length(tmp)
+        if (na.rm)
+            subarray_nval <- subarray_nval - sum(is.na(tmp))
         sum <- sum + subarray_sum
         nval <- nval + subarray_nval
     }

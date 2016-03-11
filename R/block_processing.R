@@ -1,5 +1,5 @@
 ### =========================================================================
-### Split an array in blocks
+### Internal utilities for block processing of an array
 ### -------------------------------------------------------------------------
 ###
 ### Nothing in this file is exported.
