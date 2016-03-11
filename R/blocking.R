@@ -97,7 +97,7 @@ setMethod("length", "ArrayBlocks",
 
 ### Return a multidimensional subscript as a list with 1 subscript per
 ### dimension in the original array.
-.get_array_block_subscript <- function(blocks, i)
+.get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
 {
     nblock <- length(blocks)
     stopifnot(isSingleInteger(i), i >= 1, i <= nblock)
@@ -121,9 +121,18 @@ setMethod("length", "ArrayBlocks",
     k1 <- i1 * blocks@by
     k2 <- k1 + blocks@by
     k1 <- k1 + 1L
-    if (k2 > blocks@dim[[blocks@N]])
-        k2 <- blocks@dim[[blocks@N]]
-    subscript[[blocks@N]] <- k1:k2
+    upper_bound <- blocks@dim[[blocks@N]]
+    if (k2 > upper_bound)
+        k2 <- upper_bound
+    if (expand.RangeNSBS) {
+        subscript_N <- k1:k2  # same as doing as.integer() on the RangeNSBS
+                              # object below
+    } else {
+        subscript_N <- new2("RangeNSBS", subscript=c(k1, k2),
+                                         upper_bound=upper_bound,
+                                         check=FALSE)
+    }
+    subscript[[blocks@N]] <- subscript_N
 
     if (blocks@N < ndim) {
         outer_dim <- blocks@dim[(blocks@N + 1L):ndim]
@@ -135,7 +144,8 @@ setMethod("length", "ArrayBlocks",
 
 extract_array_block <- function(x, blocks, i)
 {
-    subscript <- .get_array_block_subscript(blocks, i)
+    subscript <- .get_array_block_subscript(blocks, i,
+                                            expand.RangeNSBS=is.array(x))
     do.call(`[`, c(list(x), subscript, drop=FALSE))
 }
 

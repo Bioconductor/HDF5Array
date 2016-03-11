@@ -298,12 +298,12 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 ### list elements of class "name".
 .extract_subarray_from_HDF5Array <- function(x, subscript)
 {
-    if (x@is_transposed)
-        subscript <- rev(subscript)
     x_index <- index(x)
+    x_ndim <- length(x_index)
     index_was_touched <- FALSE
     for (n in seq_along(x_index)) {
-        k <- subscript[[n]]
+        n2 <- if (x@is_transposed) x_ndim - n + 1L else n
+        k <- subscript[[n2]]
         if (missing(k))
             next
         x_index[[n]] <- extractROWS(x_index[[n]], k)
