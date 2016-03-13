@@ -54,13 +54,13 @@
 
 .HDF5Array_block_anyNA <- function(x, recursive=FALSE)
 {
-    init <- FALSE
     APPLY <- anyNA
     REDUCE <- `||`
+    reduced <- FALSE
     BREAKIF <- identity
 
     x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
-    block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
+    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
 }
 
 setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
@@ -75,7 +75,6 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
 .HDF5Array_block_Summary <- function(.Generic, x, ..., na.rm=FALSE)
 {
     GENERIC <- match.fun(.Generic)
-    init <- NULL
     APPLY <- function(subarray) {
         ## We get a warning if 'subarray' is empty (which can't happen, blocks
         ## can't be empty) or if 'na.rm' is TRUE and 'subarray' contains only
@@ -85,21 +84,22 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
             return(NULL)
         val
     }
-    REDUCE <- function(init, val) {
-        if (is.null(init) && is.null(val))
+    REDUCE <- function(reduced, val) {
+        if (is.null(reduced) && is.null(val))
             return(NULL)
-        GENERIC(init, val)
+        GENERIC(reduced, val)
     }
-    BREAKIF <- function(init) {
-        if (is.null(init))
+    reduced <- NULL
+    BREAKIF <- function(reduced) {
+        if (is.null(reduced))
             return(FALSE)
         switch(.Generic,
-            max=         is.na(init) || init == Inf,
-            min=         is.na(init) || init == -Inf,
-            range=       is.na(init[[1L]]) || all(init == c(-Inf, Inf)),
-            sum=, prod=  is.na(init),
-            any=         identical(init, TRUE),
-            all=         identical(init, FALSE),
+            max=         is.na(reduced) || reduced == Inf,
+            min=         is.na(reduced) || reduced == -Inf,
+            range=       is.na(reduced[[1L]]) || all(reduced == c(-Inf, Inf)),
+            sum=, prod=  is.na(reduced),
+            any=         identical(reduced, TRUE),
+            all=         identical(reduced, FALSE),
             FALSE)  # fallback (actually not needed)
     }
 
@@ -114,11 +114,11 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
         } else {
             x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
         }
-        init <- block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
+        reduced <- block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
     }
-    if (is.null(init))
-        init <- GENERIC()
-    init
+    if (is.null(reduced))
+        reduced <- GENERIC()
+    reduced
 }
 
 setMethod("Summary", "HDF5Array",
@@ -138,7 +138,6 @@ setMethod("Summary", "HDF5Array",
         stop("\"mean\" method for HDF5Array objects ",
              "does not support the 'trim' argument yet")
 
-    init <- numeric(2)  # sum and nval
     APPLY <- function(subarray) {
         tmp <- as.vector(subarray, mode="numeric")
         subarray_sum <- sum(tmp, na.rm=na.rm)
@@ -148,11 +147,12 @@ setMethod("Summary", "HDF5Array",
         c(subarray_sum, subarray_nval)
     }
     REDUCE <- `+`
-    BREAKIF <- function(init) is.na(init[[1L]])
+    reduced <- numeric(2)  # sum and nval
+    BREAKIF <- function(reduced) is.na(reduced[[1L]])
 
     x <- .straighten(x, untranspose=TRUE)
-    init <- block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
-    init[[1L]] / init[[2L]]
+    reduced <- block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
+    reduced[[1L]] / reduced[[2L]]
 }
 
 ### S3/S4 combo for mean.HDF5Array

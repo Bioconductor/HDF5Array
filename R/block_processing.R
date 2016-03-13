@@ -189,7 +189,7 @@ unsplit_array_from_blocks <- function(subarrays, x)
 ###
 
 ### The core block-processing engine.
-block_APPLY_REDUCE <- function(x, init, APPLY, REDUCE,
+block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
                                BREAKIF=NULL, block_len=NULL)
 {
     APPLY <- match.fun(APPLY)
@@ -204,17 +204,17 @@ block_APPLY_REDUCE <- function(x, init, APPLY, REDUCE,
         if (!is.array(subarray))
             subarray <- as.array(subarray)
         val <- APPLY(subarray)
-        init <- REDUCE(init, val)
+        reduced <- REDUCE(reduced, val)
         if (!is.null(BREAKIF)) {
-            if (BREAKIF(init))
+            if (BREAKIF(reduced))
                 break
         }
     }
-    init
+    reduced
 }
 
 ### Processing a matrix-like object by blocks of columns.
-colblock_APPLY_REDUCE <- function(x, init, APPLY, REDUCE)
+colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
 {
     x_dim <- dim(x)
     if (length(x_dim) != 2L)
@@ -222,7 +222,7 @@ colblock_APPLY_REDUCE <- function(x, init, APPLY, REDUCE)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    block_APPLY_REDUCE(x, init, APPLY, REDUCE, block_len=block_len)
+    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, block_len=block_len)
 }
 
 

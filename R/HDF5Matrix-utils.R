@@ -21,10 +21,10 @@
     if (!is.array(x) && x@is_transposed)
         return(.HDF5Matrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
 
-    init <- integer(nrow(x))
     APPLY <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
     REDUCE <- `+`
-    colblock_APPLY_REDUCE(x, init, APPLY, REDUCE)
+    reduced <- integer(nrow(x))
+    colblock_APPLY_REDUCE(x, APPLY, REDUCE, reduced)
 }
 
 .HDF5Matrix_block_colSums <- function(x, na.rm=FALSE, dims=1)
@@ -46,10 +46,6 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
     if (!is.array(x) && x@is_transposed)
         return(.HDF5Matrix_block_colMeans(t(x), na.rm=na.rm, dims=dims))
 
-    init <- cbind(
-        numeric(nrow(x)),  # sums
-        numeric(nrow(x))   # nvals
-    )
     APPLY <- function(submatrix) {
         submatrix_sums <- rowSums(submatrix, na.rm=na.rm)
         submatrix_nvals <- ncol(submatrix)
@@ -58,8 +54,12 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
         cbind(submatrix_sums, submatrix_nvals)
     }
     REDUCE <- `+`
-    init <- colblock_APPLY_REDUCE(x, init, APPLY, REDUCE)
-    init[[1L]] / init[[2L]]
+    reduced <- cbind(
+        numeric(nrow(x)),  # sums
+        numeric(nrow(x))   # nvals
+    )
+    reduced <- colblock_APPLY_REDUCE(x, APPLY, REDUCE, reduced)
+    reduced[[1L]] / reduced[[2L]]
 }
 
 .HDF5Matrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)
