@@ -26,6 +26,17 @@ get_block_length <- function(type)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type() getter
+###
+### For internal use only.
+###
+
+setGeneric("type", function(x) standardGeneric("type"))
+
+setMethod("type", "array", function(x) typeof(x))
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### ArrayBlocks objects
 ###
 
@@ -43,7 +54,7 @@ setClass("ArrayBlocks",
 ###       i.e. the blocks fully cover it and don't overlap each other.
 ###   (b) Each block is made of adjacent elements in the original array.
 ###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
-ArrayBlocks <- function(dim, max_block_len)
+.ArrayBlocks <- function(dim, max_block_len)
 {
     ndim <- length(dim)
     p <- cumprod(dim)
@@ -152,7 +163,7 @@ extract_array_block <- function(x, blocks, i)
 ### NOT exported. Used in unit tests.
 split_array_in_blocks <- function(x, max_block_len)
 {
-    blocks <- ArrayBlocks(dim(x), max_block_len)
+    blocks <- .ArrayBlocks(dim(x), max_block_len)
     lapply(seq_along(blocks),
            function(i) extract_array_block(x, blocks, i))
 }
@@ -170,5 +181,67 @@ unsplit_array_from_blocks <- function(subarrays, x)
     ans <- combine_array_objects(subarrays)
     dim(ans) <- dim(x)
     ans
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Block processing
+###
+
+### The core block-processing engine.
+block_APPLY_REDUCE <- function(x, init, APPLY, REDUCE,
+                               BREAKIF=NULL, block_len=NULL)
+{
+    APPLY <- match.fun(APPLY)
+    REDUCE <- match.fun(REDUCE)
+    if (!is.null(BREAKIF))
+        BREAKIF <- match.fun(BREAKIF)
+    if (is.null(block_len))
+        block_len <- get_block_length(type(x))
+    blocks <- .ArrayBlocks(dim(x), block_len)
+    for (i in seq_along(blocks)) {
+        subarray <- extract_array_block(x, blocks, i)
+        if (!is.array(subarray))
+            subarray <- as.array(subarray)
+        val <- APPLY(subarray)
+        init <- REDUCE(init, val)
+        if (!is.null(BREAKIF)) {
+            if (BREAKIF(init))
+                break
+        }
+    }
+    init
+}
+
+### Processing a matrix-like object by blocks of columns.
+colblock_APPLY_REDUCE <- function(x, init, APPLY, REDUCE)
+{
+    x_dim <- dim(x)
+    if (length(x_dim) != 2L)
+        stop("'x' must be a matrix-like object")
+    ## We're going to walk along the columns so need to increase the block
+    ## length so each block is made of at least one column.
+    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
+    block_APPLY_REDUCE(x, init, APPLY, REDUCE, block_len=block_len)
+}
+
+
+colblock_APPLY <- function(x, APPLY, ...)
+{
+    x_dim <- dim(x)
+    if (length(x_dim) != 2L)
+        stop("'x' must be a matrix-like object")
+    APPLY <- match.fun(APPLY)
+    ## We're going to walk along the columns so need to increase the block
+    ## length so each block is made of at least one column.
+    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
+    blocks <- .ArrayBlocks(x_dim, block_len)
+    lapply(seq_along(blocks),
+        function(i) {
+            submatrix <- extract_array_block(x, blocks, i)
+            if (!is.matrix(submatrix))
+                submatrix <- as.matrix(submatrix)
+            APPLY(submatrix, ...)
+        })
 }
 

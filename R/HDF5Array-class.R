@@ -40,14 +40,9 @@ setMethod("t", "HDF5Array",
 ### Accessors
 ###
 
-### The type() getter is for internal use only.
 ### If 'x' is an HDF5Array object, 'type(x)' must always return the same
-### as 'typeof(as.array(x))'.
-setGeneric("type",                                 # NOT exported
-    function(x) standardGeneric("type")
-)
+### as 'typeof(as.array(x))'. For internal use only.
 setMethod("type", "HDF5Array", function(x) x@type)
-setMethod("type", "array", function(x) typeof(x))
 
 ### The index() getter and setter are for internal use only.
 

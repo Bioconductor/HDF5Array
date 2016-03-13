@@ -54,57 +54,76 @@
 
 .HDF5Array_block_anyNA <- function(x, recursive=FALSE)
 {
+    init <- FALSE
+    APPLY <- anyNA
+    REDUCE <- `||`
+    BREAKIF <- identity
+
     x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
-    blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
-    for (i in seq_along(blocks)) {
-        subarray <- extract_array_block(x, blocks, i)
-        if (anyNA(as.vector(subarray)))
-            return(TRUE)
-    }
-    FALSE
+    block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
 }
 
 setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Summary group generic
+### "Summary" group generic
 ###
-### max(), min(), range(), sum(), prod(), any(), all().
+### Members: max, min, range, sum, prod, any, all
 ###
+
+.HDF5Array_block_Summary <- function(.Generic, x, ..., na.rm=FALSE)
+{
+    GENERIC <- match.fun(.Generic)
+    init <- NULL
+    APPLY <- function(subarray) {
+        ## We get a warning if 'subarray' is empty (which can't happen, blocks
+        ## can't be empty) or if 'na.rm' is TRUE and 'subarray' contains only
+        ## NA's or NaN's.
+        val <- tryCatch(GENERIC(subarray, na.rm=na.rm), warning=identity)
+        if (is(val, "warning"))
+            return(NULL)
+        val
+    }
+    REDUCE <- function(init, val) {
+        if (is.null(init) && is.null(val))
+            return(NULL)
+        GENERIC(init, val)
+    }
+    BREAKIF <- function(init) {
+        if (is.null(init))
+            return(FALSE)
+        switch(.Generic,
+            max=         is.na(init) || init == Inf,
+            min=         is.na(init) || init == -Inf,
+            range=       is.na(init[[1L]]) || all(init == c(-Inf, Inf)),
+            sum=, prod=  is.na(init),
+            any=         identical(init, TRUE),
+            all=         identical(init, FALSE),
+            FALSE)  # fallback (actually not needed)
+    }
+
+    if (missing(x)) {
+        objects <- list(...)
+    } else {
+        objects <- list(x, ...)
+    }
+    for (x in objects) {
+        if (.Generic %in% c("sum", "prod")) {
+            x <- .straighten(x, untranspose=TRUE)
+        } else {
+            x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
+        }
+        init <- block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
+    }
+    if (is.null(init))
+        init <- GENERIC()
+    init
+}
 
 setMethod("Summary", "HDF5Array",
     function(x, ..., na.rm=FALSE)
-    {
-        if (missing(x)) {
-            objects <- list(...)
-        } else {
-            objects <- list(x, ...)
-        }
-        ans <- suppressWarnings(callGeneric(NULL))  # init value
-        for (x in objects) {
-            if (.Generic %in% c("sum", "prod")) {
-                x <- .straighten(x, untranspose=TRUE)
-            } else {
-                x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
-            }
-            blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
-            for (i in seq_along(blocks)) {
-                subarray <- extract_array_block(x, blocks, i)
-                subarray_ans <- callGeneric(as.vector(subarray), na.rm=na.rm)
-                ## Early bailout for any() and all().
-                if (.Generic == "any") {
-                    if (identical(subarray_ans, TRUE))
-                        return(TRUE)
-                } else if (.Generic == "all") {
-                    if (identical(subarray_ans, FALSE))
-                        return(FALSE)
-                }
-                ans <- callGeneric(ans, subarray_ans)
-            }
-        }
-        ans
-    }
+        .HDF5Array_block_Summary(.Generic, x, ..., na.rm=na.rm)
 )
 
 
@@ -118,26 +137,41 @@ setMethod("Summary", "HDF5Array",
     if (!identical(trim, 0))
         stop("\"mean\" method for HDF5Array objects ",
              "does not support the 'trim' argument yet")
-    x <- .straighten(x, untranspose=TRUE)
-    blocks <- ArrayBlocks(dim(x), get_block_length(type(x)))
-    sum <- nval <- 0
-    for (i in seq_along(blocks)) {
-        subarray <- extract_array_block(x, blocks, i)
+
+    init <- numeric(2)  # sum and nval
+    APPLY <- function(subarray) {
         tmp <- as.vector(subarray, mode="numeric")
         subarray_sum <- sum(tmp, na.rm=na.rm)
-        if (is.na(subarray_sum))
-            return(subarray_sum)
         subarray_nval <- length(tmp)
         if (na.rm)
             subarray_nval <- subarray_nval - sum(is.na(tmp))
-        sum <- sum + subarray_sum
-        nval <- nval + subarray_nval
+        c(subarray_sum, subarray_nval)
     }
-    sum / nval
+    REDUCE <- `+`
+    BREAKIF <- function(init) is.na(init[[1L]])
+
+    x <- .straighten(x, untranspose=TRUE)
+    init <- block_APPLY_REDUCE(x, init, APPLY, REDUCE, BREAKIF)
+    init[[1L]] / init[[2L]]
 }
 
 ### S3/S4 combo for mean.HDF5Array
 mean.HDF5Array <- function(x, trim=0, na.rm=FALSE, ...)
     .HDF5Array_block_mean(x, trim=trim, na.rm=na.rm, ...)
 setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### "Compare" group generic
+###
+### Members: ==, !=, <=, >=, <, >
+###
+
+#setMethod("Compare", "HDF5Array",
+#    function(e1, e2)
+#    {
+#        e1_len <- length(e1)
+#        e2_len <- length(e2)
+#    }
+#)
 
