@@ -185,10 +185,9 @@ unsplit_array_from_blocks <- function(subarrays, x)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Block processing
+### Core block-processing engine
 ###
 
-### The core block-processing engine.
 block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
                                BREAKIF=NULL, block_len=NULL)
 {
@@ -211,7 +210,11 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
     reduced
 }
 
-### Processing a matrix-like object by blocks of columns.
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### 2 helper functions to process a matrix-like object by blocks of columns
+###
+
 colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
 {
     x_dim <- dim(x)
@@ -222,7 +225,6 @@ colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
     block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, block_len=block_len)
 }
-
 
 colblock_APPLY <- function(x, APPLY, ...)
 {
