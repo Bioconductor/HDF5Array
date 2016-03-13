@@ -205,10 +205,8 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
             subarray <- as.array(subarray)
         val <- APPLY(subarray)
         reduced <- REDUCE(reduced, val)
-        if (!is.null(BREAKIF)) {
-            if (BREAKIF(reduced))
-                break
-        }
+        if (!is.null(BREAKIF) && BREAKIF(reduced))
+            break
     }
     reduced
 }
