@@ -167,11 +167,20 @@ setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
 ### Members: ==, !=, <=, >=, <, >
 ###
 
-#setMethod("Compare", "HDF5Array",
-#    function(e1, e2)
-#    {
-#        e1_len <- length(e1)
-#        e2_len <- length(e2)
-#    }
-#)
+.HDF5Array_block_Compare <- function(.Generic, e1, e2)
+{
+    if (!identical(dim(e1), dim(e2)))
+        stop("comparing 2 ", class(e1), " objects with different ",
+             "dimensions is not supported yet")
+    GENERIC <- match.fun(.Generic)
+    res_list <- block_MAPPLY(.Generic, e1, e2)
+    ans <- unlist(res_list, recursive=FALSE, use.names=FALSE)
+    dim(ans) <- dim(e1)
+    ans
+}
+
+setMethod("Compare", "HDF5Array",
+    function(e1, e2)
+        .HDF5Array_block_Compare(.Generic, e1, e2)
+)
 

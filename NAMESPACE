@@ -44,8 +44,9 @@ exportMethods(
     c,
     t,
     anyNA,
-    max, min, range, sum, prod, any, all,  # Summary group generic
+    max, min, range, sum, prod, any, all,  # "Summary" group generic
     mean,
+    "==", "!=", "<=", ">=", "<", ">",      # "Compare" group generic
     rowSums, colSums, rowMeans, colMeans,
 
     ## Methods for generics defined in the methods package:

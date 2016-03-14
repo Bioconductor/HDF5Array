@@ -8,17 +8,26 @@
 
 DEFAULT_BLOCK_SIZE <- 40000000L
 
+.TYPE_SIZES <- c(
+    logical=4L,
+    integer=4L,
+    numeric=8L,
+    double=8L,
+    complex=16L,
+    character=8L,  # just the overhead of a CHARSXP; doesn't account for the
+                   # string data itself
+    raw=1L
+)
+
 get_block_length <- function(type)
 {
-    type_size <- switch(type,
-        logical=, integer=4L,
-        numeric=, double=8L,
-        complex=16L,
-        character=8L,  # just the overhead of a CHARSXP, doesn't count for
-                       # the string data itself
-        raw=1L,
-        stop("type ", type, " is not supported")
-    )
+    type_size <- .TYPE_SIZES[type]
+    idx <- which(is.na(type_size))
+    if (length(idx) != 0L) {
+        unsupported_types <- unique(type[idx])
+        in1string <- paste0(unsupported_types, collapse=", ")
+        stop("unsupported type(s): ",  in1string)
+    }
     block_size <- getOption("HDF5Array.block.size",
                             default=.DEFAULT_BLOCK_SIZE)
     as.integer(block_size / type_size)
@@ -185,9 +194,62 @@ unsplit_array_from_blocks <- function(subarrays, x)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Core block-processing engine
+### Walking on the blocks
+###
+### 3 utility functions to process array-like objects by block.
 ###
 
+.as_array_or_matrix <- function(x)
+{
+    if (length(dim(x)) == 2L)
+        return(as.matrix(x))
+    as.array(x)
+}
+
+### An lapply-like function.
+block_APPLY <- function(x, APPLY, ..., block_len=NULL)
+{
+    APPLY <- match.fun(APPLY)
+    if (is.null(block_len))
+        block_len <- get_block_length(type(x))
+    blocks <- .ArrayBlocks(dim(x), block_len)
+    lapply(seq_along(blocks),
+        function(i) {
+            subarray <- extract_array_block(x, blocks, i)
+            if (!is.array(subarray))
+                subarray <- .as_array_or_matrix(subarray)
+            APPLY(subarray, ...)
+        })
+}
+
+### An mapply-like function.
+block_MAPPLY <- function(MAPPLY, ..., block_len=NULL)
+{
+    MAPPLY <- match.fun(MAPPLY)
+    dots <- unname(list(...))
+    dims <- sapply(dots, dim)
+    x_dim <- dims[ , 1L]
+    if (!all(dims == x_dim))
+        stop("all objects in ... must have the same dimensions")
+    if (is.null(block_len)) {
+        types <- unlist(lapply(dots, type))
+        block_len <- min(get_block_length(types))
+    }
+    blocks <- .ArrayBlocks(x_dim, block_len)
+    lapply(seq_along(blocks),
+        function(i) {
+            subarrays <- lapply(dots,
+                function(x) {
+                    subarray <- extract_array_block(x, blocks, i)
+                    if (!is.array(subarray))
+                        subarray <- .as_array_or_matrix(subarray)
+                    subarray
+                })
+            do.call(MAPPLY, subarrays)
+        })
+}
+
+### A Reduce-like function.
 block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
                                BREAKIF=NULL, block_len=NULL)
 {
@@ -201,7 +263,7 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
     for (i in seq_along(blocks)) {
         subarray <- extract_array_block(x, blocks, i)
         if (!is.array(subarray))
-            subarray <- as.array(subarray)
+            subarray <- .as_array_or_matrix(subarray)
         val <- APPLY(subarray)
         reduced <- REDUCE(reduced, val)
         if (!is.null(BREAKIF) && BREAKIF(reduced))
@@ -212,19 +274,11 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### 2 helper functions to process a matrix-like object by blocks of columns
+### Walking on the blocks of columns
 ###
-
-colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
-{
-    x_dim <- dim(x)
-    if (length(x_dim) != 2L)
-        stop("'x' must be a matrix-like object")
-    ## We're going to walk along the columns so need to increase the block
-    ## length so each block is made of at least one column.
-    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, block_len=block_len)
-}
+### 2 convenience wrappers around block_APPLY() and block_APPLY_REDUCE() to
+### process a matrix-like object by block of columns.
+###
 
 colblock_APPLY <- function(x, APPLY, ...)
 {
@@ -235,13 +289,17 @@ colblock_APPLY <- function(x, APPLY, ...)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    blocks <- .ArrayBlocks(x_dim, block_len)
-    lapply(seq_along(blocks),
-        function(i) {
-            submatrix <- extract_array_block(x, blocks, i)
-            if (!is.matrix(submatrix))
-                submatrix <- as.matrix(submatrix)
-            APPLY(submatrix, ...)
-        })
+    block_APPLY(x, APPLY, ..., block_len=block_len)
+}
+
+colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
+{
+    x_dim <- dim(x)
+    if (length(x_dim) != 2L)
+        stop("'x' must be a matrix-like object")
+    ## We're going to walk along the columns so need to increase the block
+    ## length so each block is made of at least one column.
+    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
+    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, block_len=block_len)
 }
 
