@@ -8,7 +8,7 @@ Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, Sequencing, Annotation, Coverage, GenomeAnnotation
-Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.42)
+Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.43)
 Imports: stats, IRanges (>= 2.5.17), rhdf5
 Suggests: h5vcData, SummarizedExperiment, GenomicRanges,
 	BiocStyle, knitr, rmarkdown

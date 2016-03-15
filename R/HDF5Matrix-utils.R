@@ -59,7 +59,7 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
         numeric(nrow(x))   # nvals
     )
     reduced <- colblock_APPLY_REDUCE(x, APPLY, REDUCE, reduced)
-    reduced[[1L]] / reduced[[2L]]
+    reduced[ , 1L] / reduced[ , 2L]
 }
 
 .HDF5Matrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)

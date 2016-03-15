@@ -1,8 +1,9 @@
 a1 <- array(sample(5L, 150, replace=TRUE), c(5, 10, 3))  # integer array
-block_sizes1 <- c(12L, 20L, 50L, 10000L)
 a2 <- a1 + runif(150) - 0.5                              # numeric array
-block_sizes2 <- 2L * block_sizes1
 m2 <- a2[ , , 2]                                         # numeric matrix
+
+block_sizes1 <- c(12L, 20L, 50L, 10000L)
+block_sizes2 <- 2L * block_sizes1
 
 test_Arith_and_Math_HDF5Array <- function()
 {
@@ -67,7 +68,7 @@ test_Summary_HDF5Array <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
-    test_HDF5Array_block_Summary <- function(.Generic, a, block_sizes) {
+    test_Summary <- function(.Generic, a, block_sizes) {
         GENERIC <- match.fun(.Generic)
         target1 <- GENERIC(a)
         target2 <- GENERIC(a, na.rm=TRUE)
@@ -90,19 +91,19 @@ test_Summary_HDF5Array <- function()
     a[2, 9, 2] <- NA  # same as a[[92]] <- NA
     #for (.Generic in c("max", "min", "range", "sum", "prod")) {
     for (.Generic in c("max", "min", "range", "sum"))
-        test_HDF5Array_block_Summary(.Generic, a, block_sizes1)
+        test_Summary(.Generic, a, block_sizes1)
 
     ## on a numeric array
     a <- a2
     a[2, 9, 2] <- NA  # same as a[[92]] <- NA
     a[2, 10, 2] <- Inf  # same as a[[97]] <- Inf
     for (.Generic in c("max", "min", "range", "sum", "prod"))
-        test_HDF5Array_block_Summary(.Generic, a, block_sizes2)
+        test_Summary(.Generic, a, block_sizes2)
 
     ## on a logical array
     a <- array(c(rep(NA, 62), rep(TRUE, 87), FALSE), c(5, 10, 3))
     for (.Generic in c("any", "all"))
-        test_HDF5Array_block_Summary(.Generic, a, block_sizes1)
+        test_Summary(.Generic, a, block_sizes1)
 }
 
 test_mean_HDF5Array <- function()
