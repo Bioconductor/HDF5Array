@@ -5,19 +5,33 @@
 
 setClass("HDF5Array",
     representation(
-        file="character",        # single string
-        group="character",       # single string
-        name="character",        # dataset name
-        type="character",        # single string
-        h5index="list",          # list of N integer vectors, one per dimension
-                                 # in the HDF5 dataset
-        is_transposed="logical"  # is it transposed with respect to the HDF5
-                                 # layout?
+        file="character",         # Single string
+        group="character",        # Single string
+        name="character",         # Dataset name
+        h5val1="ANY",             # First value in the dataset
+        h5index="list",           # List of N integer vectors, one per
+                                  # dimension in the HDF5 dataset.
+        is_transposed="logical",  # Is it transposed with respect to the HDF5
+                                  # layout?
+        delayed_ops="list"        # List of expressions representing functions
+                                  # F1, F2, etc... of single variable 'ans'.
+                                  # Each function must return an array of the
+                                  # same dimensions as original array 'ans'.
+                                  # as.array() will pass the values thru
+                                  # Fn(...F2(F1())) before returning them to
+                                  # the user.
     ),
     prototype(
         is_transposed=FALSE
     )
 )
+
+.apply_delayed_ops <- function(ans, delayed_ops)
+{
+    for (expr in delayed_ops)
+        ans <- eval(expr)
+    ans
+}
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -42,7 +56,9 @@ setMethod("t", "HDF5Array",
 
 ### If 'x' is an HDF5Array object, 'type(x)' must always return the same
 ### as 'typeof(as.array(x))'. For internal use only.
-setMethod("type", "HDF5Array", function(x) x@type)
+setMethod("type", "HDF5Array",
+    function(x) typeof(.apply_delayed_ops(x@h5val1, x@delayed_ops))
+)
 
 ### The index() getter and setter are for internal use only.
 
@@ -160,7 +176,7 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 
 ### Will fail if the dataset is empty (i.e. if at least one of its dimensions
 ### is 0).
-.read_h5dataset_first_val <- function(file, group, name, ndim)
+.read_h5dataset_val1 <- function(file, group, name, ndim)
 {
     h5index <- rep.int(list(1L), ndim)
     ans <- .read_h5dataset_slice(file, group, name, h5index)
@@ -173,11 +189,10 @@ HDF5Array <- function(file, group, name)
     h5dim <- .get_h5dataset_dim(file, group, name)
     ## Will fail if the dataset is empty. Is there a better way to obtain
     ## the type information?
-    first_val <- .read_h5dataset_first_val(file, group, name, length(h5dim))
-    type <- typeof(first_val)
+    h5val1 <- .read_h5dataset_val1(file, group, name, length(h5dim))
     h5index <- lapply(h5dim, seq_len)
     new2("HDF5Array", file=file, group=group, name=name,
-                      type=type, h5index=h5index)
+                      h5val1=h5val1, h5index=h5index)
 }
 
 
@@ -208,7 +223,7 @@ HDF5Array <- function(file, group, name)
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
     if (isEmpty(x)) {
-        ans <- new(type(x))
+        ans <- x@h5val1[0]
         dim(ans) <- .get_HDF5Array_dim_before_transpose(x)
     } else {
         ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@h5index)
@@ -226,7 +241,7 @@ HDF5Array <- function(file, group, name)
             stop("can't do as.array() on this object, sorry")
         ans <- t(ans)
     }
-    ans
+    .apply_delayed_ops(ans, x@delayed_ops)
 }
 
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
@@ -357,7 +372,7 @@ setMethod("[", "HDF5Array", .extract_subarray)
     h5index <- mapply(`[[`, x@h5index, subscript, SIMPLIFY=FALSE)
     ans <- .read_h5dataset_slice(x@file, x@group, x@name, h5index)
     stopifnot(length(ans) == 1L)  # sanity check
-    ans[[1L]]  # drop any attribute
+    .apply_delayed_ops(ans[[1L]], x@delayed_ops)
 }
 
 setMethod("[[", "HDF5Array",
