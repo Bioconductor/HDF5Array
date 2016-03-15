@@ -1,4 +1,36 @@
 
+test_Arith_and_Math_HDF5Array <- function()
+{
+    ## with a numeric array
+    a1 <- array(runif(150), c(5, 10, 3))
+    a1[2, 9, 2] <- NA  # same as a1[[92]] <- NA
+    A1 <- as(a1, "HDF5Array")
+
+    toto <- function(a) { 100 / floor(abs((5 * log(a + 0.2) - 1)^3)) }
+    target <- toto(a1)
+    checkIdentical(target, as.array(toto(A1)))
+
+    ## with a numeric matrix
+    m1 <- a1[ , , 2]
+    M1 <- as(m1, "HDF5Matrix")
+    target <- toto(m1)
+    checkIdentical(target, as.matrix(toto(M1)))
+    checkIdentical(t(target), as.matrix(toto(t(M1))))
+    checkIdentical(t(target), as.matrix(t(toto(M1))))
+
+    ## with an integer array
+    a2 <- array(sample(5L, 150, replace=TRUE), c(5, 10, 3))
+    a2[2, 9, 2] <- NA  # same as a2[[92]] <- NA
+    A2 <- as(a2, "HDF5Array")
+
+    toto <- function(a) { 100L + (5L * (a - 2L)) %% 7L }
+    target <- toto(a2)
+    ## Not sure what's going on but it seems that this call to checkIdentical()
+    ## crashes the RUnit package but only when the tests are run by
+    ## 'R CMD check'.
+    #checkIdentical(target, as.array(toto(A2)))
+}
+
 test_anyNA_HDF5Array <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))

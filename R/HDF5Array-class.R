@@ -13,24 +13,46 @@ setClass("HDF5Array",
                                   # dimension in the HDF5 dataset.
         is_transposed="logical",  # Is it transposed with respect to the HDF5
                                   # layout?
-        delayed_ops="list"        # List of expressions representing functions
-                                  # F1, F2, etc... of single variable 'ans'.
-                                  # Each function must return an array of the
-                                  # same dimensions as original array 'ans'.
-                                  # as.array() will pass the values thru
-                                  # Fn(...F2(F1())) before returning them to
-                                  # the user.
+        delayed_ops="list"        # List of delayed operations. See below for
+                                  # the details.
     ),
     prototype(
         is_transposed=FALSE
     )
 )
 
-.apply_delayed_ops <- function(ans, delayed_ops)
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Handle delayed operations
+###
+### The 'delayed_ops' slot represents the list of delayed operations op1, op2,
+### etc... Each delayed operation is itself represented by a list of length 3:
+###   1) The name of the function to call (e.g. "+" or "log").
+###   2) The list of "left arguments" i.e. the list of arguments to place
+###      before the array in the function call.
+###   3) The list of "right arguments" i.e. the list of arguments to place
+###      after the array in the function call.
+### Each operation must return an array of the same dimensions as the original
+### array.
+###
+
+register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list())
 {
-    for (expr in delayed_ops)
-        ans <- eval(expr)
-    ans
+    delayed_op <- list(FUN, Largs, Rargs)
+    x@delayed_ops <- c(x@delayed_ops, list(delayed_op))
+    x
+}
+
+### 'a' will typically be an ordinary array or vector.
+.apply_delayed_ops <- function(a, delayed_ops)
+{
+    for (delayed_op in delayed_ops) {
+        FUN <- delayed_op[[1L]]
+        Largs <- delayed_op[[2L]]
+        Rargs <- delayed_op[[3L]]
+        a <- do.call(FUN,  c(Largs, list(a), Rargs))
+    }
+    a
 }
 
 

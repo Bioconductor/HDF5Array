@@ -29,7 +29,7 @@ get_block_length <- function(type)
         stop("unsupported type(s): ",  in1string)
     }
     block_size <- getOption("HDF5Array.block.size",
-                            default=.DEFAULT_BLOCK_SIZE)
+                            default=DEFAULT_BLOCK_SIZE)
     as.integer(block_size / type_size)
 }
 

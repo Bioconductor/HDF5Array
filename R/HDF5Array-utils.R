@@ -4,6 +4,43 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### "Arith" and "Math" group generics
+###
+### Arith members: "+", "-", "*", "/", "^", "%%", "%/%"
+### Math members: abs, sign, sqrt, ceiling, floor, and many more...
+###
+
+.HDF5Array_delayed_Arith <- function(.Generic, e1, e2)
+{
+    if (isSingleNumberOrNA(e2)) {
+        ans <- register_delayed_op(e1, .Generic, Rargs=list(e2))
+    } else if (isSingleNumberOrNA(e1)) {
+        ans <- register_delayed_op(e2, .Generic, Largs=list(e1))
+    } else {
+        stop(wmsg("arithmetic operations on HDF5Array objects are supported ",
+                  "only when one operand is a single number for now"))
+    }
+    ans
+}
+
+setMethod("Arith", c("HDF5Array", "numeric"),
+    function(e1, e2) .HDF5Array_delayed_Arith(.Generic, e1, e2)
+)
+
+setMethod("Arith", c("numeric", "HDF5Array"),
+    function(e1, e2) .HDF5Array_delayed_Arith(.Generic, e1, e2)
+)
+
+setMethod("Arith", c("HDF5Array", "HDF5Array"),
+    function(e1, e2) .HDF5Array_delayed_Arith(.Generic, e1, e2)
+)
+
+setMethod("Math", "HDF5Array",
+    function(x) register_delayed_op(x, .Generic)
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### A low-level utility for putting HDF5Array object in a "straight" form
 ###
 ### Untranspose the HDF5Array object and put its rows and columns in their

@@ -43,6 +43,7 @@ exportMethods(
     "[", "[[",
     c,
     t,
+    #"+", "-", "*", "/", "^", "%%", "%/%",  # "Arith" group generic
     anyNA,
     max, min, range, sum, prod, any, all,  # "Summary" group generic
     mean,
