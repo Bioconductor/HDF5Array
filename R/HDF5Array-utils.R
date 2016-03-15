@@ -204,6 +204,28 @@ setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
 ### Members: ==, !=, <=, >=, <, >
 ###
 
+.HDF5Array_delayed_Compare_with_right_vector <- function(.Generic, e1, e2)
+{
+    if (!is.atomic(e2))
+        stop(wmsg("comparison between an ", class(e1), " object ",
+                  "and a ", class(e2), " is not supported"))
+    if (length(e2) != 1L)
+        stop(wmsg("comparison between an ", class(e1), " object ",
+                  "and an atomic vector of length != 1 is not supported"))
+    register_delayed_op(e1, .Generic, Rargs=list(e2))
+}
+
+.HDF5Array_delayed_Compare_with_left_vector <- function(.Generic, e1, e2)
+{
+    if (!is.atomic(e1))
+        stop(wmsg("comparison between a ", class(e1), " ",
+                  "and an ", class(e2), " object is not supported"))
+    if (length(e1) != 1L)
+        stop(wmsg("comparison between an atomic vector of length != 1 ",
+                  "and an ", class(e2), " object is not supported"))
+    register_delayed_op(e2, .Generic, Largs=list(e1))
+}
+
 .HDF5Array_block_Compare <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))
@@ -216,7 +238,17 @@ setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
     ans
 }
 
-setMethod("Compare", "HDF5Array",
+setMethod("Compare", c("HDF5Array", "vector"),
+    function(e1, e2)
+        .HDF5Array_delayed_Compare_with_right_vector(.Generic, e1, e2)
+)
+
+setMethod("Compare", c("vector", "HDF5Array"),
+    function(e1, e2)
+        .HDF5Array_delayed_Compare_with_left_vector(.Generic, e1, e2)
+)
+
+setMethod("Compare", c("HDF5Array", "HDF5Array"),
     function(e1, e2)
         .HDF5Array_block_Compare(.Generic, e1, e2)
 )
