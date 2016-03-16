@@ -206,31 +206,60 @@ setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
 
 .HDF5Array_delayed_Compare_with_right_vector <- function(.Generic, e1, e2)
 {
+    e1_class <- class(e1)
+    e2_class <- class(e2)
+    if (!is.vector(e2))
+        e2 <- as.vector(e2)
     if (!is.atomic(e2))
-        stop(wmsg("comparison between an ", class(e1), " object ",
-                  "and a ", class(e2), " is not supported"))
-    if (length(e2) != 1L)
-        stop(wmsg("comparison between an ", class(e1), " object ",
-                  "and an atomic vector of length != 1 is not supported"))
-    register_delayed_op(e1, .Generic, Rargs=list(e2))
+        stop(wmsg("comparison between ", e1_class, " and ", e2_class, " ",
+                  "objects is not supported"))
+    e2_len <- length(e2)
+    if (e2_len == 1L)
+        return(register_delayed_op(e1, .Generic, Rargs=list(e2)))
+    e1_len <- length(e1)
+    if (e2_len > e1_len)
+        stop(wmsg("right object is longer than left object"))
+    e1_nrow <- nrow(e1)
+    if (e1_nrow != 0L) {
+        if (e2_len == 0L || e1_nrow %% e2_len != 0L)
+            stop(wmsg("length of right object is not a divisor ",
+                      "of number of rows of left object"))
+        e2 <- rep(e2, length.out=nrow(e1))
+    }
+    register_delayed_op(e1, .Generic, Rargs=list(e2),
+                                      recycle_along_last_dim=e1@is_transposed)
 }
 
 .HDF5Array_delayed_Compare_with_left_vector <- function(.Generic, e1, e2)
 {
+    e1_class <- class(e1)
+    e2_class <- class(e2)
+    if (!is.vector(e1))
+        e1 <- as.vector(e1)
     if (!is.atomic(e1))
-        stop(wmsg("comparison between a ", class(e1), " ",
-                  "and an ", class(e2), " object is not supported"))
-    if (length(e1) != 1L)
-        stop(wmsg("comparison between an atomic vector of length != 1 ",
-                  "and an ", class(e2), " object is not supported"))
-    register_delayed_op(e2, .Generic, Largs=list(e1))
+        stop(wmsg("comparison between ", e1_class, " and ", e2_class, " ",
+                  "objects is not supported"))
+    e1_len <- length(e1)
+    if (e1_len == 1L)
+        return(register_delayed_op(e2, .Generic, Largs=list(e1)))
+    e2_len <- length(e2)
+    if (e1_len > e2_len)
+        stop(wmsg("left object is longer than right object"))
+    e2_nrow <- nrow(e2)
+    if (e2_nrow != 0L) {
+        if (e1_len == 0L || e2_nrow %% e1_len != 0L)
+            stop(wmsg("length of left object is not a divisor ",
+                      "of number of rows of right object"))
+        e1 <- rep(e1, length.out=nrow(e2))
+    }
+    register_delayed_op(e2, .Generic, Largs=list(e1),
+                                      recycle_along_last_dim=e2@is_transposed)
 }
 
 .HDF5Array_block_Compare <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))
-        stop("comparing 2 ", class(e1), " objects with different ",
-             "dimensions is not supported yet")
+        stop("non-conformable arrays")
     GENERIC <- match.fun(.Generic)
     res_list <- block_MAPPLY(.Generic, e1, e2)
     ans <- unlist(res_list, recursive=FALSE, use.names=FALSE)
@@ -250,6 +279,21 @@ setMethod("Compare", c("vector", "HDF5Array"),
 
 setMethod("Compare", c("HDF5Array", "HDF5Array"),
     function(e1, e2)
-        .HDF5Array_block_Compare(.Generic, e1, e2)
+    {
+        e1_dim <- dim(e1)
+        e2_dim <- dim(e2)
+        if (identical(e1_dim, e2_dim))
+            return(.HDF5Array_block_Compare(.Generic, e1, e2))
+        ## Effective dimensions.
+        effdim_idx1 <- which(e1_dim != 1L)
+        effdim_idx2 <- which(e2_dim != 1L)
+        if ((length(effdim_idx1) == 1L) == (length(effdim_idx2) == 1L))
+            stop("non-conformable arrays")
+        if (length(effdim_idx1) == 1L) {
+            .HDF5Array_delayed_Compare_with_left_vector(.Generic, e1, e2)
+        } else {
+            .HDF5Array_delayed_Compare_with_right_vector(.Generic, e1, e2)
+        }
+    }
 )
 

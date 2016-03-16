@@ -127,7 +127,20 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
     for (delayed_op in delayed_ops) {
         FUN <- delayed_op[[1L]]
         call_args <- prepare_call_args(a, delayed_op)
+
+        ## Perform the delayed operation.
         a <- do.call(FUN, call_args)
+
+        ## Some vectorized operations on an ordinary array can drop the dim
+        ## attribute (e.g. comparing a zero-col matrix with an atomic vector).
+        a_new_dim <- dim(a)
+        if (is.null(a_new_dim)) {
+            ## Restore the dim attribute.
+            dim(a) <- a_dim
+        } else {
+            ## Sanity check.
+            stopifnot(identical(a_dim, a_new_dim))
+        }
     }
     a
 }

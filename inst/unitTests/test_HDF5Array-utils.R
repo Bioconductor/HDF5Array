@@ -133,43 +133,76 @@ test_Compare_HDF5Array <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
-    ## comparing an HDF5Array object with an atomic vector of length 1
+    ## comparison between an HDF5Array object and a vector-like object that
+    ## has a length that is a divisor of the number of rows of the HDF5Array
+    ## object
     a <- a2
     a[2, 9, 2] <- NA  # same as a[[92]] <- NA
     A <- as(a, "HDF5Array")
+    m <- m2
+    M <- as(m2, "HDF5Matrix")
 
-    checkIdentical(a == a[[1]], as.array(A == A[[1]]))
-    checkIdentical(a[[1]] == a, as.array(A[[1]] == A))
+    for (.Generic in c("==", "!=", "<=", ">=", "<", ">")) {
+        GENERIC <- match.fun(.Generic)
 
-    checkIdentical(a != a[[1]], as.array(A != A[[1]]))
-    checkIdentical(a[[1]] != a, as.array(A[[1]] != A))
+        target_current <- list(
+            list(GENERIC(m, m[ , 1]), GENERIC(M, M[ , 1])),
+            list(GENERIC(m[ , 2], m), GENERIC(M[ , 2], M))
+        )
+        for (i in seq_along(target_current)) { 
+            target <- target_current[[i]][[1L]]
+            current <- target_current[[i]][[2L]]
+            checkIdentical(target, as.array(current))
+            checkIdentical(t(target), as.array(t(current)))
+            checkIdentical(target[-2, 8:5], as.array(current[-2, 8:5]))
+            checkIdentical(t(target[-2, 8:5]), as.array(t(current[-2, 8:5])))
+            checkIdentical(target[-2, 0], as.array(current[-2, 0]))
+            checkIdentical(t(target[-2, 0]), as.array(t(current[-2, 0])))
+            checkIdentical(target[0, ], as.array(current[0, ]))
+            checkIdentical(t(target[0, ]), as.array(t(current[0, ])))
+        }
 
-    checkIdentical(a <= a[[1]], as.array(A <= A[[1]]))
-    checkIdentical(a[[1]] >= a, as.array(A[[1]] >= A))
+        target_current <- list(
+            list(GENERIC(t(m), m[1 , ]), GENERIC(t(M), M[1 , ])),
+            list(GENERIC(m[2 , ], t(m)), GENERIC(M[2 , ], t(M))),
+            list(GENERIC(t(m), m[1 , 6:10]), GENERIC(t(M), M[1 , 6:10])),
+            list(GENERIC(m[2 , 8:7], t(m)), GENERIC(M[2 , 8:7], t(M)))
+        )
+        for (i in seq_along(target_current)) {
+            target <- target_current[[i]][[1L]]
+            current <- target_current[[i]][[2L]]
+            checkIdentical(target, as.array(current))
+            checkIdentical(t(target), as.array(t(current)))
+            checkIdentical(target[8:5, -2], as.array(current[8:5, -2]))
+            checkIdentical(t(target[8:5, -2]), as.array(t(current[8:5, -2])))
+            checkIdentical(target[0, -2], as.array(current[0, -2]))
+            checkIdentical(t(target[0, -2]), as.array(t(current[0, -2])))
+            checkIdentical(target[ , 0], as.array(current[ , 0]))
+            checkIdentical(t(target[ , 0]), as.array(t(current[ , 0])))
+        }
 
-    checkIdentical(a >= a[[1]], as.array(A >= A[[1]]))
-    checkIdentical(a[[1]] <= a, as.array(A[[1]] <= A))
-
-    checkIdentical(a < a[[1]], as.array(A < A[[1]]))
-    checkIdentical(a[[1]] > a, as.array(A[[1]] > A))
-
-    checkIdentical(a > a[[1]], as.array(A > A[[1]]))
-    checkIdentical(a[[1]] < a, as.array(A[[1]] < A))
-
-    for (block_size in block_sizes2) {
-            options(HDF5Array.block.size=block_size)
-            checkIdentical(sum(a == a[[1]], na.rm=TRUE),
-                           sum(A == A[[1]], na.rm=TRUE))
-            checkIdentical(sum(a != a[[1]], na.rm=TRUE),
-                           sum(A != A[[1]], na.rm=TRUE))
-            checkIdentical(sum(a <= a[[1]], na.rm=TRUE),
-                           sum(A <= A[[1]], na.rm=TRUE))
-            checkIdentical(sum(a >= a[[1]], na.rm=TRUE),
-                           sum(A >= A[[1]], na.rm=TRUE))
-            checkIdentical(sum(a < a[[1]], na.rm=TRUE),
-                           sum(A < A[[1]], na.rm=TRUE))
-            checkIdentical(sum(a > a[[1]], na.rm=TRUE),
-                           sum(A > A[[1]], na.rm=TRUE))
+        target_current <- list(
+            list(GENERIC(a, m[ , 1]), GENERIC(A, M[ , 1])),
+            list(GENERIC(m[ , 1], a), GENERIC(M[ , 1], A)),
+            list(GENERIC(a, a[ , 1, 1]), GENERIC(A, A[ , 1, 1])),
+            list(GENERIC(a[ , 1, 1], a), GENERIC(A[ , 1, 1], A)),
+            list(GENERIC(a, a[[1]]), GENERIC(A, A[[1]])),
+            list(GENERIC(a[[1]], a), GENERIC(A[[1]], A))
+        )
+        for (i in seq_along(target_current)) {
+            target <- target_current[[i]][[1L]]
+            current <- target_current[[i]][[2L]]
+            checkIdentical(target, as.array(current))
+            checkIdentical(target[5:3, , -2], as.array(current[5:3, , -2]))
+            checkIdentical(target[0, 0, 0], as.array(current[0, 0, 0]))
+            checkIdentical(target[0, 0, -2], as.array(current[0, 0, -2]))
+            checkIdentical(target[ , 0, ], as.array(current[ , 0, ]))
+            for (block_size in block_sizes2) {
+                options(HDF5Array.block.size=block_size)
+                checkIdentical(sum(target, na.rm=TRUE),
+                               sum(current, na.rm=TRUE))
+            }
+        }
     }
 
     ## comparing 2 HDF5Array objects
