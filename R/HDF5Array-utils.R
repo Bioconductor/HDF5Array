@@ -296,21 +296,37 @@ setGeneric("apply", signature="X")
 .simplify_apply_answer <- function(ans)
 {
     if (!all(vapply(ans, is.atomic, logical(1), USE.NAMES=FALSE)))
-        return(ans)
+        return(ans)  # won't simplify
+
     ans_lens <- lengths(ans, use.names=FALSE)
-    ans_nrow <- ans_lens[[1L]]
-    if (!all(ans_lens == ans_nrow))
-        return(ans)
-    ans_names <- names(ans)
-    ans <- unlist(ans, use.names=FALSE)
-    if (ans_nrow == 1L)
-        return(setNames(ans, ans_names))
-    if (is.null(ans_names)) {
-        dimnames <- NULL
+    mat_nrow <- ans_lens[[1L]]
+    if (!all(ans_lens == mat_nrow))
+        return(ans)  # won't simplify
+
+    mat_data <- unlist(unname(ans))
+    if (mat_nrow == 0L)
+        return(mat_data)  # zero-length atomic vector
+
+    mat_colnames <- names(ans)
+    if (mat_nrow == 1L)
+        return(setNames(mat_data, mat_colnames))  # atomic vector parallel
+                                                  # to 'ans'
+
+    ## Simplify as matrix.
+    mat_data_names <- names(mat_data)  # comes from the 'ans' inner names
+    if (is.null(mat_data_names)) {
+        mat_rownames <- NULL
     } else {
-        dimnames <- list(NULL, ans_names)
+        mat_rownames <- head(mat_data_names, n=mat_nrow)
+        if (!all(mat_data_names == mat_rownames))
+            mat_rownames <- NULL
     }
-    matrix(ans, nrow=ans_nrow, dimnames=dimnames)
+    if (is.null(mat_rownames) && is.null(mat_colnames)) {
+        mat_dimnames <- NULL
+    } else {
+        mat_dimnames <- list(mat_rownames, mat_colnames)
+    }
+    matrix(mat_data, ncol=length(ans), dimnames=mat_dimnames)
 }
 
 ### MARGIN must be a single integer.
@@ -325,23 +341,23 @@ setGeneric("apply", signature="X")
     if (MARGIN < 1L || MARGIN > length(X_dim))
         stop("'MARGIN' must be >= 1 and <= length(dim(X))")
 
-    apply_FUN_to_slice <- function(i) {
-        subscript <- rep.int(alist(foo=), length(X_dim))
-        subscript[[MARGIN]] <- i
-        args <- c(list(X), subscript)
-        slice <- do.call("[", args)
-        if (length(X_dim) == 3L && is(X, "HDF5Array"))
-            slice <- make_HDF5Matrix_from_3D_array(slice, MARGIN)
-        FUN(slice, ...)
+    if (X_dim[[MARGIN]] == 0L) {
+        ## base::apply seems to be doing something like that!
+        ans <- FUN(X, ...)
+        return(as.vector(ans[0L]))
     }
-
-    if (X_dim[[MARGIN]] == 0L)
-        return(apply_FUN_to_slice(0L)[0L])  # that's what base::apply seems
-                                            # to be doing!
 
     ans_names <-  dimnames(X)[[MARGIN]]
     ans <- lapply(setNames(seq_len(X_dim[[MARGIN]]), ans_names),
-                  apply_FUN_to_slice)
+        function(i) {
+            subscript <- rep.int(alist(foo=), length(X_dim))
+            subscript[[MARGIN]] <- i
+            args <- c(list(X), subscript)
+            slice <- do.call("[", args)
+            if (length(X_dim) == 3L && is(X, "HDF5Array"))
+                slice <- make_HDF5Matrix_from_3D_array(slice, MARGIN)
+            FUN(slice, ...)
+        })
 
     ## Try to simplify the answer.
     .simplify_apply_answer(ans)

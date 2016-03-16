@@ -249,26 +249,40 @@ test_HDF5Array_mean <- function()
 
 test_HDF5Array_apply <- function()
 {
+    test_apply <- function(a) {
+        A <- as(a, "HDF5Array")
+        for (MARGIN in seq_along(dim(a))) {
+            checkIdentical(apply(a, MARGIN, dim),
+                           apply(A, MARGIN, dim))
+            checkIdentical(apply(a, MARGIN, sum),
+                           apply(A, MARGIN, sum))
+            checkIdentical(apply(a, MARGIN, sum, na.rm=TRUE),
+                           apply(A, MARGIN, sum, na.rm=TRUE))
+            ## row/colSums and row/colMeans don't work yet in that case.
+            if (dim(A)[[MARGIN]] == 0L && length(dim(A)) >= 3L)
+                next
+            checkIdentical(apply(a, MARGIN, rowSums),
+                           apply(A, MARGIN, rowSums))
+            checkIdentical(apply(a, MARGIN, rowSums, na.rm=TRUE),
+                           apply(A, MARGIN, rowSums, na.rm=TRUE))
+            checkIdentical(apply(a, MARGIN, colMeans),
+                           apply(A, MARGIN, colMeans))
+            checkIdentical(apply(a, MARGIN, colMeans, na.rm=TRUE),
+                           apply(A, MARGIN, colMeans, na.rm=TRUE))
+        }
+    }
+
     a <- a1
     a[2, 9, 2] <- NA  # same as a[[92]] <- NA
-    #dimnames(a) <- list(NULL, NULL, LETTERS[1:3])
-    A <- as(a, "HDF5Array")
+    test_apply(a)
+    test_apply(a[ , , 0])
 
-    for (MARGIN in seq_along(dim(a))) {
-        checkIdentical(apply(a, MARGIN, dim),
-                       apply(A, MARGIN, dim))
-        checkIdentical(apply(a, MARGIN, sum),
-                       apply(A, MARGIN, sum))
-        checkIdentical(apply(a, MARGIN, sum, na.rm=TRUE),
-                       apply(A, MARGIN, sum, na.rm=TRUE))
-        checkIdentical(apply(a, MARGIN, rowSums),
-                       apply(A, MARGIN, rowSums))
-        checkIdentical(apply(a, MARGIN, rowSums, na.rm=TRUE),
-                       apply(A, MARGIN, rowSums, na.rm=TRUE))
-        checkIdentical(apply(a, MARGIN, colMeans),
-                       apply(A, MARGIN, colMeans))
-        checkIdentical(apply(a, MARGIN, colMeans, na.rm=TRUE),
-                       apply(A, MARGIN, colMeans, na.rm=TRUE))
-    }
+    dimnames(a) <- list(NULL, NULL, LETTERS[1:3])
+    test_apply(a)
+    test_apply(a[ , , 0])
+
+    dimnames(a) <- list(NULL, letters[1:10], LETTERS[1:3])
+    test_apply(a)
+    test_apply(a[ , , 0])
 }
 

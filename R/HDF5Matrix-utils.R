@@ -18,7 +18,7 @@
 .HDF5Matrix_block_rowSums <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "rowSums")
-    if (!is.array(x) && x@is_transposed)
+    if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
 
     APPLY <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
@@ -30,11 +30,11 @@
 .HDF5Matrix_block_colSums <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "colSums")
-    if (!is.array(x) && x@is_transposed)
+    if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_rowSums(t(x), na.rm=na.rm, dims=dims))
 
     colsums_list <- colblock_APPLY(x, colSums, na.rm=na.rm)
-    unlist(colsums_list, recursive=FALSE, use.names=FALSE)
+    unlist(colsums_list, recursive=FALSE)
 }
 
 setMethod("rowSums", "HDF5Matrix", .HDF5Matrix_block_rowSums)
@@ -43,7 +43,7 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
 .HDF5Matrix_block_rowMeans <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "rowMeans")
-    if (!is.array(x) && x@is_transposed)
+    if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_colMeans(t(x), na.rm=na.rm, dims=dims))
 
     APPLY <- function(submatrix) {
@@ -65,11 +65,11 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
 .HDF5Matrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "colMeans")
-    if (!is.array(x) && x@is_transposed)
+    if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_rowMeans(t(x), na.rm=na.rm, dims=dims))
 
     colmeans_list <- colblock_APPLY(x, colMeans, na.rm=na.rm)
-    unlist(colmeans_list, recursive=FALSE, use.names=FALSE)
+    unlist(colmeans_list, recursive=FALSE)
 }
 
 setMethod("rowMeans", "HDF5Matrix", .HDF5Matrix_block_rowMeans)

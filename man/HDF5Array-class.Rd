@@ -39,7 +39,7 @@
 }
 
 \usage{
-HDF5Array(file, group, name)  # constructor function
+HDF5Array(file, group, name, type=NA)  # constructor function
 }
 
 \arguments{
@@ -49,6 +49,10 @@ HDF5Array(file, group, name)  # constructor function
   \item{group, name}{
     The HDF5 group and name of the dataset, as reported by
     \code{\link[rhdf5]{h5ls}}.
+  }
+  \item{type}{
+    \code{NA} or the \emph{R atomic type} (specified as a single string)
+    corresponding to the type of the HDF5 dataset.
   }
 }
 

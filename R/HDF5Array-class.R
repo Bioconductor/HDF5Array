@@ -5,16 +5,16 @@
 
 setClass("HDF5Array",
     representation(
-        file="character",         # Single string
-        group="character",        # Single string
-        name="character",         # Dataset name
-        h5val1="ANY",             # First value in the dataset
-        h5index="list",           # List of N integer vectors, one per
-                                  # dimension in the HDF5 dataset.
-        is_transposed="logical",  # Is it transposed with respect to the HDF5
-                                  # layout?
-        delayed_ops="list"        # List of delayed operations. See below for
-                                  # the details.
+        file="character",           # Single string
+        group="character",          # Single string
+        name="character",           # Dataset name
+        h5dataset_first_val="ANY",  # First value in the HDF5 dataset
+        h5index="list",             # List of N integer vectors, one per
+                                    # dimension in the HDF5 dataset.
+        is_transposed="logical",    # Is it transposed with respect to the
+                                    # HDF5 dataset?
+        delayed_ops="list"          # List of delayed operations. See below for
+                                    # the details.
     ),
     prototype(
         is_transposed=FALSE
@@ -23,7 +23,7 @@ setClass("HDF5Array",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Handle delayed operations
+### Management of delayed operations
 ###
 ### The 'delayed_ops' slot represents the list of delayed operations op1, op2,
 ### etc... Each delayed operation is itself represented by a list of length 4:
@@ -165,6 +165,8 @@ setMethod("t", "HDF5Array",
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Accessors
 ###
+### None of these accessors actually needs to access the HDF5 file.
+###
 
 ### The index() getter and setter are for internal use only.
 
@@ -188,11 +190,9 @@ setMethod("length", "HDF5Array", function(x) prod(lengths(index(x))))
 
 setMethod("isEmpty", "HDF5Array", function(x) any(lengths(index(x)) == 0L))
 
-.get_HDF5Array_dim_before_transpose <- function(x) lengths(index(x))
-
 .get_HDF5Array_dim <- function(x)
 {
-    ans <- .get_HDF5Array_dim_before_transpose(x)
+    ans <- lengths(index(x))
     if (x@is_transposed)
         ans <- rev(ans)
     ans
@@ -200,17 +200,11 @@ setMethod("isEmpty", "HDF5Array", function(x) any(lengths(index(x)) == 0L))
 
 setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
 
-.get_HDF5Array_dimnames_before_transpose <- function(x)
+.get_HDF5Array_dimnames <- function(x)
 {
     ans <- lapply(index(x), names)
     if (is.null(unlist(ans)))
         return(NULL)
-    ans
-}
-
-.get_HDF5Array_dimnames <- function(x)
-{
-    ans <- .get_HDF5Array_dimnames_before_transpose(x)
     if (x@is_transposed)
         ans <- rev(ans)
     ans
@@ -257,6 +251,44 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Low-level helpers to read stuff from the HDF5 file
+###
+
+.quiet_h5read <- function(file, group, name, index)
+{
+    ## h5read() emits an annoying warning when it loads integer values that
+    ## cannot be represented in R (and thus are converted to NAs).
+    suppressWarnings(
+        h5read(file, paste(group, name, sep="/"), index=index)
+    )
+}
+
+.get_h5slice_dim <- function(x) lengths(x@h5index)
+
+.get_h5slice_dimnames <- function(x)
+{
+    ans <- lapply(x@h5index, names)
+    if (is.null(unlist(ans)))
+        return(NULL)
+    ans
+}
+
+.read_h5slice <- function(x)
+{
+    h5slice_dim <- .get_h5slice_dim(x)
+    h5slice_is_empty <- any(h5slice_dim == 0L)
+    if (h5slice_is_empty) {
+        ans <- x@h5dataset_first_val[0]
+        dim(ans) <- h5slice_dim
+    } else {
+        ans <- .quiet_h5read(x@file, x@group, x@name, x@h5index)
+    }
+    dimnames(ans) <- .get_h5slice_dimnames(x)
+    ans
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Constructor
 ###
 
@@ -271,33 +303,46 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     H5Sget_simple_extent_dims(H5Dget_space(d))$size
 }
 
-.read_h5dataset_slice <- function(file, group, name, h5index)
-{
-    ## h5read() emits an annoying warning when it loads integer values that
-    ## cannot be represented in R (and thus are converted to NAs).
-    suppressWarnings(
-        h5read(file, paste(group, name, sep="/"), index=h5index)
-    )
-}
-
 ### Will fail if the dataset is empty (i.e. if at least one of its dimensions
 ### is 0).
-.read_h5dataset_val1 <- function(file, group, name, ndim)
+.read_h5dataset_first_val <- function(file, group, name, ndim)
 {
-    h5index <- rep.int(list(1L), ndim)
-    ans <- .read_h5dataset_slice(file, group, name, h5index)
+    index <- rep.int(list(1L), ndim)
+    ans <- .quiet_h5read(file, group, name, index)
     stopifnot(length(ans) == 1L)  # sanity check
     ans[[1L]]  # drop any attribute
 }
 
-HDF5Array <- function(file, group, name)
+HDF5Array <- function(file, group, name, type=NA)
 {
-    h5dim <- .get_h5dataset_dim(file, group, name)
-    ## Will fail if the dataset is empty.
-    h5val1 <- .read_h5dataset_val1(file, group, name, length(h5dim))
-    h5index <- lapply(h5dim, seq_len)
-    new2("HDF5Array", file=file, group=group, name=name,
-                      h5val1=h5val1, h5index=h5index)
+    if (!isSingleStringOrNA(type))
+        stop("'type' must be a single string or NA")
+    h5dataset_dim <- .get_h5dataset_dim(file, group, name)
+    if (any(h5dataset_dim == 0L)) {
+        if (is.na(type))
+            stop(wmsg("This HDF5 dataset is empty! Don't know how to ",
+                      "determine the type of an empty HDF5 dataset at the ",
+                      "moment. Please use the 'type' argument to help me ",
+                      "(see '?HDF5Array' for more information)."))
+        h5dataset_first_val <- match.fun(type)(1)  # fake value
+        if (!is.atomic(h5dataset_first_val))
+            stop("invalid type: ", type)
+    } else {
+        h5dataset_first_val <- .read_h5dataset_first_val(file, group, name,
+                                                         length(h5dataset_dim))
+        detected_type <- typeof(h5dataset_first_val)
+        if (!(is.na(type) || type == detected_type))
+            warning(wmsg("The type specified via the 'type' argument (",
+                         type, ") doesn't match the type of this HDF5 ",
+                         "dataset (", detected_type, "). Ignoring the ",
+                         "former."))
+    }
+    h5index <- lapply(h5dataset_dim, seq_len)
+    new2("HDF5Array", file=file,
+                      group=group,
+                      name=name,
+                      h5dataset_first_val=h5dataset_first_val,
+                      h5index=h5index)
 }
 
 
@@ -327,13 +372,7 @@ HDF5Array <- function(file, group, name)
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    if (isEmpty(x)) {
-        ans <- x@h5val1[0]
-        dim(ans) <- .get_HDF5Array_dim_before_transpose(x)
-    } else {
-        ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@h5index)
-    }
-    dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
+    ans <- .read_h5slice(x)
     ans <- .apply_delayed_ops(ans, x@delayed_ops)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
@@ -397,7 +436,7 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
     file <- paste0(tempfile(), ".h5")
     h5createFile(file)
     h5write(from, file, name)
-    ans <- HDF5Array(file, "/", name)
+    ans <- HDF5Array(file, "/", name, type=type(from))
     dimnames(ans) <- dimnames(from)
     ans
 }

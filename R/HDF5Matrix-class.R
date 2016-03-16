@@ -106,9 +106,9 @@ setAs("matrix", "HDF5Matrix", .from_matrix_to_HDF5Matrix)
 ### Constructor
 ###
 
-HDF5Matrix <- function(file, group, name)
+HDF5Matrix <- function(file, group, name, type=NA)
 {
-    hdf5array <- HDF5Array(file, group, name)
+    hdf5array <- HDF5Array(file, group, name, type=type)
     as(hdf5array, "HDF5Matrix")
 }
 
