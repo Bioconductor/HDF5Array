@@ -188,18 +188,15 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
 .collect_objects <- function(x, ...)
 {
     if (missing(x)) {
-        objects <- list(...)
+        objects <- unname(list(...))
     } else {
-        objects <- list(x, ...)
+        objects <- unname(list(x, ...))
     }
     NULL_idx <- which(S4Vectors:::sapply_isNULL(objects))
     if (length(NULL_idx) != 0L)
         objects <- objects[-NULL_idx]
-    ## TODO: Implement (in C) fast 'elementIs(objects, class)' in S4Vectors
-    ## that does 'sapply(objects, is, class, USE.NAMES=FALSE)', and use it
-    ## here. 'elementIs(objects, "NULL")' should work and be equivalent to
-    ## 'sapply_isNULL(objects)'.
-    if (!all(vapply(objects, is, logical(1), "HDF5Array", USE.NAMES=FALSE)))
+    is_HDF5Array_or_array <- function(x) is(x, "HDF5Array") || is.array(x)
+    if (!all(vapply(objects, is_HDF5Array_or_array, logical(1))))
         stop("the objects to combine must be HDF5Array objects (or NULLs)")
     objects
 }
