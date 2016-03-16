@@ -166,9 +166,8 @@ HDF5Matrix <- function(file, group, name)
     idx1 <- seq_len(m1)
     idx2 <- seq(to=x_nrow, by=1L, length.out=m2)
 
-    ans1 <- as.matrix(x[idx1, , drop=FALSE])
-    ans2 <- as.matrix(x[idx2, , drop=FALSE])
-    storage.mode(ans1) <- storage.mode(ans2) <- "character"
+    ans1 <- format(as.matrix(x[idx1, , drop=FALSE]))
+    ans2 <- format(as.matrix(x[idx2, , drop=FALSE]))
     dots <- rep.int(".", ncol(ans1))
     ans <- rbind(ans1, matrix(dots, nrow=1L), ans2)
 
@@ -183,9 +182,8 @@ HDF5Matrix <- function(file, group, name)
     idx1 <- seq_len(n1)
     idx2 <- seq(to=x_ncol, by=1L, length.out=n2)
 
-    ans1 <- as.matrix(x[ , idx1, drop=FALSE])
-    ans2 <- as.matrix(x[ , idx2, drop=FALSE])
-    storage.mode(ans1) <- storage.mode(ans2) <- "character"
+    ans1 <- format(as.matrix(x[ , idx1, drop=FALSE]))
+    ans2 <- format(as.matrix(x[ , idx2, drop=FALSE]))
     dots <- rep.int(".", nrow(ans1))
     ans <- cbind(ans1, matrix(dots, ncol=1L), ans2)
 
@@ -219,14 +217,29 @@ HDF5Matrix <- function(file, group, name)
     x_ncol <- ncol(x)
     if (x_nrow <= nhead + ntail + 1L) {
         if (x_ncol <= 9L) {
-            ans <- as.matrix(x)
-            storage.mode(ans) <- "character"
+            ans <- format(as.matrix(x))
+            ## Only needed because of this bug in base::print.default:
+            ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
+            ## TODO: Remove when the bug is fixed.
+            if (is.null(colnames(ans))) {
+                idx1 <- seq_len(ncol(ans))
+                idx2 <- integer(0)
+                colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
+            }
         } else {
             ans <- .csplit_HDF5Matrix(x, 4L, 4L)
         }
     } else {
         if (x_ncol <= 9L) {
             ans <- .rsplit_HDF5Matrix(x, nhead, ntail)
+            ## Only needed because of this bug in base::print.default:
+            ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
+            ## TODO: Remove when the bug is fixed.
+            if (is.null(colnames(ans))) {
+                idx1 <- seq_len(ncol(ans))
+                idx2 <- integer(0)
+                colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
+            }
         } else {
             ans <- .split_HDF5Matrix(x, nhead, ntail, 4L, 4L)
         }
