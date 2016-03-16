@@ -26,31 +26,108 @@ setClass("HDF5Array",
 ### Handle delayed operations
 ###
 ### The 'delayed_ops' slot represents the list of delayed operations op1, op2,
-### etc... Each delayed operation is itself represented by a list of length 3:
+### etc... Each delayed operation is itself represented by a list of length 4:
 ###   1) The name of the function to call (e.g. "+" or "log").
 ###   2) The list of "left arguments" i.e. the list of arguments to place
 ###      before the array in the function call.
 ###   3) The list of "right arguments" i.e. the list of arguments to place
 ###      after the array in the function call.
+###   4) A single logical. Indicates the dimension along which the (left or
+###      right) argument of the function call needs to be recycled at
+###      evaluation time (evaluation is performed by .apply_delayed_ops()
+###      which is called by as.array()). FALSE: along the 1st dim; TRUE: along
+###      the last dim; NA: no recycling. Recycling is only supported for
+###      function calls with 2 arguments (i.e. the array and the recycled
+###      argument) at the moment.
+###      
 ### Each operation must return an array of the same dimensions as the original
 ### array.
 ###
 
-register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list())
+register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
+                                        recycle_along_last_dim=NA)
 {
-    delayed_op <- list(FUN, Largs, Rargs)
+    if (isTRUEorFALSE(recycle_along_last_dim)) {
+        nLargs <- length(Largs)
+        nRargs <- length(Rargs)
+        ## Recycling is only supported for function calls with 2 arguments
+        ## (i.e. the array and the recycled argument) at the moment.
+        stopifnot(nLargs + nRargs == 1L)
+        partially_recycled_arg <- if (nLargs == 1L) Largs[[1L]] else Rargs[[1L]]
+        stopifnot(length(partially_recycled_arg) == nrow(x))
+    }
+    delayed_op <- list(FUN, Largs, Rargs, recycle_along_last_dim)
     x@delayed_ops <- c(x@delayed_ops, list(delayed_op))
     x
 }
 
-### 'a' will typically be an ordinary array or vector.
+.subset_delayed_op_args <- function(delayed_op, i, subset_along_last_dim)
+{
+    recycle_along_last_dim <- delayed_op[[4L]]
+    if (is.na(recycle_along_last_dim)
+     || recycle_along_last_dim != subset_along_last_dim)
+        return(delayed_op)
+    Largs <- delayed_op[[2L]]
+    Rargs <- delayed_op[[3L]]
+    nLargs <- length(Largs)
+    nRargs <- length(Rargs)
+    stopifnot(nLargs + nRargs == 1L)
+    if (nLargs == 1L) {
+        delayed_op[[2L]] <- list(extractROWS(Largs[[1L]], i))
+    } else {
+        delayed_op[[3L]] <- list(extractROWS(Rargs[[1L]], i))
+    }
+    delayed_op
+}
+
+.subset_delayed_ops_args <- function(delayed_ops, i, subset_along_last_dim)
+    lapply(delayed_ops, .subset_delayed_op_args, i, subset_along_last_dim)
+
+### 'a' must be an ordinary array.
 .apply_delayed_ops <- function(a, delayed_ops)
 {
-    for (delayed_op in delayed_ops) {
-        FUN <- delayed_op[[1L]]
+    a_dim <- dim(a)
+    first_dim <- a_dim[[1L]]
+    last_dim <- a_dim[[length(a_dim)]]
+    a_len <- length(a)
+    if (a_len == 0L) {
+        p1 <- p2 <- 0L
+    } else {
+        p1 <- a_len / first_dim
+        p2 <- a_len / last_dim
+    }
+
+    recycle_arg <- function(partially_recycled_arg, recycle_along_last_dim) {
+        if (recycle_along_last_dim) {
+            stopifnot(length(partially_recycled_arg) == last_dim)
+            rep(partially_recycled_arg, each=p2)
+        } else {
+            stopifnot(length(partially_recycled_arg) == first_dim)
+            rep.int(partially_recycled_arg, p1)
+        }
+    }
+
+    prepare_call_args <- function(a, delayed_op) {
         Largs <- delayed_op[[2L]]
         Rargs <- delayed_op[[3L]]
-        a <- do.call(FUN,  c(Largs, list(a), Rargs))
+        recycle_along_last_dim <- delayed_op[[4L]]
+        if (isTRUEorFALSE(recycle_along_last_dim)) {
+            nLargs <- length(Largs)
+            nRargs <- length(Rargs)
+            stopifnot(nLargs + nRargs == 1L)
+            if (nLargs == 1L) {
+                Largs <- list(recycle_arg(Largs[[1L]], recycle_along_last_dim))
+            } else {
+                Rargs <- list(recycle_arg(Rargs[[1L]], recycle_along_last_dim))
+            }
+        }
+        c(Largs, list(a), Rargs)
+    }
+
+    for (delayed_op in delayed_ops) {
+        FUN <- delayed_op[[1L]]
+        call_args <- prepare_call_args(a, delayed_op)
+        a <- do.call(FUN, call_args)
     }
     a
 }
@@ -75,12 +152,6 @@ setMethod("t", "HDF5Array",
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Accessors
 ###
-
-### If 'x' is an HDF5Array object, 'type(x)' must always return the same
-### as 'typeof(as.array(x))'. For internal use only.
-setMethod("type", "HDF5Array",
-    function(x) typeof(.apply_delayed_ops(x@h5val1, x@delayed_ops))
-)
 
 ### The index() getter and setter are for internal use only.
 
@@ -209,8 +280,7 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 HDF5Array <- function(file, group, name)
 {
     h5dim <- .get_h5dataset_dim(file, group, name)
-    ## Will fail if the dataset is empty. Is there a better way to obtain
-    ## the type information?
+    ## Will fail if the dataset is empty.
     h5val1 <- .read_h5dataset_val1(file, group, name, length(h5dim))
     h5index <- lapply(h5dim, seq_len)
     new2("HDF5Array", file=file, group=group, name=name,
@@ -251,6 +321,7 @@ HDF5Array <- function(file, group, name)
         ans <- .read_h5dataset_slice(x@file, x@group, x@name, x@h5index)
     }
     dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
+    ans <- .apply_delayed_ops(ans, x@delayed_ops)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
     ## Base R doesn't support transposition of an array of arbitrary dimension
@@ -263,7 +334,7 @@ HDF5Array <- function(file, group, name)
             stop("can't do as.array() on this object, sorry")
         ans <- t(ans)
     }
-    .apply_delayed_ops(ans, x@delayed_ops)
+    ans
 }
 
 setMethod("as.array", "HDF5Array", .from_HDF5Array_to_array)
@@ -332,17 +403,27 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
 {
     x_index <- index(x)
     x_ndim <- length(x_index)
+    x_delayed_ops <- x@delayed_ops
     index_was_touched <- FALSE
-    for (n in seq_along(x_index)) {
+    for (n in seq_along(subscript)) {
         n2 <- if (x@is_transposed) x_ndim - n + 1L else n
-        k <- subscript[[n2]]
+        k <- subscript[[n]]
         if (missing(k))
             next
-        x_index[[n]] <- extractROWS(x_index[[n]], k)
+        x_index[[n2]] <- extractROWS(x_index[[n2]], k)
         index_was_touched <- TRUE
+        if (n == 1L)
+            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k,
+                                                      x@is_transposed)
+        if (n2 == 1L)
+            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k,
+                                                      !x@is_transposed)
     }
-    if (index_was_touched)
+    if (index_was_touched) {
         index(x) <- x_index
+        if (!identical(x@delayed_ops, x_delayed_ops))
+            x@delayed_ops <- x_delayed_ops
+    }
     x
 }
 
@@ -387,16 +468,13 @@ setMethod("[", "HDF5Array", .extract_subarray)
 
 .get_HDF5Array_element <- function(x, i)
 {
-    array_dim <- lengths(x@h5index)
-    subscript <- as.integer(arrayInd(i, array_dim))
-    if (x@is_transposed)
-        subscript <- rev(subscript)
-    h5index <- mapply(`[[`, x@h5index, subscript, SIMPLIFY=FALSE)
-    ans <- .read_h5dataset_slice(x@file, x@group, x@name, h5index)
-    stopifnot(length(ans) == 1L)  # sanity check
-    .apply_delayed_ops(ans[[1L]], x@delayed_ops)
+    i <- S4Vectors:::normalizeDoubleBracketSubscript(i, x)
+    subscript <- as.integer(arrayInd(i, dim(x)))
+    as.vector(.extract_subarray_from_HDF5Array(x, subscript))
 }
 
+### Only support linear subscripting at the moment.
+### TODO: Support multidimensional subscripting e.g. x[[1, 5]].
 setMethod("[[", "HDF5Array",
     function(x, i, j, ...)
     {
@@ -406,6 +484,21 @@ setMethod("[[", "HDF5Array",
         if (!missing(j) || length(dots) > 0L)
             stop("incorrect number of subscripts")
         .get_HDF5Array_element(x, i)
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type()
+###
+
+### If 'x' is an HDF5Array object, 'type(x)' must always return the same
+### as 'typeof(as.array(x))'. For internal use only.
+setMethod("type", "HDF5Array",
+    function(x)
+    {
+        subscript <- as.list(integer(length(dim(x))))
+        typeof(as.array(.extract_subarray_from_HDF5Array(x, subscript)))
     }
 )
 
