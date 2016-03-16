@@ -419,18 +419,16 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
     x_delayed_ops <- x@delayed_ops
     index_was_touched <- FALSE
     for (n in seq_along(subscript)) {
-        n2 <- if (x@is_transposed) x_ndim - n + 1L else n
+        h5n <- if (x@is_transposed) x_ndim - n + 1L else n
         k <- subscript[[n]]
         if (missing(k))
             next
-        x_index[[n2]] <- extractROWS(x_index[[n2]], k)
+        x_index[[h5n]] <- extractROWS(x_index[[h5n]], k)
         index_was_touched <- TRUE
-        if (n == 1L)
-            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k,
-                                                      x@is_transposed)
-        if (n2 == 1L)
-            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k,
-                                                      !x@is_transposed)
+        if (h5n == 1L)
+            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, FALSE)
+        if (h5n == x_ndim)
+            x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, TRUE)
     }
     if (index_was_touched) {
         index(x) <- x_index
