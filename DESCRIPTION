@@ -10,7 +10,7 @@ Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, Sequencing, Annotation, Coverage, GenomeAnnotation
 Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.43)
 Imports: stats, IRanges (>= 2.5.17), rhdf5
-Suggests: h5vcData, SummarizedExperiment, GenomicRanges,
+Suggests: h5vcData, SummarizedExperiment, GenomicRanges, genefilter,
 	BiocStyle, knitr, rmarkdown
 VignetteBuilder: knitr
 License: Artistic-2.0

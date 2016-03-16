@@ -4,14 +4,14 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### "Math" group generic
+### Various unary operators + the "Math" group generic
 ###
 ### Math members: abs, sign, sqrt, ceiling, floor, and many more...
 ###
 
-setMethod("Math", "HDF5Array",
-    function(x) register_delayed_op(x, .Generic)
-)
+setMethod("is.na", "HDF5Array", function(x) register_delayed_op(x, "is.na"))
+setMethod("!", "HDF5Array", function(x) register_delayed_op(x, "!"))
+setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
