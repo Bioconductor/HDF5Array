@@ -185,8 +185,29 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
 ### Members: max, min, range, sum, prod, any, all
 ###
 
+.collect_objects <- function(x, ...)
+{
+    if (missing(x)) {
+        objects <- list(...)
+    } else {
+        objects <- list(x, ...)
+    }
+    NULL_idx <- which(S4Vectors:::sapply_isNULL(objects))
+    if (length(NULL_idx) != 0L)
+        objects <- objects[-NULL_idx]
+    ## TODO: Implement (in C) fast 'elementIs(objects, class)' in S4Vectors
+    ## that does 'sapply(objects, is, class, USE.NAMES=FALSE)', and use it
+    ## here. 'elementIs(objects, "NULL")' should work and be equivalent to
+    ## 'sapply_isNULL(objects)'.
+    if (!all(vapply(objects, is, logical(1), "HDF5Array", USE.NAMES=FALSE)))
+        stop("the objects to combine must be HDF5Array objects (or NULLs)")
+    objects
+}
+
 .HDF5Array_block_Summary <- function(.Generic, x, ..., na.rm=FALSE)
 {
+    objects <- .collect_objects(x, ...)
+
     GENERIC <- match.fun(.Generic)
     APPLY <- function(subarray) {
         ## We get a warning if 'subarray' is empty (which can't happen, blocks
@@ -216,11 +237,6 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
             FALSE)  # fallback (actually not needed)
     }
 
-    if (missing(x)) {
-        objects <- list(...)
-    } else {
-        objects <- list(x, ...)
-    }
     for (x in objects) {
         if (.Generic %in% c("sum", "prod")) {
             x <- .straighten(x, untranspose=TRUE)
@@ -272,4 +288,67 @@ setMethod("Summary", "HDF5Array",
 mean.HDF5Array <- function(x, trim=0, na.rm=FALSE, ...)
     .HDF5Array_block_mean(x, trim=trim, na.rm=na.rm, ...)
 setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### apply()
+###
+
+setGeneric("apply", signature="X")
+
+.simplify_apply_answer <- function(ans)
+{
+    if (!all(vapply(ans, is.atomic, logical(1), USE.NAMES=FALSE)))
+        return(ans)
+    ans_lens <- lengths(ans, use.names=FALSE)
+    ans_nrow <- ans_lens[[1L]]
+    if (!all(ans_lens == ans_nrow))
+        return(ans)
+    ans_names <- names(ans)
+    ans <- unlist(ans, use.names=FALSE)
+    if (ans_nrow == 1L)
+        return(setNames(ans, ans_names))
+    if (is.null(ans_names)) {
+        dimnames <- NULL
+    } else {
+        dimnames <- list(NULL, ans_names)
+    }
+    matrix(ans, nrow=ans_nrow, dimnames=dimnames)
+}
+
+### MARGIN must be a single integer.
+.HDF5Array_apply <- function(X, MARGIN, FUN, ...)
+{
+    FUN <- match.fun(FUN)
+    X_dim <- dim(X)
+    if (!isSingleNumber(MARGIN))
+        stop("'MARGIN' must be a single integer")
+    if (!is.integer(MARGIN))
+        MARGIN <- as.integer(MARGIN)
+    if (MARGIN < 1L || MARGIN > length(X_dim))
+        stop("'MARGIN' must be >= 1 and <= length(dim(X))")
+
+    apply_FUN_to_slice <- function(i) {
+        subscript <- rep.int(alist(foo=), length(X_dim))
+        subscript[[MARGIN]] <- i
+        args <- c(list(X), subscript)
+        slice <- do.call("[", args)
+        if (length(X_dim) == 3L && is(X, "HDF5Array"))
+            slice <- make_HDF5Matrix_from_3D_array(slice, MARGIN)
+        FUN(slice, ...)
+    }
+
+    if (X_dim[[MARGIN]] == 0L)
+        return(apply_FUN_to_slice(0L)[0L])  # that's what base::apply seems
+                                            # to be doing!
+
+    ans_names <-  dimnames(X)[[MARGIN]]
+    ans <- lapply(setNames(seq_len(X_dim[[MARGIN]]), ans_names),
+                  apply_FUN_to_slice)
+
+    ## Try to simplify the answer.
+    .simplify_apply_answer(ans)
+}
+
+setMethod("apply", "HDF5Array", .HDF5Array_apply)
 

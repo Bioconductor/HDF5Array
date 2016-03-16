@@ -458,8 +458,7 @@ setAs("array", "HDF5Array", .from_array_to_HDF5Array)
     }
 
     ## Prepare the multidimensional subscript.
-    subscript <- rep(alist(foo=), x_ndim)
-    names(subscript) <- NULL
+    subscript <- rep.int(alist(foo=), x_ndim)
     if (!missing(i))
         subscript[[1L]] <- i
     if (!missing(j))

@@ -72,9 +72,11 @@ export(
 ###
 
 export(
+    apply
 )
 
 ### Exactly the same list as above.
 exportMethods(
+    apply
 )
 

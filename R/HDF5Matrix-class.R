@@ -112,6 +112,33 @@ HDF5Matrix <- function(file, group, name)
     as(hdf5array, "HDF5Matrix")
 }
 
+### 'x' must be an array-like object with 3 dimensions.
+### 'MARGIN' is the dimension to drop.
+make_HDF5Matrix_from_3D_array <- function(x, MARGIN)
+{
+    x_dim <- dim(x)
+    x_ndim <- length(x_dim)
+    if (x_ndim != 3L)
+        stop("'x' must have 3 dimensions")
+    if (!isSingleNumber(MARGIN))
+        stop("'MARGIN' must be a single integer")
+    if (!is.integer(MARGIN))
+        MARGIN <- as.integer(MARGIN)
+    if (MARGIN < 1L || MARGIN > x_ndim)
+        stop("'MARGIN' must be >= 1 and <= length(dim(x))")
+    if (x_dim[[MARGIN]] != 1L)
+        stop("'dim(x)[[MARGIN]]' must be 1")
+    if (!is(x, "HDF5Array"))
+        x <- as(x, "HDF5Array")
+
+    if (x@is_transposed)
+        MARGIN <- x_ndim + 1L - MARGIN
+    tmp <- seq_along(x_dim)[-MARGIN]
+    N1 <- tmp[[1L]]
+    N2 <- tmp[[2L]]
+    new2("HDF5Matrix", x, N1=N1, N2=N2)
+}
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Show

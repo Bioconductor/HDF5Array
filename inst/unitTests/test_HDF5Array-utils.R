@@ -9,7 +9,7 @@ m2 <- a2[ , , 2]                                         # numeric matrix
 block_sizes1 <- c(12L, 20L, 50L, 10000L)
 block_sizes2 <- 2L * block_sizes1
 
-test_Math_ans_Arith_HDF5Array <- function()
+test_HDF5Array_Math_ans_Arith <- function()
 {
     toto1 <- function(a) { 100 / floor(abs((5 * log(a + 0.2) - 1)^3)) }
     toto2 <- function(a) { 100L + (5L * (a - 2L)) %% 7L }
@@ -48,7 +48,7 @@ test_Math_ans_Arith_HDF5Array <- function()
     checkIdentical(t(toto1(m)), as.matrix(t(toto1(M))))
 }
 
-test_delayed_Ops_HDF5Array <- function()
+test_HDF5Array_delayed_Ops <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -135,7 +135,7 @@ test_delayed_Ops_HDF5Array <- function()
     }
 }
 
-test_block_Ops_HDF5Array <- function()
+test_HDF5Array_block_Ops <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -162,7 +162,7 @@ test_block_Ops_HDF5Array <- function()
     }
 }
 
-test_anyNA_HDF5Array <- function()
+test_HDF5Array_anyNA <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -182,7 +182,7 @@ test_anyNA_HDF5Array <- function()
     }
 }
 
-test_Summary_HDF5Array <- function()
+test_HDF5Array_Summary <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -224,7 +224,7 @@ test_Summary_HDF5Array <- function()
         test_Summary(.Generic, a, block_sizes1)
 }
 
-test_mean_HDF5Array <- function()
+test_HDF5Array_mean <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -244,6 +244,31 @@ test_mean_HDF5Array <- function()
         checkIdentical(target2, mean(t(A), na.rm=TRUE))
         checkIdentical(target3, mean(A[ , 10:4, -2]))
         checkIdentical(target3, mean(t(A[ , 10:4, -2])))
+    }
+}
+
+test_HDF5Array_apply <- function()
+{
+    a <- a1
+    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
+    #dimnames(a) <- list(NULL, NULL, LETTERS[1:3])
+    A <- as(a, "HDF5Array")
+
+    for (MARGIN in seq_along(dim(a))) {
+        checkIdentical(apply(a, MARGIN, dim),
+                       apply(A, MARGIN, dim))
+        checkIdentical(apply(a, MARGIN, sum),
+                       apply(A, MARGIN, sum))
+        checkIdentical(apply(a, MARGIN, sum, na.rm=TRUE),
+                       apply(A, MARGIN, sum, na.rm=TRUE))
+        checkIdentical(apply(a, MARGIN, rowSums),
+                       apply(A, MARGIN, rowSums))
+        checkIdentical(apply(a, MARGIN, rowSums, na.rm=TRUE),
+                       apply(A, MARGIN, rowSums, na.rm=TRUE))
+        checkIdentical(apply(a, MARGIN, colMeans),
+                       apply(A, MARGIN, colMeans))
+        checkIdentical(apply(a, MARGIN, colMeans, na.rm=TRUE),
+                       apply(A, MARGIN, colMeans, na.rm=TRUE))
     }
 }
 

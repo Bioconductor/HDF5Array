@@ -123,8 +123,7 @@ setMethod("length", "ArrayBlocks",
     stopifnot(isSingleInteger(i), i >= 1, i <= nblock)
 
     ndim <- length(blocks@dim)
-    subscript <- rep(alist(foo=), ndim)
-    names(subscript) <- NULL
+    subscript <- rep.int(alist(foo=), ndim)
 
     if (nblock == 1L)
         return(subscript)
