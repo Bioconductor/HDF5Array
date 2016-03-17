@@ -64,28 +64,34 @@ setReplaceMethod("index", "HDF5Matrix",
 
 .from_HDF5Array_to_HDF5Matrix <- function(from)
 {
-    array_dim <- lengths(from@h5index)
-    if (length(array_dim) < 2L)
+    from_dim <- dim(from)
+    if (length(from_dim) < 2L)
         stop(wmsg(class(from), " object with less than 2 dimensions ",
                   "cannot be coerced to an HDF5Matrix object at the moment"))
-    idx <- which(array_dim != 1L)
-    if (length(idx) > 2L)
-        stop(wmsg(class(from), " object with more than 2 effective dimensions ",
-                  "cannot be coerced to an HDF5Matrix object. ", slicing_tip))
-    if (length(idx) == 2L) {
-        N1 <- idx[[1L]]
-        N2 <- idx[[2L]]
-    } else if (length(idx) == 0L) {
+    if (length(from_dim) == 2L) {
         N1 <- 1L
         N2 <- 2L
     } else {
-        ## length(idx) == 1L
-        N1 <- idx[[1L]]
-        if (N1 == length(array_dim))
-            stop(wmsg("A ", class(from), " object where the only effective ",
-                      "dimension is its last dimension cannot be coerced ",
-                      "to a HDF5Matrix object at the moment"))
-        N2 <- N1 + 1L
+        idx <- which(from_dim != 1L)
+        if (length(idx) > 2L)
+            stop(wmsg(class(from), " object with more than 2 effective ",
+                      "dimensions cannot be coerced to an HDF5Matrix object. ",
+                      slicing_tip))
+        if (length(idx) == 2L) {
+            N1 <- idx[[1L]]
+            N2 <- idx[[2L]]
+        } else if (length(idx) == 0L) {
+            N1 <- 1L
+            N2 <- 2L
+        } else {
+            ## length(idx) == 1L
+            N1 <- idx[[1L]]
+            if (N1 == length(from_dim))
+                stop(wmsg("A ", class(from), " object where the only ",
+                          "effective dimension is its last dimension cannot ",
+                          "be coerced to a HDF5Matrix object at the moment"))
+            N2 <- N1 + 1L
+        }
     }
     new2("HDF5Matrix", from, N1=N1, N2=N2)
 }

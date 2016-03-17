@@ -77,7 +77,9 @@ test_HDF5Matrix_delayed_Ops <- function()
 test_HDF5Matrix_row_col_summary <- function()
 {
     test_row_col_summary <- function(FUN, m, block_sizes) {
+        on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
         FUN <- match.fun(FUN)
+
         target1 <- FUN(m)
         target2 <- FUN(m, na.rm=TRUE)
         target3 <- FUN(t(m))
@@ -103,5 +105,26 @@ test_HDF5Matrix_row_col_summary <- function()
     library(genefilter)
     ## Note that the matrixStats package defines another rowVars() function.
     test_row_col_summary(genefilter::rowVars, m, block_sizes2)
+}
+
+test_HDF5Matrix_mult <- function()
+{
+    m <- m2
+    m[2, 4] <- NA
+    m[5, 4] <- Inf
+    m[6, 3] <- -Inf
+    M <- as(m, "HDF5Matrix")
+
+    Lm <- rbind(rep(1L, 10), rep(c(1L, 0L), 5), rep(-100L, 10))
+    Rm <- rbind(Lm + 7.05, 0.1 * Lm)
+
+    on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
+    for (block_size in block_sizes2) {
+        options(HDF5Array.block.size=block_size)
+        P <- Lm %*% M
+        checkEquals(Lm %*% m, as.matrix(P))
+        P <- M %*% Rm
+        checkEquals(m %*% Rm, as.matrix(P))
+    }
 }
 

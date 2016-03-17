@@ -75,3 +75,46 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
 setMethod("rowMeans", "HDF5Matrix", .HDF5Matrix_block_rowMeans)
 setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Matrix multiplication
+###
+### We only support multiplication of an ordinary matrix (typically
+### small) by an HDF5Matrix object (typically big). Multiplication of 2
+### HDF5Matrix objects is not supported.
+###
+
+### Return an HDF5Matrix object. This object points to its own HDF5 dataset
+### stored in a new file.
+.HDF5Matrix_block_mult_by_left_matrix <- function(x, y)
+{
+    stopifnot(is.matrix(x),
+              is(y, "HDF5Matrix") || is.matrix(y),
+              ncol(x) == nrow(y))
+
+    out_file <- paste0(tempfile(), ".h5")
+    out_name <- sprintf("%s %s %s", "x", "%*%", "y")
+    ans_type <- typeof(match.fun(type(x))(1) * match.fun(type(y))(1))
+    h5createFile(out_file)
+    h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),
+                    storage.mode=ans_type)
+    offset <- 0L  # offset of current block in nb of columns
+    colblock_APPLY(y,
+        function(submatrix) {
+            z <- x %*% submatrix
+            index <- list(NULL, seq_len(ncol(z)) + offset)
+            h5write(z, out_file, out_name, index=index)
+            offset <<- offset + ncol(z)
+        }
+    )
+    HDF5Matrix(out_file, "/", out_name)
+}
+
+setMethod("%*%", c("HDF5Matrix", "matrix"),
+    function(x, y) t(t(y) %*% t(x))
+)
+
+setMethod("%*%", c("matrix", "HDF5Matrix"),
+    .HDF5Matrix_block_mult_by_left_matrix
+)
+

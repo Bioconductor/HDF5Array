@@ -6,8 +6,10 @@
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Various unary operators + the "Math" group generic
 ###
-### Math members: abs, sign, sqrt, ceiling, floor, and many more...
-###
+
+### All these operations return an HDF5Array object of the same dimensions
+### as 'x'. This object points to the same HDF5 dataset than 'x' but has the
+### operation stored in it (in the delayed_ops slot) as a delayed operation.
 
 setMethod("is.na", "HDF5Array", function(x) register_delayed_op(x, "is.na"))
 setMethod("!", "HDF5Array", function(x) register_delayed_op(x, "!"))
@@ -22,8 +24,12 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
 ### Logic members: &, |
 ###
 
+### Return an HDF5Array object of the same dimensions as 'e1'. This object
+### points to the same HDF5 dataset than 'e1' but has the operation stored
+### in it (in the delayed_ops slot) as a delayed operation.
 .HDF5Array_delayed_Ops_with_right_vector <- function(.Generic, e1, e2)
 {
+    stopifnot(is(e1, "HDF5Array"))
     e1_class <- class(e1)
     e2_class <- class(e2)
     if (!is.vector(e2))
@@ -48,8 +54,12 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e1@is_transposed)
 }
 
+### Return an HDF5Array object of the same dimensions as 'e2'. This object
+### points to the same HDF5 dataset than 'e2' but has the operation stored
+### in it (in the delayed_ops slot) as a delayed operation.
 .HDF5Array_delayed_Ops_with_left_vector <- function(.Generic, e1, e2)
 {
+    stopifnot(is(e2, "HDF5Array"))
     e1_class <- class(e1)
     e2_class <- class(e2)
     if (!is.vector(e1))
