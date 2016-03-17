@@ -117,9 +117,9 @@ test_HDF5Array_block_Ops <- function()
         ## Testing with the smallest block size takes too long -> skip it.
         for (block_size in block_sizes2[-1L]) {
             options(HDF5Array.block.size=block_size)
-            checkIdentical(target1, GENERIC(A1, A2))
-            checkIdentical(target2, GENERIC(A2, A1))
-            checkIdentical(target3, GENERIC(A1, A3))
+            checkIdentical(target1, as.array(GENERIC(A1, A2)))
+            checkIdentical(target2, as.array(GENERIC(A2, A1)))
+            checkIdentical(target3, as.array(GENERIC(A1, A3)))
         }
     }
 }

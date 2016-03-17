@@ -98,15 +98,13 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
     h5createFile(out_file)
     h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),
                     storage.mode=ans_type)
-    offset <- 0L  # offset of current block in nb of columns
+
     colblock_APPLY(y,
-        function(submatrix) {
-            z <- x %*% submatrix
-            index <- list(NULL, seq_len(ncol(z)) + offset)
-            h5write(z, out_file, out_name, index=index)
-            offset <<- offset + ncol(z)
-        }
+        function(submatrix) x %*% submatrix,
+        out_file=out_file,
+        out_name=out_name
     )
+
     HDF5Matrix(out_file, "/", out_name)
 }
 
@@ -116,5 +114,12 @@ setMethod("%*%", c("HDF5Matrix", "matrix"),
 
 setMethod("%*%", c("matrix", "HDF5Matrix"),
     .HDF5Matrix_block_mult_by_left_matrix
+)
+
+setMethod("%*%", c("HDF5Matrix", "HDF5Matrix"),
+    function(x, y)
+        stop(wmsg("multiplication of 2 HDF5Matrix objects is not supported, ",
+                  "only multiplication of an ordinary matrix by an ",
+                  "HDF5Matrix object at the moment"))
 )
 

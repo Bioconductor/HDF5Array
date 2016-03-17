@@ -87,10 +87,10 @@ test_HDF5Matrix_row_col_summary <- function()
         M <- as(m, "HDF5Matrix")
         for (block_size in block_sizes) {
             options(HDF5Array.block.size=block_size)
-            checkIdentical(target1, FUN(M))
-            checkIdentical(target2, FUN(M, na.rm=TRUE))
-            checkIdentical(target3, FUN(t(M)))
-            checkIdentical(target4, FUN(t(M), na.rm=TRUE))
+            checkEquals(target1, FUN(M))
+            checkEquals(target2, FUN(M, na.rm=TRUE))
+            checkEquals(target3, FUN(t(M)))
+            checkEquals(target4, FUN(t(M), na.rm=TRUE))
         }
     }
 
@@ -103,7 +103,7 @@ test_HDF5Matrix_row_col_summary <- function()
         test_row_col_summary(FUN, m, block_sizes2)
 
     library(genefilter)
-    ## Note that the matrixStats package defines another rowVars() function.
+    ## Note that the matrixStats package also defines a rowVars() function.
     test_row_col_summary(genefilter::rowVars, m, block_sizes2)
 }
 

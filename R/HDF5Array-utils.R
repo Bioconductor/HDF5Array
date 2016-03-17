@@ -86,14 +86,28 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e2@is_transposed)
 }
 
+### Return an HDF5Array object. This object points to its own HDF5 dataset
+### stored in a new file.
 .HDF5Array_block_Ops <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))
         stop("non-conformable arrays")
     GENERIC <- match.fun(.Generic)
-    res_list <- block_MAPPLY(.Generic, e1, e2)
-    ans <- unlist(res_list, recursive=FALSE, use.names=FALSE)
-    dim(ans) <- dim(e1)
+
+    out_file <- paste0(tempfile(), ".h5")
+    out_name <- sprintf("%s %s %s", "e1", "Ops", "e2")
+    ans_type <- typeof(GENERIC(match.fun(type(e1))(1), match.fun(type(e2))(1)))
+    h5createFile(out_file)
+    h5createDataset(out_file, out_name, dim(e1), storage.mode=ans_type)
+    
+    block_MAPPLY(GENERIC, e1, e2,
+        out_file=out_file,
+        out_name=out_name
+    )
+
+    ans <- HDF5Array(out_file, "/", out_name)
+    if (is(e1, "HDF5Matrix") || is(e2, "HDF5Matrix"))
+        ans <- as(ans, "HDF5Matrix")
     ans
 }
 

@@ -161,11 +161,14 @@ setMethod("length", "ArrayBlocks",
     subscript
 }
 
-extract_array_block <- function(x, blocks, i)
+.extract_array_block1 <- function(x, subscript)
+    do.call(`[`, c(list(x), subscript, drop=FALSE))
+
+.extract_array_block2 <- function(x, blocks, i)
 {
     subscript <- .get_array_block_subscript(blocks, i,
                                             expand.RangeNSBS=is.array(x))
-    do.call(`[`, c(list(x), subscript, drop=FALSE))
+    .extract_array_block1(x, subscript)
 }
 
 ### NOT exported. Used in unit tests.
@@ -173,7 +176,7 @@ split_array_in_blocks <- function(x, max_block_len)
 {
     blocks <- .ArrayBlocks(dim(x), max_block_len)
     lapply(seq_along(blocks),
-           function(i) extract_array_block(x, blocks, i))
+           function(i) .extract_array_block2(x, blocks, i))
 }
 
 ### NOT exported. Used in unit tests.
@@ -205,24 +208,41 @@ unsplit_array_from_blocks <- function(subarrays, x)
     as.array(x)
 }
 
+subscript_to_h5index <- function(subscript)
+{
+    index <- vector("list", length(subscript))
+    not_null_idx <- which(vapply(subscript, class, character(1)) != "name")
+    index[not_null_idx] <- subscript[not_null_idx]
+    index
+}
+
 ### An lapply-like function.
-block_APPLY <- function(x, APPLY, ..., block_len=NULL)
+block_APPLY <- function(x, APPLY, ..., block_len=NULL,
+                                       out_file=NULL, out_name=NULL)
 {
     APPLY <- match.fun(APPLY)
     if (is.null(block_len))
         block_len <- get_block_length(type(x))
     blocks <- .ArrayBlocks(dim(x), block_len)
+    expand_RangeNSBS <- is.array(x) || !is.null(out_file)
     lapply(seq_along(blocks),
         function(i) {
-            subarray <- extract_array_block(x, blocks, i)
+            subscript <- .get_array_block_subscript(blocks, i,
+                                                    expand_RangeNSBS)
+            subarray <- .extract_array_block1(x, subscript)
             if (!is.array(subarray))
                 subarray <- .as_array_or_matrix(subarray)
-            APPLY(subarray, ...)
+            block_ans <- APPLY(subarray, ...)
+            if (is.null(out_file))
+                return(block_ans)
+            index <- subscript_to_h5index(subscript)
+            h5write(block_ans, out_file, out_name, index=index)
         })
 }
 
 ### An mapply-like function.
-block_MAPPLY <- function(MAPPLY, ..., block_len=NULL)
+block_MAPPLY <- function(MAPPLY, ..., block_len=NULL,
+                                      out_file=NULL, out_name=NULL)
 {
     MAPPLY <- match.fun(MAPPLY)
     dots <- unname(list(...))
@@ -237,14 +257,19 @@ block_MAPPLY <- function(MAPPLY, ..., block_len=NULL)
     blocks <- .ArrayBlocks(x_dim, block_len)
     lapply(seq_along(blocks),
         function(i) {
+            subscript <- .get_array_block_subscript(blocks, i, TRUE)
             subarrays <- lapply(dots,
                 function(x) {
-                    subarray <- extract_array_block(x, blocks, i)
+                    subarray <- .extract_array_block1(x, subscript)
                     if (!is.array(subarray))
                         subarray <- .as_array_or_matrix(subarray)
                     subarray
                 })
-            do.call(MAPPLY, subarrays)
+            block_ans <- do.call(MAPPLY, subarrays)
+            if (is.null(out_file))
+                return(block_ans)
+            index <- subscript_to_h5index(subscript)
+            h5write(block_ans, out_file, out_name, index=index)
         })
 }
 
@@ -260,7 +285,7 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
         block_len <- get_block_length(type(x))
     blocks <- .ArrayBlocks(dim(x), block_len)
     for (i in seq_along(blocks)) {
-        subarray <- extract_array_block(x, blocks, i)
+        subarray <- .extract_array_block2(x, blocks, i)
         if (!is.array(subarray))
             subarray <- .as_array_or_matrix(subarray)
         val <- APPLY(subarray)
@@ -279,7 +304,7 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
 ### process a matrix-like object by block of columns.
 ###
 
-colblock_APPLY <- function(x, APPLY, ...)
+colblock_APPLY <- function(x, APPLY, ..., out_file=NULL, out_name=NULL)
 {
     x_dim <- dim(x)
     if (length(x_dim) != 2L)
@@ -288,7 +313,8 @@ colblock_APPLY <- function(x, APPLY, ...)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    block_APPLY(x, APPLY, ..., block_len=block_len)
+    block_APPLY(x, APPLY, ..., block_len=block_len,
+                               out_file=out_file, out_name=out_name)
 }
 
 colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
