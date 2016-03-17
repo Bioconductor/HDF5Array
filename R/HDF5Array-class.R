@@ -547,7 +547,8 @@ setMethod("type", "HDF5Array",
     function(x)
     {
         subscript <- as.list(integer(length(dim(x))))
-        typeof(as.array(.extract_subarray_from_HDF5Array(x, subscript)))
+        x0 <- .extract_subarray_from_HDF5Array(x, subscript)  # x[0, ..., 0]
+        typeof(as.array(x0, drop=TRUE))
     }
 )
 

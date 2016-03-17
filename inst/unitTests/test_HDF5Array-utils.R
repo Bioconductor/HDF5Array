@@ -4,7 +4,6 @@ Logic_members <- c("&", "|")  # currently untested
 
 a1 <- array(sample(5L, 150, replace=TRUE), c(5, 10, 3))  # integer array
 a2 <- a1 + runif(150) - 0.5                              # numeric array
-m2 <- a2[ , , 2]                                         # numeric matrix
 
 block_sizes1 <- c(12L, 20L, 50L, 10000L)
 block_sizes2 <- 2L * block_sizes1
@@ -40,9 +39,12 @@ test_HDF5Array_Math_ans_Arith <- function()
     checkIdentical(toto1(toto2(a)), as.array(toto1(toto2(A))))
 
     ## with a numeric matrix
-    m <- m2
-    m[5, 2] <- NA
+    m <- a[ , , 2]
     M <- as(m, "HDF5Matrix")
+    checkIdentical(toto1(m), as.matrix(toto1(M)))
+    checkIdentical(t(toto1(m)), as.matrix(toto1(t(M))))
+    checkIdentical(t(toto1(m)), as.matrix(t(toto1(M))))
+    M <- as(A[ , , 2], "HDF5Matrix")
     checkIdentical(toto1(m), as.matrix(toto1(M)))
     checkIdentical(t(toto1(m)), as.matrix(toto1(t(M))))
     checkIdentical(t(toto1(m)), as.matrix(t(toto1(M))))
@@ -50,64 +52,9 @@ test_HDF5Array_Math_ans_Arith <- function()
 
 test_HDF5Array_delayed_Ops <- function()
 {
-    on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
-
-    ## comparison between an HDF5Array object and a vector-like object that
-    ## has a length that is a divisor of the number of rows of the HDF5Array
-    ## object
-    m <- m2
-    M <- as(m2, "HDF5Matrix")
-    a <- a2
-    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
-    A <- as(a, "HDF5Array")
-
-    ## "Logic" members currently untested.
-    for (.Generic in c(Arith_members, Compare_members)) {
+    test_delayed_Ops_on_array <- function(.Generic, a, A, m, M) {
+        on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
         GENERIC <- match.fun(.Generic)
-
-        target_current <- list(
-            list(GENERIC(m, m[ , 1]), GENERIC(M, M[ , 1])),
-            list(GENERIC(m[ , 2], m), GENERIC(M[ , 2], M))
-        )
-        for (i in seq_along(target_current)) { 
-            target <- target_current[[i]][[1L]]
-            current <- target_current[[i]][[2L]]
-            checkIdentical(target, as.array(current))
-            checkIdentical(t(target), as.array(t(current)))
-            checkIdentical(target[-2, 8:5], as.array(current[-2, 8:5]))
-            checkIdentical(t(target[-2, 8:5]), as.array(t(current[-2, 8:5])))
-            checkIdentical(target[-2, 0], as.array(current[-2, 0]))
-            checkIdentical(t(target[-2, 0]), as.array(t(current[-2, 0])))
-            checkIdentical(target[0, ], as.array(current[0, ]))
-            checkIdentical(t(target[0, ]), as.array(t(current[0, ])))
-        }
-
-        target_current <- list(
-            list(GENERIC(t(m), 8:-1), GENERIC(t(M), 8:-1)),
-            list(GENERIC(8:-1, t(m)), GENERIC(8:-1, t(M))),
-
-            list(GENERIC(t(m), m[1 , ]), GENERIC(t(M), M[1 , ])),
-            list(GENERIC(m[2 , ], t(m)), GENERIC(M[2 , ], t(M))),
-
-            list(GENERIC(t(m), m[1 , 6:10]), GENERIC(t(M), M[1 , 6:10])),
-            list(GENERIC(m[2 , 8:7], t(m)), GENERIC(M[2 , 8:7], t(M)))
-        )
-        for (i in seq_along(target_current)) {
-            target <- target_current[[i]][[1L]]
-            current <- target_current[[i]][[2L]]
-            checkIdentical(target, as.array(current))
-            checkIdentical(target[1:3 , ], as.array(current[1:3 , ]))
-            checkIdentical(target[ , 1:3], as.array(current[ , 1:3]))
-            checkIdentical(t(target), as.array(t(current)))
-            checkIdentical(t(target)[1:3 , ], as.array(t(current)[1:3 , ]))
-            checkIdentical(t(target)[ , 1:3], as.array(t(current)[ , 1:3]))
-            checkIdentical(target[8:5, -2], as.array(current[8:5, -2]))
-            checkIdentical(t(target[8:5, -2]), as.array(t(current[8:5, -2])))
-            checkIdentical(target[0, -2], as.array(current[0, -2]))
-            checkIdentical(t(target[0, -2]), as.array(t(current[0, -2])))
-            checkIdentical(target[ , 0], as.array(current[ , 0]))
-            checkIdentical(t(target[ , 0]), as.array(t(current[ , 0])))
-        }
 
         target_current <- list(
             list(GENERIC(a, m[ , 1]), GENERIC(A, M[ , 1])),
@@ -133,6 +80,21 @@ test_HDF5Array_delayed_Ops <- function()
             }
         }
     }
+
+    a <- a2
+    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
+    A <- as(a, "HDF5Array")
+    m <- a[ , , 2]
+    M <- as(m, "HDF5Matrix")
+
+    ## "Logic" members currently untested.
+    for (.Generic in c(Arith_members, Compare_members))
+        test_delayed_Ops_on_array(.Generic, a, A, m, M)
+
+    ## Takes too long and probably not that useful.
+    #M <- as(A[ , , 2], "HDF5Matrix")
+    #for (.Generic in c(Arith_members, Compare_members))
+    #    test_delayed_Ops_on_array(.Generic, a, A, m, M)
 }
 
 test_HDF5Array_block_Ops <- function()
