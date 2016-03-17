@@ -12,7 +12,9 @@
 ### operation stored in it (in the delayed_ops slot) as a delayed operation.
 
 setMethod("is.na", "HDF5Array", function(x) register_delayed_op(x, "is.na"))
+
 setMethod("!", "HDF5Array", function(x) register_delayed_op(x, "!"))
+
 setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
 
 
@@ -95,6 +97,24 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
     ans
 }
 
+.HDF5Array_Ops <- function(.Generic, e1, e2)
+{
+    e1_dim <- dim(e1)
+    e2_dim <- dim(e2)
+    if (identical(e1_dim, e2_dim))
+        return(.HDF5Array_block_Ops(.Generic, e1, e2))
+    ## Effective dimensions.
+    effdim_idx1 <- which(e1_dim != 1L)
+    effdim_idx2 <- which(e2_dim != 1L)
+    if ((length(effdim_idx1) == 1L) == (length(effdim_idx2) == 1L))
+        stop("non-conformable arrays")
+    if (length(effdim_idx1) == 1L) {
+        .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+    } else {
+        .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+    }
+}
+
 setMethod("Ops", c("HDF5Array", "vector"),
     function(e1, e2)
         .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
@@ -107,23 +127,115 @@ setMethod("Ops", c("vector", "HDF5Array"),
 
 setMethod("Ops", c("HDF5Array", "HDF5Array"),
     function(e1, e2)
+        .HDF5Array_Ops(.Generic, e1, e2)
+)
+
+### Support unary operators "+" and "-".
+setMethod("+", c("HDF5Array", "missing"),
+    function(e1, e2) register_delayed_op(e1, .Generic, Largs=list(0L))
+)
+setMethod("-", c("HDF5Array", "missing"),
+    function(e1, e2) register_delayed_op(e1, .Generic, Largs=list(0L))
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### pmax2() and pmin2()
+###
+### We treat them like the binary operators of the "Ops" group generics.
+###
+
+setGeneric("pmax2", function(e1, e2) standardGeneric("pmax2"))
+setGeneric("pmin2", function(e1, e2) standardGeneric("pmin2"))
+
+### Mimicking how the "Ops" members combine the "dim", "names", and "dimnames"
+### attributes of the 2 operands.
+.check_and_combine_dims <- function(e1, e2)
+{
+    dim1 <- dim(e1)
+    dim2 <- dim(e2)
+    if (is.null(dim1))
+        return(dim2)
+    if (is.null(dim2))
+        return(dim1)
+    if (!identical(dim1, dim2))
+        stop("non-conformable arrays")
+    dim1
+}
+
+.combine_names <- function(e1, e2)
+{
+    len1 <- length(e1)
+    len2 <- length(e2)
+    names1 <- names(e1)
+    if (len1 > len2)
+        return(names1)
+    names2 <- names(e2)
+    if (len2 > len1 || is.null(names1))
+        return(names2)
+    names1
+}
+
+.combine_dimnames <- function(e1, e2)
+{
+    ans_rownames <- rownames(e1)
+    if (is.null(ans_rownames))
+        ans_rownames <- rownames(e2)
+    ans_colnames <- colnames(e1)
+    if (is.null(ans_colnames))
+        ans_colnames <- colnames(e2)
+    if (is.null(ans_rownames) && is.null(ans_colnames)) {
+        ans_dimnames <- NULL
+    } else {
+        ans_dimnames <- list(ans_rownames, ans_colnames)
+    }
+    ans_dimnames
+}
+
+setMethod("pmax2", c("ANY", "ANY"),
+    function(e1, e2)
     {
-        e1_dim <- dim(e1)
-        e2_dim <- dim(e2)
-        if (identical(e1_dim, e2_dim))
-            return(.HDF5Array_block_Ops(.Generic, e1, e2))
-        ## Effective dimensions.
-        effdim_idx1 <- which(e1_dim != 1L)
-        effdim_idx2 <- which(e2_dim != 1L)
-        if ((length(effdim_idx1) == 1L) == (length(effdim_idx2) == 1L))
-            stop("non-conformable arrays")
-        if (length(effdim_idx1) == 1L) {
-            .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+        ans_dim <- .check_and_combine_dims(e1, e2)
+        ans <- pmax(e1, e2)
+        if (is.null(ans_dim)) {
+            names(ans) <- .combine_names(e1, e2)
         } else {
-            .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+            dim(ans) <- ans_dim
+            dimnames(ans) <- .combine_dimnames(e1, e2)
         }
+        ans
     }
 )
+
+setMethod("pmin2", c("ANY", "ANY"),
+    function(e1, e2)
+    {
+        ans_dim <- .check_and_combine_dims(e1, e2)
+        ans <- pmin(e1, e2)
+        if (is.null(ans_dim)) {
+            names(ans) <- .combine_names(e1, e2)
+        } else {
+            dim(ans) <- ans_dim
+            dimnames(ans) <- .combine_dimnames(e1, e2)
+        }
+        ans
+    }
+)
+
+for (.Generic in c("pmax2", "pmin2")) {
+    setMethod(.Generic, c("HDF5Array", "vector"),
+        function(e1, e2)
+            .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+    )
+    setMethod(.Generic, c("vector", "HDF5Array"),
+        function(e1, e2)
+            .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+    )
+    setMethod(.Generic, c("HDF5Array", "HDF5Array"),
+        function(e1, e2)
+            .HDF5Array_Ops(.Generic, e1, e2)
+    )
+}
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

@@ -73,11 +73,13 @@ export(
 ###
 
 export(
+    pmax2, pmin2,
     apply
 )
 
 ### Exactly the same list as above.
 exportMethods(
+    pmax2, pmin2,
     apply
 )
 
