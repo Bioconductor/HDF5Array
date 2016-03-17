@@ -83,7 +83,7 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
 .subset_delayed_ops_args <- function(delayed_ops, i, subset_along_last_dim)
     lapply(delayed_ops, .subset_delayed_op_args, i, subset_along_last_dim)
 
-### 'a' must be an ordinary array.
+### 'a' is the array returned by .read_HDF5Array_as_unprocessed_array().
 .apply_delayed_ops <- function(a, delayed_ops)
 {
     a_dim <- dim(a)
@@ -190,26 +190,34 @@ setMethod("length", "HDF5Array", function(x) prod(lengths(index(x))))
 
 setMethod("isEmpty", "HDF5Array", function(x) any(lengths(index(x)) == 0L))
 
+.get_HDF5Array_dim_before_transpose <- function(x)
+{
+    lengths(index(x))
+}
+.get_HDF5Array_dimnames_before_transpose <- function(x)
+{
+    ans <- lapply(index(x), names)
+    if (is.null(unlist(ans)))
+        return(NULL)
+    ans
+}
+
 .get_HDF5Array_dim <- function(x)
 {
-    ans <- lengths(index(x))
+    ans <- .get_HDF5Array_dim_before_transpose(x)
+    if (x@is_transposed)
+        ans <- rev(ans)
+    ans
+}
+.get_HDF5Array_dimnames <- function(x)
+{
+    ans <- .get_HDF5Array_dimnames_before_transpose(x)
     if (x@is_transposed)
         ans <- rev(ans)
     ans
 }
 
 setMethod("dim", "HDF5Array", .get_HDF5Array_dim)
-
-.get_HDF5Array_dimnames <- function(x)
-{
-    ans <- lapply(index(x), names)
-    if (is.null(unlist(ans)))
-        return(NULL)
-    if (x@is_transposed)
-        ans <- rev(ans)
-    ans
-}
-
 setMethod("dimnames", "HDF5Array", .get_HDF5Array_dimnames)
 
 .normalize_dimnames_replacement_value <- function(value, ndim)
@@ -263,27 +271,19 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
     )
 }
 
-.get_h5slice_dim <- function(x) lengths(x@h5index)
-
-.get_h5slice_dimnames <- function(x)
+### "unprocessed" here means untransposed and before applying the delayed
+### operations.
+.read_HDF5Array_as_unprocessed_array <- function(x)
 {
-    ans <- lapply(x@h5index, names)
-    if (is.null(unlist(ans)))
-        return(NULL)
-    ans
-}
-
-.read_h5slice <- function(x)
-{
-    h5slice_dim <- .get_h5slice_dim(x)
-    h5slice_is_empty <- any(h5slice_dim == 0L)
-    if (h5slice_is_empty) {
+    dim_before_transpose <- .get_HDF5Array_dim_before_transpose(x)
+    is_empty <- any(dim_before_transpose == 0L)
+    if (is_empty) {
         ans <- x@h5dataset_first_val[0]
-        dim(ans) <- h5slice_dim
     } else {
         ans <- .quiet_h5read(x@file, x@group, x@name, x@h5index)
     }
-    dimnames(ans) <- .get_h5slice_dimnames(x)
+    dim(ans) <- dim_before_transpose
+    dimnames(ans) <- .get_HDF5Array_dimnames_before_transpose(x)
     ans
 }
 
@@ -372,7 +372,7 @@ HDF5Array <- function(file, group, name, type=NA)
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    ans <- .read_h5slice(x)
+    ans <- .read_HDF5Array_as_unprocessed_array(x)
     ans <- .apply_delayed_ops(ans, x@delayed_ops)
     if (drop)
         ans <- .reduce_array_dimensions(ans)
