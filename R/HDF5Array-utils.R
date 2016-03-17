@@ -94,8 +94,10 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
         stop("non-conformable arrays")
     GENERIC <- match.fun(.Generic)
 
-    out_file <- paste0(tempfile(), ".h5")
-    out_name <- sprintf("%s %s %s", "e1", "Ops", "e2")
+    out_file <- getHDF5ArrayOutputFile()
+    out_name <- getHDF5ArrayOutputName()
+    on.exit(setHDF5ArrayOutputSettings())
+
     ans_type <- typeof(GENERIC(match.fun(type(e1))(1), match.fun(type(e2))(1)))
     h5createFile(out_file)
     h5createDataset(out_file, out_name, dim(e1), storage.mode=ans_type)

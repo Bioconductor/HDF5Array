@@ -315,6 +315,15 @@ setReplaceMethod("dimnames", "HDF5Array", .set_HDF5Array_dimnames)
 
 HDF5Array <- function(file, group, name, type=NA)
 {
+    if (!isSingleString(file))
+        stop(wmsg("'file' must be a single string specifying the path to ",
+                  "the HDF5 file where the dataset is located"))
+    if (!isSingleString(group))
+        stop(wmsg("'group' must be a single string specifying the HDF5 group ",
+                  "of the dataset, as reported by rhdf5::h5ls()"))
+    if (!isSingleString(name))
+        stop(wmsg("'name' must be a single string specifying the name ",
+                  "of the dataset, as reported by rhdf5::h5ls()"))
     if (!isSingleStringOrNA(type))
         stop("'type' must be a single string or NA")
     h5dataset_dim <- .get_h5dataset_dim(file, group, name)
@@ -343,6 +352,57 @@ HDF5Array <- function(file, group, name, type=NA)
                       name=name,
                       h5dataset_first_val=h5dataset_first_val,
                       h5index=h5index)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Manage settings for output destination on disk
+###
+
+.output_settings_envir <- new.env(hash=TRUE, parent=emptyenv())
+
+### Called by .onLoad() hook (see zzz.R file).
+setHDF5ArrayOutputFile <- function(file=paste0(tempfile(), ".h5"))
+{
+    if (!isSingleString(file))
+        stop(wmsg("'file' must be a single string specifying the path to ",
+                  "the HDF5 file where output will be written"))
+    assign("file", file, envir=.output_settings_envir)
+}
+
+getHDF5ArrayOutputFile <- function() get("file", envir=.output_settings_envir)
+
+assign("auto_inc_ID", 1L, envir=.output_settings_envir)
+
+setHDF5ArrayOutputName <- function(name)
+{
+    if (missing(name)) {
+        suppressWarnings(rm(list="name", envir=.output_settings_envir))
+        auto_inc_ID <- get("auto_inc_ID", envir=.output_settings_envir)
+        return(assign("auto_inc_ID", auto_inc_ID + 1L,
+                      envir=.output_settings_envir))
+    }
+    if (!isSingleString(name))
+        stop(wmsg("'name' must be a single string specifying the name of ",
+                  "the dataset in the HDF5 file to which output will be ",
+                  "written"))
+    assign("name", name, envir=.output_settings_envir)
+}
+
+getHDF5ArrayOutputName <- function()
+{
+    name <- try(get("name", envir=.output_settings_envir), silent=TRUE)
+    if (is(name, "try-error")) {
+        auto_inc_ID <- get("auto_inc_ID", envir=.output_settings_envir)
+        name <- paste0("HDF5ArrayDataset", auto_inc_ID)
+    }
+    name
+}
+
+setHDF5ArrayOutputSettings <- function(file=paste0(tempfile(), ".h5"), name)
+{
+    setHDF5ArrayOutputFile(file)
+    setHDF5ArrayOutputName(name)
 }
 
 
@@ -432,11 +492,13 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 
 .from_array_to_HDF5Array <- function(from)
 {
-    name <- deparse(substitute(from))
-    file <- paste0(tempfile(), ".h5")
-    h5createFile(file)
-    h5write(from, file, name)
-    ans <- HDF5Array(file, "/", name, type=type(from))
+    out_file <- getHDF5ArrayOutputFile()
+    out_name <- getHDF5ArrayOutputName()
+    on.exit(setHDF5ArrayOutputSettings())
+
+    h5createFile(out_file)
+    h5write(from, out_file, out_name)
+    ans <- HDF5Array(out_file, "/", out_name, type=type(from))
     dimnames(ans) <- dimnames(from)
     ans
 }

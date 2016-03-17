@@ -92,8 +92,10 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
               is(y, "HDF5Matrix") || is.matrix(y),
               ncol(x) == nrow(y))
 
-    out_file <- paste0(tempfile(), ".h5")
-    out_name <- sprintf("%s %s %s", "x", "%*%", "y")
+    out_file <- getHDF5ArrayOutputFile()
+    out_name <- getHDF5ArrayOutputName()
+    on.exit(setHDF5ArrayOutputSettings())
+
     ans_type <- typeof(match.fun(type(x))(1) * match.fun(type(y))(1))
     h5createFile(out_file)
     h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),
