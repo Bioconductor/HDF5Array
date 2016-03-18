@@ -102,8 +102,8 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
     ans_dimnames
 }
 
-### Return an HDF5Array object. This object points to its own HDF5 dataset
-### stored in a new file.
+### Write a new HDF5 dataset to disk. Return an HDF5Array object that points
+### to this new dataset.
 .HDF5Array_block_Ops <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))

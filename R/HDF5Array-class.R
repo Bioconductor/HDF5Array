@@ -439,6 +439,8 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 
 ### array -> HDF5Array
 
+### Write a new HDF5 dataset to disk. Return an HDF5Array object that points
+### to this new dataset.
 .from_array_to_HDF5Array <- function(from)
 {
     out_file <- getHDF5ArrayOutputFile()

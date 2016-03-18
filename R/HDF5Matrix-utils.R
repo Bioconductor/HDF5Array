@@ -87,8 +87,8 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
 ### HDF5Matrix objects is not supported.
 ###
 
-### Return an HDF5Matrix object. This object points to its own HDF5 dataset
-### stored in a new file.
+### Write a new HDF5 dataset to disk. Return an HDF5Matrix object that points
+### to this new dataset.
 .HDF5Matrix_block_mult_by_left_matrix <- function(x, y)
 {
     stopifnot(is.matrix(x),
