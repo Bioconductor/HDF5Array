@@ -498,6 +498,9 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 
     h5createFile(out_file)
     h5write(from, out_file, out_name)
+    ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
+    ## so the HDF5Array() constructor can bring them back. Then we wouldn't
+    ## need to explicitely set them on 'ans' like we do below.
     ans <- HDF5Array(out_file, "/", out_name, type=type(from))
     dimnames(ans) <- dimnames(from)
     ans

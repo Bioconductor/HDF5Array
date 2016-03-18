@@ -21,10 +21,11 @@
     if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
 
-    APPLY <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
-    REDUCE <- `+`
-    reduced <- integer(nrow(x))
-    colblock_APPLY_REDUCE(x, APPLY, REDUCE, reduced)
+    REDUCE <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
+    COMBINE <- `+`
+    init <- numeric(nrow(x))
+    ans <- colblock_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init)
+    setNames(ans, rownames(x))
 }
 
 .HDF5Matrix_block_colSums <- function(x, na.rm=FALSE, dims=1)
@@ -33,7 +34,8 @@
     if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_rowSums(t(x), na.rm=na.rm, dims=dims))
 
-    colsums_list <- colblock_APPLY(x, colSums, na.rm=na.rm)
+    colsums_list <- colblock_APPLY(x, colSums, na.rm=na.rm,
+                                   if_empty=numeric(0))
     unlist(colsums_list, recursive=FALSE)
 }
 
@@ -46,20 +48,20 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
     if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_colMeans(t(x), na.rm=na.rm, dims=dims))
 
-    APPLY <- function(submatrix) {
+    REDUCE <- function(submatrix) {
         submatrix_sums <- rowSums(submatrix, na.rm=na.rm)
         submatrix_nvals <- ncol(submatrix)
         if (na.rm)
             submatrix_nvals <- submatrix_nvals - rowSums(is.na(submatrix))
         cbind(submatrix_sums, submatrix_nvals)
     }
-    REDUCE <- `+`
-    reduced <- cbind(
+    COMBINE <- `+`
+    init <- cbind(
         numeric(nrow(x)),  # sums
         numeric(nrow(x))   # nvals
     )
-    reduced <- colblock_APPLY_REDUCE(x, APPLY, REDUCE, reduced)
-    reduced[ , 1L] / reduced[ , 2L]
+    ans <- colblock_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init)
+    setNames(ans[ , 1L] / ans[ , 2L], rownames(x))
 }
 
 .HDF5Matrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)
@@ -68,7 +70,8 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
     if (is(x, "HDF5Array") && x@is_transposed)
         return(.HDF5Matrix_block_rowMeans(t(x), na.rm=na.rm, dims=dims))
 
-    colmeans_list <- colblock_APPLY(x, colMeans, na.rm=na.rm)
+    colmeans_list <- colblock_APPLY(x, colMeans, na.rm=na.rm,
+                                    if_empty=numeric(0))
     unlist(colmeans_list, recursive=FALSE)
 }
 
@@ -107,7 +110,15 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
         out_name=out_name
     )
 
-    HDF5Matrix(out_file, "/", out_name)
+    ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
+    ## so the HDF5Matrix() constructor can bring them back. Then we wouldn't
+    ## need to explicitely set them on 'ans' like we do below.
+    ans <- HDF5Matrix(out_file, "/", out_name, type=ans_type)
+    ans_rownames <- rownames(x)
+    ans_colnames <- colnames(y)
+    if (!(is.null(ans_rownames) && is.null(ans_colnames)))
+        dimnames(ans) <- list(ans_rownames, ans_colnames)
+    ans
 }
 
 setMethod("%*%", c("HDF5Matrix", "matrix"),

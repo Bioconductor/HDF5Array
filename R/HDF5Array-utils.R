@@ -86,6 +86,22 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e2@is_transposed)
 }
 
+.combine_dimnames <- function(e1, e2)
+{
+    ans_rownames <- rownames(e1)
+    if (is.null(ans_rownames))
+        ans_rownames <- rownames(e2)
+    ans_colnames <- colnames(e1)
+    if (is.null(ans_colnames))
+        ans_colnames <- colnames(e2)
+    if (is.null(ans_rownames) && is.null(ans_colnames)) {
+        ans_dimnames <- NULL
+    } else {
+        ans_dimnames <- list(ans_rownames, ans_colnames)
+    }
+    ans_dimnames
+}
+
 ### Return an HDF5Array object. This object points to its own HDF5 dataset
 ### stored in a new file.
 .HDF5Array_block_Ops <- function(.Generic, e1, e2)
@@ -107,7 +123,11 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
         out_name=out_name
     )
 
-    ans <- HDF5Array(out_file, "/", out_name)
+    ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
+    ## so the HDF5Array() constructor can bring them back. Then we wouldn't
+    ## need to explicitely set them on 'ans' like we do below.
+    ans <- HDF5Array(out_file, "/", out_name, type=ans_type)
+    dimnames(ans) <- .combine_dimnames(e1, e2)
     if (is(e1, "HDF5Matrix") || is(e2, "HDF5Matrix"))
         ans <- as(ans, "HDF5Matrix")
     ans
@@ -190,22 +210,6 @@ setGeneric("pmin2", function(e1, e2) standardGeneric("pmin2"))
     if (len2 > len1 || is.null(names1))
         return(names2)
     names1
-}
-
-.combine_dimnames <- function(e1, e2)
-{
-    ans_rownames <- rownames(e1)
-    if (is.null(ans_rownames))
-        ans_rownames <- rownames(e2)
-    ans_colnames <- colnames(e1)
-    if (is.null(ans_colnames))
-        ans_colnames <- colnames(e2)
-    if (is.null(ans_rownames) && is.null(ans_colnames)) {
-        ans_dimnames <- NULL
-    } else {
-        ans_dimnames <- list(ans_rownames, ans_colnames)
-    }
-    ans_dimnames
 }
 
 setMethod("pmax2", c("ANY", "ANY"),
@@ -305,13 +309,13 @@ for (.Generic in c("pmax2", "pmin2")) {
 
 .HDF5Array_block_anyNA <- function(x, recursive=FALSE)
 {
-    APPLY <- anyNA
-    REDUCE <- `||`
-    reduced <- FALSE
+    REDUCE <- anyNA
+    COMBINE <- `||`
+    init <- FALSE
     BREAKIF <- identity
 
     x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
-    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
+    block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, BREAKIF)
 }
 
 setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
@@ -344,31 +348,31 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
     objects <- .collect_objects(x, ...)
 
     GENERIC <- match.fun(.Generic)
-    APPLY <- function(subarray) {
+    REDUCE <- function(subarray) {
         ## We get a warning if 'subarray' is empty (which can't happen, blocks
         ## can't be empty) or if 'na.rm' is TRUE and 'subarray' contains only
         ## NA's or NaN's.
-        val <- tryCatch(GENERIC(subarray, na.rm=na.rm), warning=identity)
-        if (is(val, "warning"))
+        reduced <- tryCatch(GENERIC(subarray, na.rm=na.rm), warning=identity)
+        if (is(reduced, "warning"))
             return(NULL)
-        val
+        reduced
     }
-    REDUCE <- function(reduced, val) {
-        if (is.null(reduced) && is.null(val))
+    COMBINE <- function(init, reduced) {
+        if (is.null(init) && is.null(reduced))
             return(NULL)
-        GENERIC(reduced, val)
+        GENERIC(init, reduced)
     }
-    reduced <- NULL
-    BREAKIF <- function(reduced) {
-        if (is.null(reduced))
+    init <- NULL
+    BREAKIF <- function(init) {
+        if (is.null(init))
             return(FALSE)
         switch(.Generic,
-            max=         is.na(reduced) || reduced == Inf,
-            min=         is.na(reduced) || reduced == -Inf,
-            range=       is.na(reduced[[1L]]) || all(reduced == c(-Inf, Inf)),
-            sum=, prod=  is.na(reduced),
-            any=         identical(reduced, TRUE),
-            all=         identical(reduced, FALSE),
+            max=         is.na(init) || init == Inf,
+            min=         is.na(init) || init == -Inf,
+            range=       is.na(init[[1L]]) || all(init == c(-Inf, Inf)),
+            sum=, prod=  is.na(init),
+            any=         identical(init, TRUE),
+            all=         identical(init, FALSE),
             FALSE)  # fallback (actually not needed)
     }
 
@@ -378,11 +382,11 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
         } else {
             x <- .straighten(x, untranspose=TRUE, straighten.index=TRUE)
         }
-        reduced <- block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
+        init <- block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, BREAKIF)
     }
-    if (is.null(reduced))
-        reduced <- GENERIC()
-    reduced
+    if (is.null(init))
+        init <- GENERIC()
+    init
 }
 
 setMethod("Summary", "HDF5Array",
@@ -402,7 +406,7 @@ setMethod("Summary", "HDF5Array",
         stop("\"mean\" method for HDF5Array objects ",
              "does not support the 'trim' argument yet")
 
-    APPLY <- function(subarray) {
+    REDUCE <- function(subarray) {
         tmp <- as.vector(subarray, mode="numeric")
         subarray_sum <- sum(tmp, na.rm=na.rm)
         subarray_nval <- length(tmp)
@@ -410,13 +414,13 @@ setMethod("Summary", "HDF5Array",
             subarray_nval <- subarray_nval - sum(is.na(tmp))
         c(subarray_sum, subarray_nval)
     }
-    REDUCE <- `+`
-    reduced <- numeric(2)  # sum and nval
-    BREAKIF <- function(reduced) is.na(reduced[[1L]])
+    COMBINE <- `+`
+    init <- numeric(2)  # sum and nval
+    BREAKIF <- function(init) is.na(init[[1L]])
 
     x <- .straighten(x, untranspose=TRUE)
-    reduced <- block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, BREAKIF)
-    reduced[[1L]] / reduced[[2L]]
+    ans <- block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, BREAKIF)
+    ans[[1L]] / ans[[2L]]
 }
 
 ### S3/S4 combo for mean.HDF5Array
@@ -485,6 +489,9 @@ setGeneric("apply", signature="X")
         return(as.vector(ans[0L]))
     }
 
+    ## TODO: Try using sapply() instead of lapply(). Maybe we're lucky
+    ## and it achieves the kind of simplification that we're doing with
+    ## .simplify_apply_answer() so we can get rid of .simplify_apply_answer().
     ans_names <-  dimnames(X)[[MARGIN]]
     ans <- lapply(setNames(seq_len(X_dim[[MARGIN]]), ans_names),
         function(i) {

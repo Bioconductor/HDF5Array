@@ -89,7 +89,7 @@ setClass("ArrayBlocks",
 {
     ndim <- length(x@dim)
     if (x@N > ndim)
-        return(1L)
+        return(if (any(x@dim == 0L)) 0L else 1L)
     inner_len <- x@dim[[x@N]] %/% x@by
     last_inner_block_len <- x@dim[[x@N]] %% x@by
     if (last_inner_block_len != 0L)
@@ -100,13 +100,10 @@ setClass("ArrayBlocks",
 .get_ArrayBlocks_outer_length <- function(x)
 {
     ndim <- length(x@dim)
-    if (x@N < ndim) {
-        outer_dim <- x@dim[(x@N + 1L):ndim]
-        outer_len <- prod(outer_dim)
-    } else {
-        outer_len <- 1L
-    }
-    outer_len
+    if (x@N >= ndim)
+        return(1L)
+    outer_dim <- x@dim[(x@N + 1L):ndim]
+    prod(outer_dim)
 }
 
 ### Return the number of blocks in 'x'.
@@ -217,15 +214,18 @@ subscript_to_h5index <- function(subscript)
 }
 
 ### An lapply-like function.
-block_APPLY <- function(x, APPLY, ..., block_len=NULL,
-                                       out_file=NULL, out_name=NULL)
+block_APPLY <- function(x, APPLY, ..., if_empty=NULL,
+                        out_file=NULL, out_name=NULL, block_len=NULL)
 {
     APPLY <- match.fun(APPLY)
     if (is.null(block_len))
         block_len <- get_block_length(type(x))
     blocks <- .ArrayBlocks(dim(x), block_len)
+    nblock <- length(blocks)
+    if (nblock == 0L)
+        return(if_empty)
     expand_RangeNSBS <- is.array(x) || !is.null(out_file)
-    lapply(seq_along(blocks),
+    lapply(seq_len(nblock),
         function(i) {
             subscript <- .get_array_block_subscript(blocks, i,
                                                     expand_RangeNSBS)
@@ -240,22 +240,25 @@ block_APPLY <- function(x, APPLY, ..., block_len=NULL,
         })
 }
 
-### An mapply-like function.
-block_MAPPLY <- function(MAPPLY, ..., block_len=NULL,
-                                      out_file=NULL, out_name=NULL)
+### A mapply-like function for conformable arrays.
+block_MAPPLY <- function(MAPPLY, ..., if_empty=NULL,
+                         out_file=NULL, out_name=NULL, block_len=NULL)
 {
     MAPPLY <- match.fun(MAPPLY)
     dots <- unname(list(...))
     dims <- sapply(dots, dim)
     x_dim <- dims[ , 1L]
     if (!all(dims == x_dim))
-        stop("all objects in ... must have the same dimensions")
+        stop("non-conformable arrays")
     if (is.null(block_len)) {
         types <- unlist(lapply(dots, type))
         block_len <- min(get_block_length(types))
     }
     blocks <- .ArrayBlocks(x_dim, block_len)
-    lapply(seq_along(blocks),
+    nblock <- length(blocks)
+    if (nblock == 0L)
+        return(if_empty)
+    lapply(seq_len(nblock),
         function(i) {
             subscript <- .get_array_block_subscript(blocks, i, TRUE)
             subarrays <- lapply(dots,
@@ -274,11 +277,11 @@ block_MAPPLY <- function(MAPPLY, ..., block_len=NULL,
 }
 
 ### A Reduce-like function.
-block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
-                               BREAKIF=NULL, block_len=NULL)
+block_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init,
+                                        BREAKIF=NULL, block_len=NULL)
 {
-    APPLY <- match.fun(APPLY)
     REDUCE <- match.fun(REDUCE)
+    COMBINE <- match.fun(COMBINE)
     if (!is.null(BREAKIF))
         BREAKIF <- match.fun(BREAKIF)
     if (is.null(block_len))
@@ -288,23 +291,24 @@ block_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced,
         subarray <- .extract_array_block2(x, blocks, i)
         if (!is.array(subarray))
             subarray <- .as_array_or_matrix(subarray)
-        val <- APPLY(subarray)
-        reduced <- REDUCE(reduced, val)
-        if (!is.null(BREAKIF) && BREAKIF(reduced))
+        reduced <- REDUCE(subarray)
+        init <- COMBINE(init, reduced)
+        if (!is.null(BREAKIF) && BREAKIF(init))
             break
     }
-    reduced
+    init
 }
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Walking on the blocks of columns
 ###
-### 2 convenience wrappers around block_APPLY() and block_APPLY_REDUCE() to
-### process a matrix-like object by block of columns.
+### 2 convenience wrappers around block_APPLY() and block_REDUCE_and_COMBINE()
+### to process a matrix-like object by block of columns.
 ###
 
-colblock_APPLY <- function(x, APPLY, ..., out_file=NULL, out_name=NULL)
+colblock_APPLY <- function(x, APPLY, ..., if_empty=NULL,
+                           out_file=NULL, out_name=NULL)
 {
     x_dim <- dim(x)
     if (length(x_dim) != 2L)
@@ -313,11 +317,11 @@ colblock_APPLY <- function(x, APPLY, ..., out_file=NULL, out_name=NULL)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    block_APPLY(x, APPLY, ..., block_len=block_len,
-                               out_file=out_file, out_name=out_name)
+    block_APPLY(x, APPLY, ..., if_empty=if_empty,
+                out_file=out_file, out_name=out_name, block_len=block_len)
 }
 
-colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
+colblock_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init)
 {
     x_dim <- dim(x)
     if (length(x_dim) != 2L)
@@ -325,6 +329,6 @@ colblock_APPLY_REDUCE <- function(x, APPLY, REDUCE, reduced)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
     block_len <- max(get_block_length(type(x)), x_dim[[1L]])
-    block_APPLY_REDUCE(x, APPLY, REDUCE, reduced, block_len=block_len)
+    block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, block_len=block_len)
 }
 
