@@ -97,10 +97,9 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
 
     out_file <- getHDF5ArrayOutputFile()
     out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputSettings())
+    on.exit(setHDF5ArrayOutputName())
 
     ans_type <- typeof(match.fun(type(x))(1) * match.fun(type(y))(1))
-    h5createFile(out_file)
     h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),
                     storage.mode=ans_type)
 

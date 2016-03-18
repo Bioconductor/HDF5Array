@@ -356,57 +356,6 @@ HDF5Array <- function(file, group, name, type=NA)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Manage settings for output destination on disk
-###
-
-.output_settings_envir <- new.env(hash=TRUE, parent=emptyenv())
-
-### Called by .onLoad() hook (see zzz.R file).
-setHDF5ArrayOutputFile <- function(file=paste0(tempfile(), ".h5"))
-{
-    if (!isSingleString(file))
-        stop(wmsg("'file' must be a single string specifying the path to ",
-                  "the HDF5 file where output will be written"))
-    assign("file", file, envir=.output_settings_envir)
-}
-
-getHDF5ArrayOutputFile <- function() get("file", envir=.output_settings_envir)
-
-assign("auto_inc_ID", 1L, envir=.output_settings_envir)
-
-setHDF5ArrayOutputName <- function(name)
-{
-    if (missing(name)) {
-        suppressWarnings(rm(list="name", envir=.output_settings_envir))
-        auto_inc_ID <- get("auto_inc_ID", envir=.output_settings_envir)
-        return(assign("auto_inc_ID", auto_inc_ID + 1L,
-                      envir=.output_settings_envir))
-    }
-    if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying the name of ",
-                  "the dataset in the HDF5 file to which output will be ",
-                  "written"))
-    assign("name", name, envir=.output_settings_envir)
-}
-
-getHDF5ArrayOutputName <- function()
-{
-    name <- try(get("name", envir=.output_settings_envir), silent=TRUE)
-    if (is(name, "try-error")) {
-        auto_inc_ID <- get("auto_inc_ID", envir=.output_settings_envir)
-        name <- paste0("HDF5ArrayDataset", auto_inc_ID)
-    }
-    name
-}
-
-setHDF5ArrayOutputSettings <- function(file=paste0(tempfile(), ".h5"), name)
-{
-    setHDF5ArrayOutputFile(file)
-    setHDF5ArrayOutputName(name)
-}
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Coercion
 ###
 
@@ -494,9 +443,8 @@ setMethod("as.matrix", "HDF5Array", .from_HDF5Array_to_matrix)
 {
     out_file <- getHDF5ArrayOutputFile()
     out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputSettings())
+    on.exit(setHDF5ArrayOutputName())
 
-    h5createFile(out_file)
     h5write(from, out_file, out_name)
     ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
     ## so the HDF5Array() constructor can bring them back. Then we wouldn't

@@ -112,10 +112,9 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
 
     out_file <- getHDF5ArrayOutputFile()
     out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputSettings())
+    on.exit(setHDF5ArrayOutputName())
 
     ans_type <- typeof(GENERIC(match.fun(type(e1))(1), match.fun(type(e2))(1)))
-    h5createFile(out_file)
     h5createDataset(out_file, out_name, dim(e1), storage.mode=ans_type)
     
     block_MAPPLY(GENERIC, e1, e2,
