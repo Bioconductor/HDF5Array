@@ -18,7 +18,7 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Low-level helpers to read stuff from the HDF5 file
+### A convenience wrapper to rhdf5::h5read()
 ###
 
 .quiet_h5read <- function(file, group, name, index)
@@ -49,7 +49,7 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Constructor
+### Construct an HDF5Dataset object from a file or an array
 ###
 
 .get_h5dataset_dim <- function(file, group, name)
@@ -73,8 +73,7 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
     ans[[1L]]  # drop any attribute
 }
 
-### For internal use only.
-new_HDF5Dataset <- function(file, group, name, type=NA)
+.new_HDF5Dataset_from_file <- function(file, group, name, type=NA)
 {
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path to ",
@@ -113,14 +112,14 @@ new_HDF5Dataset <- function(file, group, name, type=NA)
                         first_val=first_val)
 }
 
-new_HDF5Dataset_from_array <- function(a)
+.new_HDF5Dataset_from_array <- function(a)
 {
     out_file <- getHDF5ArrayOutputFile()
     out_name <- getHDF5ArrayOutputName()
     on.exit(setHDF5ArrayOutputName())
 
     h5write(a, out_file, out_name)
-    new_HDF5Dataset(out_file, "/", out_name, type=type(a))
+    .new_HDF5Dataset_from_file(out_file, "/", out_name, type=type(a))
 }
 
 
@@ -135,27 +134,26 @@ new_HDF5Dataset_from_array <- function(a)
 setClass("HDF5Array", contains="DelayedArray")
 
 setAs("HDF5Dataset", "HDF5Array",
-    function(from) new2("HDF5Array", new_DelayedArray(from))
+    function(from) new_DelayedArray(from, Class="HDF5Array")
 )
+
+HDF5Array <- function(file, group, name, type=NA)
+{
+    as(.new_HDF5Dataset_from_file(file, group, name, type=type), "HDF5Array")
+}
 
 setAs("array", "HDF5Array",
     function(from)
     {
-        ans <- as(new_HDF5Dataset_from_array(from), "HDF5Array")
-        ## TODO: Investigate the possiblity that new_HDF5Dataset_from_array()
-        ## stores the dimnames in the HDF5 file so new_HDF5Dataset() can
-        ## bring them back. Then we wouldn't need to explicitely set them
+        ans <- as(.new_HDF5Dataset_from_array(from), "HDF5Array")
+        ## TODO: Investigate the possiblity that .new_HDF5Dataset_from_array()
+        ## stores the dimnames in the HDF5 file so .new_HDF5Dataset_from_file()
+        ## can bring them back. Then we wouldn't need to explicitely set them
         ## on 'ans' like we do here.
         dimnames(ans) <- dimnames(from)
         ans
     }
 )
-
-HDF5Array <- function(file, group, name, type=NA)
-{
-    A0 <- new_HDF5Dataset(file, group, name, type=type)
-    new2("HDF5Array", new_DelayedArray(A0))
-}
 
 setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
 
@@ -163,40 +161,23 @@ setAs("HDF5Array", "HDF5Matrix",
     function(from) as(as(from, "DelayedMatrix"), "HDF5Matrix")
 )
 
+HDF5Matrix <- function(file, group, name, type=NA)
+{
+    as(HDF5Array(file, group, name, type=type), "HDF5Matrix")
+}
+
 setAs("matrix", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
 
-HDF5Matrix <- function(file, group, name, type=NA)
-{
-    hdf5array <- HDF5Array(file, group, name, type=type)
-    as(hdf5array, "HDF5Matrix")
-}
+setAs("DelayedArray", "HDF5Array",
+    function(from) stop(wmsg("coercing a ", class(from), " object to an ",
+                             "HDF5Array object is not supported yet"))
+)
 
-### 'x' must be an array-like object with 3 dimensions.
-### 'MARGIN' is the dimension to drop.
-make_HDF5Matrix_from_3D_array <- function(x, MARGIN)
-{
-    x_dim <- dim(x)
-    x_ndim <- length(x_dim)
-    if (x_ndim != 3L)
-        stop("'x' must have 3 dimensions")
-    if (!isSingleNumber(MARGIN))
-        stop("'MARGIN' must be a single integer")
-    if (!is.integer(MARGIN))
-        MARGIN <- as.integer(MARGIN)
-    if (MARGIN < 1L || MARGIN > x_ndim)
-        stop("'MARGIN' must be >= 1 and <= length(dim(x))")
-    if (x_dim[[MARGIN]] != 1L)
-        stop("'dim(x)[[MARGIN]]' must be 1")
-    if (!is(x, "HDF5Array"))
-        x <- as(x, "HDF5Array")
-
-    if (x@is_transposed)
-        MARGIN <- x_ndim + 1L - MARGIN
-    tmp <- seq_along(x_dim)[-MARGIN]
-    N1 <- tmp[[1L]]
-    N2 <- tmp[[2L]]
-    new2("HDF5Matrix", x, N1=N1, N2=N2)
-}
+setAs("DelayedArray", "HDF5Matrix",
+    function(from) stop(wmsg("Coercing a ", class(from), " object to an ",
+                             "HDF5Matrix object is not supported yet. ",
+                             "Please coerce to DelayedMatrix instead."))
+)
 

@@ -1,5 +1,5 @@
 ### =========================================================================
-### Common operations on HDF5Matrix objects
+### Common operations on DelayedMatrix objects
 ### -------------------------------------------------------------------------
 ###
 
@@ -11,15 +11,15 @@
 .normarg_dims <- function(dims, method)
 {
     if (!identical(dims, 1))
-        stop("\"", method, "\" method for HDF5Matrix objects ",
+        stop("\"", method, "\" method for DelayedMatrix objects ",
              "does not support the 'dims' argument yet")
 }
 
-.HDF5Matrix_block_rowSums <- function(x, na.rm=FALSE, dims=1)
+.DelayedMatrix_block_rowSums <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "rowSums")
-    if (is(x, "HDF5Array") && x@is_transposed)
-        return(.HDF5Matrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
+    if (is(x, "DelayedArray") && x@is_transposed)
+        return(.DelayedMatrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
 
     REDUCE <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
     COMBINE <- `+`
@@ -28,25 +28,25 @@
     setNames(ans, rownames(x))
 }
 
-.HDF5Matrix_block_colSums <- function(x, na.rm=FALSE, dims=1)
+.DelayedMatrix_block_colSums <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "colSums")
-    if (is(x, "HDF5Array") && x@is_transposed)
-        return(.HDF5Matrix_block_rowSums(t(x), na.rm=na.rm, dims=dims))
+    if (is(x, "DelayedArray") && x@is_transposed)
+        return(.DelayedMatrix_block_rowSums(t(x), na.rm=na.rm, dims=dims))
 
     colsums_list <- colblock_APPLY(x, colSums, na.rm=na.rm,
                                    if_empty=numeric(0))
     unlist(colsums_list, recursive=FALSE)
 }
 
-setMethod("rowSums", "HDF5Matrix", .HDF5Matrix_block_rowSums)
-setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
+setMethod("rowSums", "DelayedMatrix", .DelayedMatrix_block_rowSums)
+setMethod("colSums", "DelayedMatrix", .DelayedMatrix_block_colSums)
 
-.HDF5Matrix_block_rowMeans <- function(x, na.rm=FALSE, dims=1)
+.DelayedMatrix_block_rowMeans <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "rowMeans")
-    if (is(x, "HDF5Array") && x@is_transposed)
-        return(.HDF5Matrix_block_colMeans(t(x), na.rm=na.rm, dims=dims))
+    if (is(x, "DelayedMatrix") && x@is_transposed)
+        return(.DelayedMatrix_block_colMeans(t(x), na.rm=na.rm, dims=dims))
 
     REDUCE <- function(submatrix) {
         submatrix_sums <- rowSums(submatrix, na.rm=na.rm)
@@ -64,35 +64,35 @@ setMethod("colSums", "HDF5Matrix", .HDF5Matrix_block_colSums)
     setNames(ans[ , 1L] / ans[ , 2L], rownames(x))
 }
 
-.HDF5Matrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)
+.DelayedMatrix_block_colMeans <- function(x, na.rm=FALSE, dims=1)
 {
     .normarg_dims(dims, "colMeans")
-    if (is(x, "HDF5Array") && x@is_transposed)
-        return(.HDF5Matrix_block_rowMeans(t(x), na.rm=na.rm, dims=dims))
+    if (is(x, "DelayedArray") && x@is_transposed)
+        return(.DelayedMatrix_block_rowMeans(t(x), na.rm=na.rm, dims=dims))
 
     colmeans_list <- colblock_APPLY(x, colMeans, na.rm=na.rm,
                                     if_empty=numeric(0))
     unlist(colmeans_list, recursive=FALSE)
 }
 
-setMethod("rowMeans", "HDF5Matrix", .HDF5Matrix_block_rowMeans)
-setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
+setMethod("rowMeans", "DelayedMatrix", .DelayedMatrix_block_rowMeans)
+setMethod("colMeans", "DelayedMatrix", .DelayedMatrix_block_colMeans)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Matrix multiplication
 ###
 ### We only support multiplication of an ordinary matrix (typically
-### small) by an HDF5Matrix object (typically big). Multiplication of 2
-### HDF5Matrix objects is not supported.
+### small) by a DelayedMatrix object (typically big). Multiplication of 2
+### DelayedMatrix objects is not supported.
 ###
 
 ### Write a new HDF5 dataset to disk. Return an HDF5Matrix object that points
 ### to this new dataset.
-.HDF5Matrix_block_mult_by_left_matrix <- function(x, y)
+.DelayedMatrix_block_mult_by_left_matrix <- function(x, y)
 {
     stopifnot(is.matrix(x),
-              is(y, "HDF5Matrix") || is.matrix(y),
+              is(y, "DelayedMatrix") || is.matrix(y),
               ncol(x) == nrow(y))
 
     out_file <- getHDF5ArrayOutputFile()
@@ -120,18 +120,18 @@ setMethod("colMeans", "HDF5Matrix", .HDF5Matrix_block_colMeans)
     ans
 }
 
-setMethod("%*%", c("HDF5Matrix", "matrix"),
+setMethod("%*%", c("DelayedMatrix", "matrix"),
     function(x, y) t(t(y) %*% t(x))
 )
 
-setMethod("%*%", c("matrix", "HDF5Matrix"),
-    .HDF5Matrix_block_mult_by_left_matrix
+setMethod("%*%", c("matrix", "DelayedMatrix"),
+    .DelayedMatrix_block_mult_by_left_matrix
 )
 
-setMethod("%*%", c("HDF5Matrix", "HDF5Matrix"),
+setMethod("%*%", c("DelayedMatrix", "DelayedMatrix"),
     function(x, y)
-        stop(wmsg("multiplication of 2 HDF5Matrix objects is not supported, ",
-                  "only multiplication of an ordinary matrix by an ",
-                  "HDF5Matrix object at the moment"))
+        stop(wmsg("multiplication of 2 DelayedMatrix objects is not ",
+                  "supported, only multiplication of an ordinary matrix by ",
+                  "a DelayedMatrix object at the moment"))
 )
 

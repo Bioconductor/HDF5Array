@@ -12,7 +12,8 @@ import(rhdf5)
 
 exportClasses(
     DelayedArray, DelayedMatrix,
-    HDF5Dataset, HDF5Array, HDF5Matrix
+    HDF5Dataset,
+    HDF5Array, HDF5Matrix
 )
 
 
@@ -20,14 +21,14 @@ exportClasses(
 ### Export S3 methods
 ###
 
-S3method(mean, HDF5Array)
+S3method(mean, DelayedArray)
 
 ### We also export them thru the export() directive so that (a) they can be
 ### called directly, (b) tab-completion on the name of the generic shows them,
 ### and (c) methods() doesn't asterisk them.
 
 export(
-    mean.HDF5Array
+    mean.DelayedArray
 )
 
 

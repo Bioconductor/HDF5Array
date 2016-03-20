@@ -16,10 +16,10 @@ VignetteBuilder: knitr
 License: Artistic-2.0
 Collate:
 	DelayedArray-class.R
+	DelayedArray-utils.R
 	DelayedMatrix-class.R
+	DelayedMatrix-utils.R
 	output_settings.R
 	block_processing.R
 	HDF5Array-class.R
-	HDF5Array-utils.R
-	HDF5Matrix-utils.R
 	zzz.R

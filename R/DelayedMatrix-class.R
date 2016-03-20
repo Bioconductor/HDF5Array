@@ -48,7 +48,7 @@ setValidity2("DelayedMatrix", .validate_DelayedMatrix)
 ###
 ### Defining the internal index() getter and setter is enough to make all the
 ### DelayedArray accessors (length, isEmpty, dim, dimnames, dimnames<-) work
-### on an DelayedMatrix object.
+### on a DelayedMatrix object.
 
 setMethod("index", "DelayedMatrix",
     function(x) x@index[c(x@N1, x@N2)]
@@ -108,4 +108,36 @@ setAs("DelayedArray", "DelayedMatrix", .from_DelayedArray_to_DelayedMatrix)
 
 setAs("matrix", "DelayedMatrix", .from_matrix_to_DelayedMatrix)
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Specialized constructor
+###
+
+### 'x' must be an array-like object with 3 dimensions.
+### 'MARGIN' is the dimension to drop.
+make_DelayedMatrix_from_3D_DelayedArray <- function(x, MARGIN)
+{
+    if (!is(x, "DelayedArray"))
+        x <- as(x, "DelayedArray")
+
+    x_dim <- dim(x)
+    x_ndim <- length(x_dim)
+    if (x_ndim != 3L)
+        stop("'x' must have 3 dimensions")
+    if (!isSingleNumber(MARGIN))
+        stop("'MARGIN' must be a single integer")
+    if (!is.integer(MARGIN))
+        MARGIN <- as.integer(MARGIN)
+    if (MARGIN < 1L || MARGIN > x_ndim)
+        stop("'MARGIN' must be >= 1 and <= length(dim(x))")
+    if (x_dim[[MARGIN]] != 1L)
+        stop("'dim(x)[[MARGIN]]' must be 1")
+
+    if (x@is_transposed)
+        MARGIN <- x_ndim + 1L - MARGIN
+    tmp <- seq_along(x_dim)[-MARGIN]
+    N1 <- tmp[[1L]]
+    N2 <- tmp[[2L]]
+    new2("DelayedMatrix", x, N1=N1, N2=N2)
+}
 

@@ -9,7 +9,7 @@ m2 <- matrix(runif(60), ncol=6)                          # numeric matrix
 block_sizes1 <- c(12L, 20L, 50L, 10000L)
 block_sizes2 <- 2L * block_sizes1
 
-test_HDF5Matrix_delayed_Ops <- function()
+test_DelayedMatrix_delayed_Ops <- function()
 {
     test_delayed_Ops_on_matrix <- function(.Generic, m, M) {
         GENERIC <- match.fun(.Generic)
@@ -68,12 +68,12 @@ test_HDF5Matrix_delayed_Ops <- function()
     for (.Generic in c(Arith_members, Compare_members))
         test_delayed_Ops_on_matrix(.Generic, m, M)
 
-    M <- as(A[ , , 2], "HDF5Matrix")
+    M <- as(A[ , , 2], "DelayedMatrix")
     for (.Generic in c(Arith_members, Compare_members))
         test_delayed_Ops_on_matrix(.Generic, m, M)
 }
 
-test_HDF5Matrix_row_col_summary <- function()
+test_DelayedMatrix_row_col_summary <- function()
 {
     test_row_col_summary <- function(FUN, m, M, block_sizes) {
         on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
@@ -103,7 +103,7 @@ test_HDF5Matrix_row_col_summary <- function()
     ## on an integer matrix
     m <- a1[ , , 1]
     A1 <- as(a1, "HDF5Array")
-    M <- as(A1[ , , 1], "HDF5Matrix")
+    M <- as(A1[ , , 1], "DelayedMatrix")
     for (FUN in c("rowSums", "colSums", "rowMeans", "colMeans")) {
         test_row_col_summary(FUN, m, M, block_sizes2)
         test_row_col_summary(FUN, m[ , 0], M[ , 0], block_sizes2)
@@ -124,7 +124,7 @@ test_HDF5Matrix_row_col_summary <- function()
     test_row_col_summary(genefilter::rowVars, m, M, block_sizes2)
 }
 
-test_HDF5Matrix_mult <- function()
+test_DelayedMatrix_mult <- function()
 {
     m <- m2
     m[2, 4] <- NA

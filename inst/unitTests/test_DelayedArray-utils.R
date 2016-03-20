@@ -8,7 +8,7 @@ a2 <- a1 + runif(150) - 0.5                              # numeric array
 block_sizes1 <- c(12L, 20L, 50L, 10000L)
 block_sizes2 <- 2L * block_sizes1
 
-test_HDF5Array_Math_ans_Arith <- function()
+test_DelayedArray_Math_ans_Arith <- function()
 {
     toto1 <- function(a) { 100 / floor(abs((5 * log(a + 0.2) - 1)^3)) }
     toto2 <- function(a) { 100L + (5L * (a - 2L)) %% 7L }
@@ -44,13 +44,13 @@ test_HDF5Array_Math_ans_Arith <- function()
     checkIdentical(toto1(m), as.matrix(toto1(M)))
     checkIdentical(t(toto1(m)), as.matrix(toto1(t(M))))
     checkIdentical(t(toto1(m)), as.matrix(t(toto1(M))))
-    M <- as(A[ , , 2], "HDF5Matrix")
+    M <- as(A[ , , 2], "DelayedMatrix")
     checkIdentical(toto1(m), as.matrix(toto1(M)))
     checkIdentical(t(toto1(m)), as.matrix(toto1(t(M))))
     checkIdentical(t(toto1(m)), as.matrix(t(toto1(M))))
 }
 
-test_HDF5Array_delayed_Ops <- function()
+test_DelayedArray_Ops_with_left_or_right_vector <- function()
 {
     test_delayed_Ops_on_array <- function(.Generic, a, A, m, M) {
         on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
@@ -92,15 +92,13 @@ test_HDF5Array_delayed_Ops <- function()
         test_delayed_Ops_on_array(.Generic, a, A, m, M)
 
     ## Takes too long and probably not that useful.
-    #M <- as(A[ , , 2], "HDF5Matrix")
+    #M <- as(A[ , , 2], "DelayedMatrix")
     #for (.Generic in c(Arith_members, Compare_members))
     #    test_delayed_Ops_on_array(.Generic, a, A, m, M)
 }
 
-test_HDF5Array_block_Ops <- function()
+test_DelayedArray_Ops_COMBINE_seeds <- function()
 {
-    on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
-
     ## comparing 2 HDF5Array objects
     A1 <- as(a1, "HDF5Array")
     A2 <- as(a2, "HDF5Array")
@@ -114,21 +112,17 @@ test_HDF5Array_block_Ops <- function()
         target1 <- GENERIC(a1, a2)
         target2 <- GENERIC(a2, a1)
         target3 <- GENERIC(a1, a3)
-        ## Testing with the smallest block size takes too long -> skip it.
-        for (block_size in block_sizes2[-1L]) {
-            options(HDF5Array.block.size=block_size)
-            checkIdentical(target1, as.array(GENERIC(A1, A2)))
-            checkIdentical(target2, as.array(GENERIC(A2, A1)))
-            checkIdentical(target3, as.array(GENERIC(A1, A3)))
-        }
+        checkIdentical(target1, as.array(GENERIC(A1, A2)))
+        checkIdentical(target2, as.array(GENERIC(A2, A1)))
+        checkIdentical(target3, as.array(GENERIC(A1, A3)))
     }
 }
 
-test_HDF5Array_anyNA <- function()
+test_DelayedArray_anyNA <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
-    HDF5Array_block_anyNA <- HDF5Array:::.HDF5Array_block_anyNA
+    DelayedArray_block_anyNA <- HDF5Array:::.DelayedArray_block_anyNA
 
     A1 <- as(a1, "HDF5Array")
     a <- a1
@@ -138,13 +132,13 @@ test_HDF5Array_anyNA <- function()
     for (block_size in block_sizes2) {
         options(HDF5Array.block.size=block_size)
         checkIdentical(FALSE, anyNA(A1))
-        checkIdentical(FALSE, HDF5Array_block_anyNA(a1))
+        checkIdentical(FALSE, DelayedArray_block_anyNA(a1))
         checkIdentical(TRUE, anyNA(A))
-        checkIdentical(TRUE, HDF5Array_block_anyNA(a))
+        checkIdentical(TRUE, DelayedArray_block_anyNA(a))
     }
 }
 
-test_HDF5Array_Summary <- function()
+test_DelayedArray_Summary <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -153,16 +147,16 @@ test_HDF5Array_Summary <- function()
         target1 <- GENERIC(a)
         target2 <- GENERIC(a, na.rm=TRUE)
         A <- as(a, "HDF5Array")
-        HDF5Array_block_Summary <- HDF5Array:::.HDF5Array_block_Summary
+        DelayedArray_block_Summary <- HDF5Array:::.DelayedArray_block_Summary
         for (block_size in block_sizes) {
             options(HDF5Array.block.size=block_size)
             checkIdentical(target1, GENERIC(A))
             checkIdentical(target1, GENERIC(t(A)))
-            checkIdentical(target1, HDF5Array_block_Summary(.Generic, a))
+            checkIdentical(target1, DelayedArray_block_Summary(.Generic, a))
             checkIdentical(target2, GENERIC(A, na.rm=TRUE))
             checkIdentical(target2, GENERIC(t(A), na.rm=TRUE))
-            checkIdentical(target2, HDF5Array_block_Summary(.Generic, a,
-                                                            na.rm=TRUE))
+            checkIdentical(target2, DelayedArray_block_Summary(.Generic, a,
+                                                               na.rm=TRUE))
         }
     }
 
@@ -186,7 +180,7 @@ test_HDF5Array_Summary <- function()
         test_Summary(.Generic, a, block_sizes1)
 }
 
-test_HDF5Array_mean <- function()
+test_DelayedArray_mean <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
 
@@ -209,7 +203,7 @@ test_HDF5Array_mean <- function()
     }
 }
 
-test_HDF5Array_apply <- function()
+test_DelayedArray_apply <- function()
 {
     test_apply <- function(a) {
         A <- as(a, "HDF5Array")

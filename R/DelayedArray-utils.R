@@ -1,21 +1,20 @@
 ### =========================================================================
-### Common operations on HDF5Array objects
+### Common operations on DelayedArray objects
 ### -------------------------------------------------------------------------
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Various unary operators + the "Math" group generic
 ###
+### All these operations return a DelayedArray object of the same dimensions
+### as 'x'.
+###
 
-### All these operations return an HDF5Array object of the same dimensions
-### as 'x'. This object points to the same HDF5 dataset than 'x' but has the
-### operation stored in it (in the delayed_ops slot) as a delayed operation.
+setMethod("is.na", "DelayedArray", function(x) register_delayed_op(x, "is.na"))
 
-setMethod("is.na", "HDF5Array", function(x) register_delayed_op(x, "is.na"))
+setMethod("!", "DelayedArray", function(x) register_delayed_op(x, "!"))
 
-setMethod("!", "HDF5Array", function(x) register_delayed_op(x, "!"))
-
-setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
+setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -26,12 +25,10 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
 ### Logic members: &, |
 ###
 
-### Return an HDF5Array object of the same dimensions as 'e1'. This object
-### points to the same HDF5 dataset than 'e1' but has the operation stored
-### in it (in the delayed_ops slot) as a delayed operation.
-.HDF5Array_delayed_Ops_with_right_vector <- function(.Generic, e1, e2)
+### Return a DelayedArray object of the same dimensions as 'e1'.
+.DelayedArray_Ops_with_right_vector <- function(.Generic, e1, e2)
 {
-    stopifnot(is(e1, "HDF5Array"))
+    stopifnot(is(e1, "DelayedArray"))
     e1_class <- class(e1)
     e2_class <- class(e2)
     if (!is.vector(e2))
@@ -56,12 +53,10 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e1@is_transposed)
 }
 
-### Return an HDF5Array object of the same dimensions as 'e2'. This object
-### points to the same HDF5 dataset than 'e2' but has the operation stored
-### in it (in the delayed_ops slot) as a delayed operation.
-.HDF5Array_delayed_Ops_with_left_vector <- function(.Generic, e1, e2)
+### Return a DelayedArray object of the same dimensions as 'e2'.
+.DelayedArray_Ops_with_left_vector <- function(.Generic, e1, e2)
 {
-    stopifnot(is(e2, "HDF5Array"))
+    stopifnot(is(e2, "DelayedArray"))
     e1_class <- class(e1)
     e2_class <- class(e2)
     if (!is.vector(e1))
@@ -102,74 +97,56 @@ setMethod("Math", "HDF5Array", function(x) register_delayed_op(x, .Generic))
     ans_dimnames
 }
 
-### Write a new HDF5 dataset to disk. Return an HDF5Array object that points
-### to this new dataset.
-.HDF5Array_block_Ops <- function(.Generic, e1, e2)
+### Return a DelayedArray object of the same dimensions as 'e1' and 'e2'.
+.DelayedArray_Ops_COMBINE_seeds <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))
         stop("non-conformable arrays")
-    GENERIC <- match.fun(.Generic)
-
-    out_file <- getHDF5ArrayOutputFile()
-    out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputName())
-
-    ans_type <- typeof(GENERIC(match.fun(type(e1))(1), match.fun(type(e2))(1)))
-    h5createDataset(out_file, out_name, dim(e1), storage.mode=ans_type)
-    
-    block_MAPPLY(GENERIC, e1, e2,
-        out_file=out_file,
-        out_name=out_name
-    )
-
-    ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
-    ## so the HDF5Array() constructor can bring them back. Then we wouldn't
-    ## need to explicitely set them on 'ans' like we do below.
-    ans <- HDF5Array(out_file, "/", out_name, type=ans_type)
+    ans <- new_DelayedArray(e1, e2, COMBINING_OP=.Generic)
     dimnames(ans) <- .combine_dimnames(e1, e2)
-    if (is(e1, "HDF5Matrix") || is(e2, "HDF5Matrix"))
-        ans <- as(ans, "HDF5Matrix")
+    if (is(e1, "DelayedMatrix") || is(e2, "DelayedMatrix"))
+        ans <- as(ans, "DelayedMatrix")
     ans
 }
 
-.HDF5Array_Ops <- function(.Generic, e1, e2)
+.DelayedArray_Ops <- function(.Generic, e1, e2)
 {
     e1_dim <- dim(e1)
     e2_dim <- dim(e2)
     if (identical(e1_dim, e2_dim))
-        return(.HDF5Array_block_Ops(.Generic, e1, e2))
+        return(.DelayedArray_Ops_COMBINE_seeds(.Generic, e1, e2))
     ## Effective dimensions.
     effdim_idx1 <- which(e1_dim != 1L)
     effdim_idx2 <- which(e2_dim != 1L)
     if ((length(effdim_idx1) == 1L) == (length(effdim_idx2) == 1L))
         stop("non-conformable arrays")
     if (length(effdim_idx1) == 1L) {
-        .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+        .DelayedArray_Ops_with_left_vector(.Generic, e1, e2)
     } else {
-        .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+        .DelayedArray_Ops_with_right_vector(.Generic, e1, e2)
     }
 }
 
-setMethod("Ops", c("HDF5Array", "vector"),
+setMethod("Ops", c("DelayedArray", "vector"),
     function(e1, e2)
-        .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+        .DelayedArray_Ops_with_right_vector(.Generic, e1, e2)
 )
 
-setMethod("Ops", c("vector", "HDF5Array"),
+setMethod("Ops", c("vector", "DelayedArray"),
     function(e1, e2)
-        .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+        .DelayedArray_Ops_with_left_vector(.Generic, e1, e2)
 )
 
-setMethod("Ops", c("HDF5Array", "HDF5Array"),
+setMethod("Ops", c("DelayedArray", "DelayedArray"),
     function(e1, e2)
-        .HDF5Array_Ops(.Generic, e1, e2)
+        .DelayedArray_Ops(.Generic, e1, e2)
 )
 
 ### Support unary operators "+" and "-".
-setMethod("+", c("HDF5Array", "missing"),
+setMethod("+", c("DelayedArray", "missing"),
     function(e1, e2) register_delayed_op(e1, .Generic, Largs=list(0L))
 )
-setMethod("-", c("HDF5Array", "missing"),
+setMethod("-", c("DelayedArray", "missing"),
     function(e1, e2) register_delayed_op(e1, .Generic, Largs=list(0L))
 )
 
@@ -242,28 +219,29 @@ setMethod("pmin2", c("ANY", "ANY"),
 )
 
 for (.Generic in c("pmax2", "pmin2")) {
-    setMethod(.Generic, c("HDF5Array", "vector"),
+    setMethod(.Generic, c("DelayedArray", "vector"),
         function(e1, e2)
-            .HDF5Array_delayed_Ops_with_right_vector(.Generic, e1, e2)
+            .DelayedArray_Ops_with_right_vector(.Generic, e1, e2)
     )
-    setMethod(.Generic, c("vector", "HDF5Array"),
+    setMethod(.Generic, c("vector", "DelayedArray"),
         function(e1, e2)
-            .HDF5Array_delayed_Ops_with_left_vector(.Generic, e1, e2)
+            .DelayedArray_Ops_with_left_vector(.Generic, e1, e2)
     )
-    setMethod(.Generic, c("HDF5Array", "HDF5Array"),
+    setMethod(.Generic, c("DelayedArray", "DelayedArray"),
         function(e1, e2)
-            .HDF5Array_Ops(.Generic, e1, e2)
+            .DelayedArray_Ops(.Generic, e1, e2)
     )
 }
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### A low-level utility for putting HDF5Array object in a "straight" form
+### A low-level utility for putting DelayedArray object in a "straight" form
 ###
-### Untranspose the HDF5Array object and put its rows and columns in their
-### "native" order. The goal is to put the matrix elements in their "native"
-### order (i.e. in the same order as on disk) so as.vector() is faster on the
-### resulting object is faster than on the original object.
+### Untranspose the DelayedArray object and put its rows and columns in their
+### "native" order. The result is a DelayedArray object where the array
+### elements are in the same order as in the seeds. This makes block-processing
+### faster if the seeds are on-disk objects where the 1st dimension is the fast
+### changing dimension (e.g. 5x faster if the seeds are HDF5Dataset objects).
 ###
 
 .straighten_index <- function(i)
@@ -306,7 +284,7 @@ for (.Generic in c("pmax2", "pmin2")) {
 ### anyNA()
 ###
 
-.HDF5Array_block_anyNA <- function(x, recursive=FALSE)
+.DelayedArray_block_anyNA <- function(x, recursive=FALSE)
 {
     REDUCE <- anyNA
     COMBINE <- `||`
@@ -317,7 +295,7 @@ for (.Generic in c("pmax2", "pmin2")) {
     block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, BREAKIF)
 }
 
-setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
+setMethod("anyNA", "DelayedArray", .DelayedArray_block_anyNA)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -336,13 +314,13 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
     NULL_idx <- which(S4Vectors:::sapply_isNULL(objects))
     if (length(NULL_idx) != 0L)
         objects <- objects[-NULL_idx]
-    is_HDF5Array_or_array <- function(x) is(x, "HDF5Array") || is.array(x)
-    if (!all(vapply(objects, is_HDF5Array_or_array, logical(1))))
-        stop("the objects to combine must be HDF5Array objects (or NULLs)")
+    is_array_like <- function(x) is(x, "DelayedArray") || is.array(x)
+    if (!all(vapply(objects, is_array_like, logical(1))))
+        stop("the objects to combine must be array-like objects (or NULLs)")
     objects
 }
 
-.HDF5Array_block_Summary <- function(.Generic, x, ..., na.rm=FALSE)
+.DelayedArray_block_Summary <- function(.Generic, x, ..., na.rm=FALSE)
 {
     objects <- .collect_objects(x, ...)
 
@@ -388,9 +366,9 @@ setMethod("anyNA", "HDF5Array", .HDF5Array_block_anyNA)
     init
 }
 
-setMethod("Summary", "HDF5Array",
+setMethod("Summary", "DelayedArray",
     function(x, ..., na.rm=FALSE)
-        .HDF5Array_block_Summary(.Generic, x, ..., na.rm=na.rm)
+        .DelayedArray_block_Summary(.Generic, x, ..., na.rm=na.rm)
 )
 
 
@@ -399,10 +377,10 @@ setMethod("Summary", "HDF5Array",
 ###
 
 ### Same arguments as base::mean.default().
-.HDF5Array_block_mean <- function(x, trim=0, na.rm=FALSE)
+.DelayedArray_block_mean <- function(x, trim=0, na.rm=FALSE)
 {
     if (!identical(trim, 0))
-        stop("\"mean\" method for HDF5Array objects ",
+        stop("\"mean\" method for DelayedArray objects ",
              "does not support the 'trim' argument yet")
 
     REDUCE <- function(subarray) {
@@ -422,10 +400,10 @@ setMethod("Summary", "HDF5Array",
     ans[[1L]] / ans[[2L]]
 }
 
-### S3/S4 combo for mean.HDF5Array
-mean.HDF5Array <- function(x, trim=0, na.rm=FALSE, ...)
-    .HDF5Array_block_mean(x, trim=trim, na.rm=na.rm, ...)
-setMethod("mean", "HDF5Array", .HDF5Array_block_mean)
+### S3/S4 combo for mean.DelayedArray
+mean.DelayedArray <- function(x, trim=0, na.rm=FALSE, ...)
+    .DelayedArray_block_mean(x, trim=trim, na.rm=na.rm, ...)
+setMethod("mean", "DelayedArray", .DelayedArray_block_mean)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -471,7 +449,7 @@ setGeneric("apply", signature="X")
 }
 
 ### MARGIN must be a single integer.
-.HDF5Array_apply <- function(X, MARGIN, FUN, ...)
+.DelayedArray_apply <- function(X, MARGIN, FUN, ...)
 {
     FUN <- match.fun(FUN)
     X_dim <- dim(X)
@@ -498,8 +476,8 @@ setGeneric("apply", signature="X")
             subscript[[MARGIN]] <- i
             args <- c(list(X), subscript)
             slice <- do.call(`[`, args)
-            if (length(X_dim) == 3L && is(X, "HDF5Array"))
-                slice <- make_HDF5Matrix_from_3D_array(slice, MARGIN)
+            if (length(X_dim) == 3L && is(X, "DelayedArray"))
+                slice <- make_DelayedMatrix_from_3D_DelayedArray(slice, MARGIN)
             FUN(slice, ...)
         })
 
@@ -507,5 +485,5 @@ setGeneric("apply", signature="X")
     .simplify_apply_answer(ans)
 }
 
-setMethod("apply", "HDF5Array", .HDF5Array_apply)
+setMethod("apply", "DelayedArray", .DelayedArray_apply)
 

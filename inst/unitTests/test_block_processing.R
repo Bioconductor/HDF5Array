@@ -27,7 +27,7 @@ test_split_matrix_in_blocks <- function()
     A1 <- as(a1, "HDF5Array")
 
     m1 <- a1[2, c(9, 3:7), 2, -4]
-    M1a <- as(A1[2, c(9, 3:7), 2, -4], "HDF5Matrix")
+    M1a <- as(A1[2, c(9, 3:7), 2, -4], "DelayedMatrix")
     checkIdentical(m1, as.matrix(M1a))
 
     M1b <- as(m1, "HDF5Matrix")

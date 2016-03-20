@@ -66,14 +66,25 @@ setValidity2("DelayedArray", .validate_DelayedArray)
 ###
 
 new_DelayedArray <- function(a=new("array"),
-                                ..., COMBINING_OP="identity", Rargs=list())
+                             ..., COMBINING_OP="identity", Rargs=list(),
+                             Class="DelayedArray")
 {
     seeds <- list(a, ...)
     index <- lapply(dim(a), seq_len)
-    new2("DelayedArray", seeds=seeds,
-                         COMBINING_OP=COMBINING_OP,
-                         Rargs=Rargs,
-                         index=index)
+    new2(Class, seeds=seeds, COMBINING_OP=COMBINING_OP, Rargs=Rargs,
+                index=index)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Downgrade DelayedArray derived object to a DelayedArray or DelayedMatrix
+### *instance*.
+
+.as_DelayedArray_or_DelayedMatrix <- function(x)
+{
+    if (is(x, "DelayedMatrix"))
+        return(as(x, "DelayedMatrix", strict=TRUE))
+    as(x, "DelayedArray", strict=TRUE)
 }
 
 
@@ -203,7 +214,7 @@ setReplaceMethod("dimnames", "DelayedArray", .set_DelayedArray_dimnames)
         if (!identical(x@delayed_ops, x_delayed_ops))
             x@delayed_ops <- x_delayed_ops
     }
-    x
+    .as_DelayedArray_or_DelayedMatrix(x)
 }
 
 .extract_DelayedArray_subset <- function(x, i, j, ..., drop=TRUE)
@@ -300,7 +311,7 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
     }
     delayed_op <- list(FUN, Largs, Rargs, recycle_along_last_dim)
     x@delayed_ops <- c(x@delayed_ops, list(delayed_op))
-    x
+    .as_DelayedArray_or_DelayedMatrix(x)
 }
 
 .subset_delayed_op_args <- function(delayed_op, i, subset_along_last_dim)
@@ -399,7 +410,7 @@ setMethod("t", "DelayedArray",
     function(x)
     {
         x@is_transposed <- !x@is_transposed
-        x
+        .as_DelayedArray_or_DelayedMatrix(x)
     }
 )
 
@@ -460,7 +471,14 @@ setMethod("as.array", "DelayedArray", .from_DelayedArray_to_array)
 ### Other coercions
 ###
 
-### DelayedArray -> vector
+setAs("ANY", "DelayedArray",
+    function(from)
+    {
+        ans <- new_DelayedArray(from)
+        dimnames(ans) <- dimnames(from)
+        ans
+    }
+)
 
 .from_DelayedArray_to_vector <- function(x, mode="any")
 {
@@ -506,7 +524,7 @@ setGeneric("type", function(x) standardGeneric("type"))
 
 setMethod("type", "array", function(x) typeof(x))
 
-### If 'x' is an DelayedArray object, 'type(x)' must always return the same
+### If 'x' is a DelayedArray object, 'type(x)' must always return the same
 ### as 'typeof(as.array(x))'.
 setMethod("type", "DelayedArray",
     function(x)

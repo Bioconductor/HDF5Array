@@ -89,8 +89,8 @@ h5ls(tally_file)
 cov0 <- HDF5Array(tally_file, "/ExampleStudy/16", "Coverages")
 dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"))
 
-pcov <- as(cov0[ , 1, ], "HDF5Matrix")  # coverage on plus strand
-mcov <- as(cov0[ , 2, ], "HDF5Matrix")  # coverage on minus strand
+pcov <- as(cov0[ , 1, ], "DelayedMatrix")  # coverage on plus strand
+mcov <- as(cov0[ , 2, ], "DelayedMatrix")  # coverage on minus strand
 
 nrow(pcov)  # nb of samples
 ncol(pcov)  # length of Human chromosome 16
