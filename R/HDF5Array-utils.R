@@ -497,7 +497,7 @@ setGeneric("apply", signature="X")
             subscript <- rep.int(alist(foo=), length(X_dim))
             subscript[[MARGIN]] <- i
             args <- c(list(X), subscript)
-            slice <- do.call("[", args)
+            slice <- do.call(`[`, args)
             if (length(X_dim) == 3L && is(X, "HDF5Array"))
                 slice <- make_HDF5Matrix_from_3D_array(slice, MARGIN)
             FUN(slice, ...)

@@ -11,7 +11,8 @@ import(rhdf5)
 ###
 
 exportClasses(
-    HDF5Array, HDF5Matrix
+    DelayedArray, DelayedMatrix,
+    HDF5Dataset, HDF5Array, HDF5Matrix
 )
 
 

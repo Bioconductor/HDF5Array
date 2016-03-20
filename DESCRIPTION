@@ -3,7 +3,7 @@ Title: Array- and matrix-like containers for convenient access and manipulation
 	of HDF5 datasets
 Description: This package implements the HDF5Array and HDF5Matrix classes
 	for convenient access and manipulation of HDF5 datasets.
-Version: 0.5.2
+Version: 0.7.0
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
@@ -14,4 +14,12 @@ Suggests: h5vcData, SummarizedExperiment, GenomicRanges, genefilter,
 	BiocStyle, knitr, rmarkdown
 VignetteBuilder: knitr
 License: Artistic-2.0
-Collate: output_settings.R block_processing.R HDF5Array-class.R HDF5Matrix-class.R HDF5Array-utils.R HDF5Matrix-utils.R zzz.R
+Collate:
+	DelayedArray-class.R
+	DelayedMatrix-class.R
+	output_settings.R
+	block_processing.R
+	HDF5Array-class.R
+	HDF5Array-utils.R
+	HDF5Matrix-utils.R
+	zzz.R
