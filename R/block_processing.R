@@ -52,7 +52,7 @@ setClass("ArrayBlocks",
 ###       i.e. the blocks fully cover it and don't overlap each other.
 ###   (b) Each block is made of adjacent elements in the original array.
 ###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
-.ArrayBlocks <- function(dim, max_block_len)
+ArrayBlocks <- function(dim, max_block_len)
 {
     ndim <- length(dim)
     p <- cumprod(dim)
@@ -103,7 +103,7 @@ setMethod("length", "ArrayBlocks",
 
 ### Return a multidimensional subscript as a list with 1 subscript per
 ### dimension in the original array.
-.get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
+get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
 {
     nblock <- length(blocks)
     stopifnot(isSingleInteger(i), i >= 1, i <= nblock)
@@ -147,22 +147,22 @@ setMethod("length", "ArrayBlocks",
     subscript
 }
 
-.extract_array_block1 <- function(x, subscript)
+extract_array_block1 <- function(x, subscript)
     do.call(`[`, c(list(x), subscript, drop=FALSE))
 
-.extract_array_block2 <- function(x, blocks, i)
+extract_array_block2 <- function(x, blocks, i)
 {
-    subscript <- .get_array_block_subscript(blocks, i,
-                                            expand.RangeNSBS=is.array(x))
-    .extract_array_block1(x, subscript)
+    subscript <- get_array_block_subscript(blocks, i,
+                                           expand.RangeNSBS=is.array(x))
+    extract_array_block1(x, subscript)
 }
 
 ### NOT exported. Used in unit tests.
 split_array_in_blocks <- function(x, max_block_len)
 {
-    blocks <- .ArrayBlocks(dim(x), max_block_len)
+    blocks <- ArrayBlocks(dim(x), max_block_len)
     lapply(seq_along(blocks),
-           function(i) .extract_array_block2(x, blocks, i))
+           function(i) extract_array_block2(x, blocks, i))
 }
 
 ### NOT exported. Used in unit tests.
@@ -209,16 +209,15 @@ block_APPLY <- function(x, APPLY, ..., if_empty=NULL,
     APPLY <- match.fun(APPLY)
     if (is.null(block_len))
         block_len <- get_block_length(type(x))
-    blocks <- .ArrayBlocks(dim(x), block_len)
+    blocks <- ArrayBlocks(dim(x), block_len)
     nblock <- length(blocks)
     if (nblock == 0L)
         return(if_empty)
     expand_RangeNSBS <- is.array(x) || !is.null(out_file)
     lapply(seq_len(nblock),
         function(i) {
-            subscript <- .get_array_block_subscript(blocks, i,
-                                                    expand_RangeNSBS)
-            subarray <- .extract_array_block1(x, subscript)
+            subscript <- get_array_block_subscript(blocks, i, expand_RangeNSBS)
+            subarray <- extract_array_block1(x, subscript)
             if (!is.array(subarray))
                 subarray <- .as_array_or_matrix(subarray)
             block_ans <- APPLY(subarray, ...)
@@ -243,16 +242,16 @@ block_MAPPLY <- function(MAPPLY, ..., if_empty=NULL,
         types <- unlist(lapply(dots, type))
         block_len <- min(get_block_length(types))
     }
-    blocks <- .ArrayBlocks(x_dim, block_len)
+    blocks <- ArrayBlocks(x_dim, block_len)
     nblock <- length(blocks)
     if (nblock == 0L)
         return(if_empty)
     lapply(seq_len(nblock),
         function(i) {
-            subscript <- .get_array_block_subscript(blocks, i, TRUE)
+            subscript <- get_array_block_subscript(blocks, i, TRUE)
             subarrays <- lapply(dots,
                 function(x) {
-                    subarray <- .extract_array_block1(x, subscript)
+                    subarray <- extract_array_block1(x, subscript)
                     if (!is.array(subarray))
                         subarray <- .as_array_or_matrix(subarray)
                     subarray
@@ -275,9 +274,9 @@ block_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init,
         BREAKIF <- match.fun(BREAKIF)
     if (is.null(block_len))
         block_len <- get_block_length(type(x))
-    blocks <- .ArrayBlocks(dim(x), block_len)
+    blocks <- ArrayBlocks(dim(x), block_len)
     for (i in seq_along(blocks)) {
-        subarray <- .extract_array_block2(x, blocks, i)
+        subarray <- extract_array_block2(x, blocks, i)
         if (!is.array(subarray))
             subarray <- .as_array_or_matrix(subarray)
         reduced <- REDUCE(subarray)

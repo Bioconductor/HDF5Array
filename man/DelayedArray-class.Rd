@@ -13,8 +13,10 @@
 \alias{length,DelayedArray-method}
 \alias{isEmpty,DelayedArray-method}
 \alias{dimnames,DelayedArray-method}
-
 \alias{dimnames<-,DelayedArray-method}
+\alias{names,DelayedArray-method}
+\alias{names<-,DelayedArray-method}
+
 \alias{[,DelayedArray-method}
 \alias{t,DelayedArray-method}
 

@@ -230,6 +230,29 @@ setMethod("dimnames", "DelayedArray", .get_DelayedArray_dimnames)
 
 setReplaceMethod("dimnames", "DelayedArray", .set_DelayedArray_dimnames)
 
+.get_DelayedArray_names <- function(x)
+{
+    if (length(dim(x)) != 1L)
+        return(NULL)
+    dimnames(x)[[1L]]
+}
+
+setMethod("names", "DelayedArray", .get_DelayedArray_names)
+
+.set_DelayedArray_names <- function(x, value)
+{
+    if (length(dim(x)) != 1L) {
+        if (!is.null(value))
+            stop("setting the names of a ", class(x), " object with more ",
+                 "than 1 dimension is not supported")
+        return(x)
+    }
+    dimnames(x)[[1L]] <- value
+    x
+}
+
+setReplaceMethod("names", "DelayedArray", .set_DelayedArray_names)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### [
@@ -613,6 +636,50 @@ setMethod("[[", "DelayedArray",
 ### Show
 ###
 
+.split_names <- function(x_names, idx1, idx2)
+{
+    make_elt_indices <- function(i) {
+        if (length(i) == 0L)
+            return(character(0))
+        paste0("[", i, "]", sep="")
+    }
+    if (is.null(x_names)) {
+        s1 <- make_elt_indices(idx1)
+        s2 <- make_elt_indices(idx2)
+    } else {
+        s1 <- x_names[idx1]
+        s2 <- x_names[idx2]
+    }
+    format(c(s1, ".", s2), justify="right")
+}
+
+.prepare_1D_sample <- function(x, n1, n2)
+{
+    x_len <- length(x)
+    x_names <- names(x)
+    if (x_len <= n1 + n2 + 1L) {
+        ans <- format(as.vector(x))
+        idx1 <- seq_len(x_len)
+        idx2 <- integer(0)
+        names(ans) <- .split_names(x_names, idx1, idx2)[idx1]
+    } else {
+        idx1 <- seq_len(n1)
+        idx2 <- seq(to=x_len, by=1L, length.out=n2)
+        ans1 <- format(as.vector(x[idx1]))
+        ans2 <- format(as.vector(x[idx2]))
+        ans <- c(ans1, ".", ans2)
+        names(ans) <- .split_names(x_names, idx1, idx2)
+    }
+    ans
+}
+
+.print_1D_sample <- function(x, n1, n2)
+{
+    stopifnot(length(dim(x)) == 1L)
+    out <- .prepare_1D_sample(x, n1, n2)
+    print(out, quote=FALSE, right=TRUE, max=length(out))
+}
+
 .split_rownames <- function(x_rownames, idx1, idx2)
 {
     make_row_indices <- function(i) {
@@ -705,14 +772,12 @@ setMethod("[[", "DelayedArray",
     ans
 }
 
-.prepare_2D_DelayedArray_sample <- function(x)
+.prepare_2D_sample <- function(x, m1, m2, n1, n2)
 {
-    nhead <- get_showHeadLines()
-    ntail <- get_showTailLines()
     x_nrow <- nrow(x)
     x_ncol <- ncol(x)
-    if (x_nrow <= nhead + ntail + 1L) {
-        if (x_ncol <= 9L) {
+    if (x_nrow <= m1 + m2 + 1L) {
+        if (x_ncol <= n1 + n2 + 1L) {
             ans <- format(as.matrix(x))
             ## Only needed because of this bug in base::print.default:
             ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
@@ -723,11 +788,11 @@ setMethod("[[", "DelayedArray",
                 colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
             }
         } else {
-            ans <- .csplit_2D_DelayedArray(x, 4L, 4L)
+            ans <- .csplit_2D_DelayedArray(x, n1, n2)
         }
     } else {
-        if (x_ncol <= 9L) {
-            ans <- .rsplit_2D_DelayedArray(x, nhead, ntail)
+        if (x_ncol <= n1 + n2 + 1L) {
+            ans <- .rsplit_2D_DelayedArray(x, m1, m2)
             ## Only needed because of this bug in base::print.default:
             ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
             ## TODO: Remove when the bug is fixed.
@@ -737,25 +802,103 @@ setMethod("[[", "DelayedArray",
                 colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
             }
         } else {
-            ans <- .split_2D_DelayedArray(x, nhead, ntail, 4L, 4L)
+            ans <- .split_2D_DelayedArray(x, m1, m2, n1, n2)
         }
     }
     ans
+}
+
+.print_2D_sample <- function(x, m1, m2, n1, n2)
+{
+    stopifnot(length(dim(x)) == 2L)
+    out <- .prepare_2D_sample(x, m1, m2, n1, n2)
+    print(out, quote=FALSE, right=TRUE, max=length(out))
+}
+
+.print_2D_slices <- function(x, m1, m2, n1, n2, blocks, idx)
+{
+    subscript2string <- function(subscript, dimnames=NULL) {
+        s <- as.character(subscript)
+        if (!is.null(dimnames)) {
+            usename_idx <- which(nzchar(s) &
+                                 lengths(subscript) == 1L &
+                                 lengths(dimnames) != 0L)
+            s[usename_idx] <- mapply(`[`, dimnames[usename_idx],
+                                     subscript[usename_idx])
+        }
+        paste0(s, collapse=", ")
+    }
+    x_dimnames <- dimnames(x)
+    for (i in idx) {
+        subscript <- get_array_block_subscript(blocks, i,
+                                               expand.RangeNSBS=TRUE)
+        cat(subscript2string(subscript, x_dimnames), "\n", sep="")
+        slice <- as(extract_array_block1(x, subscript), "DelayedMatrix")
+        .print_2D_sample(slice, m1, m2, n1, n2)
+        cat("\n")
+    }
+}
+
+.print_array_data <- function(x, n1, n2)
+{
+    x_dim <- dim(x)
+    if (length(x_dim) == 1L) {
+        .print_1D_sample(x, n1, n2)
+        return()
+    }
+    if (length(x_dim) == 2L) {
+        nhead <- get_showHeadLines()
+        ntail <- get_showTailLines()
+        .print_2D_sample(x, nhead, ntail, n1, n2)
+        return()
+    }
+    x_nrow <- x_dim[[1L]]
+    x_ncol <- x_dim[[2L]]
+    if (x_ncol <= 5L) {
+        if (x_nrow <= 3L) {
+            m1 <- m2 <- 3L  # print all rows of each slice
+            z1 <- z2 <- 3L  # print first 3 and last 3 slices
+        } else {
+            m1 <- m2 <- 2L  # print first 2 and last 2 rows of each slice
+            z1 <- z2 <- 1L  # print only first and last slices
+        }
+    } else {
+        if (x_nrow <= 3L) {
+            m1 <- m2 <- 2L  # print first 2 and last 2 rows of each slice
+            z1 <- z2 <- 2L  # print first 2 and last 2 slices
+        } else {
+            m1 <- m2 <- 2L  # print first 2 and last 2 rows of each slice
+            z1 <- z2 <- 1L  # print only first and last slices
+        }
+    }
+    blocks <- ArrayBlocks(x_dim, prod(x_dim[1:2]))
+    nblock <- length(blocks)
+    if (nblock <= z1 + z2 + 1L) {
+        idx <- seq_len(nblock)
+        .print_2D_slices(x, m1, m2, n1, n2, blocks, idx)
+    } else {
+        idx1 <- seq_len(z1)
+        idx2 <- seq(to=nblock, by=1L, length.out=z2)
+        .print_2D_slices(x, m1, m2, n1, n2, blocks, idx1)
+        cat("...\n\n")
+        .print_2D_slices(x, m1, m2, n2, n2, blocks, idx2)
+    }
 }
 
 setMethod("show", "DelayedArray",
     function(object)
     {
         object_dim <- dim(object)
-        cat(class(object), " object of ", paste0(object_dim, collapse=" x "),
-            " ", type(object), ifelse(any(object_dim >= 2L), "s", ""), sep="")
-        if (length(object_dim) == 2L) {
-            cat(":\n")
-            out <- .prepare_2D_DelayedArray_sample(object)
-            print(out, quote=FALSE, right=TRUE, max=length(out))
-        } else {
-            cat("\n")
+        if (any(object_dim == 0L)) {
+            cat("<", paste0(object_dim, collapse=" x "), "> ",
+                class(object), " object of type \"", type(object), "\"\n",
+                sep="")
+            return()
         }
+        cat(class(object), " object of ", paste0(object_dim, collapse=" x "),
+            " ", type(object), ifelse(any(object_dim >= 2L), "s", ""), ":\n",
+            sep="")
+        .print_array_data(object, 4L, 4L)
     }
 )
 

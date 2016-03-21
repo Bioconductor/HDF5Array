@@ -50,9 +50,8 @@ export(
 
 exportMethods(
     ## Methods for generics defined in the base package:
-    length,
-    dim,
-    dimnames, "dimnames<-",
+    length, names, "names<-",
+    dim, dimnames, "dimnames<-",
     as.array, as.vector, as.matrix,
     "[", "[[",
     c,
