@@ -47,6 +47,27 @@
   Common operations on \link{DelayedArray} objects.
 }
 
+\details{
+  Operations currently supported on all \link{DelayedArray} objects:
+  \itemize{
+    \item \code{is.na}, \code{!}
+    \item The members of the \code{\link[methods]{Math}} group.
+    \item The members of the \code{\link[methods]{Ops}} group.
+    \item \code{pmax2}, \code{pmin2}.
+    \item \code{anyNA}.
+    \item The members of the \code{\link[methods]{Summary}} group.
+    \item \code{mean}.
+    \item \code{apply}.
+  }
+
+  Operations currently supported on \link{DelayedMatrix} objects only:
+  \itemize{
+    \item \code{rowSums}, \code{colSums}, \code{rowMeans}, \code{colMeans}.
+    \item Matrix multiplication (\%*\%) of an ordinary matrix by a
+          DelayedMatrix object.
+  }
+}
+
 \seealso{
   \itemize{
     \item \link{DelayedArray} objects.
@@ -60,6 +81,4 @@
   }
 }
 
-\examples{
-}
 \keyword{methods}
