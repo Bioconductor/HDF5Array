@@ -21,6 +21,12 @@ exportClasses(
 ### Export S3 methods
 ###
 
+S3method(as.array, DelayedArray)
+
+S3method(as.matrix, DelayedArray)
+
+S3method(as.vector, DelayedArray)
+
 S3method(mean, DelayedArray)
 
 ### We also export them thru the export() directive so that (a) they can be
@@ -28,6 +34,12 @@ S3method(mean, DelayedArray)
 ### and (c) methods() doesn't asterisk them.
 
 export(
+    as.array.DelayedArray,
+
+    as.matrix.DelayedArray,
+
+    as.vector.DelayedArray,
+
     mean.DelayedArray
 )
 

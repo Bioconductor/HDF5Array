@@ -1,45 +1,29 @@
 \name{HDF5Array-class}
 \docType{class}
 
+\alias{class:HDF5Dataset}
+\alias{HDF5Dataset-class}
+\alias{HDF5Dataset}
+
 \alias{class:HDF5Array}
 \alias{HDF5Array-class}
 \alias{HDF5Array}
 
-\alias{t,HDF5Array-method}
+\alias{class:HDF5Matrix}
+\alias{HDF5Matrix-class}
+\alias{HDF5Matrix}
 
-\alias{length,HDF5Array-method}
-\alias{isEmpty,HDF5Array-method}
-\alias{dim,HDF5Array-method}
-\alias{dimnames,HDF5Array-method}
-\alias{dimnames<-,HDF5Array-method}
-
-\alias{as.array,HDF5Array-method}
-\alias{as.vector,HDF5Array-method}
-\alias{as.matrix,HDF5Array-method}
-\alias{coerce,array,HDF5Array-method}
-
-\alias{[,HDF5Array-method}
-\alias{[[,HDF5Array-method}
-
-\alias{show,HDF5Array-method}
-
-\alias{c,HDF5Array-method}
-
-\title{HDF5Array objects}
+\title{HDF5 datasets as array-like objects}
 
 \description{
-  The HDF5Array class is a container for representing and manipulating an
-  on-disk HDF5 dataset.
-
-  HDF5Array objects can be manipulated via a \emph{restricted assay-like
-  interface} interface i.e. they support common \link[base]{array} operations
-  like \code{dim}, \code{dimnames}, \code{[}, etc... as long as the operation
-  doesn't need to alter the content of the underlying (on-disk) dataset or
-  write a new dataset to the disk.
+  We provide 3 classes for representing an (on-disk) HDF5 dataset as an
+  array-like object in R: HDF5Dataset, HDF5Array, and HDF5Matrix.
 }
 
 \usage{
-HDF5Array(file, group, name, type=NA)  # constructor function
+## Constructor functions
+HDF5Array(file, group, name, type=NA)
+HDF5Matrix(file, group, name, type=NA)
 }
 
 \arguments{
@@ -57,23 +41,14 @@ HDF5Array(file, group, name, type=NA)  # constructor function
 }
 
 \value{
-  A HDF5Array object.
-}
-
-\section{Accessors}{
-}
-
-\section{Coercion}{
-}
-
-\section{Subsetting}{
+  An HDF5Array or HDF5Matrix object.
 }
 
 \seealso{
   \itemize{
     \item \link[base]{array} objects in base R.
 
-    \item \link{HDF5Matrix} objects.
+    \item \link{DelayedArray} and \link{DelayedMatrix} objects.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
@@ -120,6 +95,47 @@ stopifnot(identical(dimnames(as.array(cov1)), dimnames(cov1)))
 cov2 <- cov0[ , "+", 29000001:29000007]
 cov2
 as.matrix(cov2)
+
+## ---------------------------------------------------------------------
+## COERCION FROM HDF5Array TO DelayedMatrix
+## ---------------------------------------------------------------------
+library(rhdf5)
+library(h5vcData)
+
+tally_file <- system.file("extdata", "example.tally.hfs5",
+                          package="h5vcData")
+h5ls(tally_file)
+
+## Pick up "Coverages" dataset for Human chromosome 16:
+cov0 <- HDF5Array(tally_file, "/ExampleStudy/16", "Coverages")
+dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"))
+
+pcov <- as(cov0[ , 1, ], "DelayedMatrix")  # coverage on plus strand
+mcov <- as(cov0[ , 2, ], "DelayedMatrix")  # coverage on minus strand
+
+nrow(pcov)  # nb of samples
+ncol(pcov)  # length of Human chromosome 16
+
+## ---------------------------------------------------------------------
+## DelayedMatrix OBJECTS AS ASSAYS OF A SummarizedExperiment OBJECT
+## ---------------------------------------------------------------------
+library(SummarizedExperiment)
+
+## The convention for a SummarizedExperiment object is to have 1 column
+## per sample so first we need to transpose 'pcov' and 'mcov':
+pcov <- t(pcov)
+mcov <- t(mcov)
+se <- SummarizedExperiment(list(pcov=pcov, mcov=mcov))
+se
+stopifnot(validObject(se, complete=TRUE))
+
+## A GPos object can be used to represent the genomic positions along
+## the dataset:
+gpos <- GPos(GRanges("16", IRanges(1, nrow(se))))
+gpos
+rowRanges(se) <- gpos
+se
+stopifnot(validObject(se))
 }
 \keyword{methods}
 \keyword{classes}

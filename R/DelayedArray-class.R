@@ -76,9 +76,8 @@ setValidity2("DelayedArray", .validate_DelayedArray)
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Constructor
 ###
-### For internal use only.
-###
 
+### For internal use only.
 new_DelayedArray <- function(a=new("array"),
                              ..., COMBINING_OP="identity", Rargs=list(),
                              Class="DelayedArray")
@@ -89,13 +88,22 @@ new_DelayedArray <- function(a=new("array"),
                 index=index)
 }
 
+setAs("ANY", "DelayedArray",
+    function(from)
+    {
+        ans <- new_DelayedArray(from)
+        dimnames(ans) <- dimnames(from)
+        ans
+    }
+)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Pristine objects
 ###
 ### A pristine DelayedArray object is an object that does not carry any
-### delayed operation on it. In other words, it's in sync with its unique
-### seed.
+### delayed operation on it. In other words, it's in sync with (i.e. reflects
+### the true content of) its unique seed.
 ###
 
 ### Note that false negatives happen when 'x' carries delayed operations that
@@ -459,6 +467,7 @@ setMethod("t", "DelayedArray",
 ### as.array()
 ###
 
+### TODO: Not sure we need this. Using drop() should do it.
 .reduce_array_dimensions <- function(x)
 {
     x_dim <- dim(x)
@@ -504,29 +513,23 @@ setMethod("t", "DelayedArray",
     ans
 }
 
+### S3/S4 combo for as.array.DelayedArray
+as.array.DelayedArray <- function(x, ...)
+    .from_DelayedArray_to_array(x, ...)
 setMethod("as.array", "DelayedArray", .from_DelayedArray_to_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Other coercions
+### Other coercions based on as.array()
 ###
 
-setAs("ANY", "DelayedArray",
-    function(from)
-    {
-        ans <- new_DelayedArray(from)
-        dimnames(ans) <- dimnames(from)
-        ans
-    }
-)
-
-.from_DelayedArray_to_vector <- function(x, mode="any")
+### S3/S4 combo for as.vector.DelayedArray
+as.vector.DelayedArray <- function(x, mode="any")
 {
     ans <- as.array(x, drop=TRUE)
     as.vector(ans, mode=mode)
 }
-
-setMethod("as.vector", "DelayedArray", .from_DelayedArray_to_vector)
+setMethod("as.vector", "DelayedArray", as.vector.DelayedArray)
 
 slicing_tip <- c(
     "Consider reducing its number of effective dimensions by slicing it ",
@@ -551,6 +554,8 @@ slicing_tip <- c(
     ans
 }
 
+### S3/S4 combo for as.matrix.DelayedArray
+as.matrix.DelayedArray <- function(x, ...) .from_DelayedArray_to_matrix(x, ...)
 setMethod("as.matrix", "DelayedArray", .from_DelayedArray_to_matrix)
 
 
@@ -589,7 +594,8 @@ setMethod("type", "DelayedArray",
 }
 
 ### Only support linear subscripting at the moment.
-### TODO: Support multidimensional subscripting e.g. x[[1, 5]].
+### TODO: Support multidimensional subscripting e.g. x[[5, 15, 2]] or
+### x[["E", 15, "b"]].
 setMethod("[[", "DelayedArray",
     function(x, i, j, ...)
     {

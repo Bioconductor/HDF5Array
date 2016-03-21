@@ -99,14 +99,14 @@ setReplaceMethod("index", "DelayedMatrix",
 
 setAs("DelayedArray", "DelayedMatrix", .from_DelayedArray_to_DelayedMatrix)
 
-### matrix -> DelayedMatrix
+### array -> DelayedMatrix
 
-.from_matrix_to_DelayedMatrix <- function(from)
+.from_array_to_DelayedMatrix <- function(from)
 {
     as(as(from, "DelayedArray"), "DelayedMatrix")
 }
 
-setAs("matrix", "DelayedMatrix", .from_matrix_to_DelayedMatrix)
+setAs("array", "DelayedMatrix", .from_array_to_DelayedMatrix)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
