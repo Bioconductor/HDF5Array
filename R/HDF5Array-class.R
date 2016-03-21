@@ -135,17 +135,11 @@ setClass("HDF5Array", contains="DelayedArray")
 
 .validate_HDF5Array <- function(x)
 {
-    ## 'seeds' slot.
     if (length(x@seeds) != 1L)
         return(wmsg("'x@seeds' must have length 1"))
     if (!is(x@seeds[[1L]], "HDF5Dataset"))
         return(wmsg("'x@seeds' must be a HDF5Dataset object"))
-    ## The object should not carry any delayed operation on it i.e. all the
-    ## DelayedArray slots must be in their original state.
-    x1 <- new_DelayedArray(x@seeds[[1L]])
-    x2 <- as(x, "DelayedArray", strict=TRUE)
-    dimnames(x2) <- NULL
-    if (!identical(x1, x2))
+    if (!is_pristine(x))
         return(wmsg("'x' carries delayed operations on it"))
     TRUE
 }

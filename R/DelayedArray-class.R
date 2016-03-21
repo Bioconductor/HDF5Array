@@ -91,10 +91,35 @@ new_DelayedArray <- function(a=new("array"),
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Downgrade DelayedArray derived object to a DelayedArray or DelayedMatrix
-### *instance*.
+### Pristine objects
+###
+### A pristine DelayedArray object is an object that does not carry any
+### delayed operation on it. In other words, it's in sync with its unique
+### seed.
+###
 
-.as_DelayedArray_or_DelayedMatrix <- function(x)
+### Note that false negatives happen when 'x' carries delayed operations that
+### do nothing, but that's ok.
+is_pristine <- function(x)
+{
+    if (length(x@seeds) != 1L)
+        return(FALSE)
+    ## 'x' should not carry any delayed operation on it, that is, all the
+    ## DelayedArray slots must be in their original state.
+    x1 <- new_DelayedArray(x@seeds[[1L]])
+    x2 <- as(x, "DelayedArray", strict=TRUE)
+    dimnames(x2) <- NULL
+    if (!identical(x1, x2))
+        return(FALSE)
+    if (!is(x, "DelayedMatrix"))
+        return(TRUE)
+    length(x@index) == 2L && x@N1 == 1L && x@N2 == 2L
+}
+
+### When a pristine DelayedArray derived object (i.e. an HDF5Array object) is
+### about to be touched, we first need to downgrade it to a DelayedArray or
+### DelayedMatrix *instance*.
+downgrade_to_DelayedArray_or_DelayedMatrix <- function(x)
 {
     if (is(x, "DelayedMatrix"))
         return(as(x, "DelayedMatrix", strict=TRUE))
@@ -207,28 +232,27 @@ setReplaceMethod("dimnames", "DelayedArray", .set_DelayedArray_dimnames)
 ### list elements of class "name".
 .extract_subarray_from_DelayedArray <- function(x, subscript)
 {
-    x_index <- index(x)
+    x_index <- x_index0 <- index(x)
     x_ndim <- length(x_index)
     x_delayed_ops <- x@delayed_ops
-    x_index_was_touched <- FALSE
     for (n in seq_along(subscript)) {
         n0 <- if (x@is_transposed) x_ndim - n + 1L else n
         k <- subscript[[n]]
         if (missing(k))
             next
         x_index[[n0]] <- extractROWS(x_index[[n0]], k)
-        x_index_was_touched <- TRUE
         if (n0 == 1L)
             x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, FALSE)
         if (n0 == x_ndim)
             x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, TRUE)
     }
-    if (x_index_was_touched) {
+    if (!identical(x_index0, x_index)) {
+        x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
         index(x) <- x_index
         if (!identical(x@delayed_ops, x_delayed_ops))
             x@delayed_ops <- x_delayed_ops
     }
-    .as_DelayedArray_or_DelayedMatrix(x)
+    x
 }
 
 .extract_DelayedArray_subset <- function(x, i, j, ..., drop=TRUE)
@@ -324,8 +348,9 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
         stopifnot(length(partially_recycled_arg) == nrow(x))
     }
     delayed_op <- list(FUN, Largs, Rargs, recycle_along_last_dim)
+    x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
     x@delayed_ops <- c(x@delayed_ops, list(delayed_op))
-    .as_DelayedArray_or_DelayedMatrix(x)
+    x
 }
 
 .subset_delayed_op_args <- function(delayed_op, i, subset_along_last_dim)
@@ -423,8 +448,9 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
 setMethod("t", "DelayedArray",
     function(x)
     {
+        x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
         x@is_transposed <- !x@is_transposed
-        .as_DelayedArray_or_DelayedMatrix(x)
+        x
     }
 )
 
