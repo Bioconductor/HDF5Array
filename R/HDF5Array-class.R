@@ -73,7 +73,7 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
     ans[[1L]]  # drop any attribute
 }
 
-.new_HDF5Dataset_from_file <- function(file, group, name, type=NA)
+HDF5Dataset <- function(file, group, name, type=NA)
 {
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path to ",
@@ -112,15 +112,17 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
                         first_val=first_val)
 }
 
-.new_HDF5Dataset_from_array <- function(a)
+.from_array_to_HDF5Dataset <- function(from)
 {
-    out_file <- getHDF5ArrayOutputFile()
-    out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputName())
+    out_file <- getHDF5OutputFile()
+    out_name <- getHDF5OutputName()
+    on.exit(setHDF5OutputName())
 
-    h5write(a, out_file, out_name)
-    .new_HDF5Dataset_from_file(out_file, "/", out_name, type=type(a))
+    h5write(from, out_file, out_name)
+    HDF5Dataset(out_file, "/", out_name, type=type(from))
 }
+
+setAs("array", "HDF5Dataset", .from_array_to_HDF5Dataset)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -152,17 +154,17 @@ setAs("HDF5Dataset", "HDF5Array",
 
 HDF5Array <- function(file, group, name, type=NA)
 {
-    as(.new_HDF5Dataset_from_file(file, group, name, type=type), "HDF5Array")
+    as(HDF5Dataset(file, group, name, type=type), "HDF5Array")
 }
 
 setAs("array", "HDF5Array",
     function(from)
     {
-        ans <- as(.new_HDF5Dataset_from_array(from), "HDF5Array")
-        ## TODO: Investigate the possiblity that .new_HDF5Dataset_from_array()
-        ## stores the dimnames in the HDF5 file so .new_HDF5Dataset_from_file()
-        ## can bring them back. Then we wouldn't need to explicitely set them
-        ## on 'ans' like we do here.
+        ans <- as(.from_array_to_HDF5Dataset(from), "HDF5Array")
+        ## TODO: Investigate the possiblity that .from_array_to_HDF5Dataset()
+        ## stores the dimnames in the HDF5 file so HDF5Dataset() can bring them
+        ## back. Then we wouldn't need to explicitely set them on 'ans' like we
+        ## do here.
         dimnames(ans) <- dimnames(from)
         ans
     }

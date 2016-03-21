@@ -78,9 +78,9 @@ exportMethods(
 ###
 
 export(
-    HDF5Array, HDF5Matrix,
-    setHDF5ArrayOutputFile, getHDF5ArrayOutputFile, lsHDF5ArrayOutputFile,
-    setHDF5ArrayOutputName, getHDF5ArrayOutputName
+    setHDF5OutputFile, getHDF5OutputFile, lsHDF5OutputFile,
+    setHDF5OutputName, getHDF5OutputName,
+    HDF5Dataset, HDF5Array, HDF5Matrix
 )
 
 

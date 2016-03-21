@@ -95,9 +95,9 @@ setMethod("colMeans", "DelayedMatrix", .DelayedMatrix_block_colMeans)
               is(y, "DelayedMatrix") || is.matrix(y),
               ncol(x) == nrow(y))
 
-    out_file <- getHDF5ArrayOutputFile()
-    out_name <- getHDF5ArrayOutputName()
-    on.exit(setHDF5ArrayOutputName())
+    out_file <- getHDF5OutputFile()
+    out_name <- getHDF5OutputName()
+    on.exit(setHDF5OutputName())
 
     ans_type <- typeof(match.fun(type(x))(1) * match.fun(type(y))(1))
     h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),

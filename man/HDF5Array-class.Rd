@@ -9,6 +9,8 @@
 
 \alias{dim,HDF5Dataset-method}
 
+\alias{coerce,array,HDF5Dataset-method}
+
 % HDF5Array and HDF5Matrix
 
 \alias{class:HDF5Array}
@@ -52,6 +54,7 @@
 ## Constructor functions
 HDF5Array(file, group, name, type=NA)
 HDF5Matrix(file, group, name, type=NA)
+HDF5Dataset(file, group, name, type=NA)
 }
 
 \arguments{
@@ -78,6 +81,9 @@ HDF5Matrix(file, group, name, type=NA)
 
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
+
+    \item \link{HDF5_output_settings} to manage settings for writing
+          output to HDF5.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 

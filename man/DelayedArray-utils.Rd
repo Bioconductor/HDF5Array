@@ -8,6 +8,7 @@
 
 \alias{is.na,DelayedArray-method}
 \alias{!,DelayedArray-method}
+
 \alias{+,DelayedArray,missing-method}
 \alias{-,DelayedArray,missing-method}
 
@@ -23,6 +24,8 @@
 \alias{pmin2,DelayedArray,DelayedArray-method}
 
 \alias{anyNA,DelayedArray-method}
+
+\alias{mean.DelayedArray}
 \alias{mean,DelayedArray-method}
 
 \alias{apply}
@@ -47,6 +50,9 @@
 \seealso{
   \itemize{
     \item \link{DelayedArray} objects.
+
+    \item \link{HDF5_output_settings} to manage settings for writing
+          output to HDF5.
 
     \item \link{HDF5Array} objects.
 

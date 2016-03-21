@@ -1,7 +1,7 @@
 .onLoad <- function(libname, pkgname)
 {
-    setHDF5ArrayOutputFile()
-    setHDF5ArrayOutputName()
+    setHDF5OutputFile()
+    setHDF5OutputName()
     options(HDF5Array.block.size=DEFAULT_BLOCK_SIZE)
 }
 

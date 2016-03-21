@@ -1,5 +1,6 @@
 
 - Complete man pages and eliminate all 'R CMD check' warnings.
+
 - Add vignette.
 
 Store the dimnames in the HDF5 file
@@ -9,29 +10,4 @@ Investigate the possiblity to store the dimnames in the HDF5 file so the
 HDF5Array() constructor can grab them from there. Methods that write a new
 HDF5 dataset to disk (e.g. coercion from array to HDF5Array) would need to
 be modified to also write the dimnames to the HDF5 file.
-
-Use a delay mechanism for "Ops" methods on 2 conformable operands
-=================================================================
-
-Just some thoughts...
-
-"Ops" methods could also use a delayed mechanism when the 2 operands (e1
-and e2) are conformable arrays. The returned HDF5Array object would store
-the name of the Ops generic and the 2 operands, plus a dimnames slot. That
-requires a new class (e.g. MultipleDatasetHDF5Array) that contains the name
-of a function (the "combining function") and the list of its HDF5Array
-arguments (a list of arbitrary length, not just of length 2, to support
-n-ary operations), plus a delayed_ops and a dimnames slot. HDF5Array would
-need to become a virtual class and the current HDF5Array class a concrete
-subclass of it (e.g. SingleDatasetHDF5Array).
-
-Because each HDF5Array object stored in a MultipleDatasetHDF5Array object
-can itself be either a SingleDatasetHDF5Array or a MultipleDatasetHDF5Array,
-a MultipleDatasetHDF5Array object would actually contain a tree where the
-nodes are MultipleDatasetHDF5Array objects and the leaves are
-SingleDatasetHDF5Array arrays.
-
-as.array() on a MultipleDatasetHDF5Array 'x' would call as.array() on each
-HDF5Array object stored in 'x', then apply the combining function to them,
-then apply the delayed ops stored in the delayed_ops slot.
 

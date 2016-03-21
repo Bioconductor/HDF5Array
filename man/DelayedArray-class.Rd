@@ -91,6 +91,9 @@
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
+    \item \link{HDF5_output_settings} to manage settings for writing
+          output to HDF5.
+
     \item \link{HDF5Array} objects.
 
     \item \link[base]{array} objects in base R.
@@ -130,6 +133,20 @@ stopifnot(identical(cs, CS))
 ## WITH A HDF5Dataset OBJECT
 ## ---------------------------------------------------------------------
 
+a2 <- as(a, "HDF5Dataset")    # create the dataset
+a2
+
+A2 <- as(a2, "DelayedArray")  # wrap the dataset in a DelayedArray object
+A2
+
+B2 <- toto(A2)  # very fast! (operations are delayed)
+B2
+as.array(B2[1:6, , ], drop=TRUE)
+
+M2 <- as(B2, "DelayedMatrix")
+
+CS2 <- colSums(M2)
+stopifnot(identical(cs, CS2))
 }
 \keyword{methods}
 \keyword{classes}
