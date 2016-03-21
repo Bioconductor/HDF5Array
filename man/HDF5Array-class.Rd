@@ -87,8 +87,8 @@ HDF5Dataset(file, group, name, type=NA)
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
-    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which the
-          \pkg{HDF5Array} package is implemented.
+    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which HDF5Array
+          objects are implemented.
 
     \item \link[base]{array} objects in base R.
   }
