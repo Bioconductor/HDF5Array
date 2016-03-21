@@ -144,6 +144,8 @@ setClass("HDF5Array", contains="DelayedArray")
     TRUE
 }
 
+setValidity2("HDF5Array", .validate_HDF5Array)
+
 setAs("HDF5Dataset", "HDF5Array",
     function(from) new_DelayedArray(from, Class="HDF5Array")
 )
@@ -169,7 +171,12 @@ setAs("array", "HDF5Array",
 setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
 
 setAs("HDF5Array", "HDF5Matrix",
-    function(from) as(as(from, "DelayedMatrix"), "HDF5Matrix")
+    function(from)
+    {
+        if (length(dim(from)) != 2L)
+            stop(wmsg("HDF5 dataset must have 2 dimensions"))
+        new("HDF5Matrix", from)
+    }
 )
 
 HDF5Matrix <- function(file, group, name, type=NA)
@@ -177,7 +184,7 @@ HDF5Matrix <- function(file, group, name, type=NA)
     as(HDF5Array(file, group, name, type=type), "HDF5Matrix")
 }
 
-setAs("matrix", "HDF5Matrix",
+setAs("array", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
 
@@ -190,5 +197,10 @@ setAs("DelayedArray", "HDF5Matrix",
     function(from) stop(wmsg("Coercing a ", class(from), " object to an ",
                              "HDF5Matrix object is not supported yet. ",
                              "Please coerce to DelayedMatrix instead."))
+)
+
+setAs("DelayedMatrix", "HDF5Matrix",
+    function(from) stop(wmsg("coercing a ", class(from), " object to an ",
+                             "HDF5Matrix object is not supported yet"))
 )
 

@@ -2,6 +2,7 @@
 \docType{class}
 
 % DelayedArray
+
 \alias{class:DelayedArray}
 \alias{DelayedArray-class}
 
@@ -44,9 +45,9 @@
 \description{
   Wrapping an array-like object (typically an on-disk object) in a
   DelayedArray object allows one to perform common array operations in an
-  efficient way. Operations on DelayedArray objects are implemented as delayed
-  operations and/or via a block processing strategy in order to optimize
-  performance and reduce memory usage.
+  efficient way. In order to optimize performance and reduce memory usage,
+  operations on DelayedArray objects are implemented as delayed operations
+  and/or via a block processing strategy.
 }
 
 \section{Coercion}{
@@ -55,8 +56,8 @@
   \code{as(a, "DelayedMatrix")} if it's a matrix-like object.
 
   To \emph{realize} it (i.e. trigger execution of the delayed operations
-  and turn it back into an ordinary array), call \code{as.array} on it.
-  Alternatively, write it to disk by coercing it to HDF5Array (other
+  and turn the object back into an ordinary array), call \code{as.array}
+  on it. Alternatively, write it to disk by coercing it to HDF5Array (other
   on-disk backends can be supported). In that case, the full object is
   not realized at once in memory, but split into blocks first, and blocks
   are realized one at a time and written to disk.
@@ -87,9 +88,12 @@
 
 \seealso{
   \itemize{
-    \item \link[base]{array} objects in base R.
+    \item \link{DelayedArray-utils} for common operations on DelayedArray
+          objects.
 
-    \item \link{HDF5Dataset} and \link{HDF5Array} objects.
+    \item \link{HDF5Array} objects.
+
+    \item \link[base]{array} objects in base R.
   }
 }
 

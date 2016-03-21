@@ -1,9 +1,15 @@
 \name{HDF5Array-class}
 \docType{class}
 
+% HDF5Dataset
+
 \alias{class:HDF5Dataset}
 \alias{HDF5Dataset-class}
 \alias{HDF5Dataset}
+
+\alias{dim,HDF5Dataset-method}
+
+% HDF5Array and HDF5Matrix
 
 \alias{class:HDF5Array}
 \alias{HDF5Array-class}
@@ -13,11 +19,33 @@
 \alias{HDF5Matrix-class}
 \alias{HDF5Matrix}
 
+\alias{coerce,HDF5Dataset,HDF5Array-method}
+\alias{coerce,array,HDF5Array-method}
+\alias{coerce,HDF5Array,HDF5Matrix-method}
+\alias{coerce,array,HDF5Matrix-method}
+
+\alias{coerce,DelayedArray,HDF5Array-method}
+\alias{coerce,DelayedArray,HDF5Matrix-method}
+\alias{coerce,DelayedMatrix,HDF5Matrix-method}
+
 \title{HDF5 datasets as array-like objects}
 
 \description{
   We provide 3 classes for representing an (on-disk) HDF5 dataset as an
-  array-like object in R: HDF5Dataset, HDF5Array, and HDF5Matrix.
+  array-like object in R:
+  \itemize{
+    \item Two high-level classes, HDF5Array and HDF5Matrix, that extend
+          \link{DelayedArray} and \link{DelayedMatrix}, respectively.
+          All the operations available on \link{DelayedArray} and
+          \link{DelayedMatrix} objects work on HDF5Array and HDF5Matrix
+          objects.
+
+    \item A low-level class, HDF5Dataset, only for pointing to an HDF5
+          dataset. No operation can be performed directly on an HDF5Dataset
+          object. It needs to be wrapped in a DelayedArray object first.
+          An HDF5Array (or HDF5Matrix) object is just an HDF5Dataset object
+          wrapped in a \link{DelayedArray} (or \link{DelayedMatrix}) object.
+  }
 }
 
 \usage{
@@ -46,14 +74,17 @@ HDF5Matrix(file, group, name, type=NA)
 
 \seealso{
   \itemize{
-    \item \link[base]{array} objects in base R.
+    \item \link{DelayedArray} objects.
 
-    \item \link{DelayedArray} and \link{DelayedMatrix} objects.
+    \item \link{DelayedArray-utils} for common operations on DelayedArray
+          objects.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which the
           \pkg{HDF5Array} package is implemented.
+
+    \item \link[base]{array} objects in base R.
   }
 }
 

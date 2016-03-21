@@ -12,6 +12,12 @@ setClass("DelayedMatrix",
         ##     1 <= x@N1 < x@N2 <= length(x@index)
         N1="integer",  # single integer
         N2="integer"   # single integer
+    ),
+    prototype(
+        seeds=list(new("matrix")),
+        index=list(integer(0), integer(0)),
+        N1=1L,
+        N2=2L
     )
 )
 
@@ -74,7 +80,7 @@ setReplaceMethod("index", "DelayedMatrix",
     } else {
         idx <- which(from_dim != 1L)
         if (length(idx) > 2L)
-            stop(wmsg(class(from), " object with more than 2 effective ",
+            stop(wmsg("Array-like object with more than 2 effective ",
                       "dimensions cannot be coerced to a DelayedMatrix ",
                       "object. ", slicing_tip))
         if (length(idx) == 2L) {
