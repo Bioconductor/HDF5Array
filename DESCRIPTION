@@ -3,7 +3,7 @@ Title: Array- and matrix-like containers for convenient access and manipulation
 	of HDF5 datasets
 Description: This package implements the HDF5Array and HDF5Matrix classes
 	for convenient access and manipulation of HDF5 datasets.
-Version: 0.7.0
+Version: 0.7.1
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>

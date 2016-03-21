@@ -19,6 +19,7 @@ setClass("DelayedArray",
     ),
     prototype(
         seeds=list(new("array")),
+        index=list(integer(0)),
         COMBINING_OP="identity",
         is_transposed=FALSE
     )
@@ -29,20 +30,33 @@ setClass("DelayedArray",
 ### Validity
 ###
 
+.objects_are_conformable_arrays <- function(objects)
+{
+    dims <- lapply(objects, dim)
+    ndims <- lengths(dims)
+    first_ndim <- ndims[[1L]]
+    if (!all(ndims == first_ndim))
+        return(FALSE)
+    tmp <- unlist(dims, use.names=FALSE)
+    if (is.null(tmp))
+        return(FALSE)
+    dims <- matrix(tmp, nrow=first_ndim)
+    first_dim <- dims[ , 1L]
+    all(dims == first_dim)
+}
+
 .validate_DelayedArray <- function(x)
 {
     ## 'seeds' slot.
     if (length(x@seeds) == 0L)
         return(wmsg("'x@seeds' cannot be empty"))
-    dims <- sapply(x@seeds, dim)
-    x_dim <- dims[ , 1L]
-    if (!all(dims == x_dim))
+    if (!.objects_are_conformable_arrays(x@seeds))
         return(wmsg("'x@seeds' must be a list of conformable ",
                     "array-like objects"))
     ## 'index' slot.
-    if (length(x@index) != length(x_dim))
-        return(wmsg("'length(x@index)' must be the same ",
-                    "as 'length(dim(x))'"))
+    if (length(x@index) != length(dim(x@seeds[[1L]])))
+        return(wmsg("'x@index' must have one element per dimension ",
+                    "in 'x@seeds[[1L]]'"))
     ## 'COMBINING_OP' slot.
     if (!isSingleString(x@COMBINING_OP))
         return(wmsg("'x@COMBINING_OP' must be a single string"))

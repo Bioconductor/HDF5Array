@@ -61,14 +61,19 @@ test_DelayedMatrix_delayed_Ops <- function()
 
     a <- a2
     a[2, 9, 2] <- NA  # same as a[[92]] <- NA
-    A <- as(a, "HDF5Array")
+
+    toto <- function(x) t((5 * x[ , 1:2] ^ 3 + 1L) * log(x)[, 10:9])[ , -1]
+
     m <- a[ , , 2]
     M <- as(m, "HDF5Matrix")
+    checkIdentical(toto(m), as.array(toto(M)))
     ## "Logic" members currently untested.
     for (.Generic in c(Arith_members, Compare_members))
         test_delayed_Ops_on_matrix(.Generic, m, M)
 
-    M <- as(A[ , , 2], "DelayedMatrix")
+    A <- as(a, "HDF5Array")[ , , 2]
+    M <- as(A, "DelayedMatrix")
+    checkIdentical(toto(m), as.array(toto(M)))
     for (.Generic in c(Arith_members, Compare_members))
         test_delayed_Ops_on_matrix(.Generic, m, M)
 }
