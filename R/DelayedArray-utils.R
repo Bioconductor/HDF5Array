@@ -266,16 +266,14 @@ for (.Generic in c("pmax2", "pmin2")) {
         x@is_transposed <- FALSE
     if (!straighten.index)
         return(x)
-    x_index <- index(x)
-    index_was_touched <- FALSE
-    for (n in seq_along(x_index)) {
-        if (isStrictlySorted(x_index[[n]]))
+    x_index <- x@index
+    for (N in x@subindex) {
+        if (isStrictlySorted(x_index[[N]]))
             next
-        x_index[[n]] <- .straighten_index(x_index[[n]])
-        index_was_touched <- TRUE
+        x_index[[N]] <- .straighten_index(x_index[[N]])
     }
-    if (index_was_touched)
-        index(x) <- x_index
+    if (!identical(x@index, x_index))
+        x@index <- x_index
     x
 }
 

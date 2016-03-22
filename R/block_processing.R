@@ -65,22 +65,15 @@ setClass("ArrayBlocks",
 ###   (c) Each block has a length (i.e. nb of elements) <= 'max_block_len'.
 ArrayBlocks <- function(dim, max_block_len)
 {
-    ndim <- length(dim)
     p <- cumprod(dim)
-    x_len <- p[[ndim]]
-    if (max_block_len > x_len) {
-        N <- ndim + 1L
+    w <- which(p <= max_block_len)
+    N <- if (length(w) == 0L) 1L else w[[length(w)]] + 1L
+    if (N > length(dim)) {
         by <- 1L
+    } else if (N == 1L) {
+        by <- max_block_len
     } else {
-        N <- which(p >= max_block_len)[[1L]]
-        if (p[[N]] == max_block_len) {
-            N <- N + 1L
-            by <- 1L
-        } else if (N == 1L) {
-            by <- max_block_len
-        } else {
-            by <- max_block_len %/% as.integer(p[[N - 1L]])
-        }
+        by <- max_block_len %/% as.integer(p[[N - 1L]])
     }
     new("ArrayBlocks", dim=dim, N=N, by=by)
 }
@@ -117,12 +110,12 @@ setMethod("length", "ArrayBlocks",
 get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
 {
     nblock <- length(blocks)
-    stopifnot(isSingleInteger(i), i >= 1, i <= nblock)
+    stopifnot(isSingleInteger(i), i >= 1L, i <= nblock)
 
     ndim <- length(blocks@dim)
     subscript <- rep.int(alist(foo=), ndim)
 
-    if (nblock == 1L)
+    if (blocks@N > ndim)
         return(subscript)
 
     i <- i - 1L

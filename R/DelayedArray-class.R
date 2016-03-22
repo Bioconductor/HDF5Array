@@ -7,7 +7,8 @@ setClass("DelayedArray",
     representation(
         seeds="list",              # List of n conformable array-like objects.
         index="list",              # List of (possibly named) integer vectors,
-                                   # one per dimension in the seeds.
+                                   # one per seed dimension.
+        subindex="integer",        # The seed dimensions to keep.
         COMBINING_OP="character",  # n-ary operator to combine the seeds
                                    # after they all went thru
                                    # extract_array_from_seed(seed, index).
@@ -20,6 +21,7 @@ setClass("DelayedArray",
     prototype(
         seeds=list(new("array")),
         index=list(integer(0)),
+        subindex=1L,
         COMBINING_OP="identity",
         is_transposed=FALSE
     )
@@ -54,9 +56,20 @@ setClass("DelayedArray",
         return(wmsg("'x@seeds' must be a list of conformable ",
                     "array-like objects"))
     ## 'index' slot.
-    if (length(x@index) != length(dim(x@seeds[[1L]])))
+    index_len <- length(x@index)
+    if (index_len != length(dim(x@seeds[[1L]])))
         return(wmsg("'x@index' must have one element per dimension ",
                     "in 'x@seeds[[1L]]'"))
+    ## 'subindex' slot.
+    if (length(x@subindex) == 0L)
+        return(wmsg("'x@subindex' cannot be empty"))
+    if (S4Vectors:::anyMissingOrOutside(x@subindex, 1L, index_len))
+        return(wmsg("all values in 'x@subindex' must be >= 1 ",
+                    "and <= 'length(x@index)'"))
+    if (!isStrictlySorted(x@subindex))
+        return(wmsg("'x@subindex' must be strictly sorted"))
+    if (!all(lengths(x@index)[-x@subindex] == 1L))
+        return(wmsg("all the dropped dimensions in 'x' must be equal to 1"))
     ## 'COMBINING_OP' slot.
     if (!isSingleString(x@COMBINING_OP))
         return(wmsg("'x@COMBINING_OP' must be a single string"))
@@ -84,8 +97,8 @@ new_DelayedArray <- function(a=new("array"),
 {
     seeds <- list(a, ...)
     index <- lapply(dim(a), seq_len)
-    new2(Class, seeds=seeds, COMBINING_OP=COMBINING_OP, Rargs=Rargs,
-                index=index)
+    new2(Class, seeds=seeds, index=index, subindex=seq_along(index),
+                COMBINING_OP=COMBINING_OP, Rargs=Rargs)
 }
 
 setAs("ANY", "DelayedArray",
@@ -117,11 +130,7 @@ is_pristine <- function(x)
     x1 <- new_DelayedArray(x@seeds[[1L]])
     x2 <- as(x, "DelayedArray", strict=TRUE)
     dimnames(x2) <- NULL
-    if (!identical(x1, x2))
-        return(FALSE)
-    if (!is(x, "DelayedMatrix"))
-        return(TRUE)
-    length(x@index) == 2L && x@N1 == 1L && x@N2 == 2L
+    identical(x1, x2)
 }
 
 ### When a pristine DelayedArray derived object (i.e. an HDF5Array object) is
@@ -139,24 +148,9 @@ downgrade_to_DelayedArray_or_DelayedMatrix <- function(x)
 ### Accessors
 ###
 
-### The index() getter and setter are for internal use only.
-
-setGeneric("index",                                # NOT exported
-    function(x) standardGeneric("index")
-)
-setGeneric("index<-", signature="x",               # NOT exported
-    function(x, value) standardGeneric("index<-")
-)
-setMethod("index", "DelayedArray",
-    function(x) x@index
-)
-setReplaceMethod("index", "DelayedArray",
-    function(x, value) { x@index <- value; x }
-)
-
 .get_DelayedArray_dim_before_transpose <- function(x)
 {
-    lengths(index(x))
+    lengths(x@index)[x@subindex]
 }
 .get_DelayedArray_dim <- function(x)
 {
@@ -177,7 +171,7 @@ setMethod("isEmpty", "DelayedArray", function(x) any(dim(x) == 0L))
 
 .get_DelayedArray_dimnames_before_transpose <- function(x)
 {
-    ans <- lapply(index(x), names)
+    ans <- lapply(x@subindex, function(N) names(x@index[[N]]))
     if (is.null(unlist(ans)))
         return(NULL)
     ans
@@ -208,23 +202,25 @@ setMethod("dimnames", "DelayedArray", .get_DelayedArray_dimnames)
 
 .set_DelayedArray_dimnames <- function(x, value)
 {
-    x_index <- index(x)
-    x_ndim <- length(x_index)
-    value <- .normalize_dimnames_replacement_value(value, x_ndim)
+    value <- .normalize_dimnames_replacement_value(value, length(x@subindex))
     if (x@is_transposed)
         value <- rev(value)
-    x_index_was_touched <- FALSE
-    for (n in seq_along(x_index)) {
+    x_index <- x@index
+    for (n in seq_along(x@subindex)) {
+        N <- x@subindex[[n]]
         ## 'x_index' can be big so avoid copies when possible. With this
         ## trick no-op 'dimnames(x) <- dimnames(x)' is very cheap (i.e. almost
         ## instantaneous).
-        if (identical(names(x_index[[n]]), value[[n]]))
+        if (identical(names(x_index[[N]]), value[[n]]))
             next
-        names(x_index[[n]]) <- value[[n]]
-        x_index_was_touched <- TRUE
+        names(x_index[[N]]) <- value[[n]]
     }
-    if (x_index_was_touched)
-        index(x) <- x_index
+    if (!identical(x@index, x_index))
+        x@index <- x_index  # Don't downgrade_to_DelayedArray_or_DelayedMatrix!
+                            # The dimnames are not coming from the seeds at
+                            # the moment (but they will when we learn how to
+                            # store them in an HDF5 dataset) so altering the
+                            # dimnames is not considered a delayed operation.
     x
 }
 
@@ -255,6 +251,25 @@ setReplaceMethod("names", "DelayedArray", .set_DelayedArray_names)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### drop()
+###
+
+setMethod("drop", "DelayedArray",
+    function(x)
+    {
+        x_subindex <- which(lengths(x@index) != 1L)
+        if (length(x_subindex) == 0L)
+            x_subindex <- x@subindex[[1L]]  # an arbitrary choice
+        if (!identical(x@subindex, x_subindex)) {
+            x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
+            x@subindex <- x_subindex
+        }
+        x
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### [
 ###
 
@@ -263,23 +278,24 @@ setReplaceMethod("names", "DelayedArray", .set_DelayedArray_names)
 ### list elements of class "name".
 .extract_subarray_from_DelayedArray <- function(x, subscript)
 {
-    x_index <- x_index0 <- index(x)
-    x_ndim <- length(x_index)
+    x_index <- x@index
+    x_ndim <- length(x@subindex)
     x_delayed_ops <- x@delayed_ops
     for (n in seq_along(subscript)) {
-        n0 <- if (x@is_transposed) x_ndim - n + 1L else n
         k <- subscript[[n]]
         if (missing(k))
             next
-        x_index[[n0]] <- extractROWS(x_index[[n0]], k)
+        n0 <- if (x@is_transposed) x_ndim - n + 1L else n
+        N <- x@subindex[[n0]]
+        x_index[[N]] <- extractROWS(x_index[[N]], k)
         if (n0 == 1L)
             x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, FALSE)
         if (n0 == x_ndim)
             x_delayed_ops <- .subset_delayed_ops_args(x_delayed_ops, k, TRUE)
     }
-    if (!identical(x_index0, x_index)) {
+    if (!identical(x@index, x_index)) {
         x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
-        index(x) <- x_index
+        x@index <- x_index
         if (!identical(x@delayed_ops, x_delayed_ops))
             x@delayed_ops <- x_delayed_ops
     }
@@ -511,6 +527,8 @@ setMethod("t", "DelayedArray",
     x
 }
 
+### Realize the object i.e. execute all the delayed operations and turn the
+### object back into an ordinary array.
 .from_DelayedArray_to_array <- function(x, drop=FALSE)
 {
     if (!isTRUEorFALSE(drop))
@@ -868,7 +886,7 @@ setMethod("[[", "DelayedArray",
             z1 <- z2 <- 1L  # print only first and last slices
         }
     }
-    blocks <- ArrayBlocks(x_dim, prod(x_dim[1:2]))
+    blocks <- new("ArrayBlocks", dim=x_dim, N=3L, by=1L)
     nblock <- length(blocks)
     if (nblock <= z1 + z2 + 1L) {
         idx <- seq_len(nblock)
