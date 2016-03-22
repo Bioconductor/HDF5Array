@@ -842,15 +842,12 @@ setMethod("[[", "DelayedArray",
 .print_array_data <- function(x, n1, n2)
 {
     x_dim <- dim(x)
-    if (length(x_dim) == 1L) {
-        .print_1D_sample(x, n1, n2)
-        return()
-    }
+    if (length(x_dim) == 1L)
+        return(.print_1D_sample(x, n1, n2))
     if (length(x_dim) == 2L) {
         nhead <- get_showHeadLines()
         ntail <- get_showTailLines()
-        .print_2D_sample(x, nhead, ntail, n1, n2)
-        return()
+        return(.print_2D_sample(x, nhead, ntail, n1, n2))
     }
     x_nrow <- x_dim[[1L]]
     x_ncol <- x_dim[[2L]]
@@ -888,17 +885,19 @@ setMethod("[[", "DelayedArray",
 setMethod("show", "DelayedArray",
     function(object)
     {
+        object_class <- class(object)
         object_dim <- dim(object)
+        dim_in1string <- paste0(object_dim, collapse=" x ")
+        object_type <- type(object)
         if (any(object_dim == 0L)) {
-            cat("<", paste0(object_dim, collapse=" x "), "> ",
-                class(object), " object of type \"", type(object), "\"\n",
-                sep="")
-            return()
+            cat(sprintf("<%s> %s object of type \"%s\"\n",
+                        dim_in1string, object_class, object_type))
+        } else {
+            cat(sprintf("%s object of %s %s%s:\n",
+                        object_class, dim_in1string, object_type,
+                        ifelse(any(object_dim >= 2L), "s", "")))
+            .print_array_data(object, 4L, 4L)
         }
-        cat(class(object), " object of ", paste0(object_dim, collapse=" x "),
-            " ", type(object), ifelse(any(object_dim >= 2L), "s", ""), ":\n",
-            sep="")
-        .print_array_data(object, 4L, 4L)
     }
 )
 
