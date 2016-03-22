@@ -23,7 +23,6 @@ License: Artistic-2.0
 Collate:
 	block_processing.R
 	DelayedArray-class.R
-	DelayedMatrix-class.R
 	HDF5_output_settings.R
 	DelayedArray-utils.R
 	DelayedMatrix-utils.R

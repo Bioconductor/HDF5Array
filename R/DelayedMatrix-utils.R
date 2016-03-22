@@ -110,9 +110,9 @@ setMethod("colMeans", "DelayedMatrix", .DelayedMatrix_block_colMeans)
     )
 
     ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
-    ## so the HDF5Matrix() constructor can bring them back. Then we wouldn't
+    ## so the HDF5Array() constructor can bring them back. Then we wouldn't
     ## need to explicitely set them on 'ans' like we do below.
-    ans <- HDF5Matrix(out_file, "/", out_name, type=ans_type)
+    ans <- HDF5Array(out_file, out_name, type=ans_type)
     ans_rownames <- rownames(x)
     ans_colnames <- colnames(y)
     if (!(is.null(ans_rownames) && is.null(ans_colnames)))

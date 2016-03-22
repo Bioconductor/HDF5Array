@@ -55,7 +55,7 @@ getHDF5OutputName <- function()
     name <- try(get("name", envir=.HDF5_output_settings_envir), silent=TRUE)
     if (is(name, "try-error")) {
         auto_inc_ID <- get("auto_inc_ID", envir=.HDF5_output_settings_envir)
-        name <- sprintf("HDF5ArrayDataset%05d", auto_inc_ID)
+        name <- sprintf("/HDF5ArrayDataset%05d", auto_inc_ID)
     }
     name
 }

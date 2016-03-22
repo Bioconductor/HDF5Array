@@ -5,7 +5,7 @@ test_split_array_in_blocks <- function()
     unsplit_array_from_blocks <- HDF5Array:::unsplit_array_from_blocks
 
     a1 <- array(1:300, c(3, 10, 2, 5))
-    A1 <- as(a1, "HDF5Array")
+    A1 <- HDF5Array(a1)
 
     for (max_block_len in c(1:7, 29:31, 39:40, 59:60, 119:120)) {
         subarrays <- split_array_in_blocks(a1, max_block_len)
@@ -24,13 +24,13 @@ test_split_matrix_in_blocks <- function()
     unsplit_array_from_blocks <- HDF5Array:::unsplit_array_from_blocks
 
     a1 <- array(1:300, c(3, 10, 2, 5))
-    A1 <- as(a1, "HDF5Array")
+    A1 <- HDF5Array(a1)
 
     m1 <- a1[2, c(9, 3:7), 2, -4]
-    M1a <- as(A1[2, c(9, 3:7), 2, -4], "DelayedMatrix")
+    M1a <- drop(A1[2, c(9, 3:7), 2, -4])
     checkIdentical(m1, as.matrix(M1a))
 
-    M1b <- as(m1, "HDF5Matrix")
+    M1b <- HDF5Array(m1)
     checkIdentical(m1, as.matrix(M1b))
 
     tm1 <- t(m1)

@@ -85,7 +85,7 @@
 ## Matrix multiplication writes a new HDF5 dataset to disk and returns
 ## an HDF5Matrix object that points to this new dataset.
 m <- matrix(runif(60), ncol=12)
-M <- as(matrix(runif(240), nrow=12), "DelayedMatrix")
+M <- DelayedArray(matrix(runif(240), nrow=12))
 
 getHDF5OutputFile()  # HDF5 file where the new dataset will be written
 lsHDF5OutputFile()

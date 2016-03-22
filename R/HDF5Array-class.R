@@ -7,7 +7,6 @@
 setClass("HDF5Dataset",
     representation(
         file="character",   # Single string.
-        group="character",  # Single string.
         name="character",   # Dataset name.
         dim="integer",
         first_val="ANY"     # First value in the dataset.
@@ -21,12 +20,12 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 ### A convenience wrapper to rhdf5::h5read()
 ###
 
-.quiet_h5read <- function(file, group, name, index)
+.quiet_h5read <- function(file, name, index)
 {
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     suppressWarnings(
-        h5read(file, paste(group, name, sep="/"), index=index)
+        h5read(file, name, index=index)
     )
 }
 
@@ -41,7 +40,7 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
         if (any(lengths(index) == 0L)) {
             ans <- seed@first_val[0]
         } else {
-            ans <- .quiet_h5read(seed@file, seed@group, seed@name, index)
+            ans <- .quiet_h5read(seed@file, seed@name, index)
         }
         ans
     }
@@ -52,8 +51,10 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
 ### Construct an HDF5Dataset object from a file or an array
 ###
 
-.get_h5dataset_dim <- function(file, group, name)
+.get_h5dataset_dim <- function(file, name)
 {
+    group <- gsub("(.*/)[^/]*$", "\\1", name)
+    name <- gsub(".*/([^/]*)$", "\\1", name)
     f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
     on.exit(H5Fclose(f))
     g <- H5Gopen(f, group)
@@ -65,28 +66,25 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
 
 ### Will fail if the dataset is empty (i.e. if at least one of its dimensions
 ### is 0).
-.read_h5dataset_first_val <- function(file, group, name, ndim)
+.read_h5dataset_first_val <- function(file, name, ndim)
 {
     index <- rep.int(list(1L), ndim)
-    ans <- .quiet_h5read(file, group, name, index)
+    ans <- .quiet_h5read(file, name, index)
     stopifnot(length(ans) == 1L)  # sanity check
     ans[[1L]]  # drop any attribute
 }
 
-HDF5Dataset <- function(file, group, name, type=NA)
+.new_HDF5Dataset_from_file <- function(file, name, type=NA)
 {
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path to ",
                   "the HDF5 file where the dataset is located"))
-    if (!isSingleString(group))
-        stop(wmsg("'group' must be a single string specifying the HDF5 group ",
-                  "of the dataset, as reported by rhdf5::h5ls()"))
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name ",
-                  "of the dataset, as reported by rhdf5::h5ls()"))
+                  "of the dataset in the HDF5 file"))
     if (!isSingleStringOrNA(type))
         stop("'type' must be a single string or NA")
-    dim <- .get_h5dataset_dim(file, group, name)
+    dim <- .get_h5dataset_dim(file, name)
     if (any(dim == 0L)) {
         if (is.na(type))
             stop(wmsg("This HDF5 dataset is empty! Don't know how to ",
@@ -97,7 +95,7 @@ HDF5Dataset <- function(file, group, name, type=NA)
         if (!is.atomic(first_val))
             stop("invalid type: ", type)
     } else {
-        first_val <- .read_h5dataset_first_val(file, group, name, length(dim))
+        first_val <- .read_h5dataset_first_val(file, name, length(dim))
         detected_type <- typeof(first_val)
         if (!(is.na(type) || type == detected_type))
             warning(wmsg("The type specified via the 'type' argument (",
@@ -106,23 +104,34 @@ HDF5Dataset <- function(file, group, name, type=NA)
                          "former."))
     }
     new2("HDF5Dataset", file=file,
-                        group=group,
                         name=name,
                         dim=dim,
                         first_val=first_val)
 }
 
-.from_array_to_HDF5Dataset <- function(from)
+### TODO: Investigate the possiblity to store the dimnames in the HDF5 file
+### so a "dimnames" method for HDF5Dataset objects could bring them back.
+### Then this coercion would propagate the dimnames.
+.new_HDF5Dataset_from_array <- function(a)
 {
+    if (!is.array(a))
+        stop("cannot create an HDF5Dataset object from a ", class(a))
     out_file <- getHDF5OutputFile()
     out_name <- getHDF5OutputName()
     on.exit(setHDF5OutputName())
 
-    h5write(from, out_file, out_name)
-    HDF5Dataset(out_file, "/", out_name, type=type(from))
+    h5write(a, out_file, out_name)
+    .new_HDF5Dataset_from_file(out_file, out_name, type=type(a))
 }
 
-setAs("array", "HDF5Dataset", .from_array_to_HDF5Dataset)
+HDF5Dataset <- function(file, name, type=NA)
+{
+    if (!missing(name))
+        return(.new_HDF5Dataset_from_file(file, name, type=type))
+    if (!identical(type, NA))
+        warning("ignoring supplied 'type'")
+    .new_HDF5Dataset_from_array(file)
+}
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -132,63 +141,45 @@ setAs("array", "HDF5Dataset", .from_array_to_HDF5Dataset)
 ### DelayedArray and DelayedMatrix classes from the user. The user will see
 ### and manipulate HDF5Array and HDF5Matrix objects instead of DelayedArray
 ### and DelayedMatrix objects.
+###
 
 setClass("HDF5Array", contains="DelayedArray")
 
+setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
+
+### Overwrite unsafe automatic coercion method that return invalid objects (it
+### doesn't validate them).
+setAs("HDF5Array", "HDF5Matrix", function(from) new("HDF5Matrix", from))
+
+### For internal use only.
+setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
+
 .validate_HDF5Array <- function(x)
 {
-    if (length(x@seeds) != 1L)
-        return(wmsg("'x@seeds' must have length 1"))
-    if (!is(x@seeds[[1L]], "HDF5Dataset"))
-        return(wmsg("'x@seeds' must be a HDF5Dataset object"))
     if (!is_pristine(x))
         return(wmsg("'x' carries delayed operations on it"))
+    if (!is(x@seeds[[1L]], "HDF5Dataset"))
+        return(wmsg("'x@seeds' must be a HDF5Dataset object"))
     TRUE
 }
 
 setValidity2("HDF5Array", .validate_HDF5Array)
 
-setAs("HDF5Dataset", "HDF5Array",
-    function(from) new_DelayedArray(from, Class="HDF5Array")
-)
-
-HDF5Array <- function(file, group, name, type=NA)
+HDF5Array <- function(file, name, type=NA)
 {
-    as(HDF5Dataset(file, group, name, type=type), "HDF5Array")
-}
-
-setAs("array", "HDF5Array",
-    function(from)
-    {
-        ans <- as(.from_array_to_HDF5Dataset(from), "HDF5Array")
-        ## TODO: Investigate the possiblity that .from_array_to_HDF5Dataset()
-        ## stores the dimnames in the HDF5 file so HDF5Dataset() can bring them
-        ## back. Then we wouldn't need to explicitely set them on 'ans' like we
-        ## do here.
-        dimnames(ans) <- dimnames(from)
-        ans
+    if (is(file, "HDF5Dataset")) {
+        seed <- file
+    } else {
+        seed <- HDF5Dataset(file, name, type=type)
     }
-)
-
-setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
-
-setAs("HDF5Array", "HDF5Matrix",
-    function(from)
-    {
-        if (length(dim(from)) != 2L)
-            stop(wmsg("HDF5 dataset must have 2 dimensions"))
-        new("HDF5Matrix", from)
-    }
-)
-
-HDF5Matrix <- function(file, group, name, type=NA)
-{
-    as(HDF5Array(file, group, name, type=type), "HDF5Matrix")
+    ans <- new_DelayedArray(seed, Class="HDF5Array")
+    ## The dimnames will automatically propagate once we store them in the
+    ## HDF5 file and we have a dimnames() getter for HDF5Dataset objects that
+    ## knows how to extract them. And so this won't be necessary anymore...
+    if (missing(name))
+        dimnames(ans) <- dimnames(file)
+    ans
 }
-
-setAs("array", "HDF5Matrix",
-    function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
-)
 
 setAs("DelayedArray", "HDF5Array",
     function(from) stop(wmsg("coercing a ", class(from), " object to an ",

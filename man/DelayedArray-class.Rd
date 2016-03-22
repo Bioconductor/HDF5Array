@@ -1,13 +1,15 @@
 \name{DelayedArray-class}
 \docType{class}
 
-% DelayedArray
-
 \alias{class:DelayedArray}
 \alias{DelayedArray-class}
-
 \alias{DelayedArray}
-\alias{coerce,ANY,DelayedArray-method}
+
+\alias{class:DelayedMatrix}
+\alias{DelayedMatrix-class}
+\alias{DelayedMatrix}
+
+\alias{coerce,DelayedArray,DelayedMatrix-method}
 
 \alias{dim,DelayedArray-method}
 \alias{length,DelayedArray-method}
@@ -33,15 +35,6 @@
 
 \alias{c,DelayedArray-method}
 
-% DelayedMatrix
-
-\alias{class:DelayedMatrix}
-\alias{DelayedMatrix-class}
-\alias{DelayedMatrix}
-
-\alias{coerce,DelayedArray,DelayedMatrix-method}
-\alias{coerce,array,DelayedMatrix-method}
-
 \title{DelayedArray objects}
 
 \description{
@@ -52,17 +45,23 @@
   and/or via a block processing strategy.
 }
 
-\section{Coercion}{
-  To wrap an array-like object \code{a} in a DelayedArray object, coerce it
-  to DelayedArray with \code{as(a, "DelayedArray")}, or to DelayedMatrix with
-  \code{as(a, "DelayedMatrix")} if it's a matrix-like object.
+\usage{
+DelayedArray(x)
+}
 
-  To \emph{realize} it (i.e. trigger execution of the delayed operations
-  and turn the object back into an ordinary array), call \code{as.array}
-  on it. Alternatively, write it to disk by coercing it to HDF5Array (other
-  on-disk backends can be supported). In that case, the full object is
-  not realized at once in memory, but split into blocks first, and blocks
-  are realized one at a time and written to disk.
+\arguments{
+  \item{x}{
+    An array-like object.
+  }
+}
+
+\section{Coercion}{
+  To \emph{realize} a DelayedArray object (i.e. to trigger execution of the
+  delayed operations that it carries and turn the object back into an ordinary
+  array), call \code{as.array} on it. Alternatively, write it to disk by
+  coercing it to HDF5Array (other on-disk backends can be supported). In that
+  case, the full object is not realized at once in memory, but split into
+  blocks first, and blocks are realized one at a time and written to disk.
 }
 
 \section{Accessors}{
@@ -108,7 +107,7 @@
 ## ---------------------------------------------------------------------
 
 a <- array(runif(15000000), c(300000, 10, 5))
-A <- as(a, "DelayedArray")
+A <- DelayedArray(a)
 A
 
 toto <- function(x) (5 * x[ , , 1] ^ 3 + 1L) * log(x[, , 2])
@@ -117,37 +116,27 @@ head(b)
 
 B <- toto(A)  # very fast! (operations are delayed)
 B             # still 3 dimensions (subsetting never drops dimensions)
-as.array(B[1:6, , ])
-
-## The as.array method for DelayedArray (as.array.DelayedArray) has
-## a 'drop' argument that is FALSE by default. Set it to TRUE to drop
-## the ineffective dimensions:
-as.array(B[1:6, , ], drop=TRUE)  # same as drop(as.array(B[1:6, , ]))
-
-M <- as(B, "DelayedMatrix")
-M
+B <- drop(B)
+B
 
 cs <- colSums(b)
-CS <- colSums(M)
+CS <- colSums(B)
 stopifnot(identical(cs, CS))
 
 ## ---------------------------------------------------------------------
 ## WITH A HDF5Dataset OBJECT
 ## ---------------------------------------------------------------------
 
-a2 <- as(a, "HDF5Dataset")    # create the dataset
+a2 <- HDF5Dataset(a)    # create the dataset
 a2
 
-A2 <- as(a2, "DelayedArray")  # wrap the dataset in a DelayedArray object
+A2 <- DelayedArray(a2)  # wrap the dataset in a DelayedArray object
 A2
 
 B2 <- toto(A2)  # very fast! (operations are delayed)
-B2
-as.array(B2[1:6, , ], drop=TRUE)
+B2 <- drop(B2)
 
-M2 <- as(B2, "DelayedMatrix")
-
-CS2 <- colSums(M2)
+CS2 <- colSums(B2)
 stopifnot(identical(cs, CS2))
 }
 \keyword{methods}

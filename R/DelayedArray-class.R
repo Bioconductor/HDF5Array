@@ -27,6 +27,28 @@ setClass("DelayedArray",
     )
 )
 
+### Extending DataTable gives us a few things for free (head(), tail(),
+### etc...)
+setClass("DelayedMatrix",
+    contains=c("DelayedArray", "DataTable"),
+    prototype=prototype(
+        seeds=list(new("matrix")),
+        index=list(integer(0), integer(0)),
+        subindex=1:2
+    )
+)
+
+### Overwrite unsafe automatic coercion method that return invalid objects (it
+### doesn't validate them).
+setAs("DelayedArray", "DelayedMatrix",
+    function(from) new("DelayedMatrix", from)
+)
+
+### For internal use only.
+setGeneric("matrixClass", function(x) standardGeneric("matrixClass"))
+
+setMethod("matrixClass", "DelayedArray", function(x) "DelayedMatrix")
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Validity
@@ -85,30 +107,44 @@ setClass("DelayedArray",
 
 setValidity2("DelayedArray", .validate_DelayedArray)
 
+### TODO: Move this to S4Vectors and make it the validity method for DataTable
+### object.
+.validate_DelayedMatrix <- function(x)
+{
+    if (length(dim(x)) != 2L)
+        return(wmsg("'x' must have exactly 2 dimensions"))
+    TRUE
+}
+
+setValidity2("DelayedMatrix", .validate_DelayedMatrix)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Constructor
 ###
 
-### For internal use only.
+### Internal constructor.
 new_DelayedArray <- function(a=new("array"),
                              ..., COMBINING_OP="identity", Rargs=list(),
                              Class="DelayedArray")
 {
+    ans_dim <- dim(a)
+    if (length(ans_dim) == 2L)
+        Class <- matrixClass(new(Class))
     seeds <- list(a, ...)
-    index <- lapply(dim(a), seq_len)
+    ans_dimnames <- dimnames(a)
+    ## If there is only 1 seed and it has dimnames, then we propagate them.
+    if (length(seeds) == 1L && !is.null(ans_dimnames)) {
+        index <- mapply(function(d, dn) setNames(seq_len(d), dn),
+                        ans_dim, ans_dimnames, SIMPLIFY=FALSE)
+    } else {
+        index <- lapply(ans_dim, seq_len)
+    }
     new2(Class, seeds=seeds, index=index, subindex=seq_along(index),
                 COMBINING_OP=COMBINING_OP, Rargs=Rargs)
 }
 
-setAs("ANY", "DelayedArray",
-    function(from)
-    {
-        ans <- new_DelayedArray(from)
-        dimnames(ans) <- dimnames(from)
-        ans
-    }
-)
+DelayedArray <- function(x) new_DelayedArray(x)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -127,10 +163,10 @@ is_pristine <- function(x)
         return(FALSE)
     ## 'x' should not carry any delayed operation on it, that is, all the
     ## DelayedArray slots must be in their original state.
-    x1 <- new_DelayedArray(x@seeds[[1L]])
-    x2 <- as(x, "DelayedArray", strict=TRUE)
-    dimnames(x2) <- NULL
-    identical(x1, x2)
+    x2 <- new_DelayedArray(x@seeds[[1L]])
+    dimnames(x) <- NULL
+    class(x) <- class(x2) <- "DelayedArray"
+    identical(x, x2)
 }
 
 ### When a pristine DelayedArray derived object (i.e. an HDF5Array object) is
@@ -139,8 +175,8 @@ is_pristine <- function(x)
 downgrade_to_DelayedArray_or_DelayedMatrix <- function(x)
 {
     if (is(x, "DelayedMatrix"))
-        return(as(x, "DelayedMatrix", strict=TRUE))
-    as(x, "DelayedArray", strict=TRUE)
+        return(as(x, "DelayedMatrix"))
+    as(x, "DelayedArray")
 }
 
 
@@ -244,6 +280,8 @@ setMethod("isEmpty", "DelayedArray", function(x) any(dim(x) == 0L))
         x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
         x@subindex <- x_subindex
     }
+    if (length(dim(x)) == 2L)
+        x <- as(x, matrixClass(x))
     x
 }
 

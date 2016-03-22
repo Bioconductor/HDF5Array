@@ -104,8 +104,6 @@ setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
         stop("non-conformable arrays")
     ans <- new_DelayedArray(e1, e2, COMBINING_OP=.Generic)
     dimnames(ans) <- .combine_dimnames(e1, e2)
-    if (is(e1, "DelayedMatrix") || is(e2, "DelayedMatrix"))
-        ans <- as(ans, "DelayedMatrix")
     ans
 }
 
@@ -474,8 +472,7 @@ setGeneric("apply", signature="X")
             subscript[[MARGIN]] <- i
             args <- c(list(X), subscript)
             slice <- do.call(`[`, args)
-            if (length(X_dim) == 3L && is(X, "DelayedArray"))
-                slice <- make_DelayedMatrix_from_3D_DelayedArray(slice, MARGIN)
+            dim(slice) <- dim(slice)[-MARGIN]
             FUN(slice, ...)
         })
 
