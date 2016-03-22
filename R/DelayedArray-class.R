@@ -145,8 +145,10 @@ downgrade_to_DelayedArray_or_DelayedMatrix <- function(x)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Accessors
+### dim()
 ###
+
+### dim() getter.
 
 .get_DelayedArray_dim_before_transpose <- function(x)
 {
@@ -169,6 +171,91 @@ setMethod("length", "DelayedArray", function(x) prod(dim(x)))
 
 setMethod("isEmpty", "DelayedArray", function(x) any(dim(x) == 0L))
 
+### dim() setter.
+
+.normalize_dim_replacement_value <- function(value, x_dim)
+{
+    if (is.null(value))
+        stop(wmsg("you can't do that, sorry"))
+    if (!is.numeric(value))
+        stop("the supplied dim vector must be numeric")
+    if (length(value) == 0L)
+        stop("the supplied dim vector cannot be empty")
+    if (!is.integer(value))
+        value <- as.integer(value)
+    if (S4Vectors:::anyMissingOrOutside(value, 0L))
+        stop("the supplied dim vector cannot contain negative or NA values")
+    if (length(value) > length(x_dim))
+        stop(wmsg("too many dimensions supplied"))
+    prod1 <- prod(value)
+    prod2 <- prod(x_dim)
+    if (prod1 != prod2)
+        stop(wmsg("the supplied dims [product ", prod1, "] do not match ",
+                  "the length of object [", prod2, "]"))
+    unname(value)
+}
+
+.map_new_to_old_dim <- function(new_dim, old_dim, x_class)
+{
+    idx1 <- which(new_dim != 1L)
+    idx2 <- which(old_dim != 1L)
+
+    cannot_map_msg <- wmsg(
+        "Cannot map the supplied dim vector to the current dimensions of ",
+        "the object. On a ", x_class, " object, the dim() setter can only ",
+        "be used to drop some of the ineffective dimensions (the dimensions ",
+        "equal to 1 are the ineffective dimensions)."
+    )
+
+    can_map <- function() {
+        if (length(idx1) != length(idx2))
+            return(FALSE)
+        if (length(idx1) == 0L)
+            return(TRUE)
+        if (!all(new_dim[idx1] == old_dim[idx2]))
+            return(FALSE)
+        tmp <- idx2 - idx1
+        tmp[[1L]] >= 0L && isSorted(tmp)
+    }
+    if (!can_map())
+        stop(cannot_map_msg)
+
+    new2old <- seq_along(new_dim) +
+        rep.int(c(0L, idx2 - idx1), diff(c(1L, idx1, length(new_dim) + 1L)))
+
+    if (new2old[[length(new2old)]] > length(old_dim))
+        stop(cannot_map_msg)
+
+    new2old
+}
+
+.set_DelayedArray_dim <- function(x, value)
+{
+    x_dim <- dim(x)
+    value <- .normalize_dim_replacement_value(value, x_dim)
+    new2old <- .map_new_to_old_dim(value, x_dim, class(x))
+    stopifnot(identical(value, x_dim[new2old]))  # sanity check
+    if (x@is_transposed) {
+        x_subindex <- rev(rev(x@subindex)[new2old])
+    } else {
+        x_subindex <- x@subindex[new2old]
+    }
+    if (!identical(x@subindex, x_subindex)) {
+        x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
+        x@subindex <- x_subindex
+    }
+    x
+}
+
+setReplaceMethod("dim", "DelayedArray", .set_DelayedArray_dim)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### dimnames()
+###
+
+### dimnames() getter.
+
 .get_DelayedArray_dimnames_before_transpose <- function(x)
 {
     ans <- lapply(x@subindex, function(N) names(x@index[[N]]))
@@ -185,6 +272,8 @@ setMethod("isEmpty", "DelayedArray", function(x) any(dim(x) == 0L))
 }
 
 setMethod("dimnames", "DelayedArray", .get_DelayedArray_dimnames)
+
+### dimnames() setter.
 
 .normalize_dimnames_replacement_value <- function(value, ndim)
 {
@@ -226,6 +315,8 @@ setMethod("dimnames", "DelayedArray", .get_DelayedArray_dimnames)
 
 setReplaceMethod("dimnames", "DelayedArray", .set_DelayedArray_dimnames)
 
+### names() getter & setter.
+
 .get_DelayedArray_names <- function(x)
 {
     if (length(dim(x)) != 1L)
@@ -257,13 +348,8 @@ setReplaceMethod("names", "DelayedArray", .set_DelayedArray_names)
 setMethod("drop", "DelayedArray",
     function(x)
     {
-        x_subindex <- which(lengths(x@index) != 1L)
-        if (length(x_subindex) == 0L)
-            x_subindex <- x@subindex[[1L]]  # an arbitrary choice
-        if (!identical(x@subindex, x_subindex)) {
-            x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
-            x@subindex <- x_subindex
-        }
+        x_dim <- dim(x)
+        dim(x) <- x_dim[x_dim != 1L]
         x
     }
 )
@@ -851,7 +937,8 @@ setMethod("[[", "DelayedArray",
         subscript <- get_array_block_subscript(blocks, i,
                                                expand.RangeNSBS=TRUE)
         cat(subscript2string(subscript, x_dimnames), "\n", sep="")
-        slice <- as(extract_array_block1(x, subscript), "DelayedMatrix")
+        slice <- extract_array_block1(x, subscript)
+        dim(slice) <- dim(slice)[1:2]
         .print_2D_sample(slice, m1, m2, n1, n2)
         cat("\n")
     }

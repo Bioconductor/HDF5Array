@@ -40,7 +40,8 @@ setClass("DelayedMatrix",
     } else {
         n1n2 <- 1:2
     }
-    new2("DelayedMatrix", from, subindex=from@subindex[n1n2])
+    dim(from) <- from_dim[n1n2]
+    new2("DelayedMatrix", from)
 }
 
 setAs("DelayedArray", "DelayedMatrix", .from_DelayedArray_to_DelayedMatrix)
