@@ -35,6 +35,17 @@ get_block_length <- function(type)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type()
+###
+### For internal use only.
+###
+
+setGeneric("type", function(x) standardGeneric("type"))
+
+setMethod("type", "array", function(x) typeof(x))
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### ArrayBlocks objects
 ###
 

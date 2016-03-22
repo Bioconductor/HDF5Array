@@ -396,10 +396,14 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
     nRargs <- length(Rargs)
     stopifnot(nLargs + nRargs == 1L)
     if (nLargs == 1L) {
-        delayed_op[[2L]] <- list(extractROWS(Largs[[1L]], i))
+        new_arg <- extractROWS(Largs[[1L]], i)
+        delayed_op[[2L]] <- list(new_arg)
     } else {
-        delayed_op[[3L]] <- list(extractROWS(Rargs[[1L]], i))
+        new_arg <- extractROWS(Rargs[[1L]], i)
+        delayed_op[[3L]] <- list(new_arg)
     }
+    if (length(new_arg) == 1L)
+        delayed_op[[4L]] <- NA
     delayed_op
 }
 
@@ -587,10 +591,6 @@ setMethod("as.matrix", "DelayedArray", .from_DelayedArray_to_matrix)
 ###
 ### For internal use only.
 ###
-
-setGeneric("type", function(x) standardGeneric("type"))
-
-setMethod("type", "array", function(x) typeof(x))
 
 ### If 'x' is a DelayedArray object, 'type(x)' must always return the same
 ### as 'typeof(as.array(x))'.
