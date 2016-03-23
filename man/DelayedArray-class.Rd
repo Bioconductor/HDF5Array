@@ -12,12 +12,15 @@
 \alias{coerce,DelayedArray,DelayedMatrix-method}
 
 \alias{dim,DelayedArray-method}
+\alias{dim<-,DelayedArray-method}
 \alias{length,DelayedArray-method}
 \alias{isEmpty,DelayedArray-method}
 \alias{dimnames,DelayedArray-method}
 \alias{dimnames<-,DelayedArray-method}
 \alias{names,DelayedArray-method}
 \alias{names<-,DelayedArray-method}
+
+\alias{drop,DelayedArray-method}
 
 \alias{[,DelayedArray-method}
 \alias{t,DelayedArray-method}
@@ -39,14 +42,15 @@
 
 \description{
   Wrapping an array-like object (typically an on-disk object) in a
-  DelayedArray object allows one to perform common array operations in an
-  efficient way. In order to optimize performance and reduce memory usage,
-  operations on DelayedArray objects are implemented as delayed operations
-  and/or via a block processing strategy.
+  DelayedArray object allows one to perform common array operations on an
+  object that would use too much memory to be stored in an ordinary array.
+  In order to optimize performance and reduce memory usage, operations on
+  DelayedArray objects are implemented as delayed operations and/or via a
+  block processing strategy.
 }
 
 \usage{
-DelayedArray(x)
+DelayedArray(x)  # constructor function
 }
 
 \arguments{
@@ -55,13 +59,16 @@ DelayedArray(x)
   }
 }
 
-\section{Coercion}{
+\section{Details}{
   To \emph{realize} a DelayedArray object (i.e. to trigger execution of the
-  delayed operations that it carries and turn the object back into an ordinary
-  array), call \code{as.array} on it. Alternatively, write it to disk by
-  coercing it to HDF5Array (other on-disk backends can be supported). In that
-  case, the full object is not realized at once in memory, but split into
-  blocks first, and blocks are realized one at a time and written to disk.
+  delayed operations that the object carries and turn the object back into
+  an ordinary array), call \code{as.array} on it. However this realizes the
+  object in memory and could require too much memory. Big DelayedArray
+  objects are preferrably realized on disk e.g. by calling the
+  \code{\link{HDF5Dataset}} constructor on it (other on-disk backends can be
+  supported). In that case, the full object is not realized at once in memory,
+  but split into small blocks first, and the blocks are realized and written
+  to disk one at a time.
 }
 
 \section{Accessors}{
@@ -77,7 +84,10 @@ DelayedArray(x)
   \itemize{
     \item The \code{drop} argument of the \code{[} operator is ignored i.e.
           subsetting a DelayedArray object always returns a DelayedArray
-          object with the same number of dimensions.
+          object with the same number of dimensions. You need to call
+          \code{drop()} on the subsetted object to actually drop its
+          ineffective dimensions (i.e. the dimensions equal to 1).
+
     \item Linear subsetting (a.k.a. 1D-style subsetting, that is, subsetting
           with a single subscript \code{i}) is not supported.
   }
@@ -106,7 +116,7 @@ DelayedArray(x)
 ## WITH AN ORDINARY array OBJECT
 ## ---------------------------------------------------------------------
 
-a <- array(runif(15000000), c(300000, 10, 5))
+a <- array(runif(1500000), c(30000, 10, 5))
 A <- DelayedArray(a)
 A
 
@@ -138,6 +148,18 @@ B2 <- drop(B2)
 
 CS2 <- colSums(B2)
 stopifnot(identical(cs, CS2))
+
+## ---------------------------------------------------------------------
+## STORE THE RESULT IN A NEW HDF5Dataset OBJECT
+## ---------------------------------------------------------------------
+
+b2 <- HDF5Dataset(B2)  # "realize" B2 on disk (as an HDF5 dataset)
+
+## If this is just an intermediate result, you can either keep going
+## with B2 or replace it with b2 wrapped in a DelayedArray object etc...
+B2 <- DelayedArray(b2)  # semantically equivalent to the previous B2
+
+
 }
 \keyword{methods}
 \keyword{classes}

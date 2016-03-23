@@ -116,6 +116,7 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
 {
     if (!is.array(a))
         stop("cannot create an HDF5Dataset object from a ", class(a))
+
     out_file <- getHDF5OutputFile()
     out_name <- getHDF5OutputName()
     on.exit(setHDF5OutputName())
@@ -124,12 +125,32 @@ setMethod("extract_array_from_seed", "HDF5Dataset",
     .new_HDF5Dataset_from_file(out_file, out_name, type=type(a))
 }
 
+### Semantically equivalent to .new_HDF5Dataset_from_array(as.array(from))
+### but uses block-processing so the full DelayedArray object is not realized
+### at once in memory. Instead the object is split into blocks first, and the
+### blocks realized and written to disk one at a time. 
+.new_HDF5Dataset_from_DelayedArray <- function(x)
+{
+    out_file <- getHDF5OutputFile()
+    out_name <- getHDF5OutputName()
+    on.exit(setHDF5OutputName())
+
+    ans_type <- type(x)
+    h5createDataset(out_file, out_name, dim(x), storage.mode=ans_type)
+
+    block_APPLY(x, identity, out_file=out_file, out_name=out_name)
+
+    .new_HDF5Dataset_from_file(out_file, out_name, type=ans_type)
+}
+
 HDF5Dataset <- function(file, name, type=NA)
 {
     if (!missing(name))
         return(.new_HDF5Dataset_from_file(file, name, type=type))
     if (!identical(type, NA))
         warning("ignoring supplied 'type'")
+    if (is(file, "DelayedArray"))
+        return(.new_HDF5Dataset_from_DelayedArray(file))
     .new_HDF5Dataset_from_array(file)
 }
 
@@ -181,19 +202,19 @@ HDF5Array <- function(file, name, type=NA)
     ans
 }
 
-setAs("DelayedArray", "HDF5Array",
-    function(from) stop(wmsg("coercing a ", class(from), " object to an ",
-                             "HDF5Array object is not supported yet"))
-)
+### Overwrite unsafe automatic coercion methods that return invalid objects
+### (they don't validate them).
+.from_DelayedArray_to_HDF5Array <- function(from)
+{
+    use_HDF5Dataset_msg <- wmsg(
+        "Coercing a ", class(from), " object to HDF5Array or HDF5Matrix is ",
+        "not supported. If you intend to realize the object on disk, you ",
+        "should instead call the HDF5Dataset() constructor on it."
+    )
+    stop(use_HDF5Dataset_msg)
+}
 
-setAs("DelayedArray", "HDF5Matrix",
-    function(from) stop(wmsg("Coercing a ", class(from), " object to an ",
-                             "HDF5Matrix object is not supported yet. ",
-                             "Please coerce to DelayedMatrix instead."))
-)
-
-setAs("DelayedMatrix", "HDF5Matrix",
-    function(from) stop(wmsg("coercing a ", class(from), " object to an ",
-                             "HDF5Matrix object is not supported yet"))
-)
+setAs("DelayedArray", "HDF5Array", .from_DelayedArray_to_HDF5Array)
+setAs("DelayedArray", "HDF5Matrix", .from_DelayedArray_to_HDF5Array)
+setAs("DelayedMatrix", "HDF5Matrix", .from_DelayedArray_to_HDF5Array)
 
