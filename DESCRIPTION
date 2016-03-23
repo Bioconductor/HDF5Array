@@ -2,12 +2,12 @@ Package: HDF5Array
 Title: Array-like containers for convenient access and manipulation of HDF5
 	datasets
 Description: This package implements the HDF5Array class for convenient access
-	and manipulation of HDF5 datasets. In order to optimize performance and
-	reduce memory usage, operations on HDF5Array objects are implemented as
-	delayed operations and/or via a block processing strategy.
-	These mechanisms are implemented via the DelayedArray class, and are
-	independent of the backend (they even work on ordinary arrays where
-	they can sometimes improve performance).
+	and manipulation of HDF5 datasets. In order to reduce memory usage and
+	optimize performance, operations on an HDF5Array object are either
+	delayed or performed using a block processing mechanism.
+	The delaying and block processing mechanisms are implemented via the
+	DelayedArray class and independent of the on-disk backend. They even
+	work on ordinary arrays where they can sometimes improve performance.
 Version: 0.9.0
 Encoding: UTF-8
 Author: Hervé Pagès
@@ -21,6 +21,7 @@ VignetteBuilder: knitr
 License: Artistic-2.0
 Collate:
 	block_processing.R
+	show-utils.R
 	DelayedArray-class.R
 	HDF5_output_settings.R
 	DelayedArray-utils.R

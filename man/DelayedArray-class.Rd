@@ -42,11 +42,10 @@
 
 \description{
   Wrapping an array-like object (typically an on-disk object) in a
-  DelayedArray object allows one to perform common array operations on an
-  object that would use too much memory to be stored in an ordinary array.
-  In order to optimize performance and reduce memory usage, operations on
-  DelayedArray objects are implemented as delayed operations and/or via a
-  block processing strategy.
+  DelayedArray object allows one to perform common array operations
+  without loading the object in memory. In order to reduce memory usage and
+  optimize performance, operations on a the object are either delayed or
+  performed using a block processing mechanism.
 }
 
 \usage{
@@ -115,8 +114,7 @@ DelayedArray(x)  # constructor function
 ## ---------------------------------------------------------------------
 ## WITH AN ORDINARY array OBJECT
 ## ---------------------------------------------------------------------
-
-a <- array(runif(1500000), c(30000, 10, 5))
+a <- array(runif(1500000), c(10000, 30, 5))
 A <- DelayedArray(a)
 A
 
@@ -136,11 +134,10 @@ stopifnot(identical(cs, CS))
 ## ---------------------------------------------------------------------
 ## WITH A HDF5Dataset OBJECT
 ## ---------------------------------------------------------------------
+h5a <- HDF5Dataset(a)    # create the dataset
+h5a
 
-a2 <- HDF5Dataset(a)    # create the dataset
-a2
-
-A2 <- DelayedArray(a2)  # wrap the dataset in a DelayedArray object
+A2 <- DelayedArray(h5a)  # wrap the dataset in a DelayedArray object
 A2
 
 B2 <- toto(A2)  # very fast! (operations are delayed)
@@ -152,14 +149,11 @@ stopifnot(identical(cs, CS2))
 ## ---------------------------------------------------------------------
 ## STORE THE RESULT IN A NEW HDF5Dataset OBJECT
 ## ---------------------------------------------------------------------
-
 b2 <- HDF5Dataset(B2)  # "realize" B2 on disk (as an HDF5 dataset)
 
 ## If this is just an intermediate result, you can either keep going
 ## with B2 or replace it with b2 wrapped in a DelayedArray object etc...
 B2 <- DelayedArray(b2)  # semantically equivalent to the previous B2
-
-
 }
 \keyword{methods}
 \keyword{classes}
