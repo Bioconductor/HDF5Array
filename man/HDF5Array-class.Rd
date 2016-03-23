@@ -37,9 +37,9 @@
 
     \item Low-level class HDF5Dataset for pointing to an HDF5 dataset. No
           operation can be performed directly on an HDF5Dataset object. It
-          needs to be wrapped in a DelayedArray or HDF5Array object first.
-          An HDF5Array object is just an HDF5Dataset object wrapped in a
-          \link{DelayedArray} object.
+          needs to be wrapped in a \link{DelayedArray} or HDF5Array object
+          first. An HDF5Array object is just an HDF5Dataset object wrapped
+          in a \link{DelayedArray} object.
   }
 }
 
@@ -51,7 +51,15 @@ HDF5Dataset(file, name, type=NA)
 
 \arguments{
   \item{file}{
-    The path to the HDF5 file where the dataset is located.
+    The path (as a single character string) to the HDF5 file where the
+    dataset is located.
+
+    \code{file} can also be a \link{DelayedArray} object or an ordinary array,
+    in which case, the object is written to disk as a new HDF5 dataset.
+    If \code{file} is a \link{DelayedArray} object, all the delayed operations
+    carried by the object are executed before the result is written to disk.
+    This is the standard way to \emph{realize} a \link{DelayedArray} object
+    on disk. See \code{?\link{DelayedArray}} for more information.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
@@ -60,6 +68,16 @@ HDF5Dataset(file, name, type=NA)
     \code{NA} or the \emph{R atomic type} (specified as a single string)
     corresponding to the type of the HDF5 dataset.
   }
+}
+
+\details{
+  \code{HDF5Array} and \code{HDF5Dataset} can be used either to point to an
+  existing HDF5 dataset or to create a new one (see description of the
+  \code{file} argument above).
+
+  When used to create a new HDF5 dataset, the location where to write the
+  dataset can be controlled with the \code{\link{setHDF5OutputFile}} and
+  \code{\link{setHDF5OutputName}} utility functions.
 }
 
 \value{
@@ -75,8 +93,8 @@ HDF5Dataset(file, name, type=NA)
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
-    \item \link{HDF5_output_settings} to manage settings for writing
-          output to HDF5.
+    \item \link{setHDF5OutputFile} to control the location of the new
+          HDF5 datasets created by \code{HDF5Array} and \code{HDF5Dataset}.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 

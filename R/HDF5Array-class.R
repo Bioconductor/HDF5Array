@@ -3,7 +3,6 @@
 ### -------------------------------------------------------------------------
 
 
-### NOT exported.
 setClass("HDF5Dataset",
     representation(
         file="character",   # Single string.

@@ -1,7 +1,9 @@
 ### =========================================================================
 ### Compact display of an array-like object
 ### -------------------------------------------------------------------------
-
+###
+### Nothing in this file is exported.
+###
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### 1D array
@@ -253,7 +255,7 @@
         idx2 <- seq(to=nblock, by=1L, length.out=z2)
         .print_2D_slices(x, m1, m2, n1, n2, blocks, idx1)
         cat("...\n\n")
-        .print_2D_slices(x, m1, m2, n2, n2, blocks, idx2)
+        .print_2D_slices(x, m1, m2, n1, n2, blocks, idx2)
     }
 }
 

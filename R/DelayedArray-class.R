@@ -495,9 +495,9 @@ setMethod("extract_array_from_seed", "ANY",
 ###   3) The list of "right arguments" i.e. the list of arguments to place
 ###      after the array in the function call.
 ###   4) A single logical. Indicates the dimension along which the (left or
-###      right) argument of the function call needs to be recycled at
-###      evaluation time (evaluation is performed by .apply_delayed_ops()
-###      which is called by as.array()). FALSE: along the 1st dim; TRUE: along
+###      right) argument of the function call needs to be recycled when the
+###      operation is actually executed (done by .execute_delayed_ops() which
+###      is called by as.array()). FALSE: along the 1st dim; TRUE: along
 ###      the last dim; NA: no recycling. Recycling is only supported for
 ###      function calls with 2 arguments (i.e. the array and the recycled
 ###      argument) at the moment.
@@ -551,7 +551,7 @@ register_delayed_op <- function(x, FUN, Largs=list(), Rargs=list(),
     lapply(delayed_ops, .subset_delayed_op_args, i, subset_along_last_dim)
 
 ### 'a' is the ordinary array returned by the "combining" operator.
-.apply_delayed_ops <- function(a, delayed_ops)
+.execute_delayed_ops <- function(a, delayed_ops)
 {
     a_dim <- dim(a)
     first_dim <- a_dim[[1L]]
@@ -665,7 +665,7 @@ setMethod("t", "DelayedArray",
             a
         })
     ans <- do.call(x@COMBINING_OP, c(arrays, x@Rargs))
-    ans <- .apply_delayed_ops(ans, x@delayed_ops)
+    ans <- .execute_delayed_ops(ans, x@delayed_ops)
     dimnames(ans) <- .get_DelayedArray_dimnames_before_transpose(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)

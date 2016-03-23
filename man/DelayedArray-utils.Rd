@@ -72,8 +72,8 @@
   \itemize{
     \item \link{DelayedArray} objects.
 
-    \item \link{HDF5_output_settings} to manage settings for writing
-          output to HDF5.
+    \item \link{setHDF5OutputFile} to control the location of automatically
+          created HDF5 datasets.
 
     \item \link{HDF5Array} objects.
 

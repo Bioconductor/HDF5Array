@@ -42,10 +42,10 @@
 
 \description{
   Wrapping an array-like object (typically an on-disk object) in a
-  DelayedArray object allows one to perform common array operations
+  DelayedArray object allows one to perform common array operations on it
   without loading the object in memory. In order to reduce memory usage and
-  optimize performance, operations on a the object are either delayed or
-  performed using a block processing mechanism.
+  optimize performance, operations on the object are either delayed or
+  executed using a block processing mechanism.
 }
 
 \usage{
@@ -101,8 +101,8 @@ DelayedArray(x)  # constructor function
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
-    \item \link{HDF5_output_settings} to manage settings for writing
-          output to HDF5.
+    \item \link{setHDF5OutputFile} to control the location of automatically
+          created HDF5 datasets.
 
     \item \link{HDF5Array} objects.
 

@@ -78,9 +78,9 @@ exportMethods(
 ###
 
 export(
-    DelayedArray,
     setHDF5OutputFile, getHDF5OutputFile, lsHDF5OutputFile,
     setHDF5OutputName, getHDF5OutputName,
+    DelayedArray,
     HDF5Dataset, HDF5Array
 )
 
