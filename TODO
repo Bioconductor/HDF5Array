@@ -3,6 +3,8 @@
 
 - Add vignette.
 
+- Do some benchmarking (with special attention to memory usage).
+
 - Store the dimnames in the HDF5 file: investigate the possiblity to store the
   dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
   can grab them from there. Operations that write a new HDF5 dataset to disk
