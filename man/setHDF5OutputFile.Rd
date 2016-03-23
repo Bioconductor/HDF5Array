@@ -58,8 +58,9 @@ getHDF5OutputName()
 getHDF5OutputFile()
 
 ## Use setHDF5OutputFile() to change the current output HDF5 file.
-## If the file file exists, it must be in the HDF5 format or an
-## error will be raised. If doesn't exist, it will be created.
+## If the specified file exists, then it must be in HDF5 format or
+## an error will be raised. If it doesn't exist, then it will be
+## created.
 \dontrun{
   setHDF5OutputFile("path/to/some/HDF5/file")
 }
