@@ -753,7 +753,7 @@ setMethod("type", "DelayedArray",
 
 .get_DelayedArray_element <- function(x, i)
 {
-    i <- S4Vectors:::normalizeDoubleBracketSubscript(i, x)
+    i <- normalizeDoubleBracketSubscript(i, x)
     subscript <- as.integer(arrayInd(i, dim(x)))
     as.vector(.extract_subarray_from_DelayedArray(x, subscript))
 }
