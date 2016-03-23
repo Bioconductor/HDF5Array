@@ -1,13 +1,15 @@
 
-- Complete man pages and eliminate all 'R CMD check' warnings.
+- Complete man pages.
 
 - Add vignette.
 
-Store the dimnames in the HDF5 file
-===================================
+- Store the dimnames in the HDF5 file: investigate the possiblity to store the
+  dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
+  can grab them from there. Operations that write a new HDF5 dataset to disk
+  (e.g. matrix multiplication, or HDF5Dataset() when called on a DelayedArray)
+  would need to be modified to also write the dimnames to the HDF5 file.
 
-Investigate the possiblity to store the dimnames in the HDF5 file so the
-HDF5Array() constructor can grab them from there. Methods that write a new
-HDF5 dataset to disk (e.g. coercion from array to HDF5Array) would need to
-be modified to also write the dimnames to the HDF5 file.
+- Support more matrix- and array-like operations.
+
+- Add more unit tests.
 
