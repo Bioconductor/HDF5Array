@@ -61,9 +61,7 @@ getHDF5OutputFile()
 ## If the specified file exists, then it must be in HDF5 format or
 ## an error will be raised. If it doesn't exist, then it will be
 ## created.
-\dontrun{
-  setHDF5OutputFile("path/to/some/HDF5/file")
-}
+#setHDF5OutputFile("path/to/some/HDF5/file")
 
 lsHDF5OutputFile()
 
