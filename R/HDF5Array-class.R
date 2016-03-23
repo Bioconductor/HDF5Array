@@ -30,10 +30,10 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_array_from_seed()
+### subset_seed_as_array()
 ###
 
-setMethod("extract_array_from_seed", "HDF5Dataset",
+setMethod("subset_seed_as_array", "HDF5Dataset",
     function(seed, index)
     {
         if (any(lengths(index) == 0L)) {

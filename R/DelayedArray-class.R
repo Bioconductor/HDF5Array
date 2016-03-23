@@ -11,7 +11,7 @@ setClass("DelayedArray",
         subindex="integer",        # The seed dimensions to keep.
         COMBINING_OP="character",  # n-ary operator to combine the seeds
                                    # after they all went thru
-                                   # extract_array_from_seed(seed, index).
+                                   # subset_seed_as_array(seed, index).
         Rargs="list",
         delayed_ops="list",        # List of delayed operations. See below
                                    # for the details.
@@ -467,18 +467,18 @@ setMethod("[", "DelayedArray", .extract_DelayedArray_subset)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_array_from_seed()
+### subset_seed_as_array()
 ###
 ### 'index' is expected to be a list of integer vectors. There is no
 ### need to support anything else.
 ### Must return an ordinary array. No need to propagate the dimnames.
 ###
 
-setGeneric("extract_array_from_seed", signature="seed",
-    function(seed, index) standardGeneric("extract_array_from_seed")
+setGeneric("subset_seed_as_array", signature="seed",
+    function(seed, index) standardGeneric("subset_seed_as_array")
 )
 
-setMethod("extract_array_from_seed", "ANY",
+setMethod("subset_seed_as_array", "ANY",
     function(seed, index)
         as.array(do.call(`[`, c(list(seed), index, drop=FALSE)))
 )
@@ -660,7 +660,7 @@ setMethod("t", "DelayedArray",
     dim_before_transpose <- .get_DelayedArray_dim_before_transpose(x)
     arrays <- lapply(x@seeds,
         function(seed) {
-            a <- extract_array_from_seed(seed, x@index)
+            a <- subset_seed_as_array(seed, x@index)
             dim(a) <- dim_before_transpose
             a
         })
