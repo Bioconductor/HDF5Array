@@ -50,7 +50,8 @@
 {
     stopifnot(length(dim(x)) == 1L)
     out <- .prepare_1D_array_sample(x, n1, n2)
-    print(out, quote=FALSE, right=TRUE, max=length(out))
+    quote <- type(x) == "character"
+    print(out, quote=quote, right=TRUE, max=length(out))
 }
 
 
@@ -190,7 +191,8 @@
 {
     stopifnot(length(dim(x)) == 2L)
     out <- .prepare_2D_array_sample(x, m1, m2, n1, n2)
-    print(out, quote=FALSE, right=TRUE, max=length(out))
+    quote <- type(x) == "character"
+    print(out, quote=quote, right=TRUE, max=length(out))
 }
 
 
