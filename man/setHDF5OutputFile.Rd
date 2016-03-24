@@ -25,8 +25,8 @@ getHDF5OutputName()
 
 \arguments{
   \item{file}{
-    The path to the \emph{current output HDF5 file}, that is, the HDF5 file
-    where to write all newly created datasets.
+    The path to the \emph{current output HDF5 file}, that is, to the HDF5
+    file where all newly created datasets shall be written.
   }
   \item{name}{
     The name of the \emph{next} dataset to be written to the current output

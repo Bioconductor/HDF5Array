@@ -8,7 +8,7 @@ Description: This package implements the HDF5Array class for convenient access
 	The delaying and block processing mechanisms are implemented via the
 	DelayedArray class and independent of the on-disk backend. They even
 	work on ordinary arrays where they can sometimes improve performance.
-Version: 0.9.0
+Version: 0.99.0
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>

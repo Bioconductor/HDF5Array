@@ -52,6 +52,8 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
 .get_h5dataset_dim <- function(file, name)
 {
+    if (substr(name, 1L, 1L) != "/")
+        name <- paste0("/", name)
     group <- gsub("(.*/)[^/]*$", "\\1", name)
     name <- gsub(".*/([^/]*)$", "\\1", name)
     f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
@@ -81,6 +83,8 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name ",
                   "of the dataset in the HDF5 file"))
+    if (name == "")
+        stop(wmsg("'name' cannot be the empty string"))
     if (!isSingleStringOrNA(type))
         stop("'type' must be a single string or NA")
     dim <- .get_h5dataset_dim(file, name)
@@ -118,9 +122,13 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
     out_file <- getHDF5OutputFile()
     out_name <- getHDF5OutputName()
+
+    ans_type <- type(a)
+    h5createDataset2(out_file, out_name, dim(a), storage.mode=ans_type)
     on.exit(setHDF5OutputName())
 
     h5write(a, out_file, out_name)
+
     .new_HDF5Dataset_from_file(out_file, out_name, type=type(a))
 }
 
@@ -132,10 +140,10 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 {
     out_file <- getHDF5OutputFile()
     out_name <- getHDF5OutputName()
-    on.exit(setHDF5OutputName())
 
     ans_type <- type(x)
-    h5createDataset(out_file, out_name, dim(x), storage.mode=ans_type)
+    h5createDataset2(out_file, out_name, dim(x), storage.mode=ans_type)
+    on.exit(setHDF5OutputName())
 
     block_APPLY(x, identity, out_file=out_file, out_name=out_name)
 

@@ -97,11 +97,11 @@ setMethod("colMeans", "DelayedMatrix", .DelayedMatrix_block_colMeans)
 
     out_file <- getHDF5OutputFile()
     out_name <- getHDF5OutputName()
-    on.exit(setHDF5OutputName())
 
     ans_type <- typeof(match.fun(type(x))(1) * match.fun(type(y))(1))
-    h5createDataset(out_file, out_name, c(nrow(x), ncol(y)),
-                    storage.mode=ans_type)
+    h5createDataset2(out_file, out_name, c(nrow(x), ncol(y)),
+                     storage.mode=ans_type)
+    on.exit(setHDF5OutputName())
 
     colblock_APPLY(y,
         function(submatrix) x %*% submatrix,
