@@ -4,7 +4,7 @@
 
 \alias{length,ArrayBlocks-method}
 
-% DelayedArray methods
+% DelayedArray utils
 
 \alias{is.na,DelayedArray-method}
 \alias{!,DelayedArray-method}
@@ -31,12 +31,27 @@
 \alias{apply}
 \alias{apply,DelayedArray-method}
 
-% DelayedMatrix methods
+% DelayedMatrix utils
 
+\alias{dim,RowBinder-method}
+\alias{dim,ColBinder-method}
+\alias{dimnames,RowBinder-method}
+\alias{dimnames,ColBinder-method}
+\alias{rbind}
+\alias{rbind,DelayedMatrix-method}
+\alias{cbind}
+\alias{cbind,DelayedMatrix-method}
+
+\alias{rowSums}
 \alias{rowSums,DelayedMatrix-method}
+\alias{colSums}
 \alias{colSums,DelayedMatrix-method}
+\alias{rowMeans}
 \alias{rowMeans,DelayedMatrix-method}
+\alias{colMeans}
 \alias{colMeans,DelayedMatrix-method}
+
+\alias{\%*\%}
 \alias{\%*\%,DelayedMatrix,matrix-method}
 \alias{\%*\%,matrix,DelayedMatrix-method}
 \alias{\%*\%,DelayedMatrix,DelayedMatrix-method}
@@ -48,28 +63,42 @@
 }
 
 \details{
-  Operations currently supported on all \link{DelayedArray} objects:
+  The operations currently supported by \link{DelayedArray} objects are:
+
+  Delayed operations:
   \itemize{
     \item \code{is.na}, \code{!}
-    \item The members of the \code{\link[methods]{Math}} group.
-    \item The members of the \code{\link[methods]{Ops}} group.
-    \item \code{pmax2}, \code{pmin2}.
-    \item \code{anyNA}.
-    \item The members of the \code{\link[methods]{Summary}} group.
-    \item \code{mean}.
-    \item \code{apply}.
+    \item all the members of the \code{\link[methods]{Ops}} and
+          \code{\link[methods]{Math}} groups
+    \item \code{pmax2} and \code{pmin2}
+    \item \code{rbind} and \code{cbind} [\link{DelayedMatrix} objects only]
   }
 
-  Operations currently supported on \link{DelayedMatrix} objects only:
+  Block-processed operations:
   \itemize{
-    \item \code{rowSums}, \code{colSums}, \code{rowMeans}, \code{colMeans}.
-    \item Matrix multiplication (\%*\%) of an ordinary matrix by a
-          DelayedMatrix object.
+    \item \code{anyNA}
+    \item all the members of the \code{\link[methods]{Summary}} group
+    \item \code{mean}
+    \item \code{apply}
+    \item \code{rowSums}, \code{colSums}, \code{rowMeans}, and
+          \code{colMeans} [\link{DelayedMatrix} objects only]
+    \item matrix multiplication (\%*\%) of an ordinary matrix by a
+          \link{DelayedMatrix} object
   }
 }
 
 \seealso{
   \itemize{
+    \item \code{\link[base]{is.na}}, \code{\link[base]{!}},
+          \code{\link[base]{cbind}}, \code{\link[base]{mean}},
+          \code{\link[base]{apply}}, \code{\link[base]{colSums}},
+          \code{\link[base]{\%*\%}} in the \pkg{base} package for the
+          corresponding operations.
+
+    \item \code{\link[methods]{S4groupGeneric}} in the \pkg{methods} package
+          for the members of the \code{\link[methods]{Ops}} and
+          \code{\link[methods]{Math}} groups.
+
     \item \link{DelayedArray} objects.
 
     \item \link{setHDF5OutputFile} to control the location of automatically

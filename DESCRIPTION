@@ -25,7 +25,6 @@ Collate:
 	block_processing.R
 	show-utils.R
 	DelayedArray-class.R
-	DelayedMatrix-cbind.R
 	DelayedArray-utils.R
 	DelayedMatrix-utils.R
 	HDF5Array-class.R
