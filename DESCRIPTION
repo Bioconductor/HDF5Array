@@ -1,12 +1,12 @@
 Package: HDF5Array
-Title: Array-like containers for convenient access and manipulation of HDF5
+Title: An array-like container for convenient access and manipulation of HDF5
 	datasets
 Description: This package implements the HDF5Array class for convenient access
 	and manipulation of HDF5 datasets. In order to reduce memory usage and
 	optimize performance, operations on an HDF5Array object are either
 	delayed or executed using a block processing mechanism.
-	The delaying and block processing mechanisms are implemented via the
-	DelayedArray class and independent of the on-disk backend. They even
+	The delaying and block processing mechanisms are independent of the
+	on-disk backend and implemented via the DelayedArray class. They even
 	work on ordinary arrays where they can sometimes improve performance.
 Version: 0.99.0
 Encoding: UTF-8
