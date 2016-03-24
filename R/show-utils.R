@@ -5,11 +5,36 @@
 ### Nothing in this file is exported.
 ###
 
+
+.format_as_character_vector <- function(x, justify)
+{
+    x_names <- names(x)
+    x <- as.vector(x)
+    if (typeof(x) == "character" && length(x) != 0L)
+        x <- paste0("\"", x, "\"")
+    names(x) <- x_names
+    format(x, justify=justify)
+}
+
+.format_as_character_matrix <- function(x, justify)
+{
+    x <- as.matrix(x)
+    if (typeof(x) == "character" && length(x) != 0L) {
+        x_dim <- dim(x)
+        x_dimnames <- dimnames(x)
+        x <- paste0("\"", x, "\"")
+        dim(x) <- x_dim
+        dimnames(x) <- x_dimnames
+    }
+    format(x, justify=justify)
+}
+
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### 1D array
 ###
 
-.split_1D_array_names <- function(x_names, idx1, idx2)
+.split_1D_array_names <- function(x_names, idx1, idx2, justify)
 {
     make_elt_indices <- function(i) {
         if (length(i) == 0L)
@@ -23,25 +48,25 @@
         s1 <- x_names[idx1]
         s2 <- x_names[idx2]
     }
-    format(c(s1, ".", s2), justify="right")
+    format(c(s1, ".", s2), justify=justify)
 }
 
-.prepare_1D_array_sample <- function(x, n1, n2)
+.prepare_1D_array_sample <- function(x, n1, n2, justify)
 {
     x_len <- length(x)
     x_names <- names(x)
     if (x_len <= n1 + n2 + 1L) {
-        ans <- format(as.vector(x))
+        ans <- .format_as_character_vector(x, justify)
         idx1 <- seq_len(x_len)
         idx2 <- integer(0)
-        names(ans) <- .split_1D_array_names(x_names, idx1, idx2)[idx1]
+        names(ans) <- .split_1D_array_names(x_names, idx1, idx2, justify)[idx1]
     } else {
         idx1 <- seq_len(n1)
         idx2 <- seq(to=x_len, by=1L, length.out=n2)
-        ans1 <- format(as.vector(x[idx1]))
-        ans2 <- format(as.vector(x[idx2]))
+        ans1 <- .format_as_character_vector(x[idx1], justify)
+        ans2 <- .format_as_character_vector(x[idx2], justify)
         ans <- c(ans1, ".", ans2)
-        names(ans) <- .split_1D_array_names(x_names, idx1, idx2)
+        names(ans) <- .split_1D_array_names(x_names, idx1, idx2, justify)
     }
     ans
 }
@@ -49,9 +74,10 @@
 .print_1D_array_data <- function(x, n1, n2)
 {
     stopifnot(length(dim(x)) == 1L)
-    out <- .prepare_1D_array_sample(x, n1, n2)
-    quote <- type(x) == "character"
-    print(out, quote=quote, right=TRUE, max=length(out))
+    right <- type(x) != "character"
+    justify <- if (right) "right" else "left"
+    out <- .prepare_1D_array_sample(x, n1, n2, justify)
+    print(out, quote=FALSE, right=right, max=length(out))
 }
 
 
@@ -59,7 +85,7 @@
 ### 2D array
 ###
 
-.split_rownames <- function(x_rownames, idx1, idx2)
+.split_rownames <- function(x_rownames, idx1, idx2, justify)
 {
     make_row_indices <- function(i) {
         if (length(i) == 0L)
@@ -81,10 +107,10 @@
     } else {
         ellipsis <- "..."
     }
-    format(c(s1, ellipsis, s2), justify="right")
+    format(c(s1, ellipsis, s2), justify=justify)
 }
 
-.split_colnames <- function(x_colnames, idx1, idx2)
+.split_colnames <- function(x_colnames, idx1, idx2, justify)
 {
     make_col_indices <- function(j) {
         if (length(j) == 0L)
@@ -98,42 +124,42 @@
         s1 <- x_colnames[idx1]
         s2 <- x_colnames[idx2]
     }
-    format(c(s1, ".", s2), justify="right")
+    format(c(s1, ".", s2), justify=justify)
 }
 
-.rsplit_2D_array_data <- function(x, m1, m2)
+.rsplit_2D_array_data <- function(x, m1, m2, justify)
 {
     x_nrow <- nrow(x)
     x_rownames <- rownames(x)
     idx1 <- seq_len(m1)
     idx2 <- seq(to=x_nrow, by=1L, length.out=m2)
 
-    ans1 <- format(as.matrix(x[idx1, , drop=FALSE]))
-    ans2 <- format(as.matrix(x[idx2, , drop=FALSE]))
+    ans1 <- .format_as_character_matrix(x[idx1, , drop=FALSE], justify)
+    ans2 <- .format_as_character_matrix(x[idx2, , drop=FALSE], justify)
     dots <- rep.int(".", ncol(ans1))
     ans <- rbind(ans1, matrix(dots, nrow=1L), ans2)
 
-    rownames(ans) <- .split_rownames(x_rownames, idx1, idx2)
+    rownames(ans) <- .split_rownames(x_rownames, idx1, idx2, justify)
     ans
 }
 
-.csplit_2D_array_data <- function(x, n1, n2)
+.csplit_2D_array_data <- function(x, n1, n2, justify)
 {
     x_ncol <- ncol(x)
     x_colnames <- colnames(x)
     idx1 <- seq_len(n1)
     idx2 <- seq(to=x_ncol, by=1L, length.out=n2)
 
-    ans1 <- format(as.matrix(x[ , idx1, drop=FALSE]))
-    ans2 <- format(as.matrix(x[ , idx2, drop=FALSE]))
+    ans1 <- .format_as_character_matrix(x[ , idx1, drop=FALSE], justify)
+    ans2 <- .format_as_character_matrix(x[ , idx2, drop=FALSE], justify)
     dots <- rep.int(".", nrow(ans1))
     ans <- cbind(ans1, matrix(dots, ncol=1L), ans2)
 
-    colnames(ans) <- .split_colnames(x_colnames, idx1, idx2)
+    colnames(ans) <- .split_colnames(x_colnames, idx1, idx2, justify)
     ans
 }
 
-.split_2D_array_data <- function(x, m1, m2, n1, n2)
+.split_2D_array_data <- function(x, m1, m2, n1, n2, justify)
 {
     x_ncol <- ncol(x)
     x_colnames <- colnames(x)
@@ -142,46 +168,48 @@
 
     x1 <- x[ , idx1, drop=FALSE]
     x2 <- x[ , idx2, drop=FALSE]
-    ans1 <- .rsplit_2D_array_data(x1, m1, m2)
-    ans2 <- .rsplit_2D_array_data(x2, m1, m2)
+    ans1 <- .rsplit_2D_array_data(x1, m1, m2, justify)
+    ans2 <- .rsplit_2D_array_data(x2, m1, m2, justify)
     dots <- rep.int(".", nrow(ans1))
     ans <- cbind(ans1, matrix(dots, ncol=1L), ans2)
 
-    colnames(ans) <- .split_colnames(x_colnames, idx1, idx2)
+    colnames(ans) <- .split_colnames(x_colnames, idx1, idx2, justify)
     ans
 }
 
-.prepare_2D_array_sample <- function(x, m1, m2, n1, n2)
+.prepare_2D_array_sample <- function(x, m1, m2, n1, n2, justify)
 {
     x_nrow <- nrow(x)
     x_ncol <- ncol(x)
     if (x_nrow <= m1 + m2 + 1L) {
         if (x_ncol <= n1 + n2 + 1L) {
-            ans <- format(as.matrix(x))
+            ans <- .format_as_character_matrix(x, justify)
             ## Only needed because of this bug in base::print.default:
             ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
             ## TODO: Remove when the bug is fixed.
             if (is.null(colnames(ans))) {
                 idx1 <- seq_len(ncol(ans))
                 idx2 <- integer(0)
-                colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
+                colnames(ans) <- .split_colnames(NULL, idx1, idx2,
+                                                 justify)[idx1]
             }
         } else {
-            ans <- .csplit_2D_array_data(x, n1, n2)
+            ans <- .csplit_2D_array_data(x, n1, n2, justify)
         }
     } else {
         if (x_ncol <= n1 + n2 + 1L) {
-            ans <- .rsplit_2D_array_data(x, m1, m2)
+            ans <- .rsplit_2D_array_data(x, m1, m2, justify)
             ## Only needed because of this bug in base::print.default:
             ##   https://stat.ethz.ch/pipermail/r-devel/2016-March/072479.html
             ## TODO: Remove when the bug is fixed.
             if (is.null(colnames(ans))) {
                 idx1 <- seq_len(ncol(ans))
                 idx2 <- integer(0)
-                colnames(ans) <- .split_colnames(NULL, idx1, idx2)[idx1]
+                colnames(ans) <- .split_colnames(NULL, idx1, idx2,
+                                                 justify)[idx1]
             }
         } else {
-            ans <- .split_2D_array_data(x, m1, m2, n1, n2)
+            ans <- .split_2D_array_data(x, m1, m2, n1, n2, justify)
         }
     }
     ans
@@ -190,9 +218,10 @@
 .print_2D_array_data <- function(x, m1, m2, n1, n2)
 {
     stopifnot(length(dim(x)) == 2L)
-    out <- .prepare_2D_array_sample(x, m1, m2, n1, n2)
-    quote <- type(x) == "character"
-    print(out, quote=quote, right=TRUE, max=length(out))
+    right <- type(x) != "character"
+    justify <- if (right) "right" else "left"
+    out <- .prepare_2D_array_sample(x, m1, m2, n1, n2, justify)
+    print(out, quote=FALSE, right=right, max=length(out))
 }
 
 
