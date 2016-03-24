@@ -6,6 +6,9 @@
 
 % DelayedArray utils
 
+\alias{dim,ConformableArrayCombiner-method}
+\alias{dimnames,ConformableArrayCombiner-method}
+
 \alias{+,DelayedArray,missing-method}
 \alias{-,DelayedArray,missing-method}
 
