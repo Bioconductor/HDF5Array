@@ -111,6 +111,22 @@
 }
 
 \examples{
+library(rhdf5)
+toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
+h5ls(toy_h5)
+
+M1 <- HDF5Array(toy_h5, "M1")
+range(M1)
+M1 >= 0.5 & M1 < 0.75
+log(M1)
+
+M2 <- HDF5Array(toy_h5, "M2")
+pmax2(M2, 0)
+
+M <- rbind(M1, t(M2))
+M
+colMeans(M)
+
 ## Matrix multiplication writes a new HDF5 dataset to disk and returns
 ## an HDF5Matrix object that points to this new dataset.
 m <- matrix(runif(60), ncol=12)

@@ -152,10 +152,13 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
 HDF5Dataset <- function(file, name, type=NA)
 {
-    if (!missing(name))
+    if (is.character(file))
         return(.new_HDF5Dataset_from_file(file, name, type=type))
-    if (!identical(type, NA))
-        warning("ignoring supplied 'type'")
+    if (!(is(file, "DelayedArray") || is.array(file)))
+        stop(wmsg("cannot create an HDF5Dataset object from this object"))
+    if (!(missing(name) && identical(type, NA)))
+        stop(wmsg("'name' or 'type' cannot be specified when calling ",
+                  "HDF5Dataset() on a DelayedArray or array object"))
     if (is(file, "DelayedArray"))
         return(.new_HDF5Dataset_from_DelayedArray(file))
     .new_HDF5Dataset_from_array(file)

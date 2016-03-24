@@ -31,11 +31,11 @@
   We provide 2 classes for representing an (on-disk) HDF5 dataset as an
   array-like object in R:
   \itemize{
-    \item High-level class HDF5Array that extends \link{DelayedArray}.
-          All the operations available on \link{DelayedArray} objects work
-          on HDF5Array objects.
+    \item HDF5Array: A high-level class HDF5Array that extends
+          \link{DelayedArray}. All the operations available on
+          \link{DelayedArray} objects work on HDF5Array objects.
 
-    \item Low-level class HDF5Dataset for pointing to an HDF5 dataset. No
+    \item HDF5Dataset: A low-level class for pointing to an HDF5 dataset. No
           operation can be performed directly on an HDF5Dataset object. It
           needs to be wrapped in a \link{DelayedArray} or HDF5Array object
           first. An HDF5Array object is just an HDF5Dataset object wrapped
