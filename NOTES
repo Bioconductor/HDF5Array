@@ -2,16 +2,31 @@
 ## in the vignette? As a separate vignette? As a man page? Probably the former.
 
 
-## Introduction
-## ------------
+## The problem
+## ===========
+##
 ## When trying to create a SummarizedExperiment object with big dimensions it's
-## critical to use a memory-efficient container for the assay data. The options
-## that are currently available for this are: DataFrame of Rle's, sparse
-## matrix. Other options that might become available in the future: on-disk
-## data container (e.g. HDF5Matrix, currently in development), Rle matrix (not
-## available yet). Each container has its strengths and weaknesses and which
-## one to use exactly depends on several factors.
+## critical to use a memory-efficient container for the assay data. Depending
+## on the nature of the data, in-memory containers that compress the data (e.g.
+## a DataFrame of Rle's or a sparse matrix from the Matrix package) might help
+## to a certain extent. However, even after compression some data might remain
+## too big to fit in memory. In that case, one solution is to split the
+## SummarizedExperiment object in smaller objects, then process the smaller
+## objects separately, and finally combine the results. A disadvantage of this
+## approach is that the split/process/combine mechanism is the responsibility
+## of the SummarizedExperiment-based application so it makes the development of
+## such applications more complicated. Having the assay data stored in an
+## on-disk container like HDF5Matrix should greatly simplify this: the goal is
+## to make it possible for the end-user to manipulate the big
+## SummarizedExperiment object as a whole and have the split/process/combine
+## mechanism automatically and transparently happen behind the scene .
 
+## Comparison of assay data containers
+## ===================================
+##
+## Each container has its strengths and weaknesses and which one to use exactly
+## depends on several factors.
+##
 ## DataFrame of Rle's
 ## ------------------
 ## Works great for coverage data. See ?GPos in GenomicRanges for an example.
@@ -33,7 +48,7 @@ object.size(Matrix(assay(airway), sparse=TRUE))
 
 ### -------------------------------------------------------------------------
 
-
+### TODO: Get rid of this or move it somewhere else.
 ### A lower-level version of h5vc::getSampleData() that doesn't mangle the
 ### data.
 get_attrs <- function(filename, group)
