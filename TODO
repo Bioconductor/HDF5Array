@@ -1,5 +1,7 @@
 
-- Complete man pages.
+- Add more examples to the man pages (using the toy dataset).
+
+- Add unit tests for rbind() and cbind().
 
 - Add vignette.
 
@@ -12,6 +14,8 @@
   would need to be modified to also write the dimnames to the HDF5 file.
 
 - Support more matrix- and array-like operations.
+
+- How well supported are DelayedArray of type "character"?
 
 - Add more unit tests.
 
