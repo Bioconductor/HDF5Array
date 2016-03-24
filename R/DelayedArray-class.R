@@ -5,32 +5,25 @@
 
 setClass("DelayedArray",
     representation(
-        seeds="list",              # List of n conformable array-like objects.
-                                   # Each object is expected to satisfy the
-                                   # "seed contract" i.e. to support dim(),
-                                   # dimnames(), and subset_seed_as_array().
+        seed="ANY",              # An array-like object expected to satisfy
+                                 # the "seed contract" i.e. to support dim(),
+                                 # dimnames(), and subset_seed_as_array().
 
-        index="list",              # List of (possibly named) integer vectors,
-                                   # one per seed dimension.
+        index="list",            # List of (possibly named) integer vectors,
+                                 # one per seed dimension.
 
-        subindex="integer",        # The seed dimensions to keep.
+        subindex="integer",      # The seed dimensions to keep.
 
-        COMBINING_OP="character",  # n-ary operator to combine the seeds
-                                   # after they all went thru
-                                   # subset_seed_as_array(seed, index).
-        Rargs="list",
+        delayed_ops="list",      # List of delayed operations. See below
+                                 # for the details.
 
-        delayed_ops="list",        # List of delayed operations. See below
-                                   # for the details.
-
-        is_transposed="logical"    # Is the object considered to be transposed
-                                   # with respect to the seeds?
+        is_transposed="logical"  # Is the object considered to be transposed
+                                 # with respect to the seed?
     ),
     prototype(
-        seeds=list(new("array")),
+        seed=new("array"),
         index=list(integer(0)),
         subindex=1L,
-        COMBINING_OP="identity",
         is_transposed=FALSE
     )
 )
@@ -40,7 +33,7 @@ setClass("DelayedArray",
 setClass("DelayedMatrix",
     contains=c("DelayedArray", "DataTable"),
     prototype=prototype(
-        seeds=list(new("matrix")),
+        seed=new("matrix"),
         index=list(integer(0), integer(0)),
         subindex=1:2
     )
@@ -62,51 +55,26 @@ setMethod("matrixClass", "DelayedArray", function(x) "DelayedMatrix")
 ### Validity
 ###
 
-.objects_are_conformable_arrays <- function(objects)
-{
-    dims <- lapply(objects, dim)
-    ndims <- lengths(dims)
-    first_ndim <- ndims[[1L]]
-    if (!all(ndims == first_ndim))
-        return(FALSE)
-    tmp <- unlist(dims, use.names=FALSE)
-    if (is.null(tmp))
-        return(FALSE)
-    dims <- matrix(tmp, nrow=first_ndim)
-    first_dim <- dims[ , 1L]
-    all(dims == first_dim)
-}
-
 .validate_DelayedArray <- function(x)
 {
-    ## 'seeds' slot.
-    if (length(x@seeds) == 0L)
-        return(wmsg("'x@seeds' cannot be empty"))
-    if (!.objects_are_conformable_arrays(x@seeds))
-        return(wmsg("'x@seeds' must be a list of conformable ",
-                    "array-like objects"))
+    x_ndim <- length(dim(x@seed))
+    ## 'seed' slot.
+    if (x_ndim == 0L)
+        return(wmsg("'x@seed' must have dimensions"))
     ## 'index' slot.
-    index_len <- length(x@index)
-    if (index_len != length(dim(x@seeds[[1L]])))
+    if (length(x@index) != x_ndim)
         return(wmsg("'x@index' must have one element per dimension ",
-                    "in 'x@seeds[[1L]]'"))
+                    "in 'x@seed'"))
     ## 'subindex' slot.
     if (length(x@subindex) == 0L)
         return(wmsg("'x@subindex' cannot be empty"))
-    if (S4Vectors:::anyMissingOrOutside(x@subindex, 1L, index_len))
+    if (S4Vectors:::anyMissingOrOutside(x@subindex, 1L, x_ndim))
         return(wmsg("all values in 'x@subindex' must be >= 1 ",
                     "and <= 'length(x@index)'"))
     if (!isStrictlySorted(x@subindex))
         return(wmsg("'x@subindex' must be strictly sorted"))
     if (!all(lengths(x@index)[-x@subindex] == 1L))
         return(wmsg("all the dropped dimensions in 'x' must be equal to 1"))
-    ## 'COMBINING_OP' slot.
-    if (!isSingleString(x@COMBINING_OP))
-        return(wmsg("'x@COMBINING_OP' must be a single string"))
-    OP <- try(match.fun(x@COMBINING_OP), silent=TRUE)
-    if (is(OP, "try-error"))
-        return(wmsg("the name in 'x@COMBINING_OP' (\"", x@COMBINING_OP,
-                    "\") must refer to a known function"))
     ## 'is_transposed' slot.
     if (!isTRUEorFALSE(x@is_transposed))
         return(wmsg("'x@is_transposed' must be TRUE or FALSE"))
@@ -131,25 +99,21 @@ setValidity2("DelayedMatrix", .validate_DelayedMatrix)
 ### Constructor
 ###
 
-### Internal constructor.
-new_DelayedArray <- function(a=new("array"),
-                             ..., COMBINING_OP="identity", Rargs=list(),
-                             Class="DelayedArray")
+### For internal use only.
+new_DelayedArray <- function(a=new("array"), Class="DelayedArray")
 {
     ans_dim <- dim(a)
     if (length(ans_dim) == 2L)
         Class <- matrixClass(new(Class))
-    seeds <- list(a, ...)
     ans_dimnames <- dimnames(a)
-    ## If there is only 1 seed and it has dimnames, then we propagate them.
-    if (length(seeds) == 1L && !is.null(ans_dimnames)) {
+    ## If 'a' has dimnames, then we propagate them.
+    if (is.null(ans_dimnames)) {
+        index <- lapply(ans_dim, seq_len)
+    } else {
         index <- mapply(function(d, dn) setNames(seq_len(d), dn),
                         ans_dim, ans_dimnames, SIMPLIFY=FALSE)
-    } else {
-        index <- lapply(ans_dim, seq_len)
     }
-    new2(Class, seeds=seeds, index=index, subindex=seq_along(index),
-                COMBINING_OP=COMBINING_OP, Rargs=Rargs)
+    new2(Class, seed=a, index=index, subindex=seq_along(index))
 }
 
 DelayedArray <- function(x) new_DelayedArray(x)
@@ -160,19 +124,16 @@ DelayedArray <- function(x) new_DelayedArray(x)
 ###
 ### A pristine DelayedArray object is an object that does not carry any
 ### delayed operation on it. In other words, it's in sync with (i.e. reflects
-### the true content of) its unique seed.
+### the content of) its seed.
 ###
 
 ### Note that false negatives happen when 'x' carries delayed operations that
 ### do nothing, but that's ok.
 is_pristine <- function(x)
 {
-    if (length(x@seeds) != 1L)
-        return(FALSE)
     ## 'x' should not carry any delayed operation on it, that is, all the
     ## DelayedArray slots must be in their original state.
-    x2 <- new_DelayedArray(x@seeds[[1L]])
-    dimnames(x) <- NULL
+    x2 <- new_DelayedArray(x@seed)
     class(x) <- class(x2) <- "DelayedArray"
     identical(x, x2)
 }
@@ -350,12 +311,10 @@ setMethod("dimnames", "DelayedArray", .get_DelayedArray_dimnames)
             next
         names(x_index[[N]]) <- value[[n]]
     }
-    if (!identical(x@index, x_index))
-        x@index <- x_index  # Don't downgrade_to_DelayedArray_or_DelayedMatrix!
-                            # The dimnames are not coming from the seeds at
-                            # the moment (but they will when we learn how to
-                            # store them in an HDF5 dataset) so altering the
-                            # dimnames is not considered a delayed operation.
+    if (!identical(x@index, x_index)) {
+        x <- downgrade_to_DelayedArray_or_DelayedMatrix(x)
+        x@index <- x_index
+    }
     x
 }
 
@@ -665,15 +624,9 @@ setMethod("t", "DelayedArray",
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    dim_before_transpose <- .get_DelayedArray_dim_before_transpose(x)
-    arrays <- lapply(x@seeds,
-        function(seed) {
-            a <- subset_seed_as_array(seed, x@index)
-            dim(a) <- dim_before_transpose
-            a
-        })
-    ans <- do.call(x@COMBINING_OP, c(arrays, x@Rargs))
-    ans <- .execute_delayed_ops(ans, x@delayed_ops)
+    a <- subset_seed_as_array(x@seed, x@index)
+    dim(a) <- .get_DelayedArray_dim_before_transpose(x)
+    ans <- .execute_delayed_ops(a, x@delayed_ops)
     dimnames(ans) <- .get_DelayedArray_dimnames_before_transpose(x)
     if (drop)
         ans <- .reduce_array_dimensions(ans)

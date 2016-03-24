@@ -187,10 +187,10 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 
 .validate_HDF5Array <- function(x)
 {
+    if (!is(x@seed, "HDF5Dataset"))
+        return(wmsg("'x@seed' must be a HDF5Dataset object"))
     if (!is_pristine(x))
         return(wmsg("'x' carries delayed operations on it"))
-    if (!is(x@seeds[[1L]], "HDF5Dataset"))
-        return(wmsg("'x@seeds' must be a HDF5Dataset object"))
     TRUE
 }
 

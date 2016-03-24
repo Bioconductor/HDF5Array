@@ -6,9 +6,6 @@
 
 % DelayedArray utils
 
-\alias{is.na,DelayedArray-method}
-\alias{!,DelayedArray-method}
-
 \alias{+,DelayedArray,missing-method}
 \alias{-,DelayedArray,missing-method}
 
@@ -22,6 +19,9 @@
 \alias{pmin2,vector,DelayedArray-method}
 \alias{pmax2,DelayedArray,DelayedArray-method}
 \alias{pmin2,DelayedArray,DelayedArray-method}
+
+\alias{is.na,DelayedArray-method}
+\alias{!,DelayedArray-method}
 
 \alias{anyNA,DelayedArray-method}
 
@@ -67,11 +67,11 @@
 
   Delayed operations:
   \itemize{
-    \item \code{is.na}, \code{!}
     \item all the members of the \code{\link[methods]{Ops}} and
           \code{\link[methods]{Math}} groups
+    \item \code{is.na}, \code{!}
     \item \code{pmax2} and \code{pmin2}
-    \item \code{rbind} and \code{cbind} [\link{DelayedMatrix} objects only]
+    \item \code{cbind} and \code{rbind} [\link{DelayedMatrix} objects only]
   }
 
   Block-processed operations:

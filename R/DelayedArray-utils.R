@@ -4,17 +4,101 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Various unary operators + the "Math" group generic
+### ConformableArrayCombiner objects
 ###
-### All these operations return a DelayedArray object of the same dimensions
-### as 'x'.
+### This class is for internal use only and is not exported.
 ###
 
-setMethod("is.na", "DelayedArray", function(x) register_delayed_op(x, "is.na"))
+setClass("ConformableArrayCombiner",
+    representation(
+        seeds="list",              # List of n conformable array-like objects
+                                   # to combine. Each object is expected to
+                                   # satisfy the "seed contract" i.e. to
+                                   # support dim(), dimnames(), and
+                                   # subset_seed_as_array().
 
-setMethod("!", "DelayedArray", function(x) register_delayed_op(x, "!"))
+        COMBINING_OP="character",  # n-ary operator to combine the seeds.
 
-setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
+        Rargs="list"               # Additional arguments to the n-ary
+                                   # operator. Currently unused.
+    ),
+    prototype(
+        seeds=list(new("array")),
+        COMBINING_OP="identity"
+    )
+)
+
+.objects_are_conformable_arrays <- function(objects)
+{
+    dims <- lapply(objects, dim)
+    ndims <- lengths(dims)
+    first_ndim <- ndims[[1L]]
+    if (!all(ndims == first_ndim))
+        return(FALSE)
+    tmp <- unlist(dims, use.names=FALSE)
+    if (is.null(tmp))
+        return(FALSE)
+    dims <- matrix(tmp, nrow=first_ndim)
+    first_dim <- dims[ , 1L]
+    all(dims == first_dim)
+}
+
+.validate_ConformableArrayCombiner <- function(x)
+{
+    ## 'seeds' slot.
+    if (length(x@seeds) == 0L)
+        return(wmsg("'x@seeds' cannot be empty"))
+    if (!.objects_are_conformable_arrays(x@seeds))
+        return(wmsg("'x@seeds' must be a list of conformable ",
+                    "array-like objects"))
+    ## 'COMBINING_OP' slot.
+    if (!isSingleString(x@COMBINING_OP))
+        return(wmsg("'x@COMBINING_OP' must be a single string"))
+    OP <- try(match.fun(x@COMBINING_OP), silent=TRUE)
+    if (is(OP, "try-error"))
+        return(wmsg("the name in 'x@COMBINING_OP' (\"", x@COMBINING_OP,
+                    "\") must refer to a known n-ary operator"))
+    TRUE
+}
+
+setValidity2("ConformableArrayCombiner", .validate_ConformableArrayCombiner)
+
+.new_ConformableArrayCombiner <- function(a=new("array"), ...,
+                                          COMBINING_OP="identity",
+                                          Rargs=list())
+{
+    new2("ConformableArrayCombiner", seeds=unname(list(a, ...)),
+                                     COMBINING_OP=COMBINING_OP,
+                                     Rargs=Rargs)
+}
+
+### Implement the "seed contract" i.e. dim(), dimnames(), and
+### subset_seed_as_array().
+
+.get_ConformableArrayCombiner_dim <- function(x) dim(x@seeds[[1L]])
+
+setMethod("dim", "ConformableArrayCombiner",
+    .get_ConformableArrayCombiner_dim
+)
+
+.get_ConformableArrayCombiner_dimnames <- function(x)
+{
+    combine_dimnames(x@seeds)
+}
+
+setMethod("dimnames", "ConformableArrayCombiner",
+    .get_ConformableArrayCombiner_dimnames
+)
+
+.subset_ConformableArrayCombiner_as_array <- function(seed, index)
+{
+    arrays <- lapply(seed@seeds, subset_seed_as_array, index)
+    do.call(seed@COMBINING_OP, c(arrays, seed@Rargs))
+}
+
+setMethod("subset_seed_as_array", "ConformableArrayCombiner",
+    .subset_ConformableArrayCombiner_as_array
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -81,32 +165,12 @@ setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e2@is_transposed)
 }
 
-### TODO: Compare with semantic of combine_dimnames() defined in R/utils.R
-### and use the latter if semantic agrees.
-.combine_dimnames <- function(e1, e2)
-{
-    ans_rownames <- rownames(e1)
-    if (is.null(ans_rownames))
-        ans_rownames <- rownames(e2)
-    ans_colnames <- colnames(e1)
-    if (is.null(ans_colnames))
-        ans_colnames <- colnames(e2)
-    if (is.null(ans_rownames) && is.null(ans_colnames)) {
-        ans_dimnames <- NULL
-    } else {
-        ans_dimnames <- list(ans_rownames, ans_colnames)
-    }
-    ans_dimnames
-}
-
 ### Return a DelayedArray object of the same dimensions as 'e1' and 'e2'.
 .DelayedArray_Ops_COMBINE_seeds <- function(.Generic, e1, e2)
 {
     if (!identical(dim(e1), dim(e2)))
         stop("non-conformable arrays")
-    ans <- new_DelayedArray(e1, e2, COMBINING_OP=.Generic)
-    dimnames(ans) <- .combine_dimnames(e1, e2)
-    ans
+    DelayedArray(.new_ConformableArrayCombiner(e1, e2, COMBINING_OP=.Generic))
 }
 
 .DelayedArray_Ops <- function(.Generic, e1, e2)
@@ -197,7 +261,7 @@ setMethod("pmax2", c("ANY", "ANY"),
             names(ans) <- .combine_names(e1, e2)
         } else {
             dim(ans) <- ans_dim
-            dimnames(ans) <- .combine_dimnames(e1, e2)
+            dimnames(ans) <- combine_dimnames(e1, e2)
         }
         ans
     }
@@ -212,7 +276,7 @@ setMethod("pmin2", c("ANY", "ANY"),
             names(ans) <- .combine_names(e1, e2)
         } else {
             dim(ans) <- ans_dim
-            dimnames(ans) <- .combine_dimnames(e1, e2)
+            dimnames(ans) <- combine_dimnames(e1, e2)
         }
         ans
     }
@@ -232,6 +296,20 @@ for (.Generic in c("pmax2", "pmin2")) {
             .DelayedArray_Ops(.Generic, e1, e2)
     )
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Various unary operators + the "Math" group generic
+###
+### All these operations return a DelayedArray object of the same dimensions
+### as 'x'.
+###
+
+setMethod("is.na", "DelayedArray", function(x) register_delayed_op(x, "is.na"))
+
+setMethod("!", "DelayedArray", function(x) register_delayed_op(x, "!"))
+
+setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

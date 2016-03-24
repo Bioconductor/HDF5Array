@@ -7,7 +7,9 @@
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### RowBinder and ColBinder objects
 ###
-
+### These classes are for internal use only and are not exported.
+###
+ 
 setClass("MatrixBinder",
     representation(
         "VIRTUAL",
@@ -68,13 +70,16 @@ setValidity2("ColBinder", .validate_ColBinder)
 
 .new_RowBinder <- function(m=new("matrix"), ...)
 {
-    new2("RowBinder", seeds=unlist(list(m, ...)))
+    new2("RowBinder", seeds=unname(list(m, ...)))
 }
 
 .new_ColBinder <- function(m=new("matrix"), ...)
 {
-    new2("ColBinder", seeds=unlist(list(m, ...)), check=FALSE)
+    new2("ColBinder", seeds=unname(list(m, ...)))
 }
+
+### Implement the "seed contract" i.e. dim(), dimnames(), and
+### subset_seed_as_array().
 
 .get_matrices_dims <- function(matrices)
 {
@@ -102,12 +107,12 @@ setMethod("dim", "ColBinder", .get_ColBinder_dim)
 
 .get_RowBinder_dimnames <- function(x)
 {
-    combine_dimnames(x@seeds, .get_matrices_dims(x@seeds), 1L)
+    combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 1L)
 }
 
 .get_ColBinder_dimnames <- function(x)
 {
-    combine_dimnames(x@seeds, .get_matrices_dims(x@seeds), 2L)
+    combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 2L)
 }
 
 setMethod("dimnames", "RowBinder", .get_RowBinder_dimnames)

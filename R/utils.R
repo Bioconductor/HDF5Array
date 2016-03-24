@@ -10,7 +10,7 @@
 ### Translate an index into the whole to an index into the parts
 ###
 ### This is .rowidx2rowkeys() from BSgenome/R/OnDiskLongTable-class.R, copied
-### and renamed here get_part_index() !
+### here and renamed get_part_index() !
 ### TODO: Put it somewhere else where it can be shared.
 ###
 
@@ -59,12 +59,10 @@ get_rev_index <- function(part_index)
 ### Combine the dimnames of a list of array-like objects
 ###
 
-### Copied from SummarizedExperiment/R/utils.R !
-### TODO: Put it somewhere else where it can be shared.
-combine_dimnames <- function(objects, dims, along)
+### Assume the arrays in 'objects' are conformable.
+combine_dimnames <- function(objects)
 {
-    ndim <- nrow(dims)
-    dimnames <- lapply(seq_len(ndim),
+    lapply(seq_along(dim(objects[[1L]])),
         function(n) {
             for (x in objects) {
                 dn <- dimnames(x)[[n]]
@@ -73,6 +71,15 @@ combine_dimnames <- function(objects, dims, along)
             }
             NULL
         })
+}
+
+### Combine the dimnames the rbind/cbind way.
+### This is combine_dimnames() from SummarizedExperiment/R/utils.R, copied
+### here and renamed combine_dimnames_along() !
+### TODO: Put it somewhere else where it can be shared.
+combine_dimnames_along <- function(objects, dims, along)
+{
+    dimnames <- combine_dimnames(objects)
     along_names <- lapply(objects, function(x) dimnames(x)[[along]])
     along_names_lens <- lengths(along_names)
     if (any(along_names_lens != 0L)) {
