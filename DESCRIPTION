@@ -20,10 +20,12 @@ Suggests: h5vcData, SummarizedExperiment, GenomicRanges, genefilter,
 VignetteBuilder: knitr
 License: Artistic-2.0
 Collate:
+	utils.R
 	setHDF5OutputFile.R
 	block_processing.R
 	show-utils.R
 	DelayedArray-class.R
+	DelayedMatrix-cbind.R
 	DelayedArray-utils.R
 	DelayedMatrix-utils.R
 	HDF5Array-class.R

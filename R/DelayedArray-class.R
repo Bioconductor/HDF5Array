@@ -6,15 +6,23 @@
 setClass("DelayedArray",
     representation(
         seeds="list",              # List of n conformable array-like objects.
+                                   # Each object is expected to satisfy the
+                                   # "seed contract" i.e. to support dim(),
+                                   # dimnames(), and subset_seed_as_array().
+
         index="list",              # List of (possibly named) integer vectors,
                                    # one per seed dimension.
+
         subindex="integer",        # The seed dimensions to keep.
+
         COMBINING_OP="character",  # n-ary operator to combine the seeds
                                    # after they all went thru
                                    # subset_seed_as_array(seed, index).
         Rargs="list",
+
         delayed_ops="list",        # List of delayed operations. See below
                                    # for the details.
+
         is_transposed="logical"    # Is the object considered to be transposed
                                    # with respect to the seeds?
     ),

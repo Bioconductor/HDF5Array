@@ -81,6 +81,8 @@ setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
                                       recycle_along_last_dim=e2@is_transposed)
 }
 
+### TODO: Compare with semantic of combine_dimnames() defined in R/utils.R
+### and use the latter if semantic agrees.
 .combine_dimnames <- function(e1, e2)
 {
     ans_rownames <- rownames(e1)

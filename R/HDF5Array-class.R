@@ -33,17 +33,17 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 ### subset_seed_as_array()
 ###
 
-setMethod("subset_seed_as_array", "HDF5Dataset",
-    function(seed, index)
-    {
-        if (any(lengths(index) == 0L)) {
-            ans <- seed@first_val[0]
-        } else {
-            ans <- .quiet_h5read(seed@file, seed@name, index)
-        }
-        ans
+.subset_HDF5Dataset_as_array <- function(seed, index)
+{
+    if (any(lengths(index) == 0L)) {
+        ans <- seed@first_val[0]
+    } else {
+        ans <- .quiet_h5read(seed@file, seed@name, index)
     }
-)
+    ans
+}
+
+setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

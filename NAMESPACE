@@ -68,6 +68,9 @@ exportMethods(
     ## Methods for generics defined in the methods package:
     coerce, show,
 
+    ## Methods for generics defined in the BiocGenerics package:
+    cbind, rbind,
+
     ## Methods for generics defined in the S4Vectors package:
     isEmpty
 )
