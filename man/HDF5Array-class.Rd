@@ -76,8 +76,8 @@ HDF5Dataset(file, name, type=NA)
   \code{file} argument above).
 
   When used to create a new HDF5 dataset, the location where to write the
-  dataset can be controlled with the \code{\link{setHDF5OutputFile}} and
-  \code{\link{setHDF5OutputName}} utility functions.
+  dataset can be controlled with the \code{\link{setHDF5DumpFile}} and
+  \code{\link{setHDF5DumpName}} utility functions.
 }
 
 \value{
@@ -93,7 +93,7 @@ HDF5Dataset(file, name, type=NA)
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
-    \item \link{setHDF5OutputFile} to control the location of the new
+    \item \link{setHDF5DumpFile} to control the location of the new
           HDF5 datasets created by \code{HDF5Array} and \code{HDF5Dataset}.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.

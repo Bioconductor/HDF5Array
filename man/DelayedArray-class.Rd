@@ -101,7 +101,7 @@ DelayedArray(x)  # constructor function
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
-    \item \link{setHDF5OutputFile} to control the location of automatically
+    \item \link{setHDF5DumpFile} to control the location of automatically
           created HDF5 datasets.
 
     \item \link{HDF5Array} objects.

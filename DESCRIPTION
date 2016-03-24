@@ -21,7 +21,7 @@ VignetteBuilder: knitr
 License: Artistic-2.0
 Collate:
 	utils.R
-	setHDF5OutputFile.R
+	setHDF5DumpFile.R
 	block_processing.R
 	show-utils.R
 	DelayedArray-class.R

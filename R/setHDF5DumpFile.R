@@ -4,10 +4,10 @@
 ###
 
 
-.HDF5_output_settings_envir <- new.env(hash=TRUE, parent=emptyenv())
+.HDF5_dump_settings_envir <- new.env(hash=TRUE, parent=emptyenv())
 
 ### Called by .onLoad() hook (see zzz.R file).
-setHDF5OutputFile <- function(file=paste0(tempfile(), ".h5"))
+setHDF5DumpFile <- function(file=paste0(tempfile(), ".h5"))
 {
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path ",
@@ -22,27 +22,27 @@ setHDF5OutputFile <- function(file=paste0(tempfile(), ".h5"))
     ## If h5ls() fails (e.g. file exists but is not HDF5), "file" setting must
     ## remain untouched.
     content <- h5ls(file)
-    assign("file", file, envir=.HDF5_output_settings_envir)
+    assign("file", file, envir=.HDF5_dump_settings_envir)
     if (show_content)
         return(content)
     return(invisible(content))
 }
 
-getHDF5OutputFile <- function()
-    get("file", envir=.HDF5_output_settings_envir)
+getHDF5DumpFile <- function()
+    get("file", envir=.HDF5_dump_settings_envir)
 
 ### A convenience wrapper.
-lsHDF5OutputFile <- function() h5ls(getHDF5OutputFile())
+lsHDF5DumpFile <- function() h5ls(getHDF5DumpFile())
 
-assign("auto_inc_ID", 0L, envir=.HDF5_output_settings_envir)
+assign("auto_inc_ID", 0L, envir=.HDF5_dump_settings_envir)
 
-setHDF5OutputName <- function(name)
+setHDF5DumpName <- function(name)
 {
     if (missing(name)) {
-        suppressWarnings(rm(list="name", envir=.HDF5_output_settings_envir))
-        auto_inc_ID <- get("auto_inc_ID", envir=.HDF5_output_settings_envir)
+        suppressWarnings(rm(list="name", envir=.HDF5_dump_settings_envir))
+        auto_inc_ID <- get("auto_inc_ID", envir=.HDF5_dump_settings_envir)
         return(assign("auto_inc_ID", auto_inc_ID + 1L,
-                      envir=.HDF5_output_settings_envir))
+                      envir=.HDF5_dump_settings_envir))
     }
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name of ",
@@ -50,14 +50,14 @@ setHDF5OutputName <- function(name)
                   "HDF5 file"))
     if (name == "")
         stop(wmsg("'name' cannot be the empty string"))
-    assign("name", name, envir=.HDF5_output_settings_envir)
+    assign("name", name, envir=.HDF5_dump_settings_envir)
 }
 
-getHDF5OutputName <- function()
+getHDF5DumpName <- function()
 {
-    name <- try(get("name", envir=.HDF5_output_settings_envir), silent=TRUE)
+    name <- try(get("name", envir=.HDF5_dump_settings_envir), silent=TRUE)
     if (is(name, "try-error")) {
-        auto_inc_ID <- get("auto_inc_ID", envir=.HDF5_output_settings_envir)
+        auto_inc_ID <- get("auto_inc_ID", envir=.HDF5_dump_settings_envir)
         name <- sprintf("/HDF5ArrayDataset%05d", auto_inc_ID)
     }
     name

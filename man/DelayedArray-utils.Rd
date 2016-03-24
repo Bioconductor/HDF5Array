@@ -101,7 +101,7 @@
 
     \item \link{DelayedArray} objects.
 
-    \item \link{setHDF5OutputFile} to control the location of automatically
+    \item \link{setHDF5DumpFile} to control the location of automatically
           created HDF5 datasets.
 
     \item \link{HDF5Array} objects.
@@ -116,11 +116,11 @@
 m <- matrix(runif(60), ncol=12)
 M <- DelayedArray(matrix(runif(240), nrow=12))
 
-getHDF5OutputFile()  # HDF5 file where the new dataset will be written
-lsHDF5OutputFile()
+getHDF5DumpFile()  # HDF5 file where the new dataset will be written
+lsHDF5DumpFile()
 P <- m \%*\% M
 P
-getHDF5OutputFile()
-lsHDF5OutputFile()
+getHDF5DumpFile()
+lsHDF5DumpFile()
 }
 \keyword{methods}

@@ -1,11 +1,11 @@
-\name{setHDF5OutputFile}
+\name{setHDF5DumpFile}
 
-\alias{setHDF5OutputFile}
-\alias{getHDF5OutputFile}
-\alias{lsHDF5OutputFile}
+\alias{setHDF5DumpFile}
+\alias{getHDF5DumpFile}
+\alias{lsHDF5DumpFile}
 
-\alias{setHDF5OutputName}
-\alias{getHDF5OutputName}
+\alias{setHDF5DumpName}
+\alias{getHDF5DumpName}
 
 \title{Control the location of automatically created HDF5 datasets}
 
@@ -15,12 +15,12 @@
 }
 
 \usage{
-setHDF5OutputFile(file=paste0(tempfile(), ".h5"))
-getHDF5OutputFile()
-lsHDF5OutputFile()
+setHDF5DumpFile(file=paste0(tempfile(), ".h5"))
+getHDF5DumpFile()
+lsHDF5DumpFile()
 
-setHDF5OutputName(name)
-getHDF5OutputName()
+setHDF5DumpName(name)
+getHDF5DumpName()
 }
 
 \arguments{
@@ -35,8 +35,8 @@ getHDF5OutputName()
 }
 
 \note{
-  \code{lsHDF5OutputFile()} is a just convenience wrapper for
-  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5OutputFile())}.
+  \code{lsHDF5DumpFile()} is a just convenience wrapper for
+  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
 }
 
 \seealso{
@@ -49,41 +49,41 @@ getHDF5OutputName()
     \item \link{HDF5Array} objects.
 
     \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
-          on which \code{lsHDF5OutputFile} is based.
+          on which \code{lsHDF5DumpFile} is based.
 
   }
 }
 
 \examples{
-getHDF5OutputFile()
+getHDF5DumpFile()
 
-## Use setHDF5OutputFile() to change the current output HDF5 file.
+## Use setHDF5DumpFile() to change the current output HDF5 file.
 ## If the specified file exists, then it must be in HDF5 format or
 ## an error will be raised. If it doesn't exist, then it will be
 ## created.
-#setHDF5OutputFile("path/to/some/HDF5/file")
+#setHDF5DumpFile("path/to/some/HDF5/file")
 
-lsHDF5OutputFile()
+lsHDF5DumpFile()
 
 a <- array(1:600, c(150, 4))
 h5a <- HDF5Dataset(a)
-lsHDF5OutputFile()
+lsHDF5DumpFile()
 A <- HDF5Array(h5a)   # DelayedArray object
 A
 
 b <- array(runif(6000), c(4, 2, 150))
 h5b <- HDF5Dataset(b)
-lsHDF5OutputFile()
+lsHDF5DumpFile()
 B <- HDF5Array(h5b)   # DelayedArray object
 B
 
 C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
 C
 HDF5Dataset(C)        # realize C on disk
-lsHDF5OutputFile()
+lsHDF5DumpFile()
 
 ## Matrix multiplication is not delayed:
 P <- C \%*\% matrix(runif(20), nrow=4)
-lsHDF5OutputFile()
+lsHDF5DumpFile()
 }
 \keyword{methods}

@@ -120,12 +120,12 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
     if (!is.array(a))
         stop("cannot create an HDF5Dataset object from a ", class(a))
 
-    out_file <- getHDF5OutputFile()
-    out_name <- getHDF5OutputName()
+    out_file <- getHDF5DumpFile()
+    out_name <- getHDF5DumpName()
 
     ans_type <- type(a)
     h5createDataset2(out_file, out_name, dim(a), storage.mode=ans_type)
-    on.exit(setHDF5OutputName())
+    on.exit(setHDF5DumpName())
 
     h5write(a, out_file, out_name)
 
@@ -138,12 +138,12 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 ### blocks realized and written to disk one at a time. 
 .new_HDF5Dataset_from_DelayedArray <- function(x)
 {
-    out_file <- getHDF5OutputFile()
-    out_name <- getHDF5OutputName()
+    out_file <- getHDF5DumpFile()
+    out_name <- getHDF5DumpName()
 
     ans_type <- type(x)
     h5createDataset2(out_file, out_name, dim(x), storage.mode=ans_type)
-    on.exit(setHDF5OutputName())
+    on.exit(setHDF5DumpName())
 
     block_APPLY(x, identity, out_file=out_file, out_name=out_name)
 

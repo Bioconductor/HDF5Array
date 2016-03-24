@@ -81,8 +81,8 @@ exportMethods(
 ###
 
 export(
-    setHDF5OutputFile, getHDF5OutputFile, lsHDF5OutputFile,
-    setHDF5OutputName, getHDF5OutputName,
+    setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
+    setHDF5DumpName, getHDF5DumpName,
     DelayedArray,
     HDF5Dataset, HDF5Array
 )
