@@ -7,7 +7,7 @@
 
 
 ### Default block size in bytes.
-DEFAULT_BLOCK_SIZE <- 80000000L  # 80 Mb
+DEFAULT_BLOCK_SIZE <- 4500000L  # 4.5 Mb
 
 ### Atomic type sizes in bytes.
 .TYPE_SIZES <- c(
@@ -21,7 +21,7 @@ DEFAULT_BLOCK_SIZE <- 80000000L  # 80 Mb
     raw=1L
 )
 
-.get_block_length <- function(type)
+get_block_length <- function(type)
 {
     type_size <- .TYPE_SIZES[type]
     idx <- which(is.na(type_size))
@@ -214,7 +214,7 @@ block_APPLY <- function(x, APPLY, ..., if_empty=NULL,
 {
     APPLY <- match.fun(APPLY)
     if (is.null(block_len))
-        block_len <- .get_block_length(type(x))
+        block_len <- get_block_length(type(x))
     blocks <- ArrayBlocks(dim(x), block_len)
     nblock <- length(blocks)
     if (nblock == 0L)
@@ -246,7 +246,7 @@ block_MAPPLY <- function(MAPPLY, ..., if_empty=NULL,
         stop("non-conformable arrays")
     if (is.null(block_len)) {
         types <- unlist(lapply(dots, type))
-        block_len <- min(.get_block_length(types))
+        block_len <- min(get_block_length(types))
     }
     blocks <- ArrayBlocks(x_dim, block_len)
     nblock <- length(blocks)
@@ -279,7 +279,7 @@ block_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init,
     if (!is.null(BREAKIF))
         BREAKIF <- match.fun(BREAKIF)
     if (is.null(block_len))
-        block_len <- .get_block_length(type(x))
+        block_len <- get_block_length(type(x))
     blocks <- ArrayBlocks(dim(x), block_len)
     for (i in seq_along(blocks)) {
         subarray <- extract_array_block2(x, blocks, i)
@@ -310,7 +310,7 @@ colblock_APPLY <- function(x, APPLY, ..., if_empty=NULL,
     APPLY <- match.fun(APPLY)
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
-    block_len <- max(.get_block_length(type(x)), x_dim[[1L]])
+    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
     block_APPLY(x, APPLY, ..., if_empty=if_empty,
                 out_file=out_file, out_name=out_name, block_len=block_len)
 }
@@ -322,7 +322,7 @@ colblock_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init)
         stop("'x' must be a matrix-like object")
     ## We're going to walk along the columns so need to increase the block
     ## length so each block is made of at least one column.
-    block_len <- max(.get_block_length(type(x)), x_dim[[1L]])
+    block_len <- max(get_block_length(type(x)), x_dim[[1L]])
     block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init, block_len=block_len)
 }
 

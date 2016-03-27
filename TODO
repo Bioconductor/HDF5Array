@@ -1,3 +1,9 @@
+- Keep investigating interaction between chunk and block geometries and their
+  impact on block processing performance.
+
+- Add chunk slot to HDF5Dataset objects and populate it with physical chunk
+  geometry at creation time. Emit a warning if chunk genometry won't lead to
+  good block processing performance.
 
 - Add more examples to the man pages (using the toy dataset).
 
