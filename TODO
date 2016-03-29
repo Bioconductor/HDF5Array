@@ -1,23 +1,25 @@
 - Keep investigating interaction between chunk and block geometries and their
   impact on block processing performance.
 
-- Add chunk slot to HDF5Dataset objects and populate it with physical chunk
+- Add 'chunk' slot to HDF5Dataset objects and populate it with physical chunk
   geometry at creation time. Emit a warning if chunk genometry won't lead to
   good block processing performance.
-
-- Add more examples to the man pages (using the toy dataset).
-
-- Add unit tests for rbind() and cbind().
-
-- Add vignette.
-
-- Do some benchmarking (with special attention to memory usage).
 
 - Store the dimnames in the HDF5 file: investigate the possiblity to store the
   dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
   can grab them from there. Operations that write a new HDF5 dataset to disk
   (e.g. matrix multiplication, or HDF5Dataset() when called on a DelayedArray)
   would need to be modified to also write the dimnames to the HDF5 file.
+
+- Add more examples to the man pages (using the toy dataset).
+
+- Add unit tests for rbind() and cbind().
+
+- Add unit tests for round() and signif() (Math2 group).
+
+- Add vignette.
+
+- Do some benchmarking (with special attention to memory usage).
 
 - Support more matrix- and array-like operations.
 

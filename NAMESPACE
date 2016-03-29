@@ -63,6 +63,7 @@ exportMethods(
     anyNA,
     max, min, range, sum, prod, any, all,   # "Summary" group generic
     mean,
+    round, signif,
     rowSums, colSums, rowMeans, colMeans,
 
     ## Methods for generics defined in the methods package:

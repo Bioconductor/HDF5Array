@@ -25,6 +25,8 @@
 
 \alias{is.na,DelayedArray-method}
 \alias{!,DelayedArray-method}
+\alias{round,DelayedArray-method}
+\alias{signif,DelayedArray-method}
 
 \alias{anyNA,DelayedArray-method}
 
@@ -70,8 +72,8 @@
 
   Delayed operations:
   \itemize{
-    \item all the members of the \code{\link[methods]{Ops}} and
-          \code{\link[methods]{Math}} groups
+    \item all the members of the \code{\link[methods]{Ops}},
+          \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups
     \item \code{is.na}, \code{!}
     \item \code{pmax2} and \code{pmin2}
     \item \code{cbind} and \code{rbind} [\link{DelayedMatrix} objects only]
@@ -99,8 +101,8 @@
           corresponding operations.
 
     \item \code{\link[methods]{S4groupGeneric}} in the \pkg{methods} package
-          for the members of the \code{\link[methods]{Ops}} and
-          \code{\link[methods]{Math}} groups.
+          for the members of the \code{\link[methods]{Ops}},
+          \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups.
 
     \item \link{DelayedArray} objects.
 

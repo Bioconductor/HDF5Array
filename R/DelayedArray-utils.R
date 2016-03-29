@@ -130,8 +130,8 @@ setMethod("subset_seed_as_array", "ConformableArrayCombiner",
     if (e1_nrow != 0L) {
         if (e2_len == 0L || e1_nrow %% e2_len != 0L)
             stop(wmsg("length of right object is not a divisor ",
-                      "of number of rows of left object"))
-        e2 <- rep(e2, length.out=nrow(e1))
+                      "of number of rows in left object"))
+        e2 <- rep(e2, length.out=e1_nrow)
     }
     register_delayed_op(e1, .Generic, Rargs=list(e2),
                                       recycle_along_last_dim=e1@is_transposed)
@@ -158,8 +158,8 @@ setMethod("subset_seed_as_array", "ConformableArrayCombiner",
     if (e2_nrow != 0L) {
         if (e1_len == 0L || e2_nrow %% e1_len != 0L)
             stop(wmsg("length of left object is not a divisor ",
-                      "of number of rows of right object"))
-        e1 <- rep(e1, length.out=nrow(e2))
+                      "of number of rows in right object"))
+        e1 <- rep(e1, length.out=e2_nrow)
     }
     register_delayed_op(e2, .Generic, Largs=list(e1),
                                       recycle_along_last_dim=e2@is_transposed)
@@ -299,7 +299,7 @@ for (.Generic in c("pmax2", "pmin2")) {
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Various unary operators + the "Math" group generic
+### Various unary operators + the "Math" and "Math2" groups
 ###
 ### All these operations return a DelayedArray object of the same dimensions
 ### as 'x'.
@@ -310,6 +310,24 @@ setMethod("is.na", "DelayedArray", function(x) register_delayed_op(x, "is.na"))
 setMethod("!", "DelayedArray", function(x) register_delayed_op(x, "!"))
 
 setMethod("Math", "DelayedArray", function(x) register_delayed_op(x, .Generic))
+
+.DelayedArray_Math2 <- function(.Generic, x, digits)
+{
+    stopifnot(is(x, "DelayedArray"))
+    if (!isSingleNumberOrNA(digits))
+        stop(wmsg("'digits' must be a single numeric"))
+    if (!is.integer(digits))
+        digits <- as.integer(digits)
+    register_delayed_op(x, .Generic, Rargs=list(digits=digits))
+}
+
+### Note that round() and signif() don't use the same default for 'digits'.
+setMethod("round", "DelayedArray",
+    function(x, digits=0) .DelayedArray_Math2("round", x, digits)
+)
+setMethod("signif", "DelayedArray",
+    function(x, digits=6) .DelayedArray_Math2("signif", x, digits)
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
