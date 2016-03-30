@@ -97,8 +97,9 @@ getHDF5DumpName <- function()
 .chunk_as_subblock <- function(dims, storage.mode="double", ratio=75L)
 {
     block_len <- get_block_length(storage.mode)
-    chunk_len <- block_len %/% ratio
-    stopifnot(chunk_len * ratio == block_len)
+    chunk_len <- as.integer(ceiling(block_len / ratio))
+    ## 'block_len' must be a multiple of 'chunk_len'.
+    stopifnot(block_len %% chunk_len == 0L)
     chunks <- ArrayBlocks(dims, chunk_len)
     chunk <- chunks@dim
     ndim <- length(chunk)

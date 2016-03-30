@@ -6,7 +6,7 @@ a1 <- array(sample(5L, 150, replace=TRUE), c(5, 10, 3))  # integer array
 a2 <- a1 + runif(150) - 0.5                              # numeric array
 m2 <- matrix(runif(60), ncol=6)                          # numeric matrix
 
-block_sizes1 <- c(12L, 20L, 50L, 10000L)
+block_sizes1 <- c(12L, 20L, 50L, 15000L)
 block_sizes2 <- 2L * block_sizes1
 
 test_DelayedMatrix_delayed_Ops <- function()

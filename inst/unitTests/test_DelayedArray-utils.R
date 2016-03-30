@@ -5,7 +5,7 @@ Logic_members <- c("&", "|")  # currently untested
 a1 <- array(sample(5L, 150, replace=TRUE), c(5, 10, 3))  # integer array
 a2 <- a1 + runif(150) - 0.5                              # numeric array
 
-block_sizes1 <- c(12L, 20L, 50L, 10000L)
+block_sizes1 <- c(12L, 20L, 50L, 15000L)
 block_sizes2 <- 2L * block_sizes1
 
 test_DelayedArray_Math_ans_Arith <- function()
@@ -121,7 +121,6 @@ test_DelayedArray_Ops_COMBINE_seeds <- function()
 test_DelayedArray_anyNA <- function()
 {
     on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
-
     DelayedArray_block_anyNA <- HDF5Array:::.DelayedArray_block_anyNA
 
     A1 <- HDF5Array(a1)
@@ -140,14 +139,14 @@ test_DelayedArray_anyNA <- function()
 
 test_DelayedArray_Summary <- function()
 {
-    on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
-
     test_Summary <- function(.Generic, a, block_sizes) {
+        on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
+        DelayedArray_block_Summary <- HDF5Array:::.DelayedArray_block_Summary
+
         GENERIC <- match.fun(.Generic)
         target1 <- GENERIC(a)
         target2 <- GENERIC(a, na.rm=TRUE)
         A <- HDF5Array(a)
-        DelayedArray_block_Summary <- HDF5Array:::.DelayedArray_block_Summary
         for (block_size in block_sizes) {
             options(HDF5Array.block.size=block_size)
             checkIdentical(target1, GENERIC(A))
