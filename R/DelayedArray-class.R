@@ -9,7 +9,7 @@ setClass("DelayedArray",
                                  # the "seed contract" i.e. to support dim(),
                                  # dimnames(), and subset_seed_as_array().
 
-        index="list",            # List of (possibly named) integer vectors,
+        index="list",            # List (possibly named) of integer vectors,
                                  # one per seed dimension.
 
         subindex="integer",      # The seed dimensions to keep.
@@ -436,7 +436,7 @@ setMethod("[", "DelayedArray", .extract_DelayedArray_subset)
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### subset_seed_as_array()
 ###
-### 'index' is expected to be a list of integer vectors. There is no
+### 'index' is expected to be an unnamed list of integer vectors. There is no
 ### need to support anything else.
 ### Must return an ordinary array. No need to propagate the dimnames.
 ###
@@ -624,7 +624,7 @@ setMethod("t", "DelayedArray",
 {
     if (!isTRUEorFALSE(drop))
         stop("'drop' must be TRUE or FALSE")
-    a <- subset_seed_as_array(x@seed, x@index)
+    a <- subset_seed_as_array(x@seed, unname(x@index))
     dim(a) <- .get_DelayedArray_dim_before_transpose(x)
     ans <- .execute_delayed_ops(a, x@delayed_ops)
     dimnames(ans) <- .get_DelayedArray_dimnames_before_transpose(x)

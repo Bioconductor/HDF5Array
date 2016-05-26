@@ -28,6 +28,9 @@
 \alias{round,DelayedArray-method}
 \alias{signif,DelayedArray-method}
 
+\alias{rbind,DelayedArray-method}
+\alias{cbind,DelayedArray-method}
+
 \alias{anyNA,DelayedArray-method}
 
 \alias{mean.DelayedArray}

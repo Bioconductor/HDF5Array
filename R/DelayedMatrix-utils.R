@@ -25,7 +25,7 @@ setClass("MatrixBinder",
 setClass("RowBinder", contains="MatrixBinder")
 setClass("ColBinder", contains="MatrixBinder")
 
-.objects_are_rbindable_matrices <- function(objects)
+.objects_are_rbindable <- function(objects)
 {
     dims <- lapply(objects, dim)
     ndims <- lengths(dims)
@@ -35,7 +35,7 @@ setClass("ColBinder", contains="MatrixBinder")
     all(ncols == ncols[[1L]])
 }
 
-.objects_are_cbindable_matrices <- function(objects)
+.objects_are_cbindable <- function(objects)
 {
     dims <- lapply(objects, dim)
     ndims <- lengths(dims)
@@ -49,7 +49,7 @@ setClass("ColBinder", contains="MatrixBinder")
 {
     if (length(x@seeds) == 0L)
         return(wmsg("'x@seeds' cannot be empty"))
-    if (!.objects_are_rbindable_matrices(x@seeds))
+    if (!.objects_are_rbindable(x@seeds))
         return(wmsg("'x@seeds' must be a list of matrix-like objects ",
                     "with the same number of columns"))
     TRUE
@@ -59,7 +59,7 @@ setClass("ColBinder", contains="MatrixBinder")
 {
     if (length(x@seeds) == 0L)
         return(wmsg("'x@seeds' cannot be empty"))
-    if (!.objects_are_cbindable_matrices(x@seeds))
+    if (!.objects_are_cbindable(x@seeds))
         return(wmsg("'x@seeds' must be a list of matrix-like objects ",
                     "with the same number of rows"))
     TRUE
@@ -68,15 +68,9 @@ setClass("ColBinder", contains="MatrixBinder")
 setValidity2("RowBinder", .validate_RowBinder)
 setValidity2("ColBinder", .validate_ColBinder)
 
-.new_RowBinder <- function(m=new("matrix"), ...)
-{
-    new2("RowBinder", seeds=unname(list(m, ...)))
-}
+.new_RowBinder <- function(seeds) new2("RowBinder", seeds=seeds)
 
-.new_ColBinder <- function(m=new("matrix"), ...)
-{
-    new2("ColBinder", seeds=unname(list(m, ...)))
-}
+.new_ColBinder <- function(seeds) new2("ColBinder", seeds=seeds)
 
 ### Implement the "seed contract" i.e. dim(), dimnames(), and
 ### subset_seed_as_array().
@@ -159,20 +153,20 @@ setMethod("subset_seed_as_array", "ColBinder",
 
 .DelayedMatrix_rbind <- function(...)
 {
-
-    if (!.objects_are_rbindable_matrices(list(...)))
+    objects <- unname(list(...))
+    if (!.objects_are_rbindable(objects))
         stop(wmsg("can only rbind() matrix-like objects ",
                   "with the same number of columns"))
-    DelayedArray(.new_RowBinder(...))
+    DelayedArray(.new_RowBinder(objects))
 }
 
 .DelayedMatrix_cbind <- function(...)
 {
-
-    if (!.objects_are_cbindable_matrices(list(...)))
+    objects <- unname(list(...))
+    if (!.objects_are_cbindable(objects))
         stop(wmsg("can only cbind() matrix-like objects ",
                   "with the same number of rows"))
-    DelayedArray(.new_ColBinder(...))
+    DelayedArray(.new_ColBinder(objects))
 }
 
 setMethod("rbind", "DelayedMatrix", .DelayedMatrix_rbind)

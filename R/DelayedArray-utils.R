@@ -331,6 +331,38 @@ setMethod("signif", "DelayedArray",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### rbind() and cbind()
+###
+
+.as_DelayedMatrix_objects <- function(objects)
+{
+    lapply(objects,
+        function(object) {
+            if (length(dim(object)) != 2L)
+                stop(wmsg("cbind() and rbind() are not supported on ",
+                          "DelayedArray objects that don't have exactly ",
+                          "2 dimensions"))
+            as(object, "DelayedMatrix")
+        })
+}
+
+.DelayedArray_rbind <- function(...)
+{
+    objects <- .as_DelayedMatrix_objects(list(...))
+    do.call("rbind", objects)
+}
+
+.DelayedArray_cbind <- function(...)
+{
+    objects <- .as_DelayedMatrix_objects(list(...))
+    do.call("cbind", objects)
+}
+
+setMethod("rbind", "DelayedArray", .DelayedArray_rbind)
+setMethod("cbind", "DelayedArray", .DelayedArray_cbind)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### A low-level utility for putting DelayedArray object in a "straight" form
 ###
 ### Untranspose the DelayedArray object and put its rows and columns in their

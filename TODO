@@ -13,8 +13,6 @@
 
 - Add more examples to the man pages (using the toy dataset).
 
-- Add unit tests for rbind() and cbind().
-
 - Add unit tests for round() and signif() (Math2 group).
 
 - Add vignette.
