@@ -28,9 +28,6 @@
 \alias{round,DelayedArray-method}
 \alias{signif,DelayedArray-method}
 
-\alias{rbind,DelayedArray-method}
-\alias{cbind,DelayedArray-method}
-
 \alias{anyNA,DelayedArray-method}
 
 \alias{mean.DelayedArray}
@@ -40,15 +37,6 @@
 \alias{apply,DelayedArray-method}
 
 % DelayedMatrix utils
-
-\alias{dim,RowBinder-method}
-\alias{dim,ColBinder-method}
-\alias{dimnames,RowBinder-method}
-\alias{dimnames,ColBinder-method}
-\alias{rbind}
-\alias{rbind,DelayedMatrix-method}
-\alias{cbind}
-\alias{cbind,DelayedMatrix-method}
 
 \alias{rowSums}
 \alias{rowSums,DelayedMatrix-method}
@@ -79,7 +67,7 @@
           \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups
     \item \code{is.na}, \code{!}
     \item \code{pmax2} and \code{pmin2}
-    \item \code{cbind} and \code{rbind} [\link{DelayedMatrix} objects only]
+    \item \code{rbind} and \code{cbind} (documented in \link[HDF5Array]{cbind})
   }
 
   Block-processed operations:
@@ -98,14 +86,16 @@
 \seealso{
   \itemize{
     \item \code{\link[base]{is.na}}, \code{\link[base]{!}},
-          \code{\link[base]{cbind}}, \code{\link[base]{mean}},
-          \code{\link[base]{apply}}, \code{\link[base]{colSums}},
-          \code{\link[base]{\%*\%}} in the \pkg{base} package for the
-          corresponding operations.
+          \code{\link[base]{mean}}, \code{\link[base]{apply}},
+          \code{\link[base]{colSums}}, \code{\link[base]{\%*\%}} in the
+          \pkg{base} package for the corresponding operations.
 
     \item \code{\link[methods]{S4groupGeneric}} in the \pkg{methods} package
           for the members of the \code{\link[methods]{Ops}},
           \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups.
+
+    \item \link[HDF5Array]{cbind} in this package (\pkg{HDF5Array}) for
+          binding \link{DelayedArray} objects along their rows or columns.
 
     \item \link{DelayedArray} objects.
 

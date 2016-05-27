@@ -101,6 +101,9 @@ DelayedArray(x)  # constructor function
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
+    \item \link[HDF5Array]{cbind} in this package (\pkg{HDF5Array}) for
+          binding DelayedArray objects along their rows or columns.
+
     \item \link{setHDF5DumpFile} to control the location of automatically
           created HDF5 datasets.
 
