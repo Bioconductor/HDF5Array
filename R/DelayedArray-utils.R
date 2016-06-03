@@ -83,7 +83,7 @@ setMethod("dim", "ConformableArrayCombiner",
 
 .get_ConformableArrayCombiner_dimnames <- function(x)
 {
-    combine_dimnames(x@seeds)
+    IRanges:::combine_dimnames(x@seeds)
 }
 
 setMethod("dimnames", "ConformableArrayCombiner",
@@ -261,7 +261,7 @@ setMethod("pmax2", c("ANY", "ANY"),
             names(ans) <- .combine_names(e1, e2)
         } else {
             dim(ans) <- ans_dim
-            dimnames(ans) <- combine_dimnames(list(e1, e2))
+            dimnames(ans) <- IRanges:::combine_dimnames(list(e1, e2))
         }
         ans
     }
@@ -276,7 +276,7 @@ setMethod("pmin2", c("ANY", "ANY"),
             names(ans) <- .combine_names(e1, e2)
         } else {
             dim(ans) <- ans_dim
-            dimnames(ans) <- combine_dimnames(list(e1, e2))
+            dimnames(ans) <- IRanges:::combine_dimnames(list(e1, e2))
         }
         ans
     }

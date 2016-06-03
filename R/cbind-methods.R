@@ -101,12 +101,12 @@ setMethod("dim", "ColBinder", .get_ColBinder_dim)
 
 .get_RowBinder_dimnames <- function(x)
 {
-    combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 1L)
+    IRanges:::combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 1L)
 }
 
 .get_ColBinder_dimnames <- function(x)
 {
-    combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 2L)
+    IRanges:::combine_dimnames_along(x@seeds, .get_matrices_dims(x@seeds), 2L)
 }
 
 setMethod("dimnames", "RowBinder", .get_RowBinder_dimnames)
