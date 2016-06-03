@@ -393,6 +393,20 @@ setMethod("drop", "DelayedArray",
     x
 }
 
+### WARNING: This function uses the ugly "substitute() + eval()" hack! One
+### problem with this hack is that it seems to be causing the following bug:
+###
+###     library(HDF5Array)
+###     toto <- function(a, z) a[ , , z]
+###     a <- array(1:60, c(3, 5, 4))
+###     A <- DelayedArray(a)
+###     toto(a, 4L)
+###     toto(A, 4L)
+###     # Error in eval(expr, envir, enclos) : object 'z' not found
+###
+### This is probably due to the somewhat arbitrary use of
+### 'envir=parent.frame(2L)' in the call to eval().
+### FIXME: The above bug needs to be fixed!
 .extract_DelayedArray_subset <- function(x, i, j, ..., drop=TRUE)
 {
     if (missing(x))
@@ -419,6 +433,7 @@ setMethod("drop", "DelayedArray",
         subscript[[1L]] <- i
     if (!missing(j))
         subscript[[2L]] <- j
+    ## Ugly "substitute() + eval()" hack! See above.
     dots <- substitute(...())  # list of non-evaluated args
     for (n2 in seq_along(dots)) {
         k <- dots[[n2]]

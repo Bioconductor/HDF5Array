@@ -73,7 +73,10 @@ exportMethods(
     cbind, rbind,
 
     ## Methods for generics defined in the S4Vectors package:
-    isEmpty
+    isEmpty,
+
+    ## Methods for generics defined in the IRanges package:
+    arbind, acbind
 )
 
 
