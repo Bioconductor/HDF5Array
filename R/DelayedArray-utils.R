@@ -305,13 +305,20 @@ for (.Generic in c("pmax2", "pmin2")) {
 ### as 'x'.
 ###
 
-.UNARY_OPS <- c("is.na", "is.finite", "is.infinite", "is.nan", "!")
+.UNARY_OPS <- c("is.na", "is.finite", "is.infinite", "is.nan", "!",
+                "tolower", "toupper")
 
 for (.Generic in .UNARY_OPS) {
     setMethod(.Generic, "DelayedArray",
         function(x) register_delayed_op(x, .Generic)
     )
 }
+
+setMethod("nchar", "DelayedArray",
+    function(x, type="chars", allowNA=FALSE, keepNA=NA)
+        register_delayed_op(x, "nchar",
+            Rargs=list(type=type, allowNA=allowNA, keepNA=keepNA))
+)
 
 setMethod("Math", "DelayedArray",
     function(x) register_delayed_op(x, .Generic)

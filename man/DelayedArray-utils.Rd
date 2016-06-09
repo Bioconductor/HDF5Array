@@ -28,6 +28,11 @@
 \alias{is.infinite,DelayedArray-method}
 \alias{is.nan,DelayedArray-method}
 \alias{!,DelayedArray-method}
+
+\alias{nchar,DelayedArray-method}
+\alias{tolower,DelayedArray-method}
+\alias{toupper,DelayedArray-method}
+
 \alias{round,DelayedArray-method}
 \alias{signif,DelayedArray-method}
 
@@ -69,7 +74,8 @@
     \item all the members of the \code{\link[methods]{Ops}},
           \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups
     \item \code{!}
-    \item \code{is.na}, \code{is.finite}, \code{is.infinite}, \code{is.nan},
+    \item \code{is.na}, \code{is.finite}, \code{is.infinite}, \code{is.nan}
+    \item \code{nchar}, \code{tolower}, \code{toupper}
     \item \code{pmax2} and \code{pmin2}
     \item \code{rbind} and \code{cbind} (documented in \link[HDF5Array]{cbind})
   }

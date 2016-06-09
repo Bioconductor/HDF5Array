@@ -116,9 +116,15 @@ getHDF5DumpName <- function()
 ### chunk geometry.
 h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
 {
+    if (storage.mode == "character") {
+        size <- max(nchar(dataset, type="width"))
+    } else {
+        size <- NULL
+    }
     #chunk <- .chunk_as_hypercube(dims)
     chunk <- .chunk_as_subblock(dims, storage.mode)
     ok <- h5createDataset(file, dataset, dims, storage.mode=storage.mode,
+                                               size=size,
                                                chunk=chunk)
     if (!ok)
         stop(wmsg("failed to create dataset '", dataset, "' ",

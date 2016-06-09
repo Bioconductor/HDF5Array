@@ -71,6 +71,7 @@ exportMethods(
     mean,
     round, signif,
     rowSums, colSums, rowMeans, colMeans,
+    nchar, tolower, toupper,
 
     ## Methods for generics defined in the methods package:
     coerce, show,

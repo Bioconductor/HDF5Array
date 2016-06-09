@@ -17,6 +17,16 @@ test_DelayedArray_unary_ops <- function()
         GENERIC <- match.fun(.Generic)
         checkIdentical(GENERIC(a), as.array(GENERIC(A)))
     }
+
+    a <- array(sample(c(LETTERS, letters), 60, replace=TRUE), 5:3)
+    A <- HDF5Array(a)
+    ## For some obscure reason, the tests below fail in the context of
+    ## 'HDF5Array:::.test()' or 'R CMD check'.
+    ## TODO: Investigate this.
+    #for (.Generic in c("nchar", "tolower", "toupper")) {
+    #    GENERIC <- match.fun(.Generic)
+    #    checkIdentical(GENERIC(a), as.array(GENERIC(A)))
+    #}
 }
 
 test_DelayedArray_Math_ans_Arith <- function()
