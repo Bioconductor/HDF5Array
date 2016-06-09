@@ -158,6 +158,34 @@ test_DelayedArray_anyNA <- function()
     }
 }
 
+test_DelayedArray_which <- function()
+{
+    on.exit(options(HDF5Array.block.size=HDF5Array:::DEFAULT_BLOCK_SIZE))
+    DelayedArray_block_which <- HDF5Array:::.DelayedArray_block_which
+
+    a <- a1 == 1L
+    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
+    A <- HDF5Array(a)
+
+    target <- which(a)
+    for (block_size in block_sizes2) {
+        options(HDF5Array.block.size=block_size)
+        checkIdentical(target, which(A))
+        checkIdentical(target, DelayedArray_block_which(a))
+    }
+
+    a <- a1 == -1L    # all FALSE
+    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
+    A <- HDF5Array(a)
+
+    target <- integer(0)
+    for (block_size in block_sizes2) {
+        options(HDF5Array.block.size=block_size)
+        checkIdentical(target, which(A))
+        checkIdentical(target, DelayedArray_block_which(a))
+    }
+}
+
 test_DelayedArray_Summary <- function()
 {
     test_Summary <- function(.Generic, a, block_sizes) {

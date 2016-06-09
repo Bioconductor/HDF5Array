@@ -286,7 +286,7 @@ block_REDUCE_and_COMBINE <- function(x, REDUCE, COMBINE, init,
         if (!is.array(subarray))
             subarray <- .as_array_or_matrix(subarray)
         reduced <- REDUCE(subarray)
-        init <- COMBINE(init, reduced)
+        init <- COMBINE(i, subarray, init, reduced)
         if (!is.null(BREAKIF) && BREAKIF(init))
             break
     }

@@ -66,7 +66,7 @@ exportMethods(
     "!",
     #"+", "-", "*", "/", "^", "%%", "%/%",  # "Arith" group generic
     "==", "!=", "<=", ">=", "<", ">",       # "Compare" group generic
-    anyNA,
+    anyNA, which,
     max, min, range, sum, prod, any, all,   # "Summary" group generic
     mean,
     round, signif,

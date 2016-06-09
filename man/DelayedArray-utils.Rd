@@ -37,6 +37,7 @@
 \alias{signif,DelayedArray-method}
 
 \alias{anyNA,DelayedArray-method}
+\alias{which,DelayedArray-method}
 
 \alias{mean.DelayedArray}
 \alias{mean,DelayedArray-method}
@@ -82,7 +83,7 @@
 
   Block-processed operations:
   \itemize{
-    \item \code{anyNA}
+    \item \code{anyNA}, \code{which}
     \item all the members of the \code{\link[methods]{Summary}} group
     \item \code{mean}
     \item \code{apply}

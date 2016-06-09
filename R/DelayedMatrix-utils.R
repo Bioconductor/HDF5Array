@@ -22,7 +22,7 @@
         return(.DelayedMatrix_block_colSums(t(x), na.rm=na.rm, dims=dims))
 
     REDUCE <- function(submatrix) rowSums(submatrix, na.rm=na.rm)
-    COMBINE <- `+`
+    COMBINE <- function(i, subarray, init, reduced) { init + reduced }
     init <- numeric(nrow(x))
     ans <- colblock_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init)
     setNames(ans, rownames(x))
@@ -55,7 +55,7 @@ setMethod("colSums", "DelayedMatrix", .DelayedMatrix_block_colSums)
             submatrix_nvals <- submatrix_nvals - rowSums(is.na(submatrix))
         cbind(submatrix_sums, submatrix_nvals)
     }
-    COMBINE <- `+`
+    COMBINE <- function(i, subarray, init, reduced) { init + reduced }
     init <- cbind(
         numeric(nrow(x)),  # sums
         numeric(nrow(x))   # nvals

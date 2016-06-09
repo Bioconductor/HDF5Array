@@ -361,10 +361,11 @@ setMethod("signif", "DelayedArray",
     i_max <- max(i)
     ## Threshold is a rough estimate obtained empirically.
     ## TODO: Refine this.
-    if (i_max <= 2L * i_len * log(i_len))
+    if (i_max <= 2L * i_len * log(i_len)) {
         which(as.logical(tabulate(i, nbins=i_max)))
-    else
+    } else {
         sort(unique(i))
+    }
 }
 
 .straighten <- function(x, untranspose=FALSE, straighten.index=FALSE)
@@ -394,7 +395,7 @@ setMethod("signif", "DelayedArray",
 .DelayedArray_block_anyNA <- function(x, recursive=FALSE)
 {
     REDUCE <- anyNA
-    COMBINE <- `||`
+    COMBINE <- function(i, subarray, init, reduced) { init || reduced }
     init <- FALSE
     BREAKIF <- identity
 
@@ -403,6 +404,43 @@ setMethod("signif", "DelayedArray",
 }
 
 setMethod("anyNA", "DelayedArray", .DelayedArray_block_anyNA)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### which()
+###
+
+.DelayedArray_block_which <- function(x, arr.ind=FALSE, useNames=TRUE)
+{
+    if (!isTRUEorFALSE(arr.ind))
+        stop("'arr.ind' must be TRUE or FALSE")
+    if (!isTRUEorFALSE(useNames))
+        stop("'useNames' must be TRUE or FALSE")
+    REDUCE <- which
+    COMBINE <- function(i, subarray, init, reduced) {
+        if (length(reduced) != 0L) {
+            reduced <- reduced + init$offset
+            part_number <- sprintf("%010d", i)
+            assign(part_number, reduced, envir=init$parts)
+        }
+        init$offset <- init$offset + length(subarray)
+        init
+    }
+    init <- list(parts=new.env(parent=emptyenv()), offset=0L)
+
+    res <- block_REDUCE_and_COMBINE(x, REDUCE, COMBINE, init)
+    if (length(res$parts) == 0L) {
+        ans <- integer(0)
+    } else {
+        ans <- unlist(as.list(res$parts, sorted=TRUE),
+                      recursive=FALSE, use.names=FALSE)
+    }
+    if (arr.ind)
+        ans <- arrayInd(ans, dim(x), dimnames(x), useNames=useNames)
+    ans
+}
+
+setMethod("which", "DelayedArray", .DelayedArray_block_which)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -441,7 +479,7 @@ setMethod("anyNA", "DelayedArray", .DelayedArray_block_anyNA)
             return(NULL)
         reduced
     }
-    COMBINE <- function(init, reduced) {
+    COMBINE <- function(i, subarray, init, reduced) {
         if (is.null(init) && is.null(reduced))
             return(NULL)
         GENERIC(init, reduced)
@@ -498,7 +536,7 @@ setMethod("Summary", "DelayedArray",
             subarray_nval <- subarray_nval - sum(is.na(tmp))
         c(subarray_sum, subarray_nval)
     }
-    COMBINE <- `+`
+    COMBINE <- function(i, subarray, init, reduced) { init + reduced }
     init <- numeric(2)  # sum and nval
     BREAKIF <- function(init) is.na(init[[1L]])
 
