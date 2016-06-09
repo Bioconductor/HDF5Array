@@ -758,7 +758,7 @@ setMethod("show", "DelayedArray", show_compact_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Combining
+### Combining and splitting
 ###
 ### Combining arrays with c() is NOT an endomorphism!
 ###
@@ -792,4 +792,14 @@ setMethod("c", "DelayedArray",
         combine_array_objects(objects)
     }
 )
+
+setMethod("splitAsList", "DelayedArray",
+    function(x, f, drop=FALSE, ...)
+        splitAsList(as.vector(x), f, drop=drop, ...)
+)
+
+### S3/S4 combo for split.DelayedArray
+split.DelayedArray <- function(x, f, drop=FALSE, ...)
+    splitAsList(x, f, drop=drop, ...)
+setMethod("split", c("DelayedArray", "ANY"), split.DelayedArray)
 

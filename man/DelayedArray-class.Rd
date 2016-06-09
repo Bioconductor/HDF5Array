@@ -37,6 +37,9 @@
 \alias{show,DelayedArray-method}
 
 \alias{c,DelayedArray-method}
+\alias{splitAsList,DelayedArray-method}
+\alias{split.DelayedArray}
+\alias{split,DelayedArray,ANY-method}
 
 \title{DelayedArray objects}
 
