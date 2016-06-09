@@ -57,7 +57,8 @@ exportMethods(
     drop,
     t,
     c,
-    is.na, "!",
+    is.na, is.finite, is.infinite, is.nan,
+    "!",
     #"+", "-", "*", "/", "^", "%%", "%/%",  # "Arith" group generic
     "==", "!=", "<=", ">=", "<", ">",       # "Compare" group generic
     anyNA,

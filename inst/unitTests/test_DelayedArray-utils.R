@@ -8,6 +8,17 @@ a2 <- a1 + runif(150) - 0.5                              # numeric array
 block_sizes1 <- c(12L, 20L, 50L, 15000L)
 block_sizes2 <- 2L * block_sizes1
 
+test_DelayedArray_unary_ops <- function()
+{
+    a <- 2:-2 / (a1 - 3)
+    a[2, 9, 2] <- NA  # same as a[[92]] <- NA
+    A <- HDF5Array(a)
+    for (.Generic in c("is.na", "is.finite", "is.infinite", "is.nan")) {
+        GENERIC <- match.fun(.Generic)
+        checkIdentical(GENERIC(a), as.array(GENERIC(A)))
+    }
+}
+
 test_DelayedArray_Math_ans_Arith <- function()
 {
     toto1 <- function(a) { 100 / floor(abs((5 * log(a + 0.2) - 1)^3)) }

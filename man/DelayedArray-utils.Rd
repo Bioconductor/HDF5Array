@@ -24,6 +24,9 @@
 \alias{pmin2,DelayedArray,DelayedArray-method}
 
 \alias{is.na,DelayedArray-method}
+\alias{is.finite,DelayedArray-method}
+\alias{is.infinite,DelayedArray-method}
+\alias{is.nan,DelayedArray-method}
 \alias{!,DelayedArray-method}
 \alias{round,DelayedArray-method}
 \alias{signif,DelayedArray-method}
@@ -65,7 +68,8 @@
   \itemize{
     \item all the members of the \code{\link[methods]{Ops}},
           \code{\link[methods]{Math}}, and \code{\link[methods]{Math2}} groups
-    \item \code{is.na}, \code{!}
+    \item \code{!}
+    \item \code{is.na}, \code{is.finite}, \code{is.infinite}, \code{is.nan},
     \item \code{pmax2} and \code{pmin2}
     \item \code{rbind} and \code{cbind} (documented in \link[HDF5Array]{cbind})
   }
