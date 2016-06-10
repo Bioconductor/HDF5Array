@@ -247,7 +247,7 @@
         subscript <- get_array_block_subscript(blocks, i,
                                                expand.RangeNSBS=TRUE)
         cat(subscript2string(subscript, x_dimnames), "\n", sep="")
-        slice <- extract_array_block1(x, subscript)
+        slice <- subset_array_like_by_list(x, subscript)
         dim(slice) <- dim(slice)[1:2]
         .print_2D_array_data(slice, m1, m2, n1, n2)
         cat("\n")

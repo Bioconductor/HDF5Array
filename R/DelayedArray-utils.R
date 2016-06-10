@@ -619,8 +619,7 @@ setGeneric("apply", signature="X")
         function(i) {
             subscript <- rep.int(alist(foo=), length(X_dim))
             subscript[[MARGIN]] <- i
-            args <- c(list(X), subscript)
-            slice <- do.call(`[`, args)
+            slice <- subset_array_like_by_list(X, subscript, drop=TRUE)
             dim(slice) <- dim(slice)[-MARGIN]
             FUN(slice, ...)
         })

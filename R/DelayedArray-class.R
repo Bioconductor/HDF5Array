@@ -364,10 +364,10 @@ setMethod("drop", "DelayedArray",
 ### [
 ###
 
-### 'subscript' must be a multidimensional subscript i.e. a list with one
+### 'subscript' must be a "multidimensional subscript" i.e. a list with one
 ### subscript per dimension in 'x'. Missing subscripts are represented by
 ### list elements of class "name".
-.extract_subarray_from_DelayedArray <- function(x, subscript)
+.subset_DelayedArray_by_list <- function(x, subscript)
 {
     x_index <- x@index
     x_ndim <- length(x@subindex)
@@ -427,7 +427,7 @@ setMethod("drop", "DelayedArray",
         stop("incorrect number of dimensions")
     }
 
-    ## Prepare the multidimensional subscript.
+    ## Prepare the "multidimensional subscript".
     subscript <- rep.int(alist(foo=), x_ndim)
     if (!missing(i))
         subscript[[1L]] <- i
@@ -442,7 +442,7 @@ setMethod("drop", "DelayedArray",
     }
 
     ## Perform the subsetting.
-    .extract_subarray_from_DelayedArray(x, subscript)
+    .subset_DelayedArray_by_list(x, subscript)
 }
 
 setMethod("[", "DelayedArray", .extract_DelayedArray_subset)
@@ -451,18 +451,27 @@ setMethod("[", "DelayedArray", .extract_DelayedArray_subset)
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### subset_seed_as_array()
 ###
-### 'index' is expected to be an unnamed list of integer vectors. There is no
-### need to support anything else.
-### Must return an ordinary array. No need to propagate the dimnames.
-###
 
+### 'index' is expected to be an unnamed list of positive integer vectors.
+### The "subset_seed_as_array" methods don't need to support anything else.
+### They must return an ordinary array. No need to propagate the dimnames.
 setGeneric("subset_seed_as_array", signature="seed",
     function(seed, index) standardGeneric("subset_seed_as_array")
 )
 
 setMethod("subset_seed_as_array", "ANY",
     function(seed, index)
-        as.array(do.call(`[`, c(list(seed), index, drop=FALSE)))
+    {
+        slice <- subset_array_like_by_list(seed, index)
+        ## as.array() doesn't work on data-frame-like objects so we first go
+        ## to matrix.
+        if (is.data.frame(slice) || is(slice, "DataFrame")) {
+            stop(wmsg("DelayedArray objects with a data-frame-like seed ",
+                      "are not supported yet"))
+            slice <- as.matrix(slice)
+        }
+        as.array(slice)
+    }
 )
 
 
@@ -717,7 +726,7 @@ setMethod("type", "DelayedArray",
     {
         subscript <- as.list(integer(length(dim(x))))
         ## x0 <- x[0, ..., 0]
-        x0 <- .extract_subarray_from_DelayedArray(x, subscript)
+        x0 <- .subset_DelayedArray_by_list(x, subscript)
         typeof(as.array(x0, drop=TRUE))
     }
 )
@@ -731,7 +740,7 @@ setMethod("type", "DelayedArray",
 {
     i <- normalizeDoubleBracketSubscript(i, x)
     subscript <- as.integer(arrayInd(i, dim(x)))
-    as.vector(.extract_subarray_from_DelayedArray(x, subscript))
+    as.vector(.subset_DelayedArray_by_list(x, subscript))
 }
 
 ### Only support linear subscripting at the moment.

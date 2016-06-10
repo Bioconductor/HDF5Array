@@ -80,7 +80,7 @@ setMethod("dimnames", "ArrayBinder", .get_ArrayBinder_dimnames)
     ## Reorder the rows or columns in 'ans'.
     subscript <- rep.int(alist(foo=), length(index))
     subscript[[x@along]] <- get_rev_index(part_idx)
-    do.call(`[`, c(list(ans), subscript, drop=FALSE))
+    subset_array_like_by_list(ans, subscript)
 }
 
 setMethod("subset_seed_as_array", "ArrayBinder",

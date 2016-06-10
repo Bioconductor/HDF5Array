@@ -6,6 +6,15 @@
 ###
 
 
+### 'subscript' must be a "multidimensional subscript" i.e. a list with one
+### subscript per dimension in 'x'.
+subset_array_like_by_list <- function(x, subscript, drop=FALSE)
+{
+    stopifnot(is.list(subscript), length(subscript) == length(dim(x)))
+    do.call(`[`, c(list(x), subscript, list(drop=drop)))
+}
+
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Translate an index into the whole to an index into the parts
 ###
