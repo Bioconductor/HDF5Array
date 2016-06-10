@@ -459,17 +459,54 @@ setGeneric("subset_seed_as_array", signature="seed",
     function(seed, index) standardGeneric("subset_seed_as_array")
 )
 
-setMethod("subset_seed_as_array", "ANY",
+setMethod("subset_seed_as_array", "array",
+    function(seed, index)
+        subset_array_like_by_list(seed, index)
+)
+
+setMethod("subset_seed_as_array", "data.frame",
+    function(seed, index)
+    {
+        if (ncol(seed) == 0L) {
+            ans_type <- "logical"
+        } else {
+            slice0 <- seed[0L, , drop=FALSE]
+            ans_type <- typeof(unlist(slice0, use.names=FALSE))
+        }
+
+        slice <- subset_array_like_by_list(seed, index)
+        data <- as.vector(unlist(slice, use.names=FALSE), mode=ans_type)
+        array(data, dim=lengths(index))
+    }
+)
+
+setMethod("subset_seed_as_array", "DataFrame",
+    function(seed, index)
+    {
+        ## Compute 'ans_type'.
+        if (ncol(seed) == 0L) {
+            ans_type <- "logical"
+        } else {
+            slice0 <- seed[0L, , drop=FALSE]
+            slice0 <- as.data.frame(slice0)
+            if (ncol(slice0) != ncol(seed))
+                stop(wmsg("DataFrame object 'x' can be used as the seed of ",
+                          "a DelayedArray object only if as.data.frame(x) ",
+                          "preserves the number of columns"))
+            ans_type <- typeof(unlist(slice0, use.names=FALSE))
+        }
+
+        slice <- subset_array_like_by_list(seed, index)
+        slice <- as.data.frame(slice)
+        data <- as.vector(unlist(slice, use.names=FALSE), mode=ans_type)
+        array(data, dim=lengths(index))
+    }
+)
+
+setMethod("subset_seed_as_array", "DelayedArray",
     function(seed, index)
     {
         slice <- subset_array_like_by_list(seed, index)
-        ## as.array() doesn't work on data-frame-like objects so we first go
-        ## to matrix.
-        if (is.data.frame(slice) || is(slice, "DataFrame")) {
-            stop(wmsg("DelayedArray objects with a data-frame-like seed ",
-                      "are not supported yet"))
-            slice <- as.matrix(slice)
-        }
         as.array(slice)
     }
 )
