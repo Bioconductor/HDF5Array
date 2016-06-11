@@ -23,6 +23,8 @@ exportClasses(
 
 S3method(as.array, DelayedArray)
 
+S3method(as.data.frame, DelayedArray)
+
 S3method(as.matrix, DelayedArray)
 
 S3method(as.vector, DelayedArray)
@@ -37,6 +39,8 @@ S3method(split, DelayedArray)
 
 export(
     as.array.DelayedArray,
+
+    as.data.frame.DelayedArray,
 
     as.matrix.DelayedArray,
 
@@ -56,7 +60,7 @@ exportMethods(
     ## Methods for generics defined in the base package:
     length, names, "names<-",
     dim, "dim<-", dimnames, "dimnames<-",
-    as.array, as.vector, as.matrix,
+    as.array, as.vector, as.matrix, as.data.frame,
     "[", "[[",
     drop,
     t,

@@ -31,6 +31,8 @@
 \alias{as.vector,DelayedArray-method}
 \alias{as.matrix.DelayedArray}
 \alias{as.matrix,DelayedArray-method}
+\alias{as.data.frame.DelayedArray}
+\alias{as.data.frame,DelayedArray-method}
 
 \alias{[[,DelayedArray-method}
 
