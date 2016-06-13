@@ -3,18 +3,24 @@
 - Fix bug in "[" method for DelayedArray objects caused by "substitute() +
   eval()" hack. See R/DelayedArray-class.R for the details.
 
+- Store the dimnames in the HDF5 file: investigate the possiblity to store the
+  dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
+  can grab them from there. According to the HDF5 spec, it seems that the best
+  way to do this is by storing the dimnames in HDF5 Dimension Scale datasets
+  (1 dataset per character vector in the list returned by dimnames(x)):
+
+    https://www.hdfgroup.org/HDF5/Tutor/h5dimscale.html
+
+  Operations that write a new HDF5 dataset to disk (e.g. matrix multiplication,
+  or HDF5Dataset() when called on a DelayedArray) would then need to be
+  modified to also write the dimnames to the HDF5 file.
+
 - Keep investigating interaction between chunk and block geometries and their
   impact on block processing performance.
 
 - Add 'chunk' slot to HDF5Dataset objects and populate it with physical chunk
   geometry at creation time. Emit a warning if chunk genometry won't lead to
   good block processing performance.
-
-- Store the dimnames in the HDF5 file: investigate the possiblity to store the
-  dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
-  can grab them from there. Operations that write a new HDF5 dataset to disk
-  (e.g. matrix multiplication, or HDF5Dataset() when called on a DelayedArray)
-  would need to be modified to also write the dimnames to the HDF5 file.
 
 - Add more examples to the man pages (using the toy dataset).
 
