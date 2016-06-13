@@ -231,23 +231,23 @@
 
 .print_2D_slices <- function(x, m1, m2, n1, n2, blocks, idx)
 {
-    subscript2string <- function(subscript, dimnames=NULL) {
-        s <- as.character(subscript)
+    subscripts_as_string <- function(subscripts, dimnames=NULL) {
+        s <- as.character(subscripts)
         if (!is.null(dimnames)) {
             usename_idx <- which(nzchar(s) &
-                                 lengths(subscript) == 1L &
+                                 lengths(subscripts) == 1L &
                                  lengths(dimnames) != 0L)
             s[usename_idx] <- mapply(`[`, dimnames[usename_idx],
-                                     subscript[usename_idx])
+                                     subscripts[usename_idx])
         }
         paste0(s, collapse=", ")
     }
     x_dimnames <- dimnames(x)
     for (i in idx) {
-        subscript <- get_array_block_subscript(blocks, i,
-                                               expand.RangeNSBS=TRUE)
-        cat(subscript2string(subscript, x_dimnames), "\n", sep="")
-        slice <- subset_array_like_by_list(x, subscript)
+        subscripts <- get_array_block_subscripts(blocks, i,
+                                                 expand.RangeNSBS=TRUE)
+        cat(subscripts_as_string(subscripts, x_dimnames), "\n", sep="")
+        slice <- subset_by_subscripts(x, subscripts)
         dim(slice) <- dim(slice)[1:2]
         .print_2D_array_data(slice, m1, m2, n1, n2)
         cat("\n")

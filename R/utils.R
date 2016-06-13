@@ -6,12 +6,68 @@
 ###
 
 
-### 'subscript' must be a "multidimensional subscript" i.e. a list with one
-### subscript per dimension in 'x'.
-subset_array_like_by_list <- function(x, subscript, drop=FALSE)
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Using a "multidimensional subscript"
+###
+
+### 'subscripts' must be a "multidimensional subscript" i.e. a list with one
+### subscript per dimension in 'x'. Missing subscripts are represented by
+### list elements of class "name".
+subset_by_subscripts <- function(x, subscripts, drop=FALSE)
 {
-    stopifnot(is.list(subscript), length(subscript) == length(dim(x)))
-    do.call(`[`, c(list(x), subscript, list(drop=drop)))
+    stopifnot(is.list(subscripts), length(subscripts) == length(dim(x)))
+    do.call(`[`, c(list(x), subscripts, list(drop=drop)))
+}
+
+expand_missing_subscripts <- function(subscripts, dim)
+{
+    stopifnot(is.list(subscripts), length(subscripts) == length(dim))
+    missing_idx <- which(vapply(subscripts, is.name, logical(1)))
+    subscripts[missing_idx] <- lapply(dim[missing_idx], seq_len)
+    subscripts
+}
+
+### Return the lengths of the subscripts in 'subscripts'. The length of a
+### missing subscript is the length it would have after expansion.
+### In other words, 'get_subscripts_lengths(subscripts, dim)' is equivalent
+### to 'lengths(expand_missing_subscripts(subscripts, dim))' but is more
+### efficient because it doesn't actually expand missing subscripts.
+get_subscripts_lengths <- function(subscripts, dim)
+{
+    stopifnot(is.list(subscripts), length(subscripts) == length(dim))
+    missing_idx <- which(vapply(subscripts, is.name, logical(1)))
+    ans <- lengths(subscripts)
+    ans[missing_idx] <- dim[missing_idx]
+    ans
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Simple wrappers around rhdf5:::h5read() and rhdf5:::h5write()
+###
+
+.replace_missing_subscripts_by_NULLS <- function(subscripts)
+{
+    ans <- vector("list", length(subscripts))
+    not_null_idx <- which(vapply(subscripts, class, character(1)) != "name")
+    ans[not_null_idx] <- subscripts[not_null_idx]
+    ans
+}
+
+h5read2 <- function(file, name, index=NULL)
+{
+    if (!is.null(index))
+        index <- .replace_missing_subscripts_by_NULLS(index)
+    ## h5read() emits an annoying warning when it loads integer values that
+    ## cannot be represented in R (and thus are converted to NAs).
+    suppressWarnings(h5read(file, name, index=index))
+}
+
+h5write2 <- function(obj, file, name, index=NULL)
+{
+    if (!is.null(index))
+        index <- .replace_missing_subscripts_by_NULLS(index)
+    h5write(obj, file, name, index=index)
 }
 
 

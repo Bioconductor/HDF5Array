@@ -16,29 +16,17 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### A convenience wrapper to rhdf5::h5read()
-###
-
-.quiet_h5read <- function(file, name, index)
-{
-    ## h5read() emits an annoying warning when it loads integer values that
-    ## cannot be represented in R (and thus are converted to NAs).
-    suppressWarnings(
-        h5read(file, name, index=index)
-    )
-}
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### subset_seed_as_array()
 ###
 
 .subset_HDF5Dataset_as_array <- function(seed, index)
 {
-    if (any(lengths(index) == 0L)) {
+    ans_dim <- get_subscripts_lengths(index, dim(seed))
+    if (any(ans_dim == 0L)) {
         ans <- seed@first_val[0]
+        dim(ans) <- ans_dim
     } else {
-        ans <- .quiet_h5read(seed@file, seed@name, index)
+        ans <- h5read2(seed@file, seed@name, index)
     }
     ans
 }
@@ -70,7 +58,7 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 .read_h5dataset_first_val <- function(file, name, ndim)
 {
     index <- rep.int(list(1L), ndim)
-    ans <- .quiet_h5read(file, name, index)
+    ans <- h5read2(file, name, index)
     stopifnot(length(ans) == 1L)  # sanity check
     ans[[1L]]  # drop any attribute
 }
@@ -127,7 +115,7 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
     h5createDataset2(out_file, out_name, dim(a), storage.mode=ans_type)
     on.exit(setHDF5DumpName())
 
-    h5write(a, out_file, out_name)
+    h5write2(a, out_file, out_name)
 
     .new_HDF5Dataset_from_file(out_file, out_name, type=type(a))
 }

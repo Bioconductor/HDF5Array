@@ -1,3 +1,5 @@
+- Document global option HDF5Array.block.size
+
 - Fix bug in "[" method for DelayedArray objects caused by "substitute() +
   eval()" hack. See R/DelayedArray-class.R for the details.
 

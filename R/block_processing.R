@@ -109,16 +109,16 @@ setMethod("length", "ArrayBlocks",
 
 ### Return a "multidimensional subscript" i.e. a list with one subscript per
 ### dimension in the original array.
-get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
+get_array_block_subscripts <- function(blocks, i, expand.RangeNSBS=FALSE)
 {
     nblock <- length(blocks)
     stopifnot(isSingleInteger(i), i >= 1L, i <= nblock)
 
     ndim <- length(blocks@dim)
-    subscript <- rep.int(alist(foo=), ndim)
+    subscripts <- rep.int(alist(foo=), ndim)
 
     if (blocks@N > ndim)
-        return(subscript)
+        return(subscripts)
 
     i <- i - 1L
     if (blocks@N < ndim) {
@@ -136,28 +136,28 @@ get_array_block_subscript <- function(blocks, i, expand.RangeNSBS=FALSE)
     if (k2 > upper_bound)
         k2 <- upper_bound
     if (expand.RangeNSBS) {
-        subscript_N <- k1:k2  # same as doing as.integer() on the RangeNSBS
-                              # object below
+        subscript <- k1:k2  # same as doing as.integer() on the RangeNSBS
+                            # object below
     } else {
-        subscript_N <- new2("RangeNSBS", subscript=c(k1, k2),
-                                         upper_bound=upper_bound,
-                                         check=FALSE)
+        subscript <- new2("RangeNSBS", subscript=c(k1, k2),
+                                       upper_bound=upper_bound,
+                                       check=FALSE)
     }
-    subscript[[blocks@N]] <- subscript_N
+    subscripts[[blocks@N]] <- subscript
 
     if (blocks@N < ndim) {
         outer_dim <- blocks@dim[(blocks@N + 1L):ndim]
         subindex <- arrayInd(i2 + 1L, outer_dim)
-        subscript[(blocks@N + 1L):ndim] <- as.list(subindex)
+        subscripts[(blocks@N + 1L):ndim] <- as.list(subindex)
     }
-    subscript
+    subscripts
 }
 
 .extract_array_block <- function(x, blocks, i)
 {
-    subscript <- get_array_block_subscript(blocks, i,
-                                           expand.RangeNSBS=is.array(x))
-    subset_array_like_by_list(x, subscript)
+    subscripts <- get_array_block_subscripts(blocks, i,
+                                             expand.RangeNSBS=is.array(x))
+    subset_by_subscripts(x, subscripts)
 }
 
 ### NOT exported. Used in unit tests.
@@ -197,14 +197,6 @@ unsplit_array_from_blocks <- function(subarrays, x)
     as.array(x)
 }
 
-subscript_to_h5index <- function(subscript)
-{
-    index <- vector("list", length(subscript))
-    not_null_idx <- which(vapply(subscript, class, character(1)) != "name")
-    index[not_null_idx] <- subscript[not_null_idx]
-    index
-}
-
 ### An lapply-like function.
 block_APPLY <- function(x, APPLY, ..., if_empty=NULL,
                         out_file=NULL, out_name=NULL, block_len=NULL)
@@ -219,15 +211,15 @@ block_APPLY <- function(x, APPLY, ..., if_empty=NULL,
     expand_RangeNSBS <- is.array(x) || !is.null(out_file)
     lapply(seq_len(nblock),
         function(i) {
-            subscript <- get_array_block_subscript(blocks, i, expand_RangeNSBS)
-            subarray <- subset_array_like_by_list(x, subscript)
+            subscripts <- get_array_block_subscripts(blocks, i,
+                                                     expand_RangeNSBS)
+            subarray <- subset_by_subscripts(x, subscripts)
             if (!is.array(subarray))
                 subarray <- .as_array_or_matrix(subarray)
             block_ans <- APPLY(subarray, ...)
             if (is.null(out_file))
                 return(block_ans)
-            index <- subscript_to_h5index(subscript)
-            h5write(block_ans, out_file, out_name, index=index)
+            h5write2(block_ans, out_file, out_name, subscripts)
         })
 }
 
@@ -251,10 +243,10 @@ block_MAPPLY <- function(MAPPLY, ..., if_empty=NULL,
         return(if_empty)
     lapply(seq_len(nblock),
         function(i) {
-            subscript <- get_array_block_subscript(blocks, i, TRUE)
+            subscripts <- get_array_block_subscripts(blocks, i, TRUE)
             subarrays <- lapply(dots,
                 function(x) {
-                    subarray <- subset_array_like_by_list(x, subscript)
+                    subarray <- subset_by_subscripts(x, subscripts)
                     if (!is.array(subarray))
                         subarray <- .as_array_or_matrix(subarray)
                     subarray
@@ -262,8 +254,7 @@ block_MAPPLY <- function(MAPPLY, ..., if_empty=NULL,
             block_ans <- do.call(MAPPLY, subarrays)
             if (is.null(out_file))
                 return(block_ans)
-            index <- subscript_to_h5index(subscript)
-            h5write(block_ans, out_file, out_name, index=index)
+            h5write2(block_ans, out_file, out_name, subscripts)
         })
 }
 

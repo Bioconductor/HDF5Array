@@ -41,7 +41,10 @@ setClass("ArrayBinder",
 setValidity2("ArrayBinder", .validate_ArrayBinder)
 
 .new_ArrayBinder <- function(seeds, along)
+{
+    seeds <- lapply(seeds, remove_pristine_DelayedArray_wrapping)
     new2("ArrayBinder", seeds=seeds, along=along)
+}
 
 ### Implement the "seed contract" i.e. dim(), dimnames(), and
 ### subset_seed_as_array().
@@ -62,30 +65,39 @@ setMethod("dim", "ArrayBinder", .get_ArrayBinder_dim)
 
 setMethod("dimnames", "ArrayBinder", .get_ArrayBinder_dimnames)
 
-.subset_ArrayBinder_as_array <- function(x, index)
+.subset_ArrayBinder_as_array <- function(seed, index)
 {
-    dims <- IRanges:::get_dims_to_bind(x@seeds, x@along)
-    breakpoints <- cumsum(dims[x@along, ])
-    part_idx <- get_part_index(index[[x@along]], breakpoints)
-    split_part_idx <- split_part_index(part_idx, length(breakpoints))
-    FUN <- function(i) {
-        index[[x@along]] <- split_part_idx[[i]]
-        subset_seed_as_array(x@seeds[[i]], index)
+    i <- index[[seed@along]]
+
+    if (missing(i)) {
+        ## This is the easy situation.
+        tmp <- lapply(seed@seeds, subset_seed_as_array, index)
+        ## Bind the ordinary arrays in 'tmp'.
+        ans <- do.call(IRanges:::simple_abind, c(tmp, list(along=seed@along)))
+        return(ans)
     }
-    tmp <- lapply(seq_along(x@seeds), FUN)
+
+    ## From now on 'i' is a vector of positive integers.
+    dims <- IRanges:::get_dims_to_bind(seed@seeds, seed@along)
+    breakpoints <- cumsum(dims[seed@along, ])
+    part_idx <- get_part_index(i, breakpoints)
+    split_part_idx <- split_part_index(part_idx, length(breakpoints))
+    FUN <- function(s) {
+        index[[seed@along]] <- split_part_idx[[s]]
+        subset_seed_as_array(seed@seeds[[s]], index)
+    }
+    tmp <- lapply(seq_along(seed@seeds), FUN)
 
     ## Bind the ordinary arrays in 'tmp'.
-    ans <- do.call(IRanges:::simple_abind, c(tmp, list(along=x@along)))
+    ans <- do.call(IRanges:::simple_abind, c(tmp, list(along=seed@along)))
 
     ## Reorder the rows or columns in 'ans'.
-    subscript <- rep.int(alist(foo=), length(index))
-    subscript[[x@along]] <- get_rev_index(part_idx)
-    subset_array_like_by_list(ans, subscript)
+    subscripts <- rep.int(alist(foo=), length(index))
+    subscripts[[seed@along]] <- get_rev_index(part_idx)
+    subset_by_subscripts(ans, subscripts)
 }
 
-setMethod("subset_seed_as_array", "ArrayBinder",
-    function(seed, index) .subset_ArrayBinder_as_array(seed, index)
-)
+setMethod("subset_seed_as_array", "ArrayBinder", .subset_ArrayBinder_as_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

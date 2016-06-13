@@ -63,11 +63,13 @@ setClass("ConformableArrayCombiner",
 
 setValidity2("ConformableArrayCombiner", .validate_ConformableArrayCombiner)
 
-.new_ConformableArrayCombiner <- function(a=new("array"), ...,
+.new_ConformableArrayCombiner <- function(seed=new("array"), ...,
                                           COMBINING_OP="identity",
                                           Rargs=list())
 {
-    new2("ConformableArrayCombiner", seeds=unname(list(a, ...)),
+    seeds <- unname(list(seed, ...))
+    seeds <- lapply(seeds, remove_pristine_DelayedArray_wrapping)
+    new2("ConformableArrayCombiner", seeds=seeds,
                                      COMBINING_OP=COMBINING_OP,
                                      Rargs=Rargs)
 }
@@ -377,10 +379,14 @@ setMethod("signif", "DelayedArray",
     if (!straighten.index)
         return(x)
     x_index <- x@index
-    for (N in x@subindex) {
-        if (isStrictlySorted(x_index[[N]]))
+    x_seed_dim <- dim(x@seed)
+    for (N in x@metaindex) {
+        i <- x_index[[N]]
+        if (missing(i))
+            i <- seq_len(x_seed_dim[[N]])  # expand 'i'
+        if (isStrictlySorted(i))
             next
-        x_index[[N]] <- .straighten_index(x_index[[N]])
+        x_index[[N]] <- .straighten_index(i)
     }
     if (!identical(x@index, x_index))
         x@index <- x_index
@@ -617,9 +623,9 @@ setGeneric("apply", signature="X")
     ans_names <-  dimnames(X)[[MARGIN]]
     ans <- lapply(setNames(seq_len(X_dim[[MARGIN]]), ans_names),
         function(i) {
-            subscript <- rep.int(alist(foo=), length(X_dim))
-            subscript[[MARGIN]] <- i
-            slice <- subset_array_like_by_list(X, subscript, drop=TRUE)
+            subscripts <- rep.int(alist(foo=), length(X_dim))
+            subscripts[[MARGIN]] <- i
+            slice <- subset_by_subscripts(X, subscripts, drop=TRUE)
             dim(slice) <- dim(slice)[-MARGIN]
             FUN(slice, ...)
         })
