@@ -100,7 +100,7 @@ export(
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
     DelayedArray,
-    HDF5Dataset, HDF5Array
+    writeHDF5Dataset, HDF5Dataset, HDF5Array
 )
 
 

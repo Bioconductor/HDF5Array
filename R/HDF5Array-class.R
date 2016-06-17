@@ -35,7 +35,7 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Construct an HDF5Dataset object from a file or an array
+### HDF5Dataset internal low-level constructor
 ###
 
 .get_h5dataset_dim <- function(file, name)
@@ -100,43 +100,55 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
                         first_val=first_val)
 }
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### writeHDF5Dataset()
+###
+
+### Return an HDF5Dataset object pointing to the newly written HDF5 dataset
+### on disk.
 ### TODO: Investigate the possiblity to store the dimnames in the HDF5 file
 ### so a "dimnames" method for HDF5Dataset objects could bring them back.
-### Then this coercion would propagate the dimnames.
-.new_HDF5Dataset_from_array <- function(a)
+writeHDF5Dataset <- function(x, file, name)
 {
-    if (!is.array(a))
-        stop("cannot create an HDF5Dataset object from a ", class(a))
-
-    out_file <- getHDF5DumpFile()
-    out_name <- getHDF5DumpName()
-
-    ans_type <- type(a)
-    h5createDataset2(out_file, out_name, dim(a), storage.mode=ans_type)
-    on.exit(setHDF5DumpName())
-
-    h5write2(a, out_file, out_name)
-
-    .new_HDF5Dataset_from_file(out_file, out_name, type=type(a))
-}
-
-### Semantically equivalent to .new_HDF5Dataset_from_array(as.array(from))
-### but uses block-processing so the full DelayedArray object is not realized
-### at once in memory. Instead the object is split into blocks first, and the
-### blocks realized and written to disk one at a time. 
-.new_HDF5Dataset_from_DelayedArray <- function(x)
-{
-    out_file <- getHDF5DumpFile()
-    out_name <- getHDF5DumpName()
-
+    if (!isSingleString(file))
+        stop(wmsg("'file' must be a single string specifying the path to ",
+                  "the HDF5 file where to write the dataset"))
+    if (!isSingleString(name)) 
+        stop(wmsg("'name' must be a single string specifying the name of ", 
+                  "the HDF5 dataset to write"))
+    if (name == "")
+        stop(wmsg("'name' cannot be the empty string"))
+    if (is(x, "HDF5Dataset")) {
+        x <- DelayedArray(x)
+    } else if (!(is.array(x) || is(x, "DelayedArray"))) {
+        stop(wmsg("writing ", class(x), " object as an HDF5 dataset ",
+                  "is not supported"))
+    }
+    if (!file.exists(file))
+        h5createFile(file)
     ans_type <- type(x)
-    h5createDataset2(out_file, out_name, dim(x), storage.mode=ans_type)
-    on.exit(setHDF5DumpName())
-
-    block_APPLY(x, identity, out_file=out_file, out_name=out_name)
-
-    .new_HDF5Dataset_from_file(out_file, out_name, type=ans_type)
+    h5createDataset2(file, name, dim(x), storage.mode=ans_type)
+    if (is.array(x)) {
+        h5write2(x, file, name)
+    } else if (is(x, "DelayedArray")) {
+        ## Semantically equivalent to 'h5write2(as.array(x), file, name)'
+        ## but uses block-processing so the full DelayedArray object is not
+        ## realized at once in memory. Instead the object is first split into
+        ## blocks and the blocks are realized and written to disk one at a
+        ## time.
+        block_APPLY(x, identity, out_file=file, out_name=name)
+    } else {
+        stop(wmsg("writing ", class(x), " object to HDF5 dataset ",
+                  "not supported"))
+    }
+    invisible(.new_HDF5Dataset_from_file(file, name, type=ans_type))
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### HDF5Dataset constructor
+###
 
 HDF5Dataset <- function(file, name, type=NA)
 {
@@ -149,9 +161,10 @@ HDF5Dataset <- function(file, name, type=NA)
     if (!(missing(name) && identical(type, NA)))
         stop(wmsg("'name' or 'type' cannot be specified when calling ",
                   "HDF5Dataset() on a DelayedArray or array object"))
-    if (is(file, "DelayedArray"))
-        return(.new_HDF5Dataset_from_DelayedArray(file))
-    .new_HDF5Dataset_from_array(file)
+    out_file <- getHDF5DumpFile()
+    out_name <- getHDF5DumpName()
+    on.exit(setHDF5DumpName())
+    writeHDF5Dataset(file, out_file, out_name)
 }
 
 

@@ -63,16 +63,18 @@ DelayedArray(x)  # constructor function
   }
 }
 
-\section{Details}{
+\section{In-memory versus on-disk realization}{
   To \emph{realize} a DelayedArray object (i.e. to trigger execution of the
   delayed operations carried by the object and return the result as an
   ordinary array), call \code{as.array} on it. However this realizes the
-  object in memory and could require too much memory. Big DelayedArray
-  objects are preferrably realized on disk e.g. by calling the
-  \code{\link{HDF5Dataset}} constructor on it (other on-disk backends can be
-  supported). In that case, the full object is not realized at once in memory,
-  but split into small blocks first, and the blocks are realized and written
-  to disk one at a time.
+  full object at once \emph{in memory} which could require too much memory.
+  Big DelayedArray objects are preferrably realized \emph{on disk} e.g. by
+  calling the \code{\link{writeHDF5Dataset}} or the \code{\link{HDF5Dataset}}
+  constructor on it (other on-disk backends can be supported). This uses a
+  block-processing strategy so that the full object is not realized at once
+  in memory. Instead the object is processed block by block i.e. the blocks
+  are realized in memory and written to disk one at a time.
+  See \code{?\link{writeHDF5Dataset}} for more information about this.
 }
 
 \section{Accessors}{
