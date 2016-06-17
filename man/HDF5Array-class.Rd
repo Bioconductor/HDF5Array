@@ -106,6 +106,14 @@ writeHDF5Dataset(x, file, name)
   \code{\link{setHDF5DumpName}} utility functions.
 }
 
+\value{
+  An HDF5Array object for \code{HDF5Array()}.
+
+  An HDF5Dataset object for \code{HDF5Dataset()}.
+
+  An invisible HDF5Dataset object for \code{writeHDF5Dataset()}.
+}
+
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
   When passed an \link{DelayedArray} object, \code{writeHDF5Dataset}
   \emph{realizes} it on disk, that is, all the delayed operations carried
@@ -120,14 +128,6 @@ writeHDF5Dataset(x, file, name)
 
   See \code{?\link{DelayedArray}} for general information about
   \link{DelayedArray} objects.
-}
-
-\value{
-  An HDF5Array object for \code{HDF5Array()}.
-
-  An HDF5Dataset object for \code{HDF5Dataset()}.
-
-  An invisible HDF5Dataset object for \code{writeHDF5Dataset()}.
 }
 
 \seealso{
