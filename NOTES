@@ -37,6 +37,7 @@
 ## be sparse. Unfortunately, because the Matrix package can only store the
 ## counts as doubles and not as integers, trying to use it on real RNA-seq
 ## count data actually increases the size of the matrix of counts:
+library(Matrix)
 library(airway)
 data(airway)
 head(assay(airway))

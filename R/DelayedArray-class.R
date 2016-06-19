@@ -600,6 +600,14 @@ setMethod("subset_seed_as_array", "DelayedArray",
     }
 )
 
+setMethod("subset_seed_as_array", "Matrix",
+    function(seed, index)
+    {
+        slice <- subset_by_subscripts(seed, index)
+        as.array(slice)
+    }
+)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Management of delayed operations

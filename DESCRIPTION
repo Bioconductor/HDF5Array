@@ -7,14 +7,16 @@ Description: This package implements the HDF5Array class for convenient access
 	delayed or executed using a block processing mechanism.
 	The delaying and block processing mechanisms are independent of the
 	on-disk backend and implemented via the DelayedArray class. They even
-	work on ordinary arrays where they can sometimes improve performance.
-Version: 1.1.10
+	work on in-memory array-like objects like DataFrame objects (typically
+	with Rle columns), Matrix objects, or ordinary arrays or data frames,
+	where they can improve performance.
+Version: 1.1.11
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, Sequencing, Annotation, Coverage, GenomeAnnotation
 Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.43),
-	IRanges (>= 2.7.6)
+	IRanges (>= 2.7.6), Matrix
 Imports: stats, rhdf5
 Suggests: h5vcData, SummarizedExperiment, GenomicRanges, genefilter,
 	BiocStyle, knitr, rmarkdown
