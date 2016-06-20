@@ -5,12 +5,12 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### ArrayBinder objects
+### SeedBinder objects
 ###
 ### This class is for internal use only and is not exported.
 ###
  
-setClass("ArrayBinder",
+setClass("SeedBinder",
     representation(
         seeds="list",    # List of array-like objects to bind. Each object
                          # is expected to satisfy the "seed contract" i.e.
@@ -26,7 +26,7 @@ setClass("ArrayBinder",
     )
 )
 
-.validate_ArrayBinder <- function(x)
+.validate_SeedBinder <- function(x)
 {
     if (length(x@seeds) == 0L)
         return(wmsg("'x@seeds' cannot be empty"))
@@ -38,34 +38,34 @@ setClass("ArrayBinder",
     TRUE
 }
 
-setValidity2("ArrayBinder", .validate_ArrayBinder)
+setValidity2("SeedBinder", .validate_SeedBinder)
 
-.new_ArrayBinder <- function(seeds, along)
+.new_SeedBinder <- function(seeds, along)
 {
     seeds <- lapply(seeds, remove_pristine_DelayedArray_wrapping)
-    new2("ArrayBinder", seeds=seeds, along=along)
+    new2("SeedBinder", seeds=seeds, along=along)
 }
 
 ### Implement the "seed contract" i.e. dim(), dimnames(), and
 ### subset_seed_as_array().
 
-.get_ArrayBinder_dim <- function(x)
+.get_SeedBinder_dim <- function(x)
 {
     dims <- IRanges:::get_dims_to_bind(x@seeds, x@along)
     IRanges:::combine_dims_along(dims, x@along)
 }
 
-setMethod("dim", "ArrayBinder", .get_ArrayBinder_dim)
+setMethod("dim", "SeedBinder", .get_SeedBinder_dim)
 
-.get_ArrayBinder_dimnames <- function(x)
+.get_SeedBinder_dimnames <- function(x)
 {
     dims <- IRanges:::get_dims_to_bind(x@seeds, x@along)
     IRanges:::combine_dimnames_along(x@seeds, dims, x@along)
 }
 
-setMethod("dimnames", "ArrayBinder", .get_ArrayBinder_dimnames)
+setMethod("dimnames", "SeedBinder", .get_SeedBinder_dimnames)
 
-.subset_ArrayBinder_as_array <- function(seed, index)
+.subset_SeedBinder_as_array <- function(seed, index)
 {
     i <- index[[seed@along]]
 
@@ -97,7 +97,7 @@ setMethod("dimnames", "ArrayBinder", .get_ArrayBinder_dimnames)
     subset_by_subscripts(ans, subscripts)
 }
 
-setMethod("subset_seed_as_array", "ArrayBinder", .subset_ArrayBinder_as_array)
+setMethod("subset_seed_as_array", "SeedBinder", .subset_SeedBinder_as_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -110,7 +110,7 @@ setMethod("subset_seed_as_array", "ArrayBinder", .subset_ArrayBinder_as_array)
     dims <- IRanges:::get_dims_to_bind(objects, 1L)
     if (is.character(dims))
         stop(wmsg(dims))
-    DelayedArray(.new_ArrayBinder(objects, 1L))
+    DelayedArray(.new_SeedBinder(objects, 1L))
 }
 
 .DelayedArray_acbind <- function(...)
@@ -119,7 +119,7 @@ setMethod("subset_seed_as_array", "ArrayBinder", .subset_ArrayBinder_as_array)
     dims <- IRanges:::get_dims_to_bind(objects, 2L)
     if (is.character(dims))
         stop(wmsg(dims))
-    DelayedArray(.new_ArrayBinder(objects, 2L))
+    DelayedArray(.new_SeedBinder(objects, 2L))
 }
 
 setMethod("arbind", "DelayedArray", .DelayedArray_arbind)

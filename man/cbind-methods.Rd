@@ -2,8 +2,8 @@
 
 \alias{cbind-methods}
 
-\alias{dim,ArrayBinder-method}
-\alias{dimnames,ArrayBinder-method}
+\alias{dim,SeedBinder-method}
+\alias{dimnames,SeedBinder-method}
 
 \alias{rbind}
 \alias{rbind,DelayedMatrix-method}

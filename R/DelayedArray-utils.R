@@ -4,12 +4,12 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### ConformableArrayCombiner objects
+### ConformableSeedCombiner objects
 ###
 ### This class is for internal use only and is not exported.
 ###
 
-setClass("ConformableArrayCombiner",
+setClass("ConformableSeedCombiner",
     representation(
         seeds="list",              # List of n conformable array-like objects
                                    # to combine. Each object is expected to
@@ -43,7 +43,7 @@ setClass("ConformableArrayCombiner",
     all(dims == first_dim)
 }
 
-.validate_ConformableArrayCombiner <- function(x)
+.validate_ConformableSeedCombiner <- function(x)
 {
     ## 'seeds' slot.
     if (length(x@seeds) == 0L)
@@ -61,45 +61,45 @@ setClass("ConformableArrayCombiner",
     TRUE
 }
 
-setValidity2("ConformableArrayCombiner", .validate_ConformableArrayCombiner)
+setValidity2("ConformableSeedCombiner", .validate_ConformableSeedCombiner)
 
-.new_ConformableArrayCombiner <- function(seed=new("array"), ...,
-                                          COMBINING_OP="identity",
-                                          Rargs=list())
+.new_ConformableSeedCombiner <- function(seed=new("array"), ...,
+                                         COMBINING_OP="identity",
+                                         Rargs=list())
 {
     seeds <- unname(list(seed, ...))
     seeds <- lapply(seeds, remove_pristine_DelayedArray_wrapping)
-    new2("ConformableArrayCombiner", seeds=seeds,
-                                     COMBINING_OP=COMBINING_OP,
-                                     Rargs=Rargs)
+    new2("ConformableSeedCombiner", seeds=seeds,
+                                    COMBINING_OP=COMBINING_OP,
+                                    Rargs=Rargs)
 }
 
 ### Implement the "seed contract" i.e. dim(), dimnames(), and
 ### subset_seed_as_array().
 
-.get_ConformableArrayCombiner_dim <- function(x) dim(x@seeds[[1L]])
+.get_ConformableSeedCombiner_dim <- function(x) dim(x@seeds[[1L]])
 
-setMethod("dim", "ConformableArrayCombiner",
-    .get_ConformableArrayCombiner_dim
+setMethod("dim", "ConformableSeedCombiner",
+    .get_ConformableSeedCombiner_dim
 )
 
-.get_ConformableArrayCombiner_dimnames <- function(x)
+.get_ConformableSeedCombiner_dimnames <- function(x)
 {
     IRanges:::combine_dimnames(x@seeds)
 }
 
-setMethod("dimnames", "ConformableArrayCombiner",
-    .get_ConformableArrayCombiner_dimnames
+setMethod("dimnames", "ConformableSeedCombiner",
+    .get_ConformableSeedCombiner_dimnames
 )
 
-.subset_ConformableArrayCombiner_as_array <- function(seed, index)
+.subset_ConformableSeedCombiner_as_array <- function(seed, index)
 {
     arrays <- lapply(seed@seeds, subset_seed_as_array, index)
     do.call(seed@COMBINING_OP, c(arrays, seed@Rargs))
 }
 
-setMethod("subset_seed_as_array", "ConformableArrayCombiner",
-    .subset_ConformableArrayCombiner_as_array
+setMethod("subset_seed_as_array", "ConformableSeedCombiner",
+    .subset_ConformableSeedCombiner_as_array
 )
 
 
@@ -172,7 +172,7 @@ setMethod("subset_seed_as_array", "ConformableArrayCombiner",
 {
     if (!identical(dim(e1), dim(e2)))
         stop("non-conformable arrays")
-    DelayedArray(.new_ConformableArrayCombiner(e1, e2, COMBINING_OP=.Generic))
+    DelayedArray(.new_ConformableSeedCombiner(e1, e2, COMBINING_OP=.Generic))
 }
 
 .DelayedArray_Ops <- function(.Generic, e1, e2)
