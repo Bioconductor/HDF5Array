@@ -552,6 +552,14 @@ setGeneric("subset_seed_as_array", signature="seed",
     function(seed, index) standardGeneric("subset_seed_as_array")
 )
 
+setMethod("subset_seed_as_array", "ANY",
+    function(seed, index)
+    {
+        slice <- subset_by_subscripts(seed, index)
+        as.array(slice)
+    }
+)
+
 setMethod("subset_seed_as_array", "array",
     function(seed, index)
         subset_by_subscripts(seed, index)
@@ -589,22 +597,6 @@ setMethod("subset_seed_as_array", "DataFrame",
         slice <- .extract_DataFrame_slice(seed, index)
         data <- unlist(c(slice0, slice), use.names=FALSE)
         array(data, dim=get_subscripts_lengths(index, dim(seed)))
-    }
-)
-
-setMethod("subset_seed_as_array", "DelayedArray",
-    function(seed, index)
-    {
-        slice <- subset_by_subscripts(seed, index)
-        as.array(slice)
-    }
-)
-
-setMethod("subset_seed_as_array", "Matrix",
-    function(seed, index)
-    {
-        slice <- subset_by_subscripts(seed, index)
-        as.array(slice)
     }
 )
 

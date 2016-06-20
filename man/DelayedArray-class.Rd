@@ -123,7 +123,7 @@ DelayedArray(x)  # constructor function
 
 \examples{
 ## ---------------------------------------------------------------------
-## WITH AN ORDINARY array OBJECT
+## WRAP AN ORDINARY ARRAY IN A DelayedArray OBJECT
 ## ---------------------------------------------------------------------
 a <- array(runif(1500000), c(10000, 30, 5))
 A <- DelayedArray(a)
@@ -144,28 +144,44 @@ CS <- colSums(B)
 stopifnot(identical(cs, CS))
 
 ## ---------------------------------------------------------------------
-## WITH A HDF5Dataset OBJECT
+## WRAP A DataFrame OBJECT IN A DelayedArray OBJECT
+## ---------------------------------------------------------------------
+
+## Generate random coverage and score along an imaginary chromosome:
+cov <- Rle(sample(20, 5000, replace=TRUE), sample(6, 5000, replace=TRUE))
+score <- Rle(sample(100, nrun(cov), replace=TRUE), runLength(cov))
+
+DF <- DataFrame(cov, score)
+A2 <- DelayedArray(DF)
+A2
+
+t(A2)  # delayed transpose is very fast and very memory efficient because
+       # the matrix data is not copied
+colSums(A2)
+
+## ---------------------------------------------------------------------
+## WRAP A HDF5Dataset OBJECT IN A DelayedArray OBJECT
 ## ---------------------------------------------------------------------
 h5a <- HDF5Dataset(a)    # create the dataset
 h5a
 
-A2 <- DelayedArray(h5a)  # wrap the dataset in a DelayedArray object
-A2
+A3 <- DelayedArray(h5a)  # wrap the dataset in a DelayedArray object
+A3
 
-B2 <- toto(A2)  # very fast! (operations are delayed)
-B2 <- drop(B2)
+B3 <- toto(A3)  # very fast! (operations are delayed)
+B3 <- drop(B3)
 
-CS2 <- colSums(B2)
-stopifnot(identical(cs, CS2))
+CS3 <- colSums(B3)
+stopifnot(identical(cs, CS3))
 
 ## ---------------------------------------------------------------------
 ## STORE THE RESULT IN A NEW HDF5Dataset OBJECT
 ## ---------------------------------------------------------------------
-b2 <- HDF5Dataset(B2)  # "realize" B2 on disk (as an HDF5 dataset)
+b3 <- HDF5Dataset(B3)  # "realize" B3 on disk (as an HDF5 dataset)
 
 ## If this is just an intermediate result, you can either keep going
-## with B2 or replace it with b2 wrapped in a DelayedArray object etc...
-B2 <- DelayedArray(b2)  # semantically equivalent to the previous B2
+## with B3 or replace it with b3 wrapped in a DelayedArray object etc...
+B3 <- DelayedArray(b3)  # semantically equivalent to the previous B3
 }
 \keyword{methods}
 \keyword{classes}
