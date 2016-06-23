@@ -1,3 +1,8 @@
+- Add man page and unit tests for statistical methods defined in
+  DelayedArray-stats.R
+
+- Make DelayedArray contain Annotated from S4Vectors.
+
 - Document global option HDF5Array.block.size
 
 - Fix bug in "[" method for DelayedArray objects caused by "substitute() +

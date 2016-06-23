@@ -31,5 +31,6 @@ Collate:
 	DelayedArray-utils.R
 	DelayedMatrix-utils.R
 	cbind-methods.R
+	DelayedArray-stats.R
 	HDF5Array-class.R
 	zzz.R
