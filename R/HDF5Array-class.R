@@ -21,7 +21,7 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
 
 .subset_HDF5Dataset_as_array <- function(seed, index)
 {
-    ans_dim <- get_subscripts_lengths(index, dim(seed))
+    ans_dim <- DelayedArray:::get_subscripts_lengths(index, dim(seed))
     if (any(ans_dim == 0L)) {
         ans <- seed@first_val[0]
         dim(ans) <- ans_dim
@@ -192,7 +192,7 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 {
     if (!is(x@seed, "HDF5Dataset"))
         return(wmsg("'x@seed' must be a HDF5Dataset object"))
-    if (!is_pristine(x))
+    if (!DelayedArray:::is_pristine(x))
         return(wmsg("'x' carries delayed operations on it"))
     TRUE
 }
@@ -206,7 +206,7 @@ HDF5Array <- function(file, name, type=NA)
     } else {
         seed <- HDF5Dataset(file, name, type=type)
     }
-    ans <- new_DelayedArray(seed, Class="HDF5Array")
+    ans <- DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
     ## The dimnames will automatically propagate once we store them in the
     ## HDF5 file and we have a dimnames() getter for HDF5Dataset objects that
     ## knows how to extract them. And so this won't be necessary anymore...

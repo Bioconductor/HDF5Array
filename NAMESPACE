@@ -1,8 +1,8 @@
 import(methods)
-importFrom(stats, setNames, dlogis, plogis, qlogis)
 import(BiocGenerics)
 import(S4Vectors)
 import(IRanges)
+import(DelayedArray)
 import(rhdf5)
 
 
@@ -11,44 +11,8 @@ import(rhdf5)
 ###
 
 exportClasses(
-    DelayedArray, DelayedMatrix,
     HDF5Dataset,
     HDF5Array, HDF5Matrix
-)
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Export S3 methods
-###
-
-S3method(as.array, DelayedArray)
-
-S3method(as.data.frame, DelayedArray)
-
-S3method(as.matrix, DelayedArray)
-
-S3method(as.vector, DelayedArray)
-
-S3method(mean, DelayedArray)
-
-S3method(split, DelayedArray)
-
-### We also export them thru the export() directive so that (a) they can be
-### called directly, (b) tab-completion on the name of the generic shows them,
-### and (c) methods() doesn't asterisk them.
-
-export(
-    as.array.DelayedArray,
-
-    as.data.frame.DelayedArray,
-
-    as.matrix.DelayedArray,
-
-    as.vector.DelayedArray,
-
-    mean.DelayedArray,
-
-    split.DelayedArray
 )
 
 
@@ -58,40 +22,13 @@ export(
 
 exportMethods(
     ## Methods for generics defined in the base package:
-    length, names, "names<-",
-    dim, "dim<-", dimnames, "dimnames<-",
-    as.array, as.vector, as.matrix, as.data.frame,
-    "[", "[[",
-    drop,
-    t,
-    c,
-    split,
-    is.na, is.finite, is.infinite, is.nan,
-    "!",
-    #"+", "-", "*", "/", "^", "%%", "%/%",  # "Arith" group generic
-    "==", "!=", "<=", ">=", "<", ">",       # "Compare" group generic
-    anyNA, which,
-    max, min, range, sum, prod, any, all,   # "Summary" group generic
-    mean,
-    round, signif,
-    rowSums, colSums, rowMeans, colMeans,
-    nchar, tolower, toupper,
+    length, dim,
 
     ## Methods for generics defined in the methods package:
-    coerce, show,
+    coerce,
 
-    ## Methods for generics defined in the stats package:
-    dlogis, plogis, qlogis,
-
-    ## Methods for generics defined in the BiocGenerics package:
-    cbind, rbind,
-
-    ## Methods for generics defined in the S4Vectors package:
-    isEmpty,
-
-    ## Methods for generics defined in the IRanges package:
-    splitAsList,
-    arbind, acbind
+    ## Methods for generics defined in the DelayedArray package:
+    subset_seed_as_array, matrixClass
 )
 
 
@@ -102,23 +39,6 @@ exportMethods(
 export(
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
-    DelayedArray,
     writeHDF5Dataset, HDF5Dataset, HDF5Array
-)
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Export S4 generics defined in HDF5Array + export corresponding methods
-###
-
-export(
-    pmax2, pmin2,
-    apply
-)
-
-### Exactly the same list as above.
-exportMethods(
-    pmax2, pmin2,
-    apply
 )
 

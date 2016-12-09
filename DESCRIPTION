@@ -1,36 +1,18 @@
 Package: HDF5Array
-Title: An array-like container for convenient access and manipulation of HDF5
-	datasets
-Description: This package implements the HDF5Array class for convenient access
-	and manipulation of HDF5 datasets. In order to reduce memory usage and
-	optimize performance, operations on an HDF5Array object are either
-	delayed or executed using a block processing mechanism.
-	The delaying and block processing mechanisms are independent of the
-	on-disk backend and implemented via the DelayedArray class. They even
-	work on in-memory array-like objects like DataFrame objects (typically
-	with Rle columns), Matrix objects, or ordinary arrays or data frames,
-	where they can improve performance.
-Version: 1.3.0
+Title: HDF5 back end for DelayedArray objects
+Description: An array-like container for convenient access and manipulation
+	of HDF5 datasets. Supports delayed operations and block processing.
+Version: 1.3.1
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, Sequencing, Annotation, Coverage, GenomeAnnotation
-Depends: R (>= 3.2), methods, BiocGenerics (>= 0.15.3), S4Vectors (>= 0.9.43),
-	IRanges (>= 2.7.6)
-Imports: stats, rhdf5
-Suggests: Matrix, h5vcData, SummarizedExperiment, GenomicRanges, genefilter,
-	BiocStyle, knitr, rmarkdown
-VignetteBuilder: knitr
+Depends: R (>= 3.4), methods, DelayedArray, rhdf5
+Imports: BiocGenerics, S4Vectors, IRanges
+Suggests: h5vcData, SummarizedExperiment, GenomicRanges, BiocStyle
 License: Artistic-2.0
-Collate:
-	utils.R
+Collate: utils.R
 	block_processing.R
 	setHDF5DumpFile.R
-	show-utils.R
-	DelayedArray-class.R
-	DelayedArray-utils.R
-	DelayedMatrix-utils.R
-	cbind-methods.R
-	DelayedArray-stats.R
 	HDF5Array-class.R
 	zzz.R
