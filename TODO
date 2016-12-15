@@ -7,8 +7,8 @@
     https://www.hdfgroup.org/HDF5/Tutor/h5dimscale.html
 
   Operations that write a new HDF5 dataset to disk (e.g. matrix multiplication,
-  or HDF5Dataset() when called on a DelayedArray) would then need to be
-  modified to also write the dimnames to the HDF5 file.
+  or coercion to HDF5Dataset or HDF5Array) would then need to be modified to
+  also write the dimnames to the HDF5 file.
 
 - Keep investigating interaction between chunk and block geometries and their
   impact on block processing performance.
