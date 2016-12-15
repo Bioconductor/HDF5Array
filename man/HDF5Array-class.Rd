@@ -9,6 +9,8 @@
 
 \alias{dim,HDF5Dataset-method}
 \alias{subset_seed_as_array,HDF5Dataset-method}
+
+\alias{coerce,HDF5DatasetDump,HDF5Dataset-method}
 \alias{writeHDF5Dataset}
 
 % HDF5Array and HDF5Matrix
@@ -23,6 +25,9 @@
 
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 \alias{matrixClass,HDF5Array-method}
+
+\alias{coerce,HDF5DatasetDump,HDF5Array-method}
+\alias{coerce,HDF5DatasetDump,DelayedArray-method}
 
 \alias{coerce,DelayedArray,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Matrix-method}

@@ -84,7 +84,7 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
                       "(see '?HDF5Array' for more information)."))
         first_val <- match.fun(type)(1)  # fake value
         if (!is.atomic(first_val))
-            stop("invalid type: ", type)
+            stop(wmsg("invalid type: ", type))
     } else {
         first_val <- .read_h5dataset_first_val(file, name, length(dim))
         detected_type <- typeof(first_val)
@@ -100,49 +100,32 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
                         first_val=first_val)
 }
 
+.from_HDF5DatasetDump_to_HDF5Dataset <- function(from)
+{
+    .new_HDF5Dataset_from_file(from@file, from@name, type=from@type)
+}
+
+setAs("HDF5DatasetDump", "HDF5Dataset", .from_HDF5DatasetDump_to_HDF5Dataset)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### writeHDF5Dataset()
 ###
 
-### Return an HDF5Dataset object pointing to the newly written HDF5 dataset
-### on disk.
+### Return an invisible HDF5Dataset object pointing to the newly written HDF5
+### dataset on disk.
 ### TODO: Investigate the possiblity to store the dimnames in the HDF5 file
 ### so a "dimnames" method for HDF5Dataset objects could bring them back.
 writeHDF5Dataset <- function(x, file, name)
 {
-    if (!isSingleString(file))
-        stop(wmsg("'file' must be a single string specifying the path to ",
-                  "the HDF5 file where to write the dataset"))
-    if (!isSingleString(name)) 
-        stop(wmsg("'name' must be a single string specifying the name of ", 
-                  "the HDF5 dataset to write"))
-    if (name == "")
-        stop(wmsg("'name' cannot be the empty string"))
-    if (is(x, "HDF5Dataset")) {
-        x <- DelayedArray(x)
-    } else if (!(is.array(x) || is(x, "DelayedArray"))) {
-        stop(wmsg("writing ", class(x), " object as an HDF5 dataset ",
-                  "is not supported"))
-    }
-    if (!file.exists(file))
-        h5createFile(file)
-    ans_type <- type(x)
-    h5createDataset2(file, name, dim(x), storage.mode=ans_type)
-    if (is.array(x)) {
-        h5write2(x, file, name)
-    } else if (is(x, "DelayedArray")) {
-        ## Semantically equivalent to 'h5write2(as.array(x), file, name)'
-        ## but uses block-processing so the full DelayedArray object is not
-        ## realized at once in memory. Instead the object is first split into
-        ## blocks and the blocks are realized and written to disk one at a
-        ## time.
-        block_APPLY(x, identity, out_file=file, out_name=name)
-    } else {
-        stop(wmsg("writing ", class(x), " object to HDF5 dataset ",
-                  "not supported"))
-    }
-    invisible(.new_HDF5Dataset_from_file(file, name, type=ans_type))
+    old_dump_file <- getHDF5DumpFile()
+    old_dump_name <- getHDF5DumpName()
+    setHDF5DumpFile(file)
+    on.exit({setHDF5DumpFile(old_dump_file); setHDF5DumpName(old_dump_name)})
+    setHDF5DumpName(name)
+    dump <- HDF5DatasetDump(dim(x), dimnames(x), type(x))
+    write_to_dump(x, dump)
+    invisible(as(dump, "HDF5Dataset"))
 }
 
 
@@ -161,10 +144,10 @@ HDF5Dataset <- function(file, name, type=NA)
     if (!(missing(name) && identical(type, NA)))
         stop(wmsg("'name' or 'type' cannot be specified when calling ",
                   "HDF5Dataset() on a DelayedArray or array object"))
-    out_file <- getHDF5DumpFile()
-    out_name <- getHDF5DumpName()
-    on.exit(setHDF5DumpName())
-    writeHDF5Dataset(file, out_file, out_name)
+    dump <- HDF5DatasetDump(dim(file), dimnames(file), type(file))
+    on.exit(close(dump))
+    write_to_dump(file, dump)
+    as(dump, "HDF5Dataset")
 }
 
 
@@ -214,6 +197,20 @@ HDF5Array <- function(file, name, type=NA)
         dimnames(ans) <- dimnames(file)
     ans
 }
+
+.from_HDF5DatasetDump_to_HDF5Array <- function(from)
+{
+    ## TODO: Investigate the possiblity to store the dimnames in the HDF5 file
+    ## so the HDF5Array() constructor can bring them back. Then we wouldn't
+    ## need to explicitely set them on 'ans' like we do below. 
+    ans <- HDF5Array(from@file, from@name, type=from@type)
+    if (!all(S4Vectors:::sapply_isNULL(from@dimnames)))
+        dimnames(ans) <- from@dimnames
+    ans
+}
+
+setAs("HDF5DatasetDump", "HDF5Array", .from_HDF5DatasetDump_to_HDF5Array)
+setAs("HDF5DatasetDump", "DelayedArray", .from_HDF5DatasetDump_to_HDF5Array)
 
 ### Overwrite unsafe automatic coercion methods that return invalid objects
 ### (they don't validate them).

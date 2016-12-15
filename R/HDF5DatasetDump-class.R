@@ -65,69 +65,43 @@ getHDF5DumpName <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Some low-level non-exported stuff
+### HDF5DatasetDump objects
 ###
 
-### Here is the trade-off: The shorter the chunks, the snappier the "show"
-### method feels (on my laptop, it starts to feel sloppy with a chunk
-### length > 10 millions). OTOH small chunks tend to slow down methods that
-### do block processing (e.g. sum(), range(), etc...). Setting the default
-### to 1 million seems a good compromise.
-.chunk_as_hypercube <- function(dims, chunk_len=1000000L)
+setClass("HDF5DatasetDump",
+    contains="ArrayOnDiskDump",
+    representation(
+        file="character",  # Single string.
+        name="character",  # Dataset name.
+        dim="integer",
+        dimnames="list",
+        type="character"   # Single string.
+    )
+)
+
+### HDF5DatasetDump object created with an earlier call to HDF5DatasetDump()
+### should be closed before calling HDF5DatasetDump() again.
+HDF5DatasetDump <- function(dim, dimnames=NULL, type="double")
 {
-    if (prod(dims) <= chunk_len)
-        return(dims)
-    ndim <- length(dims)
-
-    ## The perfect chunk is the hypercube.
-    chunk <- as.integer(round(rep.int(chunk_len ^ (1 / ndim), ndim)))
-
-    ## But it could have dimensions that are greater than 'dims'. In that case
-    ## we need to reshape it.
-    while (any(chunk > dims)) {
-        chunk <- pmin(chunk, dims)
-        r <- chunk_len / prod(chunk)  # > 1
-        extend_along <- which(chunk < dims)
-        extend_factor <- r ^ (1 / length(extend_along))
-        chunk[extend_along] <- as.integer(chunk[extend_along] * extend_factor)
-    }
-    chunk
+    file <- getHDF5DumpFile()
+    name <- getHDF5DumpName()
+    if (is(try(h5createDataset2(file, name, dim, type)), "try-error"))
+        stop(wmsg("Failed to create a new HDF5DatasetDump object. Make sure ",
+                  "to close() the previously created HDF5DatasetDump object ",
+                  "first. Alternatively call setHDF5DumpName() before trying ",
+                  "to call HDF5DatasetDump() again."))
+    if (is.null(dimnames))
+        dimnames <- vector("list", length(dim))
+    new2("HDF5DatasetDump", file=file, name=name,
+                            dim=dim, dimnames=dimnames, type=type)
 }
 
-.chunk_as_subblock <- function(dims, storage.mode="double", ratio=75L)
-{
-    block_len <- get_block_length(storage.mode)
-    chunk_len <- as.integer(ceiling(block_len / ratio))
-    ## 'block_len' must be a multiple of 'chunk_len'.
-    stopifnot(block_len %% chunk_len == 0L)
-    chunks <- ArrayBlocks(dims, chunk_len)
-    chunk <- chunks@dim
-    ndim <- length(chunk)
-    if (chunks@N > ndim)
-        return(chunk)
-    chunk[[chunks@N]] <- chunks@by
-    if (chunks@N == ndim)
-        return(chunk)
-    chunk[(chunks@N+1L):ndim] <- 1L
-    chunk
-}
+setMethod("write_to_dump", c("array", "HDF5DatasetDump"),
+    function(x, dump, subscripts=NULL)
+        h5write2(x, dump@file, dump@name, index=subscripts)
+)
 
-### A simple wrapper around h5createDataset() that automatically chooses the
-### chunk geometry.
-h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
-{
-    if (storage.mode == "character") {
-        size <- max(nchar(dataset, type="width"))
-    } else {
-        size <- NULL
-    }
-    #chunk <- .chunk_as_hypercube(dims)
-    chunk <- .chunk_as_subblock(dims, storage.mode)
-    ok <- h5createDataset(file, dataset, dims, storage.mode=storage.mode,
-                                               size=size,
-                                               chunk=chunk)
-    if (!ok)
-        stop(wmsg("failed to create dataset '", dataset, "' ",
-                  "in file '", file, "'"), call.=FALSE)
-}
+setMethod("close", "HDF5DatasetDump",
+    function(con, ...) setHDF5DumpName()
+)
 

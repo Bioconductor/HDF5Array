@@ -7,6 +7,13 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
+\alias{class:HDF5DatasetDump}
+\alias{HDF5DatasetDump-class}
+\alias{HDF5DatasetDump}
+
+\alias{write_to_dump,array,HDF5DatasetDump-method}
+\alias{close,HDF5DatasetDump-method}
+
 \title{Control the location of automatically created HDF5 datasets}
 
 \description{

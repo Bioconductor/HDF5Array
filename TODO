@@ -1,5 +1,3 @@
-- Document global option HDF5Array.block.size
-
 - Store the dimnames in the HDF5 file: investigate the possiblity to store the
   dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
   can grab them from there. According to the HDF5 spec, it seems that the best
