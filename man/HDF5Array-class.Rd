@@ -77,9 +77,9 @@ HDF5Dataset(file, name, type=NA)
     \item \link{DelayedArray-utils} for common operations on DelayedArray
           objects.
 
-    \item \link{writeHDF5Dataset} for writting an array-like object to an HDF5
-          file and other low-level utilities to control the location of
-          automatically created HDF5 datasets.
+    \item \code{\link{writeHDF5Dataset}} for writting an array-like object
+          to an HDF5 file and other low-level utilities to control the
+          location of automatically created HDF5 datasets.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 

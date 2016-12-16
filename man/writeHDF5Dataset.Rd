@@ -20,6 +20,7 @@
 \alias{coerce,ANY,HDF5Dataset-method}
 \alias{coerce,HDF5DatasetDump,DelayedArray-method}
 \alias{coerce,ANY,HDF5Array-method}
+\alias{coerce,DelayedArray,HDF5Array-method}
 
 \title{Write an array-like object to an HDF5 file}
 

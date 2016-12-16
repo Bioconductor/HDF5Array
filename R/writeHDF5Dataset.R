@@ -4,7 +4,7 @@
 ###
 
 
-.HDF5_dump_settings_envir <- new.env(hash=TRUE, parent=emptyenv())
+.HDF5_dump_settings_envir <- new.env(parent=emptyenv())
 
 ### Called by .onLoad() hook (see zzz.R file).
 setHDF5DumpFile <- function(file=paste0(tempfile(), ".h5"))
@@ -184,4 +184,9 @@ setAs("ANY", "HDF5Dataset", .dump_as_HDF5Dataset)
 
 setAs("HDF5DatasetDump", "DelayedArray", .dump_as_HDF5Array)
 setAs("ANY", "HDF5Array", .dump_as_HDF5Array)
+
+### Automatic coercion method from DelayedArray to HDF5Array silently returns
+### a broken object (unfortunately these dummy automatic coercion methods don't
+### bother to validate the object they return). So we overwrite it.
+setAs("DelayedArray", "HDF5Array", .dump_as_HDF5Array)
 
