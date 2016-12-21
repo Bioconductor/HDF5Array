@@ -65,10 +65,10 @@ getHDF5DumpName <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5DatasetDump objects
+### HDF5ArrayDump objects
 ###
 
-setClass("HDF5DatasetDump",
+setClass("HDF5ArrayDump",
     contains="OnDiskArrayDump",
     representation(
         file="character",  # Single string.
@@ -79,7 +79,7 @@ setClass("HDF5DatasetDump",
     )
 )
 
-setMethod("dimnames", "HDF5DatasetDump",
+setMethod("dimnames", "HDF5ArrayDump",
     function(x)
     {
         ans <- x@dimnames
@@ -89,28 +89,28 @@ setMethod("dimnames", "HDF5DatasetDump",
     }
 )
 
-### HDF5DatasetDump object created with an earlier call to HDF5DatasetDump()
-### should be closed before calling HDF5DatasetDump() again.
+### HDF5ArrayDump object created with an earlier call to HDF5ArrayDump()
+### should be closed before calling HDF5ArrayDump() again.
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
-HDF5DatasetDump <- function(dim, dimnames=NULL, type="double")
+HDF5ArrayDump <- function(dim, dimnames=NULL, type="double")
 {
     file <- getHDF5DumpFile()
     name <- getHDF5DumpName()
     if (is(try(h5createDataset2(file, name, dim, type)), "try-error"))
-        stop(wmsg("Failed to create a new HDF5DatasetDump object. Make sure ",
-                  "to close() the previously created HDF5DatasetDump object ",
+        stop(wmsg("Failed to create a new HDF5ArrayDump object. Make sure ",
+                  "to close() the previously created HDF5ArrayDump object ",
                   "first. Alternatively call setHDF5DumpName() before trying ",
-                  "to call HDF5DatasetDump() again."))
+                  "to call HDF5ArrayDump() again."))
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
         ## TODO: Write the dimnames to the HDF5 file.
     }
-    new2("HDF5DatasetDump", file=file, name=name,
-                            dim=dim, dimnames=dimnames, type=type)
+    new2("HDF5ArrayDump", file=file, name=name,
+                          dim=dim, dimnames=dimnames, type=type)
 }
 
-setMethod("write_to_dump", c("array", "HDF5DatasetDump"),
+setMethod("write_to_dump", c("array", "HDF5ArrayDump"),
     function(x, dump, offsets=NULL)
     {
         if (is.null(offsets)) {
@@ -127,7 +127,7 @@ setMethod("write_to_dump", c("array", "HDF5DatasetDump"),
     }
 )
 
-setMethod("close", "HDF5DatasetDump",
+setMethod("close", "HDF5ArrayDump",
     function(con, ...) setHDF5DumpName()
 )
 
@@ -138,22 +138,22 @@ setMethod("close", "HDF5DatasetDump",
 
 ### FIXME: This needs to propagate the dimnames. Unfortunately this is not
 ### possible at the moment. See FIXME right before definition of
-### HDF5DatasetDump() above in this file and right before definition of
-### HDF5Dataset() in HDF5Array-class.R about this.
-.from_HDF5DatasetDump_to_HDF5Dataset <- function(from)
+### HDF5ArrayDump() above in this file and right before definition of
+### HDF5ArraySeed() in HDF5Array-class.R about this.
+.from_HDF5ArrayDump_to_HDF5ArraySeed <- function(from)
 {
-    HDF5Dataset(from@file, from@name, type=from@type)
+    HDF5ArraySeed(from@file, from@name, type=from@type)
 }
 
-setAs("HDF5DatasetDump", "HDF5Dataset", .from_HDF5DatasetDump_to_HDF5Dataset)
+setAs("HDF5ArrayDump", "HDF5ArraySeed", .from_HDF5ArrayDump_to_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### writeHDF5Dataset()
 ###
 
-### Return an invisible HDF5Dataset object pointing to the newly written HDF5
-### dataset on disk.
+### Return an invisible HDF5ArraySeed object pointing to the newly written
+### HDF5 dataset on disk.
 ### FIXME: This needs to propagate the dimnames. Unfortunately this is not
 ### possible at the moment. See various FIXMEs above in this file about this.
 writeHDF5Dataset <- function(x, file, name)
@@ -163,38 +163,38 @@ writeHDF5Dataset <- function(x, file, name)
     setHDF5DumpFile(file)
     on.exit({setHDF5DumpFile(old_dump_file); setHDF5DumpName(old_dump_name)})
     setHDF5DumpName(name)
-    dump <- HDF5DatasetDump(dim(x), dimnames(x), type(x))
+    dump <- HDF5ArrayDump(dim(x), dimnames(x), type(x))
     write_to_dump(x, dump)
-    invisible(as(dump, "HDF5Dataset"))
+    invisible(as(dump, "HDF5ArraySeed"))
 }
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an array-like object to HDF5Dataset, HDF5Array, or HDF5Matrix
+### Coercing an array-like object to HDF5ArraySeed, HDF5Array, or HDF5Matrix
 ### dumps it to disk.
 ###
 
-.dump_as_HDF5Dataset <- function(from)
+.dump_as_HDF5ArraySeed <- function(from)
 {
-    dump <- HDF5DatasetDump(dim(from), dimnames(from), type(from))
+    dump <- HDF5ArrayDump(dim(from), dimnames(from), type(from))
     on.exit(close(dump))
     write_to_dump(from, dump)
-    as(dump, "HDF5Dataset")
+    as(dump, "HDF5ArraySeed")
 }
 
-setAs("ANY", "HDF5Dataset", .dump_as_HDF5Dataset)
+setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
 
 .dump_as_HDF5Array <- function(from)
 {
-    ans <- as(as(from, "HDF5Dataset"), "HDF5Array")
-    ## Temporarily needed because coercion from HDF5DatasetDump to HDF5Dataset
+    ans <- as(as(from, "HDF5ArraySeed"), "HDF5Array")
+    ## Temporarily needed because coercion from HDF5ArrayDump to HDF5ArraySeed
     ## doesn't propagate the dimnames at the moment. See FIXME above.
     ## TODO: Remove line below when FIXME above is addressed.
     dimnames(ans) <- dimnames(from)
     ans
 }
 
-setAs("HDF5DatasetDump", "DelayedArray", .dump_as_HDF5Array)
+setAs("HDF5ArrayDump", "DelayedArray", .dump_as_HDF5Array)
 setAs("ANY", "HDF5Array", .dump_as_HDF5Array)
 
 ### Automatic coercion method from DelayedArray to HDF5Array silently returns

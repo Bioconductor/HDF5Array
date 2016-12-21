@@ -7,18 +7,18 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
-\alias{class:HDF5DatasetDump}
-\alias{HDF5DatasetDump-class}
-\alias{HDF5DatasetDump}
+\alias{class:HDF5ArrayDump}
+\alias{HDF5ArrayDump-class}
+\alias{HDF5ArrayDump}
 
-\alias{dimnames,HDF5DatasetDump-method}
-\alias{write_to_dump,array,HDF5DatasetDump-method}
-\alias{close,HDF5DatasetDump-method}
+\alias{dimnames,HDF5ArrayDump-method}
+\alias{write_to_dump,array,HDF5ArrayDump-method}
+\alias{close,HDF5ArrayDump-method}
 
-\alias{coerce,HDF5DatasetDump,HDF5Dataset-method}
+\alias{coerce,HDF5ArrayDump,HDF5ArraySeed-method}
 \alias{writeHDF5Dataset}
-\alias{coerce,ANY,HDF5Dataset-method}
-\alias{coerce,HDF5DatasetDump,DelayedArray-method}
+\alias{coerce,ANY,HDF5ArraySeed-method}
+\alias{coerce,HDF5ArrayDump,DelayedArray-method}
 \alias{coerce,ANY,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Array-method}
 
@@ -47,7 +47,7 @@ getHDF5DumpName()
 \arguments{
   \item{x}{
     The array-like object to write to an HDF5 file e.g. an ordinary array,
-    a \link{DelayedArray} object, a \link{HDF5Dataset} object, etc...
+    a \link{DelayedArray} object, a \link{HDF5ArraySeed} object, etc...
 
     If \code{x} is a \link{DelayedArray} object, \code{writeHDF5Dataset}
     \emph{realizes} it on disk, that is, all the delayed operations carried
@@ -55,7 +55,7 @@ getHDF5DumpName()
     See "On-disk realization of a DelayedArray object as an HDF5 dataset"
     section below for more information.
 
-    If \code{x} is an \link{HDF5Dataset} object, \code{writeHDF5Dataset}
+    If \code{x} is an \link{HDF5ArraySeed} object, \code{writeHDF5Dataset}
     first wraps it in a \link{DelayedArray} object in order to trigger the
     block-processing strategy used by the on-disk realization mechanism.
   }
@@ -81,7 +81,7 @@ getHDF5DumpName()
 }
 
 \value{
-  An invisible HDF5Dataset object for \code{writeHDF5Dataset()}.
+  An invisible HDF5ArraySeed object for \code{writeHDF5Dataset()}.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
@@ -153,20 +153,20 @@ getHDF5DumpFile()
 lsHDF5DumpFile()
 
 a <- array(1:600, c(150, 4))
-h5a <- as(a, "HDF5Dataset")
+h5a <- as(a, "HDF5ArraySeed")
 lsHDF5DumpFile()
 A <- as(h5a, "HDF5Array")   # DelayedArray object
 A
 
 b <- array(runif(6000), c(4, 2, 150))
-h5b <- as(b, "HDF5Dataset")
+h5b <- as(b, "HDF5ArraySeed")
 lsHDF5DumpFile()
 B <- as(h5b, "HDF5Array")   # DelayedArray object
 B
 
 C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
 C
-as(C, "HDF5Dataset")        # realize C on disk
+as(C, "HDF5ArraySeed")      # realize C on disk
 lsHDF5DumpFile()
 
 ## Matrix multiplication is not delayed. It will realize the result and

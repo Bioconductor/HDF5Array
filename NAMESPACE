@@ -11,8 +11,8 @@ import(rhdf5)
 ###
 
 exportClasses(
-    HDF5Dataset, HDF5Array, HDF5Matrix,
-    HDF5DatasetDump
+    HDF5ArraySeed, HDF5Array, HDF5Matrix,
+    HDF5ArrayDump
 )
 
 
@@ -37,9 +37,9 @@ exportMethods(
 ###
 
 export(
-    HDF5Dataset, HDF5Array,
+    HDF5ArraySeed, HDF5Array,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
-    HDF5DatasetDump, writeHDF5Dataset
+    HDF5ArrayDump, writeHDF5Dataset
 )
 

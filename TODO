@@ -1,5 +1,5 @@
 - Store the dimnames in the HDF5 file: investigate the possiblity to store the
-  dimnames in the HDF5 file so the HDF5Dataset() and HDF5Array() constructors
+  dimnames in the HDF5 file so the HDF5ArraySeed() and HDF5Array() constructors
   can grab them from there. According to the HDF5 spec, it seems that the best
   way to do this is by storing the dimnames in HDF5 Dimension Scale datasets
   (1 dataset per character vector in the list returned by dimnames(x)):
@@ -7,13 +7,13 @@
     https://www.hdfgroup.org/HDF5/Tutor/h5dimscale.html
 
   Operations that write a new HDF5 dataset to disk (e.g. matrix multiplication,
-  or coercion to HDF5Dataset or HDF5Array) would then need to be modified to
+  or coercion to HDF5ArraySeed or HDF5Array) would then need to be modified to
   also write the dimnames to the HDF5 file.
 
 - Keep investigating interaction between chunk and block geometries and their
   impact on block processing performance.
 
-- Add 'chunk' slot to HDF5Dataset objects and populate it with physical chunk
+- Add 'chunk' slot to HDF5ArraySeed objects and populate it with physical chunk
   geometry at creation time. Emit a warning if chunk genometry won't lead to
   good block processing performance.
 

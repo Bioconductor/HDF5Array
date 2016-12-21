@@ -1,14 +1,14 @@
 \name{HDF5Array-class}
 \docType{class}
 
-% HDF5Dataset
+% HDF5ArraySeed
 
-\alias{class:HDF5Dataset}
-\alias{HDF5Dataset-class}
-\alias{HDF5Dataset}
+\alias{class:HDF5ArraySeed}
+\alias{HDF5ArraySeed-class}
+\alias{HDF5ArraySeed}
 
-\alias{dim,HDF5Dataset-method}
-\alias{subset_seed_as_array,HDF5Dataset-method}
+\alias{dim,HDF5ArraySeed-method}
+\alias{subset_seed_as_array,HDF5ArraySeed-method}
 
 % HDF5Array and HDF5Matrix
 
@@ -23,7 +23,7 @@
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 \alias{matrixClass,HDF5Array-method}
 
-\alias{coerce,HDF5Dataset,HDF5Array-method}
+\alias{coerce,HDF5ArraySeed,HDF5Array-method}
 \alias{coerce,ANY,HDF5Matrix-method}
 
 \title{HDF5 datasets as array-like objects}
@@ -36,10 +36,10 @@
           \link{DelayedArray}. All the operations available on
           \link{DelayedArray} objects work on HDF5Array objects.
 
-    \item HDF5Dataset: A low-level class for pointing to an HDF5 dataset. No
-          operation can be performed directly on an HDF5Dataset object. It
+    \item HDF5ArraySeed: A low-level class for pointing to an HDF5 dataset. No
+          operation can be performed directly on an HDF5ArraySeed object. It
           needs to be wrapped in a \link{DelayedArray} or HDF5Array object
-          first. An HDF5Array object is just an HDF5Dataset object wrapped
+          first. An HDF5Array object is just an HDF5ArraySeed object wrapped
           in a \link{DelayedArray} object.
   }
 }
@@ -47,7 +47,7 @@
 \usage{
 ## Constructor functions:
 HDF5Array(file, name, type=NA)
-HDF5Dataset(file, name, type=NA)
+HDF5ArraySeed(file, name, type=NA)
 }
 
 \arguments{
@@ -67,7 +67,7 @@ HDF5Dataset(file, name, type=NA)
 \value{
   An HDF5Array object for \code{HDF5Array()}.
 
-  An HDF5Dataset object for \code{HDF5Dataset()}.
+  An HDF5ArraySeed object for \code{HDF5ArraySeed()}.
 }
 
 \seealso{

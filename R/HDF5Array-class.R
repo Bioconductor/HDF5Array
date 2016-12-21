@@ -3,7 +3,7 @@
 ### -------------------------------------------------------------------------
 
 
-setClass("HDF5Dataset",
+setClass("HDF5ArraySeed",
     representation(
         file="character",   # Single string.
         name="character",   # Dataset name.
@@ -12,14 +12,14 @@ setClass("HDF5Dataset",
     )
 )
 
-setMethod("dim", "HDF5Dataset", function(x) x@dim)
+setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### subset_seed_as_array()
 ###
 
-.subset_HDF5Dataset_as_array <- function(seed, index)
+.subset_HDF5ArraySeed_as_array <- function(seed, index)
 {
     ans_dim <- DelayedArray:::get_subscripts_lengths(index, dim(seed))
     if (any(ans_dim == 0L)) {
@@ -31,11 +31,13 @@ setMethod("dim", "HDF5Dataset", function(x) x@dim)
     ans
 }
 
-setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
+setMethod("subset_seed_as_array", "HDF5ArraySeed",
+    .subset_HDF5ArraySeed_as_array
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5Dataset internal low-level constructor
+### HDF5ArraySeed internal low-level constructor
 ###
 
 .get_h5dataset_dim <- function(file, name)
@@ -65,14 +67,14 @@ setMethod("subset_seed_as_array", "HDF5Dataset", .subset_HDF5Dataset_as_array)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5Dataset constructor
+### HDF5ArraySeed constructor
 ###
 
-### Returns a HDF5Dataset object with NO dimnames!
+### Returns a HDF5ArraySeed object with NO dimnames!
 ### FIXME: Investigate the possiblity to store the dimnames in the HDF5 file
-### and make dimnames() on the object returned by HDF5Dataset() bring them
+### and make dimnames() on the object returned by HDF5ArraySeed() bring them
 ### back.
-HDF5Dataset <- function(file, name, type=NA)
+HDF5ArraySeed <- function(file, name, type=NA)
 {
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path to ",
@@ -103,10 +105,10 @@ HDF5Dataset <- function(file, name, type=NA)
                          "dataset (", detected_type, "). Ignoring the ",
                          "former."))
     }
-    new2("HDF5Dataset", file=file,
-                        name=name,
-                        dim=dim,
-                        first_val=first_val)
+    new2("HDF5ArraySeed", file=file,
+                          name=name,
+                          dim=dim,
+                          first_val=first_val)
 }
 
 
@@ -132,8 +134,8 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 
 .validate_HDF5Array <- function(x)
 {
-    if (!is(x@seed, "HDF5Dataset"))
-        return(wmsg("'x@seed' must be a HDF5Dataset object"))
+    if (!is(x@seed, "HDF5ArraySeed"))
+        return(wmsg("'x@seed' must be a HDF5ArraySeed object"))
     if (!DelayedArray:::is_pristine(x))
         return(wmsg("'x' carries delayed operations on it"))
     TRUE
@@ -141,23 +143,23 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 
 setValidity2("HDF5Array", .validate_HDF5Array)
 
-setAs("HDF5Dataset", "HDF5Array",
+setAs("HDF5ArraySeed", "HDF5Array",
     function(from) DelayedArray:::new_DelayedArray(from, Class="HDF5Array")
 )
 setAs("ANY", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
 
-### Works directly on a HDF5Dataset object, in which case it must be called
+### Works directly on a HDF5ArraySeed object, in which case it must be called
 ### with a single argument.
 HDF5Array <- function(file, name, type=NA)
 {
-    if (!is(file, "HDF5Dataset")) {
-        seed <- HDF5Dataset(file, name, type=type)
+    if (!is(file, "HDF5ArraySeed")) {
+        seed <- HDF5ArraySeed(file, name, type=type)
     } else {
         if (!(missing(name) && identical(type, NA)))
             stop(wmsg("HDF5Array() must be called with a single argument ",
-                      "when passed a HDF5Dataset object"))
+                      "when passed a HDF5ArraySeed object"))
         seed <- file
     }
     as(seed, "HDF5Array")
