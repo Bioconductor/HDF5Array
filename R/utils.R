@@ -10,10 +10,26 @@
 ### Simple wrappers around rhdf5::h5read() and rhdf5::h5write()
 ###
 
+.set_missing_subscripts_to_NULL <- function(subscripts)
+{
+    stopifnot(is.list(subscripts))
+    ans <- vector("list", length(subscripts))
+    not_missing_idx <- which(!vapply(subscripts, is.name, logical(1)))
+    ans[not_missing_idx] <- subscripts[not_missing_idx]
+    ans
+}
+
+.make_index_from_subscripts <- function(subscripts)
+{
+    stopifnot(is.list(subscripts))
+    subscripts <- DelayedArray:::expand_RangeNSBS_subscripts(subscripts)
+    .set_missing_subscripts_to_NULL(subscripts)
+}
+
 h5read2 <- function(file, name, index=NULL)
 {
     if (!is.null(index))
-        index <- DelayedArray:::set_missing_subscripts_to_NULL(index)
+        index <- .make_index_from_subscripts(index)
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     suppressWarnings(h5read(file, name, index=index))
@@ -22,7 +38,7 @@ h5read2 <- function(file, name, index=NULL)
 h5write2 <- function(obj, file, name, index=NULL)
 {
     if (!is.null(index))
-        index <- DelayedArray:::set_missing_subscripts_to_NULL(index)
+        index <- .make_index_from_subscripts(index)
     h5write(obj, file, name, index=index)
 }
 

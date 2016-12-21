@@ -169,7 +169,10 @@ C
 as(C, "HDF5Dataset")        # realize C on disk
 lsHDF5DumpFile()
 
-## Matrix multiplication is not delayed:
+## Matrix multiplication is not delayed. It will realize the result and
+## thus one needs to set a "realize() backend" first if none is set yet.
+setRealizeBackend("HDF5Array")
+
 P <- C \%*\% matrix(runif(20), nrow=4)
 lsHDF5DumpFile()
 }

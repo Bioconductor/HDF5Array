@@ -111,8 +111,20 @@ HDF5DatasetDump <- function(dim, dimnames=NULL, type="double")
 }
 
 setMethod("write_to_dump", c("array", "HDF5DatasetDump"),
-    function(x, dump, subscripts=NULL)
-        h5write2(x, dump@file, dump@name, index=subscripts)
+    function(x, dump, offsets=NULL)
+    {
+        if (is.null(offsets)) {
+            stopifnot(all(dim(x) == dump@dim))
+            index <- NULL
+        } else {
+            block_ranges <- IRanges(offsets, width=dim(x))
+            index <- DelayedArray:::make_subscripts_from_ranges(
+                                        block_ranges,
+                                        dump@dim,
+                                        expand.RangeNSBS=TRUE)
+        }
+        h5write2(x, dump@file, dump@name, index=index)
+    }
 )
 
 setMethod("close", "HDF5DatasetDump",
