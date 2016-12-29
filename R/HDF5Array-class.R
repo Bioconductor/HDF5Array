@@ -37,7 +37,7 @@ setMethod("subset_seed_as_array", "HDF5ArraySeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5ArraySeed internal low-level constructor
+### HDF5ArraySeed constructor
 ###
 
 .get_h5dataset_dim <- function(file, name)
@@ -65,12 +65,7 @@ setMethod("subset_seed_as_array", "HDF5ArraySeed",
     ans[[1L]]  # drop any attribute
 }
 
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5ArraySeed constructor
-###
-
-### Returns a HDF5ArraySeed object with NO dimnames!
+### Return a HDF5ArraySeed object with NO dimnames!
 ### FIXME: Investigate the possiblity to store the dimnames in the HDF5 file
 ### and make dimnames() on the object returned by HDF5ArraySeed() bring them
 ### back.
@@ -125,8 +120,9 @@ setClass("HDF5Array", contains="DelayedArray")
 
 setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
 
-### Overwrite unsafe automatic coercion method that return invalid objects (it
-### doesn't validate them).
+### Automatic coercion method from HDF5Array to HDF5Matrix silently returns
+### a broken object (unfortunately these dummy automatic coercion methods don't
+### bother to validate the object they return). So we overwrite it.
 setAs("HDF5Array", "HDF5Matrix", function(from) new("HDF5Matrix", from))
 
 ### For internal use only.
