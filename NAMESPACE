@@ -40,6 +40,6 @@ export(
     HDF5ArraySeed, HDF5Array,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
-    HDF5ArrayDump, writeHDF5Dataset
+    HDF5ArrayDump, writeHDF5Array, writeHDF5Dataset
 )
 

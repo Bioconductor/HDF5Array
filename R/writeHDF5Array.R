@@ -149,14 +149,14 @@ setAs("HDF5ArrayDump", "HDF5ArraySeed", .from_HDF5ArrayDump_to_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### writeHDF5Dataset()
+### writeHDF5Array()
 ###
 
 ### Return an invisible HDF5ArraySeed object pointing to the newly written
 ### HDF5 dataset on disk.
 ### FIXME: This needs to propagate the dimnames. Unfortunately this is not
 ### possible at the moment. See various FIXMEs above in this file about this.
-writeHDF5Dataset <- function(x, file, name)
+writeHDF5Array <- function(x, file, name)
 {
     old_dump_file <- getHDF5DumpFile()
     old_dump_name <- getHDF5DumpName()
@@ -165,7 +165,13 @@ writeHDF5Dataset <- function(x, file, name)
     setHDF5DumpName(name)
     dump <- HDF5ArrayDump(dim(x), dimnames(x), type(x))
     write_to_dump(x, dump)
-    invisible(as(dump, "HDF5ArraySeed"))
+    invisible(HDF5Array(as(dump, "HDF5ArraySeed")))
+}
+
+writeHDF5Dataset <- function(...)
+{
+    .Deprecated("writeHDF5Array")
+    writeHDF5Array(...)
 }
 
 

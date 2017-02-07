@@ -16,7 +16,10 @@
 \alias{close,HDF5ArrayDump-method}
 
 \alias{coerce,HDF5ArrayDump,HDF5ArraySeed-method}
+
+\alias{writeHDF5Array}
 \alias{writeHDF5Dataset}
+
 \alias{coerce,ANY,HDF5ArraySeed-method}
 \alias{coerce,HDF5ArrayDump,DelayedArray-method}
 \alias{coerce,ANY,HDF5Array-method}
@@ -32,7 +35,7 @@
 
 \usage{
 ## Write an array-like object to an HDF5 file:
-writeHDF5Dataset(x, file, name)
+writeHDF5Array(x, file, name)
 
 ## Control the location of automatically created HDF5 datasets (a.k.a. HDF5
 ## dump management):
@@ -49,25 +52,25 @@ getHDF5DumpName()
     The array-like object to write to an HDF5 file e.g. an ordinary array,
     a \link{DelayedArray} object, a \link{HDF5ArraySeed} object, etc...
 
-    If \code{x} is a \link{DelayedArray} object, \code{writeHDF5Dataset}
+    If \code{x} is a \link{DelayedArray} object, \code{writeHDF5Array}
     \emph{realizes} it on disk, that is, all the delayed operations carried
     by the object are executed while the object is written to disk.
     See "On-disk realization of a DelayedArray object as an HDF5 dataset"
     section below for more information.
 
-    If \code{x} is an \link{HDF5ArraySeed} object, \code{writeHDF5Dataset}
+    If \code{x} is an \link{HDF5ArraySeed} object, \code{writeHDF5Array}
     first wraps it in a \link{DelayedArray} object in order to trigger the
     block-processing strategy used by the on-disk realization mechanism.
   }
   \item{file}{
-    For \code{writeHDF5Dataset}: The path (as a single character string)
+    For \code{writeHDF5Array}: The path (as a single character string)
     to the (new or existing) HDF5 file where to write the dataset.
 
     For \code{setHDF5DumpFile}: The path to the HDF5 file where to write
     automatically created HDF5 datasets.
   }
   \item{name}{
-    For \code{writeHDF5Dataset}: The name of the HDF5 dataset to write.
+    For \code{writeHDF5Array}: The name of the HDF5 dataset to write.
 
     For \code{setHDF5DumpName}: The name of the \emph{next automatic dataset}
     to be written to the current output HDF5 file. The supplied name is for
@@ -81,19 +84,19 @@ getHDF5DumpName()
 }
 
 \value{
-  An invisible HDF5ArraySeed object for \code{writeHDF5Dataset()}.
+  An invisible HDF5Array object for \code{writeHDF5Array()}.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
-  When passed an \link{DelayedArray} object, \code{writeHDF5Dataset}
+  When passed an \link{DelayedArray} object, \code{writeHDF5Array}
   \emph{realizes} it on disk, that is, all the delayed operations carried
   by the object are executed on-the-fly while the object is written to disk.
   This uses a block-processing strategy so that the full object is not
   realized at once in memory. Instead the object is processed block by block
   i.e. the blocks are realized in memory and written to disk one at a time.
 
-  In other words, \code{writeHDF5Dataset(x, ...)} is semantically equivalent
-  to \code{writeHDF5Dataset(as.array(x), ...)}, except that \code{as.array(x)}
+  In other words, \code{writeHDF5Array(x, ...)} is semantically equivalent
+  to \code{writeHDF5Array(as.array(x), ...)}, except that \code{as.array(x)}
   is not called because this would realize the full object at once in memory.
 
   See \code{?\link{DelayedArray}} for general information about
@@ -122,7 +125,7 @@ getHDF5DumpName()
 
 \examples{
 ## ---------------------------------------------------------------------
-## writeHDF5Dataset()
+## writeHDF5Array()
 ## ---------------------------------------------------------------------
 library(rhdf5)
 library(h5vcData)
@@ -136,7 +139,7 @@ cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 cov1 <- drop(cov0[ , , 29000001:29000007])
 
 out_file <- tempfile()
-writeHDF5Dataset(cov1, out_file, "cov1")
+writeHDF5Array(cov1, out_file, "cov1")
 h5ls(out_file)
 
 ## ---------------------------------------------------------------------

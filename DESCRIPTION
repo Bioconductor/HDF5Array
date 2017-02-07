@@ -2,7 +2,7 @@ Package: HDF5Array
 Title: HDF5 back end for DelayedArray objects
 Description: An array-like container for convenient access and manipulation
 	of HDF5 datasets. Supports delayed operations and block processing.
-Version: 1.3.4
+Version: 1.3.5
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
@@ -13,5 +13,5 @@ Suggests: h5vcData, SummarizedExperiment, GenomicRanges, BiocStyle
 License: Artistic-2.0
 Collate: utils.R
 	HDF5Array-class.R
-	writeHDF5Dataset.R
+	writeHDF5Array.R
 	zzz.R
