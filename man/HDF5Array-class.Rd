@@ -23,7 +23,6 @@
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 \alias{matrixClass,HDF5Array-method}
 
-\alias{coerce,HDF5ArraySeed,HDF5Array-method}
 \alias{coerce,ANY,HDF5Matrix-method}
 
 \title{HDF5 datasets as array-like objects}

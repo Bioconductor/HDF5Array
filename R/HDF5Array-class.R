@@ -139,9 +139,6 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 
 setValidity2("HDF5Array", .validate_HDF5Array)
 
-setAs("HDF5ArraySeed", "HDF5Array",
-    function(from) DelayedArray:::new_DelayedArray(from, Class="HDF5Array")
-)
 setAs("ANY", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
@@ -158,6 +155,6 @@ HDF5Array <- function(file, name, type=NA)
                       "when passed a HDF5ArraySeed object"))
         seed <- file
     }
-    as(seed, "HDF5Array")
+    DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
 }
 

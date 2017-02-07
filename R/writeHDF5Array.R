@@ -176,8 +176,7 @@ writeHDF5Dataset <- function(...)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an array-like object to HDF5ArraySeed, HDF5Array, or HDF5Matrix
-### dumps it to disk.
+### Coercing an array-like object to HDF5ArraySeed dumps it to disk.
 ###
 
 .dump_as_HDF5ArraySeed <- function(from)
@@ -190,9 +189,17 @@ writeHDF5Dataset <- function(...)
 
 setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
 
-.dump_as_HDF5Array <- function(from)
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Coercion to HDF5Array.
+###
+### Note that unless the object to coerce is a HDF5ArraySeed object, coercing
+### it to HDF5Array dumps it to disk.
+###
+
+.as_HDF5Array <- function(from)
 {
-    ans <- as(as(from, "HDF5ArraySeed"), "HDF5Array")
+    ans <- HDF5Array(as(from, "HDF5ArraySeed"))
     ## Temporarily needed because coercion from HDF5ArrayDump to HDF5ArraySeed
     ## doesn't propagate the dimnames at the moment. See FIXME above.
     ## TODO: Remove line below when FIXME above is addressed.
@@ -200,11 +207,11 @@ setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
     ans
 }
 
-setAs("HDF5ArrayDump", "DelayedArray", .dump_as_HDF5Array)
-setAs("ANY", "HDF5Array", .dump_as_HDF5Array)
+setAs("HDF5ArrayDump", "DelayedArray", .as_HDF5Array)
+setAs("ANY", "HDF5Array", .as_HDF5Array)
 
 ### Automatic coercion method from DelayedArray to HDF5Array silently returns
 ### a broken object (unfortunately these dummy automatic coercion methods don't
 ### bother to validate the object they return). So we overwrite it.
-setAs("DelayedArray", "HDF5Array", .dump_as_HDF5Array)
+setAs("DelayedArray", "HDF5Array", .as_HDF5Array)
 

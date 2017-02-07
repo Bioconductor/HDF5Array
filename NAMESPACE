@@ -22,7 +22,7 @@ exportClasses(
 
 exportMethods(
     ## Methods for generics defined in the base package:
-    length, dim, dimnames,
+    dim, dimnames,
 
     ## Methods for generics defined in the methods package:
     coerce,
