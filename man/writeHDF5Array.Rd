@@ -7,21 +7,21 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
-\alias{class:HDF5ArrayDump}
-\alias{HDF5ArrayDump-class}
-\alias{HDF5ArrayDump}
+\alias{class:HDF5RealizationSink}
+\alias{HDF5RealizationSink-class}
+\alias{HDF5RealizationSink}
 
-\alias{dimnames,HDF5ArrayDump-method}
-\alias{write_to_dump,array,HDF5ArrayDump-method}
-\alias{close,HDF5ArrayDump-method}
+\alias{dimnames,HDF5RealizationSink-method}
+\alias{write_to_sink,array,HDF5RealizationSink-method}
+\alias{close,HDF5RealizationSink-method}
 
-\alias{coerce,HDF5ArrayDump,HDF5ArraySeed-method}
+\alias{coerce,HDF5RealizationSink,HDF5ArraySeed-method}
 
 \alias{writeHDF5Array}
 \alias{writeHDF5Dataset}
 
 \alias{coerce,ANY,HDF5ArraySeed-method}
-\alias{coerce,HDF5ArrayDump,DelayedArray-method}
+\alias{coerce,HDF5RealizationSink,DelayedArray-method}
 \alias{coerce,ANY,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Array-method}
 

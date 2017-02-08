@@ -65,21 +65,21 @@ getHDF5DumpName <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5ArrayDump objects
+### HDF5RealizationSink objects
 ###
 
-setClass("HDF5ArrayDump",
-    contains="OnDiskArrayDump",
+setClass("HDF5RealizationSink",
+    contains="RealizationSink",
     representation(
-        file="character",  # Single string.
-        name="character",  # Dataset name.
         dim="integer",
         dimnames="list",
-        type="character"   # Single string.
+        type="character",  # Single string.
+        file="character",  # Single string.
+        name="character"   # Dataset name.
     )
 )
 
-setMethod("dimnames", "HDF5ArrayDump",
+setMethod("dimnames", "HDF5RealizationSink",
     function(x)
     {
         ans <- x@dimnames
@@ -89,45 +89,46 @@ setMethod("dimnames", "HDF5ArrayDump",
     }
 )
 
-### HDF5ArrayDump object created with an earlier call to HDF5ArrayDump()
-### should be closed before calling HDF5ArrayDump() again.
+### HDF5RealizationSink object created with an earlier call to
+### HDF5RealizationSink() should be closed before calling HDF5RealizationSink()
+### again.
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
-HDF5ArrayDump <- function(dim, dimnames=NULL, type="double")
+HDF5RealizationSink <- function(dim, dimnames=NULL, type="double")
 {
     file <- getHDF5DumpFile()
     name <- getHDF5DumpName()
     if (is(try(h5createDataset2(file, name, dim, type)), "try-error"))
-        stop(wmsg("Failed to create a new HDF5ArrayDump object. Make sure ",
-                  "to close() the previously created HDF5ArrayDump object ",
-                  "first. Alternatively call setHDF5DumpName() before trying ",
-                  "to call HDF5ArrayDump() again."))
+        stop(wmsg("Failed to create a new HDF5RealizationSink object. Make ",
+                  "sure to close() the previously created HDF5RealizationSink ",
+                  "object first. Alternatively call setHDF5DumpName() before ",
+                  "trying to call HDF5RealizationSink() again."))
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
         ## TODO: Write the dimnames to the HDF5 file.
     }
-    new2("HDF5ArrayDump", file=file, name=name,
-                          dim=dim, dimnames=dimnames, type=type)
+    new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
+                                file=file, name=name)
 }
 
-setMethod("write_to_dump", c("array", "HDF5ArrayDump"),
-    function(x, dump, offsets=NULL)
+setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
+    function(x, sink, offsets=NULL)
     {
         if (is.null(offsets)) {
-            stopifnot(all(dim(x) == dump@dim))
+            stopifnot(all(dim(x) == sink@dim))
             index <- NULL
         } else {
             block_ranges <- IRanges(offsets, width=dim(x))
             index <- DelayedArray:::make_subscripts_from_ranges(
                                         block_ranges,
-                                        dump@dim,
+                                        sink@dim,
                                         expand.RangeNSBS=TRUE)
         }
-        h5write2(x, dump@file, dump@name, index=index)
+        h5write2(x, sink@file, sink@name, index=index)
     }
 )
 
-setMethod("close", "HDF5ArrayDump",
+setMethod("close", "HDF5RealizationSink",
     function(con, ...) setHDF5DumpName()
 )
 
@@ -138,14 +139,15 @@ setMethod("close", "HDF5ArrayDump",
 
 ### FIXME: This needs to propagate the dimnames. Unfortunately this is not
 ### possible at the moment. See FIXME right before definition of
-### HDF5ArrayDump() above in this file and right before definition of
+### HDF5RealizationSink() above in this file and right before definition of
 ### HDF5ArraySeed() in HDF5Array-class.R about this.
-.from_HDF5ArrayDump_to_HDF5ArraySeed <- function(from)
+.from_HDF5RealizationSink_to_HDF5ArraySeed <- function(from)
 {
     HDF5ArraySeed(from@file, from@name, type=from@type)
 }
 
-setAs("HDF5ArrayDump", "HDF5ArraySeed", .from_HDF5ArrayDump_to_HDF5ArraySeed)
+setAs("HDF5RealizationSink", "HDF5ArraySeed",
+      .from_HDF5RealizationSink_to_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -163,9 +165,9 @@ writeHDF5Array <- function(x, file, name)
     setHDF5DumpFile(file)
     on.exit({setHDF5DumpFile(old_dump_file); setHDF5DumpName(old_dump_name)})
     setHDF5DumpName(name)
-    dump <- HDF5ArrayDump(dim(x), dimnames(x), type(x))
-    write_to_dump(x, dump)
-    invisible(HDF5Array(as(dump, "HDF5ArraySeed")))
+    sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x))
+    write_to_sink(x, sink)
+    invisible(HDF5Array(as(sink, "HDF5ArraySeed")))
 }
 
 writeHDF5Dataset <- function(...)
@@ -181,10 +183,10 @@ writeHDF5Dataset <- function(...)
 
 .dump_as_HDF5ArraySeed <- function(from)
 {
-    dump <- HDF5ArrayDump(dim(from), dimnames(from), type(from))
-    on.exit(close(dump))
-    write_to_dump(from, dump)
-    as(dump, "HDF5ArraySeed")
+    sink <- HDF5RealizationSink(dim(from), dimnames(from), type(from))
+    on.exit(close(sink))
+    write_to_sink(from, sink)
+    as(sink, "HDF5ArraySeed")
 }
 
 setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
@@ -200,14 +202,15 @@ setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
 .as_HDF5Array <- function(from)
 {
     ans <- HDF5Array(as(from, "HDF5ArraySeed"))
-    ## Temporarily needed because coercion from HDF5ArrayDump to HDF5ArraySeed
-    ## doesn't propagate the dimnames at the moment. See FIXME above.
+    ## Temporarily needed because coercion from HDF5RealizationSink to
+    ## HDF5ArraySeed doesn't propagate the dimnames at the moment. See FIXME
+    ## above.
     ## TODO: Remove line below when FIXME above is addressed.
     dimnames(ans) <- dimnames(from)
     ans
 }
 
-setAs("HDF5ArrayDump", "DelayedArray", .as_HDF5Array)
+setAs("HDF5RealizationSink", "DelayedArray", .as_HDF5Array)
 setAs("ANY", "HDF5Array", .as_HDF5Array)
 
 ### Automatic coercion method from DelayedArray to HDF5Array silently returns
