@@ -15,12 +15,12 @@
 \alias{write_to_sink,array,HDF5RealizationSink-method}
 
 \alias{coerce,HDF5RealizationSink,HDF5ArraySeed-method}
+\alias{coerce,HDF5RealizationSink,HDF5Array-method}
+\alias{coerce,HDF5RealizationSink,DelayedArray-method}
 
 \alias{writeHDF5Array}
 \alias{writeHDF5Dataset}
 
-\alias{coerce,ANY,HDF5ArraySeed-method}
-\alias{coerce,HDF5RealizationSink,DelayedArray-method}
 \alias{coerce,ANY,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Array-method}
 
@@ -34,10 +34,10 @@
 
 \usage{
 ## Write an array-like object to an HDF5 file:
-writeHDF5Array(x, file, name)
+writeHDF5Array(x, file=NULL, name=NULL)
 
-## Control the location of automatically created HDF5 datasets (a.k.a. HDF5
-## dump management):
+## Control the location of automatically created HDF5 datasets (a.k.a.
+## HDF5 dump management):
 setHDF5DumpFile(file=paste0(tempfile(), ".h5"))
 getHDF5DumpFile()
 lsHDF5DumpFile()
@@ -48,32 +48,33 @@ getHDF5DumpName()
 
 \arguments{
   \item{x}{
-    The array-like object to write to an HDF5 file e.g. an ordinary array,
-    a \link{DelayedArray} object, a \link{HDF5ArraySeed} object, etc...
+    The array-like object to write to an HDF5 file.
 
     If \code{x} is a \link{DelayedArray} object, \code{writeHDF5Array}
     \emph{realizes} it on disk, that is, all the delayed operations carried
     by the object are executed while the object is written to disk.
     See "On-disk realization of a DelayedArray object as an HDF5 dataset"
     section below for more information.
-
-    If \code{x} is an \link{HDF5ArraySeed} object, \code{writeHDF5Array}
-    first wraps it in a \link{DelayedArray} object in order to trigger the
-    block-processing strategy used by the on-disk realization mechanism.
   }
   \item{file}{
-    For \code{writeHDF5Array}: The path (as a single character string)
+    For \code{writeHDF5Array}: \code{NULL} or the path (as a single string)
     to the (new or existing) HDF5 file where to write the dataset.
+    If \code{NULL} then the dataset is written to the \emph{HDF5 dump
+    file} (see below) i.e. the path returned by \code{getHDF5DumpFile()}
+    is used.
 
-    For \code{setHDF5DumpFile}: The path to the HDF5 file where to write
-    automatically created HDF5 datasets.
+    For \code{setHDF5DumpFile}: The path (as a single string) to the
+    \emph{HDF5 dump file}, that is, to the (new or existing) HDF5 file
+    where to write automatically created HDF5 datasets.
   }
   \item{name}{
-    For \code{writeHDF5Array}: The name of the HDF5 dataset to write.
+    For \code{writeHDF5Array}: \code{NULL} or the name of the HDF5 dataset
+    to write. If \code{NULL} then the name returned by \code{getHDF5DumpName()}
+    is used.
 
     For \code{setHDF5DumpName}: The name of the \emph{next automatic dataset}
-    to be written to the current output HDF5 file. The supplied name is for
-    a one-time use only.
+    to be written to the current \emph{HDF5 dump file}. The supplied name is
+    for a one-time use only.
   }
 }
 
@@ -83,7 +84,8 @@ getHDF5DumpName()
 }
 
 \value{
-  An invisible HDF5Array object for \code{writeHDF5Array()}.
+  A HDF5Array object pointing to the newly written HDF5 dataset on disk
+  for \code{writeHDF5Array()}.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
@@ -146,7 +148,7 @@ h5ls(out_file)
 ## ---------------------------------------------------------------------
 getHDF5DumpFile()
 
-## Use setHDF5DumpFile() to change the current output HDF5 file.
+## Use setHDF5DumpFile() to change the current HDF5 dump file.
 ## If the specified file exists, then it must be in HDF5 format or
 ## an error will be raised. If it doesn't exist, then it will be
 ## created.
@@ -155,20 +157,17 @@ getHDF5DumpFile()
 lsHDF5DumpFile()
 
 a <- array(1:600, c(150, 4))
-h5a <- as(a, "HDF5ArraySeed")
+A <- as(a, "HDF5Array")
 lsHDF5DumpFile()
-A <- as(h5a, "HDF5Array")   # DelayedArray object
 A
 
 b <- array(runif(6000), c(4, 2, 150))
-h5b <- as(b, "HDF5ArraySeed")
+B <- as(b, "HDF5Array")
 lsHDF5DumpFile()
-B <- as(h5b, "HDF5Array")   # DelayedArray object
 B
 
 C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
-C
-as(C, "HDF5ArraySeed")      # realize C on disk
+as(C, "HDF5Array")  # realize C on disk
 lsHDF5DumpFile()
 
 ## Matrix multiplication is not delayed. It will realize the result and

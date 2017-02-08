@@ -1,5 +1,5 @@
 ### =========================================================================
-### Manage settings for writing output to HDF5
+### writeHDF5Array() and HDF5 dump management
 ### -------------------------------------------------------------------------
 ###
 
@@ -147,36 +147,54 @@ setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercion
+### Coercing a HDF5RealizationSink object.
 ###
 
-### FIXME: This needs to propagate the dimnames. Unfortunately this is not
-### possible at the moment. See FIXME right before definition of
+### FIXME: This coercion needs to propagate the dimnames *thru* the HDF5 file.
+### For more details about this, see FIXME right before definition of
 ### HDF5RealizationSink() above in this file and right before definition of
-### HDF5ArraySeed() in HDF5Array-class.R about this.
-.from_HDF5RealizationSink_to_HDF5ArraySeed <- function(from)
-{
-    HDF5ArraySeed(from@file, from@name, type=from@type)
-}
-
+### HDF5ArraySeed() in HDF5Array-class.R.
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
-      .from_HDF5RealizationSink_to_HDF5ArraySeed)
+    function(from) HDF5ArraySeed(from@file, from@name, type=from@type)
+)
+
+### Note that this coercion currently drops the dimnames but will naturally
+### propagate them when coercion from HDF5RealizationSink to HDF5ArraySeed
+### propagates them. See FIXME above.
+setAs("HDF5RealizationSink", "HDF5Array",
+    function(from) HDF5Array(as(from, "HDF5ArraySeed"))
+)
+
+setAs("HDF5RealizationSink", "DelayedArray",
+    function(from)
+    {
+        ans <- HDF5Array(as(from, "HDF5ArraySeed"))
+        ## Temporarily needed because coercion from HDF5RealizationSink to
+        ## HDF5ArraySeed does not propagate the dimnames at the moment. See
+        ## FIXME above.
+        ## TODO: Remove line below when FIXME above is addressed.
+        dimnames(ans) <- dimnames(from)
+        ans
+    }
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### writeHDF5Array()
 ###
 
-### Return an invisible HDF5ArraySeed object pointing to the newly written
-### HDF5 dataset on disk.
-### FIXME: This needs to propagate the dimnames. Unfortunately this is not
-### possible at the moment. See various FIXMEs above in this file about this.
-writeHDF5Array <- function(x, file, name)
+### Write the dataset to the current dump if 'file' and 'name' are not
+### specified.
+### Return a HDF5Array object pointing to the newly written HDF5 dataset on
+### disk.
+### FIXME: This needs to write the dimnames to the file. See various FIXMEs
+### above in this file about this.
+writeHDF5Array <- function(x, file=NULL, name=NULL)
 {
     sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x),
                                 file=file, name=name)
     write_to_sink(x, sink)
-    invisible(HDF5Array(as(sink, "HDF5ArraySeed")))
+    as(sink, "HDF5Array")
 }
 
 writeHDF5Dataset <- function(...)
@@ -187,38 +205,17 @@ writeHDF5Dataset <- function(...)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an array-like object to HDF5ArraySeed dumps it to disk.
-###
-
-.dump_as_HDF5ArraySeed <- function(from)
-{
-    sink <- HDF5RealizationSink(dim(from), dimnames(from), type(from))
-    write_to_sink(from, sink)
-    as(sink, "HDF5ArraySeed")
-}
-
-setAs("ANY", "HDF5ArraySeed", .dump_as_HDF5ArraySeed)
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Coercion to HDF5Array.
 ###
-### Note that unless the object to coerce is a HDF5ArraySeed object, coercing
-### it to HDF5Array dumps it to disk.
+### The methods below write the object to disk. Note that coercion from
+### HDF5RealizationSink to HDF5Array is already taken care of by the specific
+### method above and doesn't write anything to disk. So coercing to HDF5Array
+### in general writes the object to disk *except* when the object to coerce is
+### a HDF5RealizationSink object.
 ###
 
-.as_HDF5Array <- function(from)
-{
-    ans <- HDF5Array(as(from, "HDF5ArraySeed"))
-    ## Temporarily needed because coercion from HDF5RealizationSink to
-    ## HDF5ArraySeed doesn't propagate the dimnames at the moment. See FIXME
-    ## above.
-    ## TODO: Remove line below when FIXME above is addressed.
-    dimnames(ans) <- dimnames(from)
-    ans
-}
+.as_HDF5Array <- function(from) writeHDF5Array(from)  # write to current dump
 
-setAs("HDF5RealizationSink", "DelayedArray", .as_HDF5Array)
 setAs("ANY", "HDF5Array", .as_HDF5Array)
 
 ### Automatic coercion method from DelayedArray to HDF5Array silently returns

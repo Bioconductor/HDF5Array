@@ -133,7 +133,7 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
     if (!is(x@seed, "HDF5ArraySeed"))
         return(wmsg("'x@seed' must be a HDF5ArraySeed object"))
     if (!DelayedArray:::is_pristine(x))
-        return(wmsg("'x' carries delayed operations on it"))
+        return(wmsg("'x' carries delayed operations"))
     TRUE
 }
 
