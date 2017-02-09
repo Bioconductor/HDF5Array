@@ -34,7 +34,7 @@
 
 \usage{
 ## Write an array-like object to an HDF5 file:
-writeHDF5Array(x, file=NULL, name=NULL)
+writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
 
 ## Control the location of automatically created HDF5 datasets (a.k.a.
 ## HDF5 dump management):
@@ -75,6 +75,9 @@ getHDF5DumpName()
     For \code{setHDF5DumpName}: The name of the \emph{next automatic dataset}
     to be written to the current \emph{HDF5 dump file}. The supplied name is
     for a one-time use only.
+  }
+  \item{verbose}{
+    Set to \code{TRUE} to make the function display progress.
   }
 }
 

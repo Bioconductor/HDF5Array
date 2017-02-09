@@ -7,7 +7,7 @@ Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, Sequencing, Annotation, Coverage, GenomeAnnotation
-Depends: R (>= 3.4), methods, DelayedArray (>= 0.1.5), rhdf5
+Depends: R (>= 3.4), methods, DelayedArray (>= 0.1.6), rhdf5
 Imports: BiocGenerics, S4Vectors, IRanges
 Suggests: h5vcData, SummarizedExperiment (>= 1.5.6), GenomicRanges, BiocStyle
 License: Artistic-2.0

@@ -189,10 +189,16 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs
 ### above in this file about this.
-writeHDF5Array <- function(x, file=NULL, name=NULL)
+writeHDF5Array <- function(x, file=NULL, name=NULL, verbose=FALSE)
 {
+    if (!isTRUEorFALSE(verbose))
+        stop("'verbose' must be TRUE or FALSE")
     sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x),
                                 file=file, name=name)
+    if (verbose) {
+        old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
+        on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
+    }
     write_to_sink(x, sink)
     as(sink, "HDF5Array")
 }
