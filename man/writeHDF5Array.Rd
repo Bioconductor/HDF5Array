@@ -1,4 +1,4 @@
-\name{setHDF5DumpFile}
+\name{writeHDF5Array}
 
 \alias{setHDF5DumpFile}
 \alias{getHDF5DumpFile}
