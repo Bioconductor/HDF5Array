@@ -80,6 +80,11 @@ HDF5ArraySeed(file, name, type=NA)
           to an HDF5 file and other low-level utilities to control the
           location of automatically created HDF5 datasets.
 
+    \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
+          \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
+          the \pkg{SummarizedExperiment} package for saving/loading a
+          HDF5-based SummarizedExperiment object to/from disk.
+
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which HDF5Array
@@ -129,8 +134,12 @@ cov2
 as.matrix(cov2)
 
 ## ---------------------------------------------------------------------
-## DelayedMatrix OBJECTS AS ASSAYS OF A SummarizedExperiment OBJECT
+## SummarizedExperiment OBJECTS WITH DELAYED ASSAYS
 ## ---------------------------------------------------------------------
+
+## DelayedArray objects can be used inside a SummarizedExperiment object
+## to hold the assay data and to delay operations on them.
+ 
 library(SummarizedExperiment)
 
 pcov <- drop(cov0[ , 1, ])  # coverage on plus strand
@@ -154,6 +163,8 @@ gpos
 rowRanges(se) <- gpos
 se
 stopifnot(validObject(se))
+assays(se)$pcov
+assays(se)$mcov
 }
 \keyword{methods}
 \keyword{classes}

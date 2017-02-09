@@ -118,6 +118,11 @@ getHDF5DumpName()
 
     \item \link{HDF5Array} objects.
 
+    \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
+          \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
+          the \pkg{SummarizedExperiment} package for saving/loading a
+          HDF5-based SummarizedExperiment object to/from disk.
+
     \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
           on which \code{lsHDF5DumpFile} is based.
 
