@@ -82,6 +82,10 @@ getHDF5DumpName()
 }
 
 \details{
+  Please note that, depending on the size of the data to write to disk
+  and the performance of the disk, \code{writeHDF5Array} can take a long
+  time to complete. Use \code{verbose=FALSE} to see its progress.
+
   Use \code{\link{setHDF5DumpFile}} and \code{\link{setHDF5DumpName}} to
   control the location of automatically created HDF5 datasets.
 }
