@@ -5,8 +5,10 @@
 
 setClass("HDF5ArraySeed",
     representation(
-        file="character",   # Single string.
-        name="character",   # Dataset name.
+        file="character",   # Absolute path to the HDF5 file so the object
+                            # doesn't break when the user changes the working
+                            # directory (e.g. with setwd()).
+        name="character",   # Name of the dataset in the HDF5 file.
         dim="integer",
         first_val="ANY"     # First value in the dataset.
     )
@@ -74,6 +76,7 @@ HDF5ArraySeed <- function(file, name, type=NA)
     if (!isSingleString(file))
         stop(wmsg("'file' must be a single string specifying the path to ",
                   "the HDF5 file where the dataset is located"))
+    file <- file_path_as_absolute(file)
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name ",
                   "of the dataset in the HDF5 file"))
