@@ -182,11 +182,14 @@ C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
 as(C, "HDF5Array")  # realize C on disk
 lsHDF5DumpFile()
 
-## Matrix multiplication is not delayed. It will realize the result and
-## thus one needs to set a "realize() backend" first if none is set yet.
-setRealizeBackend("HDF5Array")
-
-P <- C \%*\% matrix(runif(20), nrow=4)
+## Matrix multiplication is not delayed: the output matrix is realized
+## block by block. The current "realization backend" controls where
+## realization happens e.g. in memory if set to NULL or in an HDF5 file
+## if set to "HDF5Array". See '?realize' in the DelayedArray package for
+## more information about "realization backends".
+setRealizationBackend("HDF5Array")
+m <- matrix(runif(20), nrow=4)
+P <- C \%*\% m
 lsHDF5DumpFile()
 }
 \keyword{methods}
