@@ -78,6 +78,9 @@ getHDF5DumpName <- function()
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### HDF5RealizationSink objects
 ###
+### The HDF5RealizationSink class is a concrete RealizationSink subclass that
+### implements an HDF5 realization sink.
+###
 
 setClass("HDF5RealizationSink",
     contains="RealizationSink",
@@ -131,14 +134,16 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
     function(x, sink, offsets=NULL)
     {
+        x_dim <- dim(x)
+        sink_dim <- sink@dim
+        stopifnot(length(x_dim) == length(sink_dim))
         if (is.null(offsets)) {
-            stopifnot(all(dim(x) == sink@dim))
+            stopifnot(identical(x_dim, sink_dim))
             index <- NULL
         } else {
-            block_ranges <- IRanges(offsets, width=dim(x))
-            index <- DelayedArray:::make_subscripts_from_ranges(
-                                        block_ranges,
-                                        sink@dim,
+            block_ranges <- IRanges(offsets, width=x_dim)
+            index <- DelayedArray:::make_subscripts_from_block_ranges(
+                                        block_ranges, sink_dim,
                                         expand.RangeNSBS=TRUE)
         }
         h5write2(x, sink@file, sink@name, index=index)
