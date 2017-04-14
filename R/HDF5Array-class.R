@@ -146,18 +146,22 @@ setAs("ANY", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
 
+setMethod("DelayedArray", "HDF5ArraySeed",
+    function(seed) DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
+)
+
 ### Works directly on a HDF5ArraySeed object, in which case it must be called
 ### with a single argument.
 HDF5Array <- function(file, name, type=NA)
 {
-    if (!is(file, "HDF5ArraySeed")) {
-        seed <- HDF5ArraySeed(file, name, type=type)
-    } else {
+    if (is(file, "HDF5ArraySeed")) {
         if (!(missing(name) && identical(type, NA)))
             stop(wmsg("HDF5Array() must be called with a single argument ",
                       "when passed a HDF5ArraySeed object"))
         seed <- file
+    } else {
+        seed <- HDF5ArraySeed(file, name, type=type)
     }
-    DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
+    DelayedArray(seed)
 }
 

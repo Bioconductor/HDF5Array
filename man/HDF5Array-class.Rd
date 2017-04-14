@@ -14,7 +14,6 @@
 
 \alias{class:HDF5Array}
 \alias{HDF5Array-class}
-\alias{HDF5Array}
 
 \alias{class:HDF5Matrix}
 \alias{HDF5Matrix-class}
@@ -24,6 +23,9 @@
 \alias{matrixClass,HDF5Array-method}
 
 \alias{coerce,ANY,HDF5Matrix-method}
+
+\alias{DelayedArray,HDF5ArraySeed-method}
+\alias{HDF5Array}
 
 \title{HDF5 datasets as array-like objects}
 
