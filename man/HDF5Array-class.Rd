@@ -75,8 +75,8 @@ HDF5ArraySeed(file, name, type=NA)
   \itemize{
     \item \link{DelayedArray} objects.
 
-    \item \link{DelayedArray-utils} for common operations on DelayedArray
-          objects.
+    \item \link{DelayedArray-utils} for common operations on
+          \link{DelayedArray} objects.
 
     \item \code{\link{writeHDF5Array}} for writting an array-like object
           to an HDF5 file and other low-level utilities to control the

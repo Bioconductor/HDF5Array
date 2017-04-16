@@ -146,6 +146,11 @@ setAs("ANY", "HDF5Matrix",
     function(from) as(as(from, "HDF5Array"), "HDF5Matrix")
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Constructor
+###
+
 setMethod("DelayedArray", "HDF5ArraySeed",
     function(seed) DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
 )

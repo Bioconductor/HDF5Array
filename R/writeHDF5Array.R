@@ -136,11 +136,11 @@ setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
     {
         x_dim <- dim(x)
         sink_dim <- sink@dim
-        stopifnot(length(x_dim) == length(sink_dim))
         if (is.null(offsets)) {
             stopifnot(identical(x_dim, sink_dim))
             index <- NULL
         } else {
+            stopifnot(length(x_dim) == length(sink_dim))
             block_ranges <- IRanges(offsets, width=x_dim)
             index <- DelayedArray:::make_subscripts_from_block_ranges(
                                         block_ranges, sink_dim,
