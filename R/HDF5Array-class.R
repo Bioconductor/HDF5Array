@@ -54,7 +54,18 @@ setMethod("subset_seed_as_array", "HDF5ArraySeed",
     on.exit(H5Gclose(g), add=TRUE)
     d <- H5Dopen(g, name)
     on.exit(H5Dclose(d), add=TRUE)
-    H5Sget_simple_extent_dims(H5Dget_space(d))$size
+    dim <- H5Sget_simple_extent_dims(H5Dget_space(d))$size
+    if (!is.integer(dim)) {
+        if (any(dim > .Machine$integer.max)) {
+            dim_in1string <- paste0(dim, collapse=" x ")
+            stop(wmsg("The dimensions of HDF5 dataset '", name, "' are: ",
+                      dim_in1string, "\n\nThe HDF5Array package only ",
+                      "supports datasets with all dimensions <= 2^31-1",
+                      " (this is ", .Machine$integer.max, ") at the moment."))
+        }
+        dim <- as.integer(dim)
+    }
+    dim
 }
 
 ### Will fail if the dataset is empty (i.e. if at least one of its dimensions
