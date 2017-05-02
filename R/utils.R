@@ -7,6 +7,26 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### h5dim()
+###
+
+h5dim <- function(file, name)
+{
+    if (substr(name, 1L, 1L) != "/")
+        name <- paste0("/", name)
+    group <- gsub("(.*/)[^/]*$", "\\1", name)
+    name <- gsub(".*/([^/]*)$", "\\1", name)
+    f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
+    on.exit(H5Fclose(f))
+    g <- H5Gopen(f, group)
+    on.exit(H5Gclose(g), add=TRUE)
+    d <- H5Dopen(g, name)
+    on.exit(H5Dclose(d), add=TRUE)
+    H5Sget_simple_extent_dims(H5Dget_space(d))$size
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Simple wrappers around rhdf5::h5read() and rhdf5::h5write()
 ###
 
