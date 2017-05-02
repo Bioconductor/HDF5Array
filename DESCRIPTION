@@ -2,7 +2,7 @@ Package: HDF5Array
 Title: HDF5 back end for DelayedArray objects
 Description: An array-like container for convenient access and manipulation
 	of HDF5 datasets. Supports delayed operations and block processing.
-Version: 1.5.0
+Version: 1.5.1
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
