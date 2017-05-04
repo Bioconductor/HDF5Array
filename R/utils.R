@@ -33,7 +33,7 @@ h5dim <- function(file, name)
 h5read2 <- function(file, name, index=NULL)
 {
     if (!is.null(index))
-        index <- DelayedArray:::expand_RangeNSBS_index(index)
+        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     suppressWarnings(h5read(file, name, index=index))
@@ -42,7 +42,7 @@ h5read2 <- function(file, name, index=NULL)
 h5write2 <- function(obj, file, name, index=NULL)
 {
     if (!is.null(index))
-        index <- DelayedArray:::expand_RangeNSBS_index(index)
+        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
     h5write(obj, file, name, index=index)
 }
 
