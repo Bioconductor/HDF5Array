@@ -23,7 +23,7 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 .subset_HDF5ArraySeed_as_array <- function(seed, index)
 {
-    ans_dim <- DelayedArray:::get_index_lengths(index, dim(seed))
+    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(seed))
     if (any(ans_dim == 0L)) {
         ans <- seed@first_val[0]
         dim(ans) <- ans_dim
