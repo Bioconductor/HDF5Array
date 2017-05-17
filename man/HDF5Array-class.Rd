@@ -79,8 +79,10 @@ HDF5ArraySeed(file, name, type=NA)
           \link{DelayedArray} objects.
 
     \item \code{\link{writeHDF5Array}} for writting an array-like object
-          to an HDF5 file and other low-level utilities to control the
-          location of automatically created HDF5 datasets.
+          to an HDF5 file.
+
+    \item \link{HDF5-dump-management} for controlling the location of
+          automatically created HDF5 datasets.
 
     \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
           \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
