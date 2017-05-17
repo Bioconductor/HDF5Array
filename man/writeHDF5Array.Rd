@@ -38,7 +38,7 @@ writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
 
 ## Control the location of automatically created HDF5 datasets (a.k.a.
 ## HDF5 dump management):
-setHDF5DumpFile(file=paste0(tempfile(), ".h5"))
+setHDF5DumpFile(file)
 getHDF5DumpFile()
 lsHDF5DumpFile()
 
@@ -65,7 +65,9 @@ getHDF5DumpName()
 
     For \code{setHDF5DumpFile}: The path (as a single string) to the
     \emph{HDF5 dump file}, that is, to the (new or existing) HDF5 file
-    where to write automatically created HDF5 datasets.
+    where to write automatically created HDF5 datasets. If \code{file}
+    is missing, then a new file with an automatic name is used for each
+    automatically created HDF5 dataset.
   }
   \item{name}{
     For \code{writeHDF5Array}: \code{NULL} or the name of the HDF5 dataset

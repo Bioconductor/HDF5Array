@@ -123,6 +123,8 @@ h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
 
 .locked_path <- function(filepath)
 {
+    if (!isSingleString(filepath) || filepath == "")
+        stop("'filepath' must be a single non-empty string")
     paste0(filepath, "-locked")
 }
 
@@ -174,7 +176,7 @@ unlock_file <- function(filepath)
 }
 
 ### NOT safe to use in the context of parallel execution!
-init_global_counter <- function(filepath, counter=0L)
+init_global_counter <- function(filepath, counter=1L)
 {
     if (!isSingleString(filepath) || filepath == "")
         stop("'filepath' must be a single non-empty string")
@@ -194,13 +196,17 @@ init_global_counter <- function(filepath, counter=0L)
 ###   library(BiocParallel)
 ###   filepath <- tempfile()
 ###   init_global_counter(filepath)
-###   bplapply(1:10, function(i) increment_global_counter(filepath))
+###   bplapply(1:10, function(i) get_global_counter(filepath, increment=TRUE))
 ###
-increment_global_counter <- function(filepath)
+get_global_counter <- function(filepath, increment=FALSE)
 {
+    if (!isTRUEorFALSE(increment))
+        stop("'increment' must be TRUE or FALSE")
     locked_path <- lock_file(filepath)
     on.exit(unlock_file(filepath))
-    counter <- .read_counter(locked_path) + 1L
-    .write_counter(counter, locked_path)
+    counter <- .read_counter(locked_path)
+    if (increment)
+        .write_counter(counter + 1L, locked_path)
+    counter
 }
 
