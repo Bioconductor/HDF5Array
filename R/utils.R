@@ -115,3 +115,92 @@ h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
                   "in file '", file, "'"), call.=FALSE)
 }
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### A simple mechanism to lock/unlock a file so processes can get temporary
+### exclusive access to it
+###
+
+.locked_path <- function(filepath)
+{
+    paste0(filepath, "-locked")
+}
+
+.safe_file_rename <- function(from, to)
+{
+    !file.exists(to) && suppressWarnings(file.rename(from, to))
+}
+
+lock_file <- function(filepath)
+{
+    locked_path <- .locked_path(filepath)
+    ## Must wait if the file is already locked.
+    while (TRUE) {
+        if (.safe_file_rename(filepath, locked_path))
+            break
+        Sys.sleep(0.01)
+    }
+    locked_path
+}
+
+unlock_file <- function(filepath)
+{
+    locked_path <- .locked_path(filepath)
+    if (!.safe_file_rename(locked_path, filepath))
+        stop("failed to unlock '", filepath, "' file")
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### A global counter that is safe to use in the context of parallelized
+### execution
+###
+
+.read_counter <- function(filepath)
+{
+    counter <- readLines(filepath)
+    stopifnot(length(counter) == 1L)
+    counter <- suppressWarnings(as.integer(counter))
+    if (is.na(counter))
+        stop("file '", filepath, "' does not contain a counter")
+    counter
+}
+
+### Will overwrite an existing file.
+.write_counter <- function(counter, filepath)
+{
+    writeLines(as.character(counter), filepath)
+    counter
+}
+
+### NOT safe to use in the context of parallel execution!
+init_global_counter <- function(filepath, counter=0L)
+{
+    if (!isSingleString(filepath) || filepath == "")
+        stop("'filepath' must be a single non-empty string")
+    if (file.exists(filepath))
+        stop("file '", filepath, "' already exists")
+    if (!isSingleNumber(counter))
+        stop("'counter' must be a single number")
+    if (!is.integer(counter))
+        counter <- as.integer(counter)
+    .write_counter(counter, filepath)
+}
+
+### Use a lock mechanism to prevent several processes from trying to increment
+### the counter simultaneously. So is safe to use in the context of parallel
+### execution e.g.
+###
+###   library(BiocParallel)
+###   filepath <- tempfile()
+###   init_global_counter(filepath)
+###   bplapply(1:10, function(i) increment_global_counter(filepath))
+###
+increment_global_counter <- function(filepath)
+{
+    locked_path <- lock_file(filepath)
+    on.exit(unlock_file(filepath))
+    counter <- .read_counter(locked_path) + 1L
+    .write_counter(counter, locked_path)
+}
+

@@ -4,6 +4,55 @@
 ###
 
 
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### 2 global internal counters: one for the dump files, one for the dump
+### names
+###
+### The 2 counters are safe to use in the context of parallel execution e.g.
+###
+###   library(BiocParallel)
+###   bplapply(1:10, function(i) .increment_HDF5_dump_files_global_counter())
+###   bplapply(1:99, function(i) .increment_HDF5_dump_names_global_counter())
+###
+
+.get_dump_files_global_counter_filepath <- function()
+{
+    file.path(tempdir(), "HDF5Array_dump_files_global_counter")
+}
+ 
+.get_dump_names_global_counter_filepath <- function()
+{
+    file.path(tempdir(), "HDF5Array_dump_names_global_counter")
+}
+ 
+init_HDF5_dump_files_global_counter <- function()
+{
+    filepath <- .get_dump_files_global_counter_filepath()
+    init_global_counter(filepath)
+}
+
+init_HDF5_dump_names_global_counter <- function()
+{
+    filepath <- .get_dump_names_global_counter_filepath()
+    init_global_counter(filepath)
+}
+
+.increment_HDF5_dump_files_global_counter <- function()
+{
+    filepath <- .get_dump_files_global_counter_filepath()
+    increment_global_counter(filepath)
+}
+.increment_HDF5_dump_names_global_counter <- function()
+{
+    filepath <- .get_dump_names_global_counter_filepath()
+    increment_global_counter(filepath)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### set/getHDF5DumpFile(), lsHDF5DumpFile(), set/getHDF5DumpName()
+###
+
 .check_HDF5_dump_file <- function(file)
 {
     if (!isSingleString(file))
