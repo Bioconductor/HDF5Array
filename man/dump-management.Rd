@@ -45,8 +45,8 @@ showHDF5DumpLog()
 }
 
 \value{
-  \code{getHDF5DumpFile} returns the path to the HDF5 file where to write the
-  \emph{next automatic HDF5 dataset}.
+  \code{getHDF5DumpFile} returns the absolute path to the HDF5 file where
+  to write the \emph{next automatic HDF5 dataset}.
 
   \code{getHDF5DumpName} returns the name of the \emph{next automatic HDF5
   dataset}.
