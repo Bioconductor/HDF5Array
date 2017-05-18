@@ -1,78 +1,7 @@
 ### =========================================================================
-### writeHDF5Array() and HDF5 dump management
+### writeHDF5Array()
 ### -------------------------------------------------------------------------
 ###
-
-
-.check_HDF5_dump_file <- function(file)
-{
-    if (!isSingleString(file))
-        stop(wmsg("'file' must be a single string specifying the path ",
-                  "to an existing HDF5 file or to a new file"))
-    if (file.exists(file))
-        return(h5ls(file))
-    h5createFile(file)
-    return(NULL)
-}
-
-.check_HDF5_dump_name <- function(name)
-{
-    if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying the name ",
-                  "of the HDF5 dataset to write"))
-    if (name == "")
-        stop(wmsg("'name' cannot be the empty string"))
-}
-
-.HDF5_dump_settings_envir <- new.env(parent=emptyenv())
-
-### Called by .onLoad() hook (see zzz.R file).
-setHDF5DumpFile <- function(file=paste0(tempfile(), ".h5"))
-{
-    file_content <- .check_HDF5_dump_file(file)
-    assign("file", file, envir=.HDF5_dump_settings_envir)
-    if (is.null(file_content))
-        return(invisible(file_content))
-    return(file_content)
-}
-
-getHDF5DumpFile <- function()
-    get("file", envir=.HDF5_dump_settings_envir)
-
-### A convenience wrapper.
-lsHDF5DumpFile <- function() h5ls(getHDF5DumpFile())
-
-assign("auto_inc_ID", 0L, envir=.HDF5_dump_settings_envir)
-
-.get_auto_inc_ID <- function()
-{
-    get("auto_inc_ID", envir=.HDF5_dump_settings_envir)
-}
-
-.set_HDF5_dump_name_to_next_auto_inc_ID <- function()
-{
-    suppressWarnings(rm(list="name", envir=.HDF5_dump_settings_envir))
-    auto_inc_ID <- .get_auto_inc_ID() + 1L
-    assign("auto_inc_ID", auto_inc_ID, envir=.HDF5_dump_settings_envir)
-}
-
-setHDF5DumpName <- function(name)
-{
-    if (missing(name))
-        return(.set_HDF5_dump_name_to_next_auto_inc_ID())
-    .check_HDF5_dump_name(name)
-    assign("name", name, envir=.HDF5_dump_settings_envir)
-}
-
-getHDF5DumpName <- function()
-{
-    name <- try(get("name", envir=.HDF5_dump_settings_envir), silent=TRUE)
-    if (is(name, "try-error")) {
-        auto_inc_ID <- .get_auto_inc_ID()
-        name <- sprintf("/HDF5ArrayAUTO%05d", auto_inc_ID)
-    }
-    name
-}
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -108,20 +37,17 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 file=NULL, name=NULL)
 {
     if (is.null(file)) {
-        file <- getHDF5DumpFile()
+        file <- get_dump_file_for_use()
     } else {
-        .check_HDF5_dump_file(file)
+        check_dump_file(file)
     }
     if (is.null(name)) {
-        use_HDF5_dump_name <- TRUE
-        name <- getHDF5DumpName()
+        name <- get_dump_name_for_use()
     } else {
-        use_HDF5_dump_name <- FALSE
-        .check_HDF5_dump_name(name)
+        check_dump_name(name)
     }
     h5createDataset2(file, name, dim, type)
-    if (use_HDF5_dump_name)
-        .set_HDF5_dump_name_to_next_auto_inc_ID()
+    append_dataset_creation_to_dump_logfile(file, name, dim, type)
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {

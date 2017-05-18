@@ -1,12 +1,5 @@
 \name{writeHDF5Array}
 
-\alias{setHDF5DumpFile}
-\alias{getHDF5DumpFile}
-\alias{lsHDF5DumpFile}
-
-\alias{setHDF5DumpName}
-\alias{getHDF5DumpName}
-
 \alias{class:HDF5RealizationSink}
 \alias{HDF5RealizationSink-class}
 \alias{HDF5RealizationSink}
@@ -27,23 +20,11 @@
 \title{Write an array-like object to an HDF5 file}
 
 \description{
-  A function for writting an array-like object to an HDF5 file and other
-  low-level utilities to control the location of automatically created
-  HDF5 datasets.
+  A function for writting an array-like object to an HDF5 file.
 }
 
 \usage{
-## Write an array-like object to an HDF5 file:
 writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
-
-## Control the location of automatically created HDF5 datasets (a.k.a.
-## HDF5 dump management):
-setHDF5DumpFile(file=paste0(tempfile(), ".h5"))
-getHDF5DumpFile()
-lsHDF5DumpFile()
-
-setHDF5DumpName(name)
-getHDF5DumpName()
 }
 
 \arguments{
@@ -57,24 +38,16 @@ getHDF5DumpName()
     section below for more information.
   }
   \item{file}{
-    For \code{writeHDF5Array}: \code{NULL} or the path (as a single string)
-    to the (new or existing) HDF5 file where to write the dataset.
-    If \code{NULL} then the dataset is written to the \emph{HDF5 dump
-    file} (see below) i.e. the path returned by \code{getHDF5DumpFile()}
-    is used.
-
-    For \code{setHDF5DumpFile}: The path (as a single string) to the
-    \emph{HDF5 dump file}, that is, to the (new or existing) HDF5 file
-    where to write automatically created HDF5 datasets.
+    \code{NULL} or the path (as a single string) to the (new or existing)
+    HDF5 file where to write the dataset.
+    If \code{NULL}, then the dataset will be written to the current \emph{HDF5
+    dump file} i.e. the path returned by \code{\link{getHDF5DumpFile}}
+    will be used.
   }
   \item{name}{
-    For \code{writeHDF5Array}: \code{NULL} or the name of the HDF5 dataset
-    to write. If \code{NULL} then the name returned by \code{getHDF5DumpName()}
-    is used.
-
-    For \code{setHDF5DumpName}: The name of the \emph{next automatic dataset}
-    to be written to the current \emph{HDF5 dump file}. The supplied name is
-    for a one-time use only.
+    \code{NULL} or the name of the HDF5 dataset to write.
+    If \code{NULL}, then the name returned by \code{\link{getHDF5DumpName}}
+    will be used.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
@@ -91,8 +64,7 @@ getHDF5DumpName()
 }
 
 \value{
-  A HDF5Array object pointing to the newly written HDF5 dataset on disk
-  for \code{writeHDF5Array()}.
+  A HDF5Array object pointing to the newly written HDF5 dataset on disk.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
@@ -111,35 +83,26 @@ getHDF5DumpName()
   \link{DelayedArray} objects.
 }
 
-\note{
-  \code{lsHDF5DumpFile()} is a just convenience wrapper for
-  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
-}
-
 \seealso{
   \itemize{
-    \item \link{DelayedArray} objects.
-
-    \item \link{DelayedArray-utils} for common operations on DelayedArray
-          objects.
-
-    \item \link{HDF5Array} objects.
-
     \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
           \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
           the \pkg{SummarizedExperiment} package for saving/loading a
           HDF5-based SummarizedExperiment object to/from disk.
 
-    \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
-          on which \code{lsHDF5DumpFile} is based.
+    \item \link{HDF5-dump-management} for controlling the location of
+          automatically created HDF5 datasets.
 
+    \item \link{HDF5Array} objects.
+
+    \item \link{DelayedArray} objects.
+
+    \item \link{DelayedArray-utils} for common operations on DelayedArray
+          objects.
   }
 }
 
 \examples{
-## ---------------------------------------------------------------------
-## writeHDF5Array()
-## ---------------------------------------------------------------------
 library(rhdf5)
 library(h5vcData)
 
@@ -154,42 +117,5 @@ cov1 <- drop(cov0[ , , 29000001:29000007])
 out_file <- tempfile()
 writeHDF5Array(cov1, out_file, "cov1")
 h5ls(out_file)
-
-## ---------------------------------------------------------------------
-## AUTOMATIC HDF5 DATASETS AND DUMP MANAGEMENT
-## ---------------------------------------------------------------------
-getHDF5DumpFile()
-
-## Use setHDF5DumpFile() to change the current HDF5 dump file.
-## If the specified file exists, then it must be in HDF5 format or
-## an error will be raised. If it doesn't exist, then it will be
-## created.
-#setHDF5DumpFile("path/to/some/HDF5/file")
-
-lsHDF5DumpFile()
-
-a <- array(1:600, c(150, 4))
-A <- as(a, "HDF5Array")
-lsHDF5DumpFile()
-A
-
-b <- array(runif(6000), c(4, 2, 150))
-B <- as(b, "HDF5Array")
-lsHDF5DumpFile()
-B
-
-C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
-as(C, "HDF5Array")  # realize C on disk
-lsHDF5DumpFile()
-
-## Matrix multiplication is not delayed: the output matrix is realized
-## block by block. The current "realization backend" controls where
-## realization happens e.g. in memory if set to NULL or in an HDF5 file
-## if set to "HDF5Array". See '?realize' in the DelayedArray package for
-## more information about "realization backends".
-setRealizationBackend("HDF5Array")
-m <- matrix(runif(20), nrow=4)
-P <- C \%*\% m
-lsHDF5DumpFile()
 }
 \keyword{methods}
