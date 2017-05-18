@@ -21,32 +21,46 @@
 
 \usage{
 setHDF5DumpFile(file)
-getHDF5DumpFile()
-lsHDF5DumpFile()
-
 setHDF5DumpName(name)
-getHDF5DumpName()
+getHDF5DumpFile(for.use=FALSE)
+getHDF5DumpName(for.use=FALSE)
 
+lsHDF5DumpFile()
 showHDF5DumpLog()
 }
 
 \arguments{
   \item{file}{
-    The path (as a single string) to the \emph{HDF5 dump file}, that is,
-    to the (new or existing) HDF5 file where to write automatically created
-    HDF5 datasets. If \code{file} is missing, then a new file with an
-    automatic name is used for each automatically created HDF5 dataset.
+    The path (as a single string) to the current \emph{HDF5 dump file},
+    that is, to the (new or existing) HDF5 file where the \emph{next
+    automatic HDF5 datasets} will be written. If \code{file} is missing,
+    then a new file with an automatic name will be used for each new dataset.
   }
   \item{name}{
     The name of the \emph{next automatic HDF5 dataset} to be written to the
-    current \emph{HDF5 dump file}. The supplied name is for a one-time use
-    only.
+    current \emph{HDF5 dump file}.
   }
+  \item{for.use}{
+    Whether the returned file or dataset name is for use by the caller or not.
+    See below for the details.
+  }
+}
+
+\details{
+  Calling \code{getHDF5DumpFile()} and \code{getHDF5DumpName()} with no
+  argument should be \emph{informative} only i.e. it's a mean for the user
+  to know where the \emph{next automatic HDF5 dataset} will be written.
+  Since a given file/name combination can be used only once, the user should
+  be careful to not use that combination to explicitely create an HDF5 dataset
+  because that would get in the way of the creation of the \emph{next
+  automatic HDF5 dataset}. If the user or an application want to use this
+  combination, then they need to call \code{getHDF5DumpFile(for.use=TRUE)}
+  and \code{getHDF5DumpName(for.use=TRUE)}.
 }
 
 \value{
   \code{getHDF5DumpFile} returns the absolute path to the HDF5 file where
-  to write the \emph{next automatic HDF5 dataset}.
+  the \emph{next automatic HDF5 dataset} will be written.
 
   \code{getHDF5DumpName} returns the name of the \emph{next automatic HDF5
   dataset}.

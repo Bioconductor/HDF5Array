@@ -175,19 +175,13 @@ setHDF5DumpFile <- function(file)
 }
 
 ### Return the *absolute path* to the dump file.
-getHDF5DumpFile <- function()
+getHDF5DumpFile <- function(for.use=FALSE)
 {
+    if (!isTRUEorFALSE(for.use))
+        stop("'for.use' must be TRUE or FALSE")
     file <- try(.get_dump_specfile(), silent=TRUE)
     if (is(file, "try-error"))
-        file <- .get_dump_autofile()
-    file
-}
-
-get_dump_file_for_use <- function()
-{
-    file <- try(.get_dump_specfile(), silent=TRUE)
-    if (is(file, "try-error"))
-        file <- .get_dump_autofile(increment=TRUE)
+        file <- .get_dump_autofile(increment=for.use)
     file
 }
 
@@ -219,20 +213,14 @@ setHDF5DumpName <- function(name)
     .set_dump_specname(name)
 }
 
-getHDF5DumpName <- function()
+getHDF5DumpName <- function(for.use=FALSE)
 {
-    name <- try(.get_dump_specname(), silent=TRUE)
-    if (is(name, "try-error"))
-        name <- .get_dump_autoname()
-    name
-}
-
-get_dump_name_for_use <- function()
-{
+    if (!isTRUEorFALSE(for.use))
+        stop("'for.use' must be TRUE or FALSE")
     name <- try(.get_dump_specname(), silent=TRUE)
     if (is(name, "try-error")) {
-        name <- .get_dump_autoname(increment=TRUE)
-    } else {
+        name <- .get_dump_autoname(increment=for.use)
+    } else if (for.use) {
         ## If the dump file is a user-specified file, we switch back to
         ## automatic dump names.
         file <- try(.get_dump_specfile(), silent=TRUE)

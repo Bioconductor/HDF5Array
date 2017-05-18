@@ -37,12 +37,12 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 file=NULL, name=NULL)
 {
     if (is.null(file)) {
-        file <- get_dump_file_for_use()
+        file <- getHDF5DumpFile(for.use=TRUE)
     } else {
         check_dump_file(file)
     }
     if (is.null(name)) {
-        name <- get_dump_name_for_use()
+        name <- getHDF5DumpName(for.use=TRUE)
     } else {
         check_dump_name(name)
     }
