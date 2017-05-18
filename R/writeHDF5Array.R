@@ -47,6 +47,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         check_dump_name(name)
     }
     h5createDataset2(file, name, dim, type)
+    append_dataset_creation_to_dump_logfile(file, name, dim, type)
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {

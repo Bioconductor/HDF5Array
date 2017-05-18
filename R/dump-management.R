@@ -44,6 +44,7 @@ init_HDF5_dump_names_global_counter <- function()
     filepath <- .get_dump_files_global_counter_filepath()
     get_global_counter(filepath, increment=increment)
 }
+
 .get_dump_names_global_counter <- function(increment=FALSE)
 {
     filepath <- .get_dump_names_global_counter_filepath()
@@ -239,5 +240,54 @@ get_dump_name_for_use <- function()
             .set_dump_autonames_mode()
     }
     name
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Dump log
+###
+
+### Called by .onLoad() hook (see zzz.R file).
+get_HDF5_dump_logfile <- function()
+{
+    file.path(tempdir(), "HDF5Array_dump_log")
+}
+
+.get_dataset_creation_global_counter_filepath <- function()
+{
+    file.path(tempdir(), "HDF5Array_dataset_creation_global_counter")
+}
+
+### Called by .onLoad() hook (see zzz.R file). 
+init_HDF5_dataset_creation_global_counter <- function()
+{
+    filepath <- .get_dataset_creation_global_counter_filepath()
+    init_global_counter(filepath)
+}
+
+.get_dataset_creation_global_counter <- function(increment=FALSE)
+{
+    filepath <- .get_dataset_creation_global_counter_filepath()
+    get_global_counter(filepath, increment=increment)
+}
+
+### Use a lock mechanism so is safe to use in the context of parallel
+### execution.
+append_dataset_creation_to_dump_logfile <- function(file, name, dim, type)
+{
+    logfile <- get_HDF5_dump_logfile()
+    locked_path <- lock_file(logfile)
+    on.exit(unlock_file(logfile))
+    counter <- .get_dataset_creation_global_counter(increment=TRUE)
+    dim_in1string <- paste0(dim, collapse="x")
+    cat("[", as.character(Sys.time()), "] #", counter, " ",
+        "Dataset '", name, "' (", dim_in1string, ":", type, ") ",
+        "created in file '", file, "'\n",
+        file=locked_path, sep="", append=TRUE)
+}
+
+showHDF5DumpLog <- function()
+{
+    cat(readLines(get_HDF5_dump_logfile()), sep="\n")
 }
 

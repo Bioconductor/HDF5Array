@@ -10,6 +10,8 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
+\alias{showHDF5DumpLog}
+
 \title{HDF5 dump management}
 
 \description{
@@ -24,6 +26,8 @@ lsHDF5DumpFile()
 
 setHDF5DumpName(name)
 getHDF5DumpName()
+
+showHDF5DumpLog()
 }
 
 \arguments{
@@ -100,5 +104,8 @@ setRealizationBackend("HDF5Array")
 m <- matrix(runif(20), nrow=4)
 P <- C \%*\% m
 lsHDF5DumpFile()
+
+## See all the HDF5 datasets created in the current session so far:
+showHDF5DumpLog()
 }
 \keyword{methods}
