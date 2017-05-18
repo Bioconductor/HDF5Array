@@ -267,15 +267,38 @@ append_dataset_creation_to_dump_logfile <- function(file, name, dim, type)
     locked_path <- lock_file(logfile)
     on.exit(unlock_file(logfile))
     counter <- .get_dataset_creation_global_counter(increment=TRUE)
-    dim_in1string <- paste0(dim, collapse="x")
-    cat("[", as.character(Sys.time()), "] #", counter, " ",
-        "Dataset '", name, "' (", dim_in1string, ":", type, ") ",
-        "created in file '", file, "'\n",
-        file=locked_path, sep="", append=TRUE)
+    dims <- paste0(dim, collapse="x")
+    cat(as.character(Sys.time()), counter, name, dims, type, file,
+        sep="\t", file=locked_path, append=TRUE)
+    cat("\n", file=locked_path, append=TRUE)
 }
 
 showHDF5DumpLog <- function()
 {
-    cat(readLines(get_HDF5_dump_logfile()), sep="\n")
+    COLNAMES <- c("time", "counter", "name", "dims", "type", "file")
+    ## The nb of lines in the log file is the current value of the dataset
+    ## creation counter minus one.
+    counter <- .get_dataset_creation_global_counter()
+    if (counter == 1L) {
+        dump_log <- data.frame(time=character(0),
+                               counter=integer(0),
+                               name=character(0),
+                               dims=character(0),
+                               type=character(0),
+                               file=character(0),
+                               stringsAsFactors=FALSE)
+    } else {
+        dump_log <- read.table(get_HDF5_dump_logfile(),
+                               sep="\t", stringsAsFactors=FALSE)
+        colnames(dump_log) <- COLNAMES
+        fmt <- "[%s] #%d Dataset '%s' (%s:%s) created in file '%s'"
+        message(paste0(sprintf(fmt,
+                               dump_log$time, dump_log$counter,
+                               dump_log$name, dump_log$dims,
+                               dump_log$type, dump_log$file),
+                       "\n"),
+                appendLF=FALSE)
+    }
+    invisible(dump_log)
 }
 
