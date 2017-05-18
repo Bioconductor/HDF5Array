@@ -1,4 +1,5 @@
 import(methods)
+importFrom(utils, read.table)
 importFrom(tools, file_path_as_absolute)
 
 import(BiocGenerics)
