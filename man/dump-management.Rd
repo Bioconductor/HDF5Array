@@ -64,6 +64,8 @@ showHDF5DumpLog()
 
   \code{getHDF5DumpName} returns the name of the \emph{next automatic HDF5
   dataset}.
+
+  \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
 }
 
 \note{
@@ -121,5 +123,10 @@ lsHDF5DumpFile()
 
 ## See all the HDF5 datasets created in the current session so far:
 showHDF5DumpLog()
+
+## Wrap the call in suppressMessages() if you are only interested in the
+## data frame version of the dump log:
+dump_log <- suppressMessages(showHDF5DumpLog())
+dump_log
 }
 \keyword{methods}
