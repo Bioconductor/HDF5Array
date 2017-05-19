@@ -56,6 +56,7 @@ init_HDF5_dump_names_global_counter <- function()
 ### Normalization (with basic checking) of an HDF5 file path or dataset name
 ###
 
+### Return the *absolute path* to the dump file.
 ### Has the side effect of creating the file as an empty HDF5 file if it does
 ### not exist yet.
 normalize_dump_file <- function(file)
@@ -102,24 +103,9 @@ normalize_dump_name <- function(name)
     assign("dir", dir, envir=.dump_settings_envir)
 }
 
-.get_dump_dir <- function()
-{
-    get("dir", envir=.dump_settings_envir)
-}
-
 .set_dump_autofiles_mode <- function()
 {
     suppressWarnings(rm(list="specfile", envir=.dump_settings_envir))
-}
-
-### Create auto file as an empty HDF5 file if it doesn't exist yet.
-.get_dump_autofile <- function(increment=FALSE)
-{
-    counter <- .get_dump_files_global_counter(increment=increment)
-    file <- file.path(.get_dump_dir(), sprintf("auto%05d.h5", counter))
-    if (!file.exists(file))
-        h5createFile(file)
-    file
 }
 
 ### Create file as an empty HDF5 file if it doesn't exist yet.
@@ -129,6 +115,16 @@ normalize_dump_name <- function(name)
     assign("specfile", file, envir=.dump_settings_envir)
 }
 
+.set_dump_autonames_mode <- function()
+{
+    suppressWarnings(rm(list="specname", envir=.dump_settings_envir))
+}
+
+.set_dump_specname <- function(name)
+{
+    assign("specname", name, envir=.dump_settings_envir)
+}
+
 ### Return the user-specified file of the dump or an error if the user didn't
 ### specify a file.
 .get_dump_specfile <- function()
@@ -136,20 +132,10 @@ normalize_dump_name <- function(name)
     get("specfile", envir=.dump_settings_envir)
 }
 
-.set_dump_autonames_mode <- function()
-{
-    suppressWarnings(rm(list="specname", envir=.dump_settings_envir))
-}
-
 .get_dump_autoname <- function(increment=FALSE)
 {
     counter <- .get_dump_names_global_counter(increment=increment)
     sprintf("/HDF5ArrayAUTO%05d", counter)
-}
-
-.set_dump_specname <- function(name)
-{
-    assign("specname", name, envir=.dump_settings_envir)
 }
 
 ### Return the user-specified name of the dump or an error if the user didn't
@@ -161,8 +147,23 @@ normalize_dump_name <- function(name)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### set/getHDF5DumpDir()
+### get/setHDF5DumpDir()
 ###
+
+getHDF5DumpDir <- function()
+{
+    get("dir", envir=.dump_settings_envir)
+}
+
+### Create auto file as an empty HDF5 file if it doesn't exist yet.
+.get_dump_autofile <- function(increment=FALSE)
+{
+    counter <- .get_dump_files_global_counter(increment=increment)
+    file <- file.path(getHDF5DumpDir(), sprintf("auto%05d.h5", counter))
+    if (!file.exists(file))
+        h5createFile(file)
+    file
+}
 
 ### Called by .onLoad() hook (see zzz.R file).
 setHDF5DumpDir <- function(dir)
@@ -178,8 +179,6 @@ setHDF5DumpDir <- function(dir)
     .get_dump_autofile()
     invisible(dir)
 }
-
-getHDF5DumpDir <- .get_dump_dir
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
