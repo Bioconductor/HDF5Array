@@ -117,6 +117,24 @@ h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Detect and trim trailing slahes in a character vector
+###
+
+has_trailing_slash <- function(x)
+{
+    stopifnot(is.character(x))
+    #nc <- nchar(x)
+    #substr(x, start=nc, stop=nc) == "/"
+    grepl("/$", x)  # seems slightly faster than the above
+}
+
+trim_trailing_slashes <- function(x)
+{
+    sub("/*$", "", x)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### A simple mechanism to lock/unlock a file so processes can get temporary
 ### exclusive access to it
 ###

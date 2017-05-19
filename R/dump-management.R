@@ -53,13 +53,43 @@ init_HDF5_dump_names_global_counter <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Very low-level stuff
+### Basic checking of an HDF5 file path and dataset name
+###
+
+### Has the side effect to create the file as an empty HDF5 file if it does
+### not exist yet.
+check_dump_file <- function(file)
+{
+    if (!isSingleString(file) || file == "")
+        stop(wmsg("'file' must be a non-empty string specifying the path ",
+                  "to a new or existing HDF5 file"))
+    if (!file.exists(file))
+        h5createFile(file)
+    file_path_as_absolute(file)
+}
+
+check_dump_name <- function(name)
+{
+    if (!isSingleString(name) || name == "")
+        stop(wmsg("'name' must be a non-empty string specifying the name ",
+                  "of the HDF5 dataset to write"))
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Very low-level stuff used in this file only
 ###
 
 .dump_settings_envir <- new.env(parent=emptyenv())
 
+### Create directory 'dir' if it doesn't exist yet.
 .set_dump_dir <- function(dir)
 {
+    ## Even though file_path_as_absolute() will trim the trailing slashes,
+    ## we need to do this early. Otherwise, checking for the existence of a
+    ## file of the same name as the to-be-created directory will fail.
+    if (nchar(dir) > 1L)
+        dir <- trim_trailing_slashes(dir)
     if (!dir.exists(dir)) {
         if (file.exists(dir))
             stop(wmsg("\"", dir, "\" already exists and is a file, ",
@@ -73,12 +103,7 @@ init_HDF5_dump_names_global_counter <- function()
 
 .get_dump_dir <- function()
 {
-    dir <- try(get("dir", envir=.dump_settings_envir), silent=TRUE)
-    if (is(dir, "try-error")) {
-        dir <- file.path(tempdir(), "HDF5Array_dump")
-        .set_dump_dir(dir)
-    }
-    dir
+    get("dir", envir=.dump_settings_envir)
 }
 
 .set_dump_autofiles_mode <- function()
@@ -86,6 +111,7 @@ init_HDF5_dump_names_global_counter <- function()
     suppressWarnings(rm(list="specfile", envir=.dump_settings_envir))
 }
 
+### Create auto file as an empty HDF5 file if it doesn't exist yet.
 .get_dump_autofile <- function(increment=FALSE)
 {
     counter <- .get_dump_files_global_counter(increment=increment)
@@ -95,9 +121,10 @@ init_HDF5_dump_names_global_counter <- function()
     file
 }
 
+### Create file as an empty HDF5 file if it doesn't exist yet.
 .set_dump_specfile <- function(file)
 {
-    file <- file_path_as_absolute(file)
+    file <- check_dump_file(file)
     assign("specfile", file, envir=.dump_settings_envir)
 }
 
@@ -133,43 +160,50 @@ init_HDF5_dump_names_global_counter <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### set/getHDF5DumpDir()
+###
+
+### Called by .onLoad() hook (see zzz.R file).
+setHDF5DumpDir <- function(dir)
+{
+    if (missing(dir)) {
+        dir <- file.path(tempdir(), "HDF5Array_dump")
+    } else if (!isSingleString(dir) || dir == "") {
+        stop(wmsg("'dir' must be a non-empty string specifying the path ",
+                  "to a new or existing directory"))
+    }
+    dir <- .set_dump_dir(dir)
+    .set_dump_autofiles_mode()
+    .get_dump_autofile()
+    invisible(dir)
+}
+
+getHDF5DumpDir <- .get_dump_dir
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### set/getHDF5DumpFile()
 ###
 
-check_dump_file <- function(file)
-{
-    if (!isSingleString(file) || file == "")
-        stop(wmsg("'file' must be a single string specifying the path ",
-                  "to a new or existing HDF5 file"))
-    if (file.exists(file))
-        return(h5ls(file))
-    h5createFile(file)
-    return(NULL)
-}
-
-### Called by .onLoad() hook (see zzz.R file).
+### Set the current HDF5 dump file. Create it as an empty HDF5 file if it
+### doesn't exist yet.
 setHDF5DumpFile <- function(file)
 {
     if (missing(file)) {
         .set_dump_autofiles_mode()
         file <- .get_dump_autofile()
-        file_content <- check_dump_file(file)
     } else {
         if (!isSingleString(file) || file == "")
-            stop("'file' must be a single non-empty string")
-        nc <- nchar(file)
-        if (substr(file, start=nc, stop=nc) == "/") {
-            if (nc >= 2L)
-                file <- substr(file, start=1L, stop=nc-1L)
-            .set_dump_dir(file)
+            stop("'file' must be a non-empty string")
+        if (has_trailing_slash(file)) {
+            setHDF5DumpDir(file)
             file <- .get_dump_autofile()
-            file_content <- check_dump_file(file)
         } else {
-            file_content <- check_dump_file(file)
-            .set_dump_specfile(file)
+            file <- .set_dump_specfile(file)
         }
     }
-    if (is.null(file_content))
+    file_content <- h5ls(file)
+    if (nrow(file_content) == 0L)
         return(invisible(file_content))
     file_content
 }
@@ -192,15 +226,6 @@ lsHDF5DumpFile <- function() h5ls(getHDF5DumpFile())
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### set/getHDF5DumpName()
 ###
-
-check_dump_name <- function(name)
-{
-    if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying the name ",
-                  "of the HDF5 dataset to write"))
-    if (name == "")
-        stop(wmsg("'name' cannot be the empty string"))
-}
 
 setHDF5DumpName <- function(name)
 {
