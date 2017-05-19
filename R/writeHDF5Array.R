@@ -39,12 +39,12 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     if (is.null(file)) {
         file <- getHDF5DumpFile(for.use=TRUE)
     } else {
-        check_dump_file(file)
+        file <- normalize_dump_file(file)
     }
     if (is.null(name)) {
         name <- getHDF5DumpName(for.use=TRUE)
     } else {
-        check_dump_name(name)
+        name <- normalize_dump_name(name)
     }
     h5createDataset2(file, name, dim, type)
     append_dataset_creation_to_dump_log(file, name, dim, type)

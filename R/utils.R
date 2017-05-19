@@ -107,6 +107,9 @@ h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
     }
     #chunk <- .chunk_as_hypercube(dims)
     chunk <- .chunk_as_subblock(dims, storage.mode)
+    ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
+    ## Calling H5close() will close all opened HDF5 object handles.
+    #on.exit(H5close())
     ok <- h5createDataset(file, dataset, dims, storage.mode=storage.mode,
                                                size=size,
                                                chunk=chunk)

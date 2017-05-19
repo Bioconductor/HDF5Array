@@ -53,12 +53,12 @@ init_HDF5_dump_names_global_counter <- function()
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Basic checking of an HDF5 file path and dataset name
+### Normalization (with basic checking) of an HDF5 file path or dataset name
 ###
 
-### Has the side effect to create the file as an empty HDF5 file if it does
+### Has the side effect of creating the file as an empty HDF5 file if it does
 ### not exist yet.
-check_dump_file <- function(file)
+normalize_dump_file <- function(file)
 {
     if (!isSingleString(file) || file == "")
         stop(wmsg("'file' must be a non-empty string specifying the path ",
@@ -68,11 +68,12 @@ check_dump_file <- function(file)
     file_path_as_absolute(file)
 }
 
-check_dump_name <- function(name)
+normalize_dump_name <- function(name)
 {
     if (!isSingleString(name) || name == "")
         stop(wmsg("'name' must be a non-empty string specifying the name ",
                   "of the HDF5 dataset to write"))
+    trim_trailing_slashes(name)
 }
 
 
@@ -124,7 +125,7 @@ check_dump_name <- function(name)
 ### Create file as an empty HDF5 file if it doesn't exist yet.
 .set_dump_specfile <- function(file)
 {
-    file <- check_dump_file(file)
+    file <- normalize_dump_file(file)
     assign("specfile", file, envir=.dump_settings_envir)
 }
 
@@ -234,7 +235,7 @@ setHDF5DumpName <- function(name)
         name <- .get_dump_autoname()
         return(invisible(name))
     }
-    check_dump_name(name)
+    name <- normalize_dump_name(name)
     .set_dump_specname(name)
 }
 
