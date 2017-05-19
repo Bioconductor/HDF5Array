@@ -286,7 +286,7 @@ init_HDF5_dataset_creation_global_counter <- function()
 
 ### Use a lock mechanism so is safe to use in the context of parallel
 ### execution.
-append_dataset_creation_to_dump_log <- function(file, name, dim, type)
+appendDatasetCreationToDumpLog <- function(file, name, dim, type)
 {
     logfile <- get_HDF5_dump_logfile()
     locked_path <- lock_file(logfile)
