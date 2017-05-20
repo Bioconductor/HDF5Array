@@ -84,7 +84,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
   }
   \item{type}{
     The type (a.k.a. storage mode) of the data to be written to disk. Can be
-    obtained with \code{\link[DelayedArray]{type()}} on an array-like object
+    obtained with \code{\link[DelayedArray]{type}()} on an array-like object
     (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
     ordinary array). This is typically what an application writing datasets
     to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
@@ -109,7 +109,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \value{
-  \code{getHDF5DumpDir()} returns the absolute path to the directory
+  \code{getHDF5DumpDir} returns the absolute path to the directory
   where \emph{HDF5 dump files} with automatic names will be created.
   Only meaningful if the user did NOT specify an \emph{HDF5 dump file}
   with \code{setHDF5DumpFile}.
