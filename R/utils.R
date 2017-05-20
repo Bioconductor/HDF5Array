@@ -107,12 +107,33 @@ h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
     }
     #chunk <- .chunk_as_hypercube(dims)
     chunk <- .chunk_as_subblock(dims, storage.mode)
+    ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
+    ## Calling H5close() will close all opened HDF5 object handles.
+    #on.exit(H5close())
     ok <- h5createDataset(file, dataset, dims, storage.mode=storage.mode,
                                                size=size,
                                                chunk=chunk)
     if (!ok)
         stop(wmsg("failed to create dataset '", dataset, "' ",
                   "in file '", file, "'"), call.=FALSE)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Detect and trim trailing slahes in a character vector
+###
+
+has_trailing_slash <- function(x)
+{
+    stopifnot(is.character(x))
+    #nc <- nchar(x)
+    #substr(x, start=nc, stop=nc) == "/"
+    grepl("/$", x)  # seems slightly faster than the above
+}
+
+trim_trailing_slashes <- function(x)
+{
+    sub("/*$", "", x)
 }
 
 

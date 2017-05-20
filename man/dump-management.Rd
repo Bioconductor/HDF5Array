@@ -3,6 +3,9 @@
 \alias{HDF5-dump-management}
 \alias{dump-management}
 
+\alias{setHDF5DumpDir}
+\alias{getHDF5DumpDir}
+
 \alias{setHDF5DumpFile}
 \alias{getHDF5DumpFile}
 \alias{lsHDF5DumpFile}
@@ -11,6 +14,7 @@
 \alias{getHDF5DumpName}
 
 \alias{showHDF5DumpLog}
+\alias{appendDatasetCreationToHDF5DumpLog}
 
 \title{HDF5 dump management}
 
@@ -20,29 +24,72 @@
 }
 
 \usage{
+setHDF5DumpDir(dir)
 setHDF5DumpFile(file)
 setHDF5DumpName(name)
+
+getHDF5DumpDir()
 getHDF5DumpFile(for.use=FALSE)
 getHDF5DumpName(for.use=FALSE)
 
 lsHDF5DumpFile()
+
 showHDF5DumpLog()
+
+## For developers:
+appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \arguments{
+  \item{dir}{
+    The path (as a single string) to the current \emph{HDF5 dump directory},
+    that is, to the (new or existing) directory where \emph{HDF5 dump files}
+    with automatic names will be created. This is ignored if the user
+    specified an \emph{HDF5 dump file} with \code{setHDF5DumpFile}.
+    If \code{dir} is missing, then the \emph{HDF5 dump directory} is set
+    back to its default value i.e. to some directory under \code{tempdir()}
+    (call \code{getHDF5DumpDir()} to get the exact path).
+  }
   \item{file}{
+    For \code{setHDF5DumpFile}:
     The path (as a single string) to the current \emph{HDF5 dump file},
     that is, to the (new or existing) HDF5 file where the \emph{next
-    automatic HDF5 datasets} will be written. If \code{file} is missing,
-    then a new file with an automatic name will be used for each new dataset.
+    automatic HDF5 datasets} will be written. If \code{file} is
+    missing, then a new file with an automatic name will be created
+    (in \code{getHDF5DumpDir()}) and used for each new dataset.
+
+    For \code{appendDatasetCreationToHDF5DumpLog}:
+    The absolute path to the \emph{HDF5 dump file} obtained with
+    \code{getHDF5DumpFile(for.use=TRUE)}.
   }
   \item{name}{
-    The name of the \emph{next automatic HDF5 dataset} to be written to the
-    current \emph{HDF5 dump file}.
+    For \code{setHDF5DumpName}:
+    The name of the \emph{next automatic HDF5 dataset} to be written to
+    the current \emph{HDF5 dump file}.
+
+    For \code{appendDatasetCreationToHDF5DumpLog}:
+    The name of the HDF5 dataset obtained with
+    \code{getHDF5DumpName(for.use=TRUE)}.
   }
   \item{for.use}{
     Whether the returned file or dataset name is for use by the caller or not.
     See below for the details.
+  }
+  \item{dim}{
+    The dimensions of the HDF5 dataset to be written to disk, that is,
+    an integer vector of length one or more giving the maximal indices in each
+    dimension.
+    See the \code{dims} argument in \code{?rhdf5::\link{h5createDataset}}
+    (in the \pkg{rhdf5} package) for more information about this.
+  }
+  \item{type}{
+    The type (a.k.a. storage mode) of the data to be written to disk. Can be
+    obtained with \code{\link[DelayedArray]{type}()} on an array-like object
+    (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
+    ordinary array). This is typically what an application writing datasets
+    to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
+    of its call to \code{rhdf5::\link{h5createDataset}}.
+    See the Note TO DEVELOPERS below for more information.
   }
 }
 
@@ -53,12 +100,20 @@ showHDF5DumpLog()
   Since a given file/name combination can be used only once, the user should
   be careful to not use that combination to explicitely create an HDF5 dataset
   because that would get in the way of the creation of the \emph{next
-  automatic HDF5 dataset}. If the user or an application want to use this
-  combination, then they need to call \code{getHDF5DumpFile(for.use=TRUE)}
-  and \code{getHDF5DumpName(for.use=TRUE)}.
+  automatic HDF5 dataset}.
+  See the Note TO DEVELOPERS below if you actually need to use this file/name
+  combination.
+
+  \code{lsHDF5DumpFile()} is a just convenience wrapper for
+  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
 }
 
 \value{
+  \code{getHDF5DumpDir} returns the absolute path to the directory
+  where \emph{HDF5 dump files} with automatic names will be created.
+  Only meaningful if the user did NOT specify an \emph{HDF5 dump file}
+  with \code{setHDF5DumpFile}.
+
   \code{getHDF5DumpFile} returns the absolute path to the HDF5 file where
   the \emph{next automatic HDF5 dataset} will be written.
 
@@ -69,8 +124,25 @@ showHDF5DumpLog()
 }
 
 \note{
-  \code{lsHDF5DumpFile()} is a just convenience wrapper for
-  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
+  TO DEVELOPERS:
+
+  If your application needs to write its own dataset to the \emph{HDF5 dump}
+  then it should:
+  \enumerate{
+    \item Get a file/name combination by calling
+          \code{getHDF5DumpFile(for.use=TRUE)} and
+          \code{getHDF5DumpName(for.use=TRUE)}.
+
+    \item Add an entry to the dump log by calling
+          \code{appendDatasetCreationToHDF5DumpLog}.
+          Typically, this should be done right after creating the dataset
+          (e.g. with \code{rhdf5::h5createDataset}) and before starting to
+          write the data to disk.
+          Note that \code{appendDatasetCreationToHDF5DumpLog} uses a lock
+          mechanism so is safe to use in the context of parallel execution.
+  }
+  This is actually what the coercion method to \link{HDF5Array} does
+  internally.
 }
 
 \seealso{
@@ -83,10 +155,12 @@ showHDF5DumpLog()
     \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
           on which \code{lsHDF5DumpFile} is based.
 
+    \item \code{\link[DelayedArray]{type}} in the \pkg{DelayedArray} package.
   }
 }
 
 \examples{
+getHDF5DumpDir()
 getHDF5DumpFile()
 
 ## Use setHDF5DumpFile() to change the current HDF5 dump file.

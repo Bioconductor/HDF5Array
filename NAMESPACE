@@ -41,9 +41,10 @@ exportMethods(
 
 export(
     HDF5ArraySeed, HDF5Array,
+    setHDF5DumpDir, getHDF5DumpDir,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
-    showHDF5DumpLog,
+    appendDatasetCreationToHDF5DumpLog, showHDF5DumpLog,
     HDF5RealizationSink, writeHDF5Array, writeHDF5Dataset
 )
 
