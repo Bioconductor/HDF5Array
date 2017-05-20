@@ -155,6 +155,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
     \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
           on which \code{lsHDF5DumpFile} is based.
 
+    \item \code{\link[DelayedArray]{type}} in the \pkg{DelayedArray} package.
   }
 }
 
