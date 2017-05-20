@@ -120,7 +120,8 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
           Note that \code{appendDatasetCreationToHDF5DumpLog} uses a lock
           mechanism so is safe to use in the context of parallel execution.
   }
-  This is what the coercion method to \link{HDF5Array} does internally.
+  This is actually what the coercion method to \link{HDF5Array} does
+  internally.
 }
 
 \seealso{
