@@ -3,6 +3,9 @@
 \alias{HDF5-dump-management}
 \alias{dump-management}
 
+\alias{setHDF5DumpDir}
+\alias{getHDF5DumpDir}
+
 \alias{setHDF5DumpFile}
 \alias{getHDF5DumpFile}
 \alias{lsHDF5DumpFile}
@@ -21,8 +24,11 @@
 }
 
 \usage{
+setHDF5DumpDir(dir)
 setHDF5DumpFile(file)
 setHDF5DumpName(name)
+
+getHDF5DumpDir()
 getHDF5DumpFile(for.use=FALSE)
 getHDF5DumpName(for.use=FALSE)
 
@@ -35,12 +41,22 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \arguments{
+  \item{dir}{
+    The path (as a single string) to the current \emph{HDF5 dump directory},
+    that is, to the (new or existing) directory where \emph{HDF5 dump files}
+    with automatic names will be created. This is ignored if the user
+    specified an \emph{HDF5 dump file} with \code{setHDF5DumpFile}.
+    If \code{dir} is missing, then the \emph{HDF5 dump directory} is set
+    back to its default value i.e. to some directory under \code{tempdir()}
+    (call \code{getHDF5DumpDir()} to get the exact path).
+  }
   \item{file}{
     For \code{setHDF5DumpFile}:
     The path (as a single string) to the current \emph{HDF5 dump file},
     that is, to the (new or existing) HDF5 file where the \emph{next
-    automatic HDF5 datasets} will be written. If \code{file} is missing,
-    then a new file with an automatic name will be used for each new dataset.
+    automatic HDF5 datasets} will be written. If \code{file} is
+    missing, then a new file with an automatic name will be created
+    (in \code{getHDF5DumpDir()}) and used for each new dataset.
 
     For \code{appendDatasetCreationToHDF5DumpLog}:
     The absolute path to the \emph{HDF5 dump file} obtained with
@@ -93,6 +109,11 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \value{
+  \code{getHDF5DumpDir()} returns the absolute path to the directory
+  where \emph{HDF5 dump files} with automatic names will be created.
+  Only meaningful if the user did NOT specify an \emph{HDF5 dump file}
+  with \code{setHDF5DumpFile}.
+
   \code{getHDF5DumpFile} returns the absolute path to the HDF5 file where
   the \emph{next automatic HDF5 dataset} will be written.
 
@@ -138,6 +159,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \examples{
+getHDF5DumpDir()
 getHDF5DumpFile()
 
 ## Use setHDF5DumpFile() to change the current HDF5 dump file.
