@@ -11,7 +11,7 @@
 \alias{getHDF5DumpName}
 
 \alias{showHDF5DumpLog}
-\alias{appendDatasetCreationToDumpLog}
+\alias{appendDatasetCreationToHDF5DumpLog}
 
 \title{HDF5 dump management}
 
@@ -29,7 +29,9 @@ getHDF5DumpName(for.use=FALSE)
 lsHDF5DumpFile()
 
 showHDF5DumpLog()
-appendDatasetCreationToDumpLog(file, name, dim, type)
+
+## For developers:
+appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
 }
 
 \arguments{
@@ -40,7 +42,7 @@ appendDatasetCreationToDumpLog(file, name, dim, type)
     automatic HDF5 datasets} will be written. If \code{file} is missing,
     then a new file with an automatic name will be used for each new dataset.
 
-    For \code{appendDatasetCreationToDumpLog}:
+    For \code{appendDatasetCreationToHDF5DumpLog}:
     The absolute path to the \emph{HDF5 dump file} obtained with
     \code{getHDF5DumpFile(for.use=TRUE)}.
   }
@@ -49,7 +51,7 @@ appendDatasetCreationToDumpLog(file, name, dim, type)
     The name of the \emph{next automatic HDF5 dataset} to be written to
     the current \emph{HDF5 dump file}.
 
-    For \code{appendDatasetCreationToDumpLog}:
+    For \code{appendDatasetCreationToHDF5DumpLog}:
     The name of the HDF5 dataset obtained with
     \code{getHDF5DumpName(for.use=TRUE)}.
   }
@@ -64,13 +66,13 @@ appendDatasetCreationToDumpLog(file, name, dim, type)
     See the \code{dims} argument in \code{?rhdf5::\link{h5createDataset}}
     (in the \pkg{rhdf5} package) for more information about this.
   }
-  \item{type){
+  \item{type}{
     The type (a.k.a. storage mode) of the data to be written to disk. Can be
     obtained with \code{\link[DelayedArray]{type()}} on an array-like object
     (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
     ordinary array). This is typically what an application writing datasets
-    to the HDF5 dump should pass to the \code{storage.mode} argument of its
-    call to \code{rhdf5::\link{h5createDataset}}.
+    to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
+    of its call to \code{rhdf5::\link{h5createDataset}}.
     See the Note TO DEVELOPERS below for more information.
   }
 }
@@ -83,26 +85,11 @@ appendDatasetCreationToDumpLog(file, name, dim, type)
   be careful to not use that combination to explicitely create an HDF5 dataset
   because that would get in the way of the creation of the \emph{next
   automatic HDF5 dataset}.
-}
+  See the Note TO DEVELOPERS below if you actually need to use this file/name
+  combination.
 
-\note{
-  TO DEVELOPERS:
-
-  If your application wants to write its own dataset to the HDF5 dump then it
-  needs to:
-  \itemize{
-    \item Get a file/name combination by calling
-          \code{getHDF5DumpFile(for.use=TRUE)} and
-          \code{getHDF5DumpName(for.use=TRUE)}.
-
-    \item Add an entry to the dump log by calling
-          \code{appendDatasetCreationToDumpLog}.
-          Typically, this should be done right after creating the dataset
-          (e.g. with \code{rhdf5::h5createDataset}) and before starting to
-          write the data to disk.
-  }
-  Note that this is what the coercion method to \link{HDF5Array} does
-  internally.
+  \code{lsHDF5DumpFile()} is a just convenience wrapper for
+  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
 }
 
 \value{
@@ -116,8 +103,24 @@ appendDatasetCreationToDumpLog(file, name, dim, type)
 }
 
 \note{
-  \code{lsHDF5DumpFile()} is a just convenience wrapper for
-  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
+  TO DEVELOPERS:
+
+  If your application needs to write its own dataset to the \emph{HDF5 dump}
+  then it should:
+  \enumerate{
+    \item Get a file/name combination by calling
+          \code{getHDF5DumpFile(for.use=TRUE)} and
+          \code{getHDF5DumpName(for.use=TRUE)}.
+
+    \item Add an entry to the dump log by calling
+          \code{appendDatasetCreationToHDF5DumpLog}.
+          Typically, this should be done right after creating the dataset
+          (e.g. with \code{rhdf5::h5createDataset}) and before starting to
+          write the data to disk.
+          Note that \code{appendDatasetCreationToHDF5DumpLog} uses a lock
+          mechanism so is safe to use in the context of parallel execution.
+  }
+  This is what the coercion method to \link{HDF5Array} does internally.
 }
 
 \seealso{
