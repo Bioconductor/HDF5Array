@@ -133,7 +133,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
 
   \code{getHDF5ChunkDim} returns the dimension of the chunks for the specified
   ratio. By default a ratio of 75 is used i.e. the \emph{automatic HDF5 dataset}
-  are written to disk using 75 chunks by block.
+  are written to disk using 75 chunks per block.
 }
 
 \note{
