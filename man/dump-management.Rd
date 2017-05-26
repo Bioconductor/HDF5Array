@@ -13,8 +13,10 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
-\alias{showHDF5DumpLog}
+\alias{getHDF5ChunkDim}
+
 \alias{appendDatasetCreationToHDF5DumpLog}
+\alias{showHDF5DumpLog}
 
 \title{HDF5 dump management}
 
@@ -37,7 +39,8 @@ lsHDF5DumpFile()
 showHDF5DumpLog()
 
 ## For developers:
-appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
+getHDF5ChunkDim(dim, type, ratio=75)
+appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
 }
 
 \arguments{
@@ -91,6 +94,12 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
     of its call to \code{rhdf5::\link{h5createDataset}}.
     See the Note TO DEVELOPERS below for more information.
   }
+  \item{ratio}{
+    The number of chunks per block. By default, a ratio of 75 is used.
+  }
+  \item{chunk_dim}{
+    The dimensions of the chunks.
+  }
 }
 
 \details{
@@ -121,6 +130,10 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
   dataset}.
 
   \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
+
+  \code{getHDF5ChunkDim} returns the dimension of the chunks for the specified
+  ratio. By default a ratio of 75 is used i.e. the \emph{automatic HDF5 dataset}
+  are written to disk using 75 chunks per block.
 }
 
 \note{
@@ -133,11 +146,20 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type)
           \code{getHDF5DumpFile(for.use=TRUE)} and
           \code{getHDF5DumpName(for.use=TRUE)}.
 
+    \item [OPTIONAL] Call \code{getHDF5ChunkDim(dim, type)} (possibly with
+          a non-default ratio) to get reasonable chunk dimensions to use.
+          Or choose your own chunk dimensions.
+
     \item Add an entry to the dump log by calling
           \code{appendDatasetCreationToHDF5DumpLog}.
           Typically, this should be done right after creating the dataset
           (e.g. with \code{rhdf5::h5createDataset}) and before starting to
-          write the data to disk.
+          write the data to disk. The values passed to
+          \code{appendDatasetCreationToHDF5DumpLog} via the \code{file},
+          \code{name}, \code{dim}, \code{type}, and \code{chunk_dim} arguments
+          should be those that were passed to \code{rhdf5::h5createDataset}
+          via the \code{file}, \code{dataset}, \code{dims},
+          \code{storage.mode}, and \code{chunk} arguments, respectively.
           Note that \code{appendDatasetCreationToHDF5DumpLog} uses a lock
           mechanism so is safe to use in the context of parallel execution.
   }

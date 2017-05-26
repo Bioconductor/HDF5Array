@@ -24,7 +24,7 @@
 }
 
 \usage{
-writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
+writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, verbose=FALSE)
 }
 
 \arguments{
@@ -49,6 +49,11 @@ writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
     If \code{NULL}, then the name returned by \code{\link{getHDF5DumpName}}
     will be used.
   }
+  \item{chunk_dim}{
+    The dimensions of the chunks to use when writting the data to disk.
+    By default, \code{getHDF5ChunkDim(dim(x), type(x))} is used.
+    See \code{?\link{getHDF5ChunkDim}} for more information.
+  }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
   }
@@ -64,11 +69,11 @@ writeHDF5Array(x, file=NULL, name=NULL, verbose=FALSE)
 }
 
 \value{
-  A HDF5Array object pointing to the newly written HDF5 dataset on disk.
+  An HDF5Array object pointing to the newly written HDF5 dataset on disk.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
-  When passed an \link{DelayedArray} object, \code{writeHDF5Array}
+  When passed a \link{DelayedArray} object, \code{writeHDF5Array}
   \emph{realizes} it on disk, that is, all the delayed operations carried
   by the object are executed on-the-fly while the object is written to disk.
   This uses a block-processing strategy so that the full object is not

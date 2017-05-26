@@ -48,8 +48,7 @@ h5write2 <- function(obj, file, name, index=NULL)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### A simple wrapper around rhdf5::h5createDataset() that automatically
-### chooses the chunk geometry
+### A simple wrapper around rhdf5::h5createDataset()
 ###
 
 ### Here is the trade-off: The shorter the chunks, the snappier the "show"
@@ -57,64 +56,48 @@ h5write2 <- function(obj, file, name, index=NULL)
 ### length > 10 millions). OTOH small chunks tend to slow down methods that
 ### do block processing (e.g. sum(), range(), etc...). Setting the default
 ### to 1 million seems a good compromise.
-.chunk_as_hypercube <- function(dims, chunk_len=1000000L)
+.chunk_as_hypercube <- function(dim, chunk_len=1000000L)
 {
-    if (prod(dims) <= chunk_len)
-        return(dims)
-    ndim <- length(dims)
+    if (prod(dim) <= chunk_len)
+        return(dim)
+    ndim <- length(dim)
 
     ## The perfect chunk is the hypercube.
     chunk <- as.integer(round(rep.int(chunk_len ^ (1 / ndim), ndim)))
 
-    ## But it could have dimensions that are greater than 'dims'. In that case
+    ## But it could have dimensions that are greater than 'dim'. In that case
     ## we need to reshape it.
-    while (any(chunk > dims)) {
-        chunk <- pmin(chunk, dims)
+    while (any(chunk > dim)) {
+        chunk <- pmin(chunk, dim)
         r <- chunk_len / prod(chunk)  # > 1
-        extend_along <- which(chunk < dims)
+        extend_along <- which(chunk < dim)
         extend_factor <- r ^ (1 / length(extend_along))
         chunk[extend_along] <- as.integer(chunk[extend_along] * extend_factor)
     }
     chunk
 }
 
-.chunk_as_subblock <- function(dims, storage.mode="double", ratio=75L)
+### A simple wrapper around rhdf5::h5createDataset().
+h5createDataset2 <- function(file, name, dim, type="double",
+                             chunk_dim=NULL)
 {
-    block_len <- DelayedArray:::get_block_length(storage.mode)
-    chunk_len <- as.integer(ceiling(block_len / ratio))
-    ## 'block_len' must be a multiple of 'chunk_len'.
-    stopifnot(block_len %% chunk_len == 0L)
-    chunks <- ArrayBlocks(dims, chunk_len)
-    chunk <- chunks@dim
-    ndim <- length(chunk)
-    if (chunks@N > ndim)
-        return(chunk)
-    chunk[[chunks@N]] <- chunks@by
-    if (chunks@N == ndim)
-        return(chunk)
-    chunk[(chunks@N+1L):ndim] <- 1L
-    chunk
-}
-
-### A simple wrapper around h5createDataset() that automatically chooses the
-### chunk geometry.
-h5createDataset2 <- function(file, dataset, dims, storage.mode="double")
-{
-    if (storage.mode == "character") {
-        size <- max(nchar(dataset, type="width"))
+    if (type == "character") {
+        size <- max(nchar(name, type="width"))
     } else {
         size <- NULL
     }
-    #chunk <- .chunk_as_hypercube(dims)
-    chunk <- .chunk_as_subblock(dims, storage.mode)
+    if (is.null(chunk_dim)) {
+        #chunk_dim <- .chunk_as_hypercube(dim)
+        chunk_dim <- dim
+    }
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
-    ok <- h5createDataset(file, dataset, dims, storage.mode=storage.mode,
-                                               size=size,
-                                               chunk=chunk)
+    ok <- h5createDataset(file, name, dim, storage.mode=type,
+                                           size=size,
+                                           chunk=chunk_dim)
     if (!ok)
-        stop(wmsg("failed to create dataset '", dataset, "' ",
+        stop(wmsg("failed to create dataset '", name, "' ",
                   "in file '", file, "'"), call.=FALSE)
 }
 
