@@ -257,6 +257,29 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Choosing the chunk dimensions
+###
+
+getHDF5ChunkDim <- function(dim, type, ratio=75)
+{
+    block_len <- DelayedArray:::get_block_length(type)
+    chunk_len <- as.integer(ceiling(block_len / ratio))
+    ## 'block_len' must be a multiple of 'chunk_len'.
+    stopifnot(block_len %% chunk_len == 0L)
+    chunks <- ArrayBlocks(dim, chunk_len)
+    chunk_dim <- chunks@dim
+    ndim <- length(chunk_dim)
+    if (chunks@N > ndim)
+        return(chunk_dim)
+    chunk_dim[[chunks@N]] <- chunks@by
+    if (chunks@N == ndim)
+        return(chunk_dim)
+    chunk_dim[(chunks@N+1L):ndim] <- 1L
+    chunk_dim
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Dump log
 ###
 
@@ -286,21 +309,23 @@ init_HDF5_dataset_creation_global_counter <- function()
 
 ### Use a lock mechanism so is safe to use in the context of parallel
 ### execution.
-appendDatasetCreationToHDF5DumpLog <- function(file, name, dim, type)
+appendDatasetCreationToHDF5DumpLog <- function(file, name, dim, type, chunk_dim)
 {
     logfile <- get_HDF5_dump_logfile()
     locked_path <- lock_file(logfile)
     on.exit(unlock_file(logfile))
     counter <- .get_dataset_creation_global_counter(increment=TRUE)
     dims <- paste0(dim, collapse="x")
-    cat(as.character(Sys.time()), counter, name, dims, type, file,
+    chunk_dims <- paste0(chunk_dim, collapse="x")
+    cat(as.character(Sys.time()), counter, name, dims, type, chunk_dims, file,
         sep="\t", file=locked_path, append=TRUE)
     cat("\n", file=locked_path, append=TRUE)
 }
 
 showHDF5DumpLog <- function()
 {
-    COLNAMES <- c("time", "counter", "name", "dims", "type", "file")
+    COLNAMES <- c("time", "counter",
+                  "name", "dims", "type", "chunk_dims", "file")
     ## The nb of lines in the log file is the current value of the dataset
     ## creation counter minus one.
     counter <- .get_dataset_creation_global_counter()
@@ -310,6 +335,7 @@ showHDF5DumpLog <- function()
                                name=character(0),
                                dims=character(0),
                                type=character(0),
+                               chunk_dims=character(0),
                                file=character(0),
                                stringsAsFactors=FALSE)
     } else {
@@ -319,11 +345,12 @@ showHDF5DumpLog <- function()
         dump_log <- read.table(locked_path,
                                sep="\t", stringsAsFactors=FALSE)
         colnames(dump_log) <- COLNAMES
-        fmt <- "[%s] #%d Dataset '%s' (%s:%s) created in file '%s'"
+        fmt <- "[%s] #%d Dataset '%s' (%s:%s, %s chunks) created in file '%s'"
         message(paste0(sprintf(fmt,
                                dump_log$time, dump_log$counter,
                                dump_log$name, dump_log$dims,
-                               dump_log$type, dump_log$file),
+                               dump_log$type, dump_log$chunk_dims,
+                               dump_log$file),
                        "\n"),
                 appendLF=FALSE)
     }
