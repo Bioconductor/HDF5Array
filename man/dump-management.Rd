@@ -13,7 +13,7 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
-\alias{getHDF5ChunkDim}
+\alias{getHDF5DumpChunkDim}
 
 \alias{appendDatasetCreationToHDF5DumpLog}
 \alias{showHDF5DumpLog}
@@ -39,7 +39,7 @@ lsHDF5DumpFile()
 showHDF5DumpLog()
 
 ## For developers:
-getHDF5ChunkDim(dim, type, ratio=75)
+getHDF5DumpChunkDim(dim, type, ratio=75)
 appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
 }
 
@@ -131,9 +131,9 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
 
   \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
 
-  \code{getHDF5ChunkDim} returns the dimension of the chunks for the specified
-  ratio. By default a ratio of 75 is used i.e. the \emph{automatic HDF5 dataset}
-  are written to disk using 75 chunks per block.
+  \code{getHDF5DumpChunkDim} returns the dimension of the chunks for the
+  specified \code{ratio}. By default a ratio of 75 is used i.e. the
+  \emph{automatic HDF5 dataset} are written to disk using 75 chunks per block.
 }
 
 \note{
@@ -146,9 +146,10 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
           \code{getHDF5DumpFile(for.use=TRUE)} and
           \code{getHDF5DumpName(for.use=TRUE)}.
 
-    \item [OPTIONAL] Call \code{getHDF5ChunkDim(dim, type)} (possibly with
-          a non-default ratio) to get reasonable chunk dimensions to use.
-          Or choose your own chunk dimensions.
+    \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim, type)} (possibly
+          with a non-default \code{ratio}) to get reasonable chunk dimensions
+          to use for writting the data to disk. Or choose your own chunk
+          dimensions.
 
     \item Add an entry to the dump log by calling
           \code{appendDatasetCreationToHDF5DumpLog}.

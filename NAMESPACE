@@ -44,7 +44,7 @@ export(
     setHDF5DumpDir, getHDF5DumpDir,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
-    getHDF5ChunkDim,
+    getHDF5DumpChunkDim,
     appendDatasetCreationToHDF5DumpLog, showHDF5DumpLog,
     HDF5RealizationSink, writeHDF5Array, writeHDF5Dataset
 )

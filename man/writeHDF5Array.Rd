@@ -50,9 +50,9 @@ writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, verbose=FALSE)
     will be used.
   }
   \item{chunk_dim}{
-    The dimensions of the chunks to use when writting the data to disk.
-    By default, \code{getHDF5ChunkDim(dim(x), type(x))} is used.
-    See \code{?\link{getHDF5ChunkDim}} for more information.
+    The dimensions of the chunks to use for writting the data to disk.
+    By default, \code{getHDF5DumpChunkDim(dim(x), type(x))} is used.
+    See \code{?\link{getHDF5DumpChunkDim}} for more information.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.

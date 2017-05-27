@@ -257,10 +257,10 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Choosing the chunk dimensions
+### Get the chunk dimensions
 ###
 
-getHDF5ChunkDim <- function(dim, type, ratio=75)
+getHDF5DumpChunkDim <- function(dim, type, ratio=75)
 {
     block_len <- DelayedArray:::get_block_length(type)
     chunk_len <- as.integer(ceiling(block_len / ratio))

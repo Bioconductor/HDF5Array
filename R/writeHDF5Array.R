@@ -47,7 +47,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         name <- normalize_dump_name(name)
     }
     if (is.null(chunk_dim))
-        chunk_dim <- getHDF5ChunkDim(dim, type)
+        chunk_dim <- getHDF5DumpChunkDim(dim, type)
     h5createDataset2(file, name, dim, type, chunk_dim)
     appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
     if (is.null(dimnames)) {
