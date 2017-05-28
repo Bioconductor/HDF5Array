@@ -15,6 +15,9 @@
 
 \alias{getHDF5DumpChunkDim}
 
+\alias{setHDF5DumpCompressionLevel}
+\alias{getHDF5DumpCompressionLevel}
+
 \alias{appendDatasetCreationToHDF5DumpLog}
 \alias{showHDF5DumpLog}
 
@@ -29,10 +32,12 @@
 setHDF5DumpDir(dir)
 setHDF5DumpFile(file)
 setHDF5DumpName(name)
+setHDF5DumpCompressionLevel(level=6L)
 
 getHDF5DumpDir()
 getHDF5DumpFile(for.use=FALSE)
 getHDF5DumpName(for.use=FALSE)
+getHDF5DumpCompressionLevel()
 
 lsHDF5DumpFile()
 
@@ -40,7 +45,7 @@ showHDF5DumpLog()
 
 ## For developers:
 getHDF5DumpChunkDim(dim, type, ratio=75)
-appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
+appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim, level)
 }
 
 \arguments{
@@ -62,8 +67,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
     (in \code{getHDF5DumpDir()}) and used for each new dataset.
 
     For \code{appendDatasetCreationToHDF5DumpLog}:
-    The absolute path to the \emph{HDF5 dump file} obtained with
-    \code{getHDF5DumpFile(for.use=TRUE)}.
+    See the Note TO DEVELOPERS below.
   }
   \item{name}{
     For \code{setHDF5DumpName}:
@@ -71,8 +75,17 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
     the current \emph{HDF5 dump file}.
 
     For \code{appendDatasetCreationToHDF5DumpLog}:
-    The name of the HDF5 dataset obtained with
-    \code{getHDF5DumpName(for.use=TRUE)}.
+    See the Note TO DEVELOPERS below.
+  }
+  \item{level}{
+    For \code{setHDF5DumpCompressionLevel}:
+    The compression level to use for writting \emph{automatic HDF5 datasets}
+    to disk.
+    See the \code{level} argument in \code{?rhdf5::\link{h5createDataset}}
+    (in the \pkg{rhdf5} package) for more information about this.
+
+    For \code{appendDatasetCreationToHDF5DumpLog}:
+    See the Note TO DEVELOPERS below.
   }
   \item{for.use}{
     Whether the returned file or dataset name is for use by the caller or not.
@@ -129,6 +142,9 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
   \code{getHDF5DumpName} returns the name of the \emph{next automatic HDF5
   dataset}.
 
+  \code{getHDF5DumpCompressionLevel} returns the compression level currently
+  used for writting \emph{automatic HDF5 datasets} to disk.
+
   \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
 
   \code{getHDF5DumpChunkDim} returns the dimension of the chunks for the
@@ -157,10 +173,11 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
           (e.g. with \code{rhdf5::h5createDataset}) and before starting to
           write the data to disk. The values passed to
           \code{appendDatasetCreationToHDF5DumpLog} via the \code{file},
-          \code{name}, \code{dim}, \code{type}, and \code{chunk_dim} arguments
-          should be those that were passed to \code{rhdf5::h5createDataset}
-          via the \code{file}, \code{dataset}, \code{dims},
-          \code{storage.mode}, and \code{chunk} arguments, respectively.
+          \code{name}, \code{dim}, \code{type}, \code{chunk_dim}, and
+          \code{level} arguments should be those that were passed to
+          \code{rhdf5::h5createDataset} via the \code{file}, \code{dataset},
+          \code{dims}, \code{storage.mode}, \code{chunk}, and \code{level}
+          arguments, respectively.
           Note that \code{appendDatasetCreationToHDF5DumpLog} uses a lock
           mechanism so is safe to use in the context of parallel execution.
   }

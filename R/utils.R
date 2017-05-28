@@ -79,7 +79,7 @@ h5write2 <- function(obj, file, name, index=NULL)
 
 ### A simple wrapper around rhdf5::h5createDataset().
 h5createDataset2 <- function(file, name, dim, type="double",
-                             chunk_dim=NULL)
+                             chunk_dim=NULL, level=6L)
 {
     if (type == "character") {
         size <- max(nchar(name, type="width"))
@@ -94,8 +94,7 @@ h5createDataset2 <- function(file, name, dim, type="double",
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
     ok <- h5createDataset(file, name, dim, storage.mode=type,
-                                           size=size,
-                                           chunk=chunk_dim)
+                          size=size, chunk=chunk_dim, level=level)
     if (!ok)
         stop(wmsg("failed to create dataset '", name, "' ",
                   "in file '", file, "'"), call.=FALSE)
