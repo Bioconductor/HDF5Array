@@ -34,7 +34,8 @@ setMethod("dimnames", "HDF5RealizationSink",
 
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
-                                file=NULL, name=NULL, chunk_dim=NULL)
+                                file=NULL, name=NULL,
+                                chunk_dim=NULL, level=NULL)
 {
     if (is.null(file)) {
         file <- getHDF5DumpFile(for.use=TRUE)
@@ -46,10 +47,19 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     } else {
         name <- normalize_dump_name(name)
     }
-    if (is.null(chunk_dim))
+    if (is.null(chunk_dim)) {
         chunk_dim <- getHDF5DumpChunkDim(dim, type)
-    h5createDataset2(file, name, dim, type, chunk_dim)
-    appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim)
+    } else {
+        chunk_dim <- as.integer(chunk_dim)
+    }
+    if (is.null(level)) {
+        level <- getHDF5DumpCompressionLevel()
+    } else {
+        level <- normalize_compression_level(level)
+    }
+    h5createDataset2(file, name, dim, type, chunk_dim, level)
+    appendDatasetCreationToHDF5DumpLog(file, name, dim, type,
+                                       chunk_dim, level)
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
@@ -122,13 +132,14 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs
 ### above in this file about this.
-writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL,
+writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
                            verbose=FALSE)
 {
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
     sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x),
-                                file=file, name=name, chunk_dim=chunk_dim)
+                                file=file, name=name,
+                                chunk_dim=chunk_dim, level=level)
     if (verbose) {
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))

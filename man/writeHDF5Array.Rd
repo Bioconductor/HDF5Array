@@ -24,7 +24,8 @@
 }
 
 \usage{
-writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, verbose=FALSE)
+writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
+               verbose=FALSE)
 }
 
 \arguments{
@@ -53,6 +54,11 @@ writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, verbose=FALSE)
     The dimensions of the chunks to use for writting the data to disk.
     By default, \code{getHDF5DumpChunkDim(dim(x), type(x))} is used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.
+  }
+  \item{level}{
+    The compression level to use for writting the data to disk.
+    By default, \code{getHDF5DumpCompressionLevel()} is used.
+    See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
