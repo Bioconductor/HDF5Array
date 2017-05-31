@@ -148,11 +148,7 @@ writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
     as(sink, "HDF5Array")
 }
 
-writeHDF5Dataset <- function(...)
-{
-    .Deprecated("writeHDF5Array")
-    writeHDF5Array(...)
-}
+writeHDF5Dataset <- function(...) .Defunct("writeHDF5Array")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
