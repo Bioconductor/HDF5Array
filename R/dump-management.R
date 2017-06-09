@@ -262,10 +262,10 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 .get_chunk_dim <- function(dim, chunk_len)
 {
-    chunks <- ArrayBlocks(dim, chunk_len)
-    if (length(chunks) == 0L)
+    grid <- ArrayBlocks(dim, chunk_len)
+    if (length(grid) == 0L)
         return(dim)
-    dim(chunks[[1L]])
+    dim(grid[[1L]])
 }
 
 getHDF5DumpChunkDim <- function(dim, type, ratio=75)

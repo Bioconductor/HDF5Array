@@ -79,8 +79,9 @@ setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
             index <- NULL
         } else {
             stopifnot(length(x_dim) == length(sink_dim))
-            block <- ArrayBlock(sink_dim, IRanges(offsets, width=x_dim))
-            index <- makeNindexFromArrayBlock(block, expand.RangeNSBS=TRUE)
+            viewport <- ArrayViewport(sink_dim, IRanges(offsets, width=x_dim))
+            index <- makeNindexFromArrayViewport(viewport,
+                                                 expand.RangeNSBS=TRUE)
         }
         h5write2(x, sink@file, sink@name, index=index)
     }
