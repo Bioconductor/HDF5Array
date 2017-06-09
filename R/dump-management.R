@@ -262,10 +262,10 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 getHDF5DumpChunkDim <- function(dim, type, ratio=75)
 {
-    block_len <- DelayedArray:::get_block_length(type)
-    chunk_len <- as.integer(ceiling(block_len / ratio))
-    ## 'block_len' must be a multiple of 'chunk_len'.
-    stopifnot(block_len %% chunk_len == 0L)
+    max_block_len <- DelayedArray:::get_max_block_length(type)
+    chunk_len <- as.integer(ceiling(max_block_len / ratio))
+    ## 'max_block_len' must be a multiple of 'chunk_len'.
+    stopifnot(max_block_len %% chunk_len == 0L)
     chunks <- ArrayBlocks(dim, chunk_len)
     chunk_dim <- chunks@dim
     ndim <- length(chunk_dim)
