@@ -262,7 +262,7 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 .get_chunk_dim <- function(dim, chunk_len)
 {
-    grid <- ArrayBlocks(dim, chunk_len)
+    grid <- DelayedArray:::ArrayLinearGrid(dim, chunk_len)
     if (length(grid) == 0L)
         return(dim)
     dim(grid[[1L]])
