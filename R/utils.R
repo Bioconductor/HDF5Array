@@ -51,32 +51,6 @@ h5write2 <- function(obj, file, name, index=NULL)
 ### A simple wrapper around rhdf5::h5createDataset()
 ###
 
-### Here is the trade-off: The shorter the chunks, the snappier the "show"
-### method feels (on my laptop, it starts to feel sloppy with a chunk
-### length > 10 millions). OTOH small chunks tend to slow down methods that
-### do block processing (e.g. sum(), range(), etc...). Setting the default
-### to 1 million seems a good compromise.
-.chunk_as_hypercube <- function(dim, chunk_len=1000000L)
-{
-    if (prod(dim) <= chunk_len)
-        return(dim)
-    ndim <- length(dim)
-
-    ## The perfect chunk is the hypercube.
-    chunk <- as.integer(round(rep.int(chunk_len ^ (1 / ndim), ndim)))
-
-    ## But it could have dimensions that are greater than 'dim'. In that case
-    ## we need to reshape it.
-    while (any(chunk > dim)) {
-        chunk <- pmin(chunk, dim)
-        r <- chunk_len / prod(chunk)  # > 1
-        extend_along <- which(chunk < dim)
-        extend_factor <- r ^ (1 / length(extend_along))
-        chunk[extend_along] <- as.integer(chunk[extend_along] * extend_factor)
-    }
-    chunk
-}
-
 ### A simple wrapper around rhdf5::h5createDataset().
 h5createDataset2 <- function(file, name, dim, type="double",
                              chunk_dim=NULL, level=6L)
@@ -87,7 +61,14 @@ h5createDataset2 <- function(file, name, dim, type="double",
         size <- NULL
     }
     if (is.null(chunk_dim)) {
-        #chunk_dim <- .chunk_as_hypercube(dim)
+        ## Here is the trade-off: The shorter the chunks, the snappier the
+        ## "show" method feels (on my laptop, it starts to feel sloppy with
+        ## a chunk length > 10 millions). OTOH small chunks tend to slow down
+        ## methods that do block processing (e.g. sum(), range(), etc...).
+        ## A chunk length of 1 million seems a good compromise.
+        #chunk_dim <-
+        #    DelayedArray:::get_max_spacings_for_hypercube_blocks(dim,
+        #                                                         1000000L)
         chunk_dim <- dim
     }
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
