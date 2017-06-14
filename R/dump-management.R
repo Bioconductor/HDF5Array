@@ -260,21 +260,13 @@ getHDF5DumpName <- function(for.use=FALSE)
 ### Get the chunk dimensions
 ###
 
-.get_chunk_dim <- function(dim, chunk_len)
-{
-    grid <- DelayedArray:::ArrayLinearGrid(dim, chunk_len)
-    if (length(grid) == 0L)
-        return(dim)
-    dim(grid[[1L]])
-}
-
 getHDF5DumpChunkDim <- function(dim, type, ratio=75)
 {
     max_block_len <- DelayedArray:::get_max_block_length(type)
     chunk_len <- as.integer(ceiling(max_block_len / ratio))
     ## 'max_block_len' must be a multiple of 'chunk_len'.
     stopifnot(max_block_len %% chunk_len == 0L)
-    .get_chunk_dim(dim, chunk_len)
+    DelayedArray:::get_max_spacings_for_linear_blocks(dim, chunk_len)
 }
 
 
