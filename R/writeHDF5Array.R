@@ -14,7 +14,8 @@
 setClass("HDF5RealizationSink",
     contains="RealizationSink",
     representation(
-        dim="integer",
+        dim="integer",     # Naming this slot "dim" makes dim() work
+                           # out of the box.
         dimnames="list",
         type="character",  # Single string.
         file="character",  # Single string.
@@ -70,19 +71,12 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 }
 
 setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
-    function(x, sink, offsets=NULL)
+    function(x, sink, viewport)
     {
-        x_dim <- dim(x)
-        sink_dim <- sink@dim
-        if (is.null(offsets)) {
-            stopifnot(identical(x_dim, sink_dim))
-            index <- NULL
-        } else {
-            stopifnot(length(x_dim) == length(sink_dim))
-            viewport <- ArrayViewport(sink_dim, IRanges(offsets, width=x_dim))
-            index <- makeNindexFromArrayViewport(viewport,
-                                                 expand.RangeNSBS=TRUE)
-        }
+        stopifnot(identical(dim(sink), refdim(viewport)),
+                  identical(dim(viewport), dim(x)))
+        index <- makeNindexFromArrayViewport(viewport,
+                                             expand.RangeNSBS=TRUE)
         h5write2(x, sink@file, sink@name, index=index)
     }
 )
@@ -143,7 +137,7 @@ writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
     }
-    write_to_sink(x, sink)
+    write_to_sink(x, sink, ArrayViewport(dim(sink)))
     as(sink, "HDF5Array")
 }
 
