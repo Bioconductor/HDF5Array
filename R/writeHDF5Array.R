@@ -73,10 +73,15 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 setMethod("write_to_sink", c("array", "HDF5RealizationSink"),
     function(x, sink, viewport)
     {
-        stopifnot(identical(dim(sink), refdim(viewport)),
-                  identical(dim(viewport), dim(x)))
-        index <- makeNindexFromArrayViewport(viewport,
-                                             expand.RangeNSBS=TRUE)
+        if (is.null(viewport)) {
+            stopifnot(identical(dim(x), dim(sink)))
+            index <- NULL
+        } else {
+            stopifnot(identical(dim(x), dim(viewport)),
+                      identical(dim(sink), refdim(viewport)))
+            index <- makeNindexFromArrayViewport(viewport,
+                                                 expand.RangeNSBS=TRUE)
+        }
         h5write2(x, sink@file, sink@name, index=index)
     }
 )
@@ -137,7 +142,7 @@ writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
     }
-    write_to_sink(x, sink, ArrayViewport(dim(sink)))
+    write_to_sink(x, sink, NULL)
     as(sink, "HDF5Array")
 }
 
