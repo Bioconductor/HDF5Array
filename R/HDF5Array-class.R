@@ -4,6 +4,7 @@
 
 
 setClass("HDF5ArraySeed",
+    contains="Array",
     representation(
         file="character",   # Absolute path to the HDF5 file so the object
                             # doesn't break when the user changes the working
