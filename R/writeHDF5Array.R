@@ -14,12 +14,13 @@
 setClass("HDF5RealizationSink",
     contains="RealizationSink",
     representation(
-        dim="integer",     # Naming this slot "dim" makes dim() work
-                           # out of the box.
+        dim="integer",          # Naming this slot "dim" makes dim() work
+                                # out of the box.
         dimnames="list",
-        type="character",  # Single string.
-        file="character",  # Single string.
-        name="character"   # Dataset name.
+        type="character",       # Single string.
+        file="character",       # Single string.
+        name="character",       # Dataset name.
+        chunk_dim="integer"     # Parallel to 'dim' slot.
     )
 )
 
@@ -67,8 +68,10 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         ## TODO: Write the dimnames to the HDF5 file.
     }
     new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
-                                file=file, name=name)
+                                file=file, name=name, chunk_dim=chunk_dim)
 }
+
+setMethod("chunk_dim", "HDF5RealizationSink", function(x) x@chunk_dim)
 
 setMethod("write_block_to_sink", "HDF5RealizationSink",
     function(block, sink, viewport)
