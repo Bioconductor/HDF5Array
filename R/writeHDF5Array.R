@@ -164,4 +164,5 @@ setAs("ANY", "HDF5Array", .as_HDF5Array)
 ### a broken object (unfortunately these dummy automatic coercion methods don't
 ### bother to validate the object they return). So we overwrite it.
 setAs("DelayedArray", "HDF5Array", .as_HDF5Array)
+setAs("DelayedMatrix", "HDF5Matrix", .as_HDF5Array)
 

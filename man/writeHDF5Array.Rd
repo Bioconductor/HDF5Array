@@ -17,6 +17,7 @@
 
 \alias{coerce,ANY,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Array-method}
+\alias{coerce,DelayedMatrix,HDF5Matrix-method}
 
 \title{Write an array-like object to an HDF5 file}
 
