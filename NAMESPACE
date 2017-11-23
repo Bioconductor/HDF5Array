@@ -31,7 +31,7 @@ exportMethods(
     coerce,
 
     ## Methods for generics defined in the DelayedArray package:
-    subset_seed_as_array, matrixClass, write_block_to_sink, DelayedArray
+    extract_array, matrixClass, write_block_to_sink, DelayedArray
 )
 
 

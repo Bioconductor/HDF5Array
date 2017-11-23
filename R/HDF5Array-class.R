@@ -7,8 +7,8 @@ setClass("HDF5ArraySeed",
     contains="Array",
     representation(
         file="character",   # Absolute path to the HDF5 file so the object
-                            # doesn't break when the user changes the working
-                            # directory (e.g. with setwd()).
+                            # doesn't break when the user changes the
+                            # working directory (e.g. with setwd()).
         name="character",   # Name of the dataset in the HDF5 file.
         dim="integer",
         first_val="ANY"     # First value in the dataset.
@@ -19,24 +19,22 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### subset_seed_as_array()
+### extract_array()
 ###
 
-.subset_HDF5ArraySeed_as_array <- function(seed, index)
+.extract_array_from_HDF5ArraySeed <- function(x, index)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(seed))
+    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L)) {
-        ans <- seed@first_val[0]
+        ans <- x@first_val[0]
         dim(ans) <- ans_dim
     } else {
-        ans <- h5read2(seed@file, seed@name, index)
+        ans <- h5read2(x@file, x@name, index)
     }
     ans
 }
 
-setMethod("subset_seed_as_array", "HDF5ArraySeed",
-    .subset_HDF5ArraySeed_as_array
-)
+setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
