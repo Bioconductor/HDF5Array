@@ -22,7 +22,7 @@
 \title{Write an array-like object to an HDF5 file}
 
 \description{
-  A function for writting an array-like object to an HDF5 file.
+  A function for writing an array-like object to an HDF5 file.
 }
 
 \usage{
@@ -53,12 +53,12 @@ writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
     will be used.
   }
   \item{chunk_dim}{
-    The dimensions of the chunks to use for writting the data to disk.
+    The dimensions of the chunks to use for writing the data to disk.
     By default, \code{getHDF5DumpChunkDim(dim(x), type(x))} is used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.
   }
   \item{level}{
-    The compression level to use for writting the data to disk.
+    The compression level to use for writing the data to disk.
     By default, \code{getHDF5DumpCompressionLevel()} is used.
     See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
