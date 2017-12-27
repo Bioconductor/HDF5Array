@@ -18,7 +18,7 @@ setClass("HDF5RealizationSink",
                                 # out of the box.
         dimnames="list",
         type="character",       # Single string.
-        file="character",       # Single string.
+        filepath="character",   # Single string.
         name="character",       # Dataset name.
         chunk_dim="integer"     # Parallel to 'dim' slot.
     )
@@ -36,13 +36,13 @@ setMethod("dimnames", "HDF5RealizationSink",
 
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
-                                file=NULL, name=NULL,
+                                filepath=NULL, name=NULL,
                                 chunk_dim=NULL, level=NULL)
 {
-    if (is.null(file)) {
-        file <- getHDF5DumpFile(for.use=TRUE)
+    if (is.null(filepath)) {
+        filepath <- getHDF5DumpFile(for.use=TRUE)
     } else {
-        file <- normalize_dump_file(file)
+        filepath <- normalize_dump_filepath(filepath)
     }
     if (is.null(name)) {
         name <- getHDF5DumpName(for.use=TRUE)
@@ -59,8 +59,8 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     } else {
         level <- normalize_compression_level(level)
     }
-    h5createDataset2(file, name, dim, type, chunk_dim, level)
-    appendDatasetCreationToHDF5DumpLog(file, name, dim, type,
+    h5createDataset2(filepath, name, dim, type, chunk_dim, level)
+    appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
                                        chunk_dim, level)
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
@@ -68,7 +68,8 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         ## TODO: Write the dimnames to the HDF5 file.
     }
     new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
-                                file=file, name=name, chunk_dim=chunk_dim)
+                                filepath=filepath, name=name,
+                                chunk_dim=chunk_dim)
 }
 
 setMethod("chunk_dim", "HDF5RealizationSink", function(x) x@chunk_dim)
@@ -79,7 +80,7 @@ setMethod("write_block_to_sink", "HDF5RealizationSink",
         stopifnot(identical(dim(sink), refdim(viewport)),
                   identical(dim(block), dim(viewport)))
         index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
-        h5write2(block, sink@file, sink@name, index=index)
+        h5write2(block, sink@filepath, sink@name, index=index)
     }
 )
 
@@ -93,7 +94,7 @@ setMethod("write_block_to_sink", "HDF5RealizationSink",
 ### HDF5RealizationSink() above in this file and right before definition of
 ### HDF5ArraySeed() in HDF5Array-class.R.
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
-    function(from) HDF5ArraySeed(from@file, from@name, type=from@type)
+    function(from) HDF5ArraySeed(from@filepath, from@name, type=from@type)
 )
 
 ### Note that this coercion currently drops the dimnames but will naturally
@@ -121,19 +122,19 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### writeHDF5Array()
 ###
 
-### Write the dataset to the current dump if 'file' and 'name' are not
+### Write the dataset to the current dump if 'filepath' and 'name' are not
 ### specified.
 ### Return a HDF5Array object pointing to the newly written HDF5 dataset on
 ### disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs
 ### above in this file about this.
-writeHDF5Array <- function(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
-                           verbose=FALSE)
+writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunk_dim=NULL,
+                           level=NULL, verbose=FALSE)
 {
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
     sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x),
-                                file=file, name=name,
+                                filepath=filepath, name=name,
                                 chunk_dim=chunk_dim, level=level)
     if (verbose) {
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)

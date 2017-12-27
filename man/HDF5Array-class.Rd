@@ -47,12 +47,12 @@
 
 \usage{
 ## Constructor functions:
-HDF5Array(file, name, type=NA)
-HDF5ArraySeed(file, name, type=NA)
+HDF5Array(filepath, name, type=NA)
+HDF5ArraySeed(filepath, name, type=NA)
 }
 
 \arguments{
-  \item{file}{
+  \item{filepath}{
     The path (as a single character string) to the HDF5 file where the dataset
     is located.
   }

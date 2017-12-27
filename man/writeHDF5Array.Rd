@@ -26,7 +26,7 @@
 }
 
 \usage{
-writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
+writeHDF5Array(x, filepath=NULL, name=NULL, chunk_dim=NULL, level=NULL,
                verbose=FALSE)
 }
 
@@ -40,7 +40,7 @@ writeHDF5Array(x, file=NULL, name=NULL, chunk_dim=NULL, level=NULL,
     See "On-disk realization of a DelayedArray object as an HDF5 dataset"
     section below for more information.
   }
-  \item{file}{
+  \item{filepath}{
     \code{NULL} or the path (as a single string) to the (new or existing)
     HDF5 file where to write the dataset.
     If \code{NULL}, then the dataset will be written to the current \emph{HDF5

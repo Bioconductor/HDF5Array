@@ -30,7 +30,7 @@
 
 \usage{
 setHDF5DumpDir(dir)
-setHDF5DumpFile(file)
+setHDF5DumpFile(filepath)
 setHDF5DumpName(name)
 setHDF5DumpCompressionLevel(level=6L)
 
@@ -45,7 +45,8 @@ showHDF5DumpLog()
 
 ## For developers:
 getHDF5DumpChunkDim(dim, type, ratio=75)
-appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim, level)
+appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
+                                   chunk_dim, level)
 }
 
 \arguments{
@@ -58,11 +59,11 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim, level)
     back to its default value i.e. to some directory under \code{tempdir()}
     (call \code{getHDF5DumpDir()} to get the exact path).
   }
-  \item{file}{
+  \item{filepath}{
     For \code{setHDF5DumpFile}:
     The path (as a single string) to the current \emph{HDF5 dump file},
     that is, to the (new or existing) HDF5 file where the \emph{next
-    automatic HDF5 datasets} will be written. If \code{file} is
+    automatic HDF5 datasets} will be written. If \code{filepath} is
     missing, then a new file with an automatic name will be created
     (in \code{getHDF5DumpDir()}) and used for each new dataset.
 
@@ -172,7 +173,7 @@ appendDatasetCreationToHDF5DumpLog(file, name, dim, type, chunk_dim, level)
           Typically, this should be done right after creating the dataset
           (e.g. with \code{rhdf5::h5createDataset}) and before starting to
           write the data to disk. The values passed to
-          \code{appendDatasetCreationToHDF5DumpLog} via the \code{file},
+          \code{appendDatasetCreationToHDF5DumpLog} via the \code{filepath},
           \code{name}, \code{dim}, \code{type}, \code{chunk_dim}, and
           \code{level} arguments should be those that were passed to
           \code{rhdf5::h5createDataset} via the \code{file}, \code{dataset},

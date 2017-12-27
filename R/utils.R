@@ -10,13 +10,13 @@
 ### h5dim()
 ###
 
-h5dim <- function(file, name)
+h5dim <- function(filepath, name)
 {
     if (substr(name, 1L, 1L) != "/")
         name <- paste0("/", name)
     group <- gsub("(.*/)[^/]*$", "\\1", name)
     name <- gsub(".*/([^/]*)$", "\\1", name)
-    f <- H5Fopen(file, flags="H5F_ACC_RDONLY")
+    f <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
     on.exit(H5Fclose(f))
     g <- H5Gopen(f, group)
     on.exit(H5Gclose(g), add=TRUE)
@@ -30,20 +30,20 @@ h5dim <- function(file, name)
 ### Simple wrappers around rhdf5::h5read() and rhdf5::h5write()
 ###
 
-h5read2 <- function(file, name, index=NULL)
+h5read2 <- function(filepath, name, index=NULL)
 {
     if (!is.null(index))
         index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
-    suppressWarnings(h5read(file, name, index=index))
+    suppressWarnings(h5read(filepath, name, index=index))
 }
 
-h5write2 <- function(obj, file, name, index=NULL)
+h5write2 <- function(obj, filepath, name, index=NULL)
 {
     if (!is.null(index))
         index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
-    h5write(obj, file, name, index=index)
+    h5write(obj, filepath, name, index=index)
 }
 
 
@@ -52,7 +52,7 @@ h5write2 <- function(obj, file, name, index=NULL)
 ###
 
 ### A simple wrapper around rhdf5::h5createDataset().
-h5createDataset2 <- function(file, name, dim, type="double",
+h5createDataset2 <- function(filepath, name, dim, type="double",
                              chunk_dim=NULL, level=6L)
 {
     if (type == "character") {
@@ -74,11 +74,11 @@ h5createDataset2 <- function(file, name, dim, type="double",
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
-    ok <- h5createDataset(file, name, dim, storage.mode=type,
+    ok <- h5createDataset(filepath, name, dim, storage.mode=type,
                           size=size, chunk=chunk_dim, level=level)
     if (!ok)
         stop(wmsg("failed to create dataset '", name, "' ",
-                  "in file '", file, "'"), call.=FALSE)
+                  "in file '", filepath, "'"), call.=FALSE)
 }
 
 

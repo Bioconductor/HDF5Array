@@ -59,14 +59,14 @@ init_HDF5_dump_names_global_counter <- function()
 ### Return the *absolute path* to the dump file.
 ### Has the side effect of creating the file as an empty HDF5 file if it does
 ### not exist yet.
-normalize_dump_file <- function(file)
+normalize_dump_filepath <- function(filepath)
 {
-    if (!isSingleString(file) || file == "")
-        stop(wmsg("'file' must be a non-empty string specifying the path ",
-                  "to a new or existing HDF5 file"))
-    if (!file.exists(file))
-        h5createFile(file)
-    file_path_as_absolute(file)
+    if (!isSingleString(filepath) || filepath == "")
+        stop(wmsg("'filepath' must be a non-empty string specifying the ",
+                  "path to a new or existing HDF5 file"))
+    if (!file.exists(filepath))
+        h5createFile(filepath)
+    file_path_as_absolute(filepath)
 }
 
 normalize_dump_name <- function(name)
@@ -109,10 +109,10 @@ normalize_dump_name <- function(name)
 }
 
 ### Create file as an empty HDF5 file if it doesn't exist yet.
-.set_dump_specfile <- function(file)
+.set_dump_specfile <- function(filepath)
 {
-    file <- normalize_dump_file(file)
-    assign("specfile", file, envir=.dump_settings_envir)
+    filepath <- normalize_dump_filepath(filepath)
+    assign("specfile", filepath, envir=.dump_settings_envir)
 }
 
 .set_dump_autonames_mode <- function()
@@ -159,10 +159,10 @@ getHDF5DumpDir <- function()
 .get_dump_autofile <- function(increment=FALSE)
 {
     counter <- .get_dump_files_global_counter(increment=increment)
-    file <- file.path(getHDF5DumpDir(), sprintf("auto%05d.h5", counter))
-    if (!file.exists(file))
-        h5createFile(file)
-    file
+    filepath <- file.path(getHDF5DumpDir(), sprintf("auto%05d.h5", counter))
+    if (!file.exists(filepath))
+        h5createFile(filepath)
+    filepath
 }
 
 ### Called by .onLoad() hook (see zzz.R file).
@@ -187,22 +187,22 @@ setHDF5DumpDir <- function(dir)
 
 ### Set the current HDF5 dump file. Create it as an empty HDF5 file if it
 ### doesn't exist yet.
-setHDF5DumpFile <- function(file)
+setHDF5DumpFile <- function(filepath)
 {
-    if (missing(file)) {
+    if (missing(filepath)) {
         .set_dump_autofiles_mode()
-        file <- .get_dump_autofile()
+        filepath <- .get_dump_autofile()
     } else {
-        if (!isSingleString(file) || file == "")
-            stop("'file' must be a non-empty string")
-        if (has_trailing_slash(file)) {
-            setHDF5DumpDir(file)
-            file <- .get_dump_autofile()
+        if (!isSingleString(filepath) || filepath == "")
+            stop("'filepath' must be a non-empty string")
+        if (has_trailing_slash(filepath)) {
+            setHDF5DumpDir(filepath)
+            filepath <- .get_dump_autofile()
         } else {
-            file <- .set_dump_specfile(file)
+            filepath <- .set_dump_specfile(filepath)
         }
     }
-    file_content <- h5ls(file)
+    file_content <- h5ls(filepath)
     if (nrow(file_content) == 0L)
         return(invisible(file_content))
     file_content
@@ -213,10 +213,10 @@ getHDF5DumpFile <- function(for.use=FALSE)
 {
     if (!isTRUEorFALSE(for.use))
         stop("'for.use' must be TRUE or FALSE")
-    file <- try(.get_dump_specfile(), silent=TRUE)
-    if (is(file, "try-error"))
-        file <- .get_dump_autofile(increment=for.use)
-    file
+    filepath <- try(.get_dump_specfile(), silent=TRUE)
+    if (is(filepath, "try-error"))
+        filepath <- .get_dump_autofile(increment=for.use)
+    filepath
 }
 
 ### A convenience wrapper.
@@ -248,8 +248,8 @@ getHDF5DumpName <- function(for.use=FALSE)
     } else if (for.use) {
         ## If the dump file is a user-specified file, we switch back to
         ## automatic dump names.
-        file <- try(.get_dump_specfile(), silent=TRUE)
-        if (!is(file, "try-error"))
+        filepath <- try(.get_dump_specfile(), silent=TRUE)
+        if (!is(filepath, "try-error"))
             .set_dump_autonames_mode()
     }
     name
@@ -329,7 +329,7 @@ init_HDF5_dataset_creation_global_counter <- function()
 
 ### Use a lock mechanism so is safe to use in the context of parallel
 ### execution.
-appendDatasetCreationToHDF5DumpLog <- function(file, name, dim, type,
+appendDatasetCreationToHDF5DumpLog <- function(filepath, name, dim, type,
                                                chunk_dim, level)
 {
     logfile <- get_HDF5_dump_logfile()
@@ -339,7 +339,7 @@ appendDatasetCreationToHDF5DumpLog <- function(file, name, dim, type,
     dims <- paste0(dim, collapse="x")
     chunk_dims <- paste0(chunk_dim, collapse="x")
     cat(as.character(Sys.time()), counter,
-        file, name, dims, type, chunk_dims, level,
+        filepath, name, dims, type, chunk_dims, level,
         sep="\t", file=locked_path, append=TRUE)
     cat("\n", file=locked_path, append=TRUE)
 }
@@ -347,14 +347,14 @@ appendDatasetCreationToHDF5DumpLog <- function(file, name, dim, type,
 showHDF5DumpLog <- function()
 {
     COLNAMES <- c("time", "counter",
-                  "file", "name", "dims", "type", "chunk_dims", "level")
+                  "filepath", "name", "dims", "type", "chunk_dims", "level")
     ## The nb of lines in the log file is the current value of the dataset
     ## creation counter minus one.
     counter <- .get_dataset_creation_global_counter()
     if (counter == 1L) {
         dump_log <- data.frame(time=character(0),
                                counter=integer(0),
-                               file=character(0),
+                               filepath=character(0),
                                name=character(0),
                                dims=character(0),
                                type=character(0),
@@ -371,7 +371,7 @@ showHDF5DumpLog <- function()
         fmt <- "[%s] #%d In file '%s': creation of dataset '%s' (%s:%s, chunk_dims=%s, level=%d)"
         message(paste0(sprintf(fmt,
                                dump_log$time, dump_log$counter,
-                               dump_log$file, dump_log$name,
+                               dump_log$filepath, dump_log$name,
                                dump_log$dims, dump_log$type,
                                dump_log$chunk_dims, dump_log$level),
                        "\n"),
