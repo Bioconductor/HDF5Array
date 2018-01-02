@@ -55,7 +55,7 @@ setReplaceMethod("path", "HDF5ArraySeed",
             dim_in1string <- paste0(object_dim, collapse=" x ")
             stop(wmsg("dimensions (", new_dim_in1string, ") ",
                       "of HDF5 dataset '", object@name, "' ",
-                      "from file ", new_filepath, " are not ",
+                      "from file '", value, "' are not ",
                       "as expected (", dim_in1string, ")"))
         }
 
@@ -65,7 +65,7 @@ setReplaceMethod("path", "HDF5ArraySeed",
                                                    length(object_dim))
         if (!identical(new_first_val, object@first_val))
             stop(wmsg("first value in HDF5 dataset '", object@name, "' ",
-                      "from file ", new_filepath, " is not ",
+                      "from file '", value, "' is not ",
                       "as expected"))
 
         ## Set new path.
