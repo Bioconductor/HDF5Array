@@ -10,6 +10,20 @@
 ### h5dim()
 ###
 
+.check_h5dim <- function(dim, name)
+{
+    if (is.integer(dim))
+        return(dim)
+    if (any(dim > .Machine$integer.max)) {
+        dim_in1string <- paste0(dim, collapse=" x ")
+        stop(wmsg("The dimensions of HDF5 dataset '", name, "' are: ",
+                  dim_in1string, "\n\nThe HDF5Array package only ",
+                  "supports datasets with all dimensions <= 2^31-1",
+                  " (this is ", .Machine$integer.max, ") at the moment."))
+    }
+    as.integer(dim)
+}
+
 h5dim <- function(filepath, name)
 {
     if (substr(name, 1L, 1L) != "/")
@@ -22,7 +36,8 @@ h5dim <- function(filepath, name)
     on.exit(H5Gclose(g), add=TRUE)
     d <- H5Dopen(g, name)
     on.exit(H5Dclose(d), add=TRUE)
-    H5Sget_simple_extent_dims(H5Dget_space(d))$size
+    dim <- H5Sget_simple_extent_dims(H5Dget_space(d))$size
+    .check_h5dim(dim, name)
 }
 
 

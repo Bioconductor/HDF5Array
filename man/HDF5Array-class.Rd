@@ -8,6 +8,8 @@
 \alias{HDF5ArraySeed}
 
 \alias{dim,HDF5ArraySeed-method}
+\alias{path,HDF5ArraySeed-method}
+\alias{path<-,HDF5ArraySeed-method}
 \alias{extract_array,HDF5ArraySeed-method}
 
 % HDF5Array and HDF5Matrix

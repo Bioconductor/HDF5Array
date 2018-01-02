@@ -19,42 +19,17 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_array()
+### path() getter/setter
 ###
 
-.extract_array_from_HDF5ArraySeed <- function(x, index)
+setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
+
+.normarg_path <- function(path, what)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
-    if (any(ans_dim == 0L)) {
-        ans <- x@first_val[0]
-        dim(ans) <- ans_dim
-    } else {
-        ans <- h5read2(x@filepath, x@name, index)
-    }
-    ans
-}
-
-setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### HDF5ArraySeed constructor
-###
-
-.get_h5dataset_dim <- function(filepath, name)
-{
-    dim <- h5dim(filepath, name)
-    if (!is.integer(dim)) {
-        if (any(dim > .Machine$integer.max)) {
-            dim_in1string <- paste0(dim, collapse=" x ")
-            stop(wmsg("The dimensions of HDF5 dataset '", name, "' are: ",
-                      dim_in1string, "\n\nThe HDF5Array package only ",
-                      "supports datasets with all dimensions <= 2^31-1",
-                      " (this is ", .Machine$integer.max, ") at the moment."))
-        }
-        dim <- as.integer(dim)
-    }
-    dim
+    if (!isSingleString(path))
+        stop(wmsg(what, " must be a single string specifying the path ",
+                  "to the HDF5 file where the dataset is located"))
+    file_path_as_absolute(path)
 }
 
 ### Will fail if the dataset is empty (i.e. if at least one of its
@@ -67,16 +42,69 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
     ans[[1L]]  # drop any attribute
 }
 
+setReplaceMethod("path", "HDF5ArraySeed",
+    function(object, value)
+    {
+        new_filepath <- .normarg_path(value, "supplied path")
+
+        ## Check dim compatibility.
+        new_dim <- h5dim(new_filepath, object@name)
+        object_dim <- dim(object)
+        if (!identical(new_dim, object_dim)) {
+            new_dim_in1string <- paste0(new_dim, collapse=" x ")
+            dim_in1string <- paste0(object_dim, collapse=" x ")
+            stop(wmsg("dimensions (", new_dim_in1string, ") ",
+                      "of HDF5 dataset '", object@name, "' ",
+                      "from file ", new_filepath, " are not ",
+                      "as expected (", dim_in1string, ")"))
+        }
+
+        ## Check first val compatibility.
+        new_first_val <- .read_h5dataset_first_val(new_filepath,
+                                                   object@name,
+                                                   length(object_dim))
+        if (!identical(new_first_val, object@first_val))
+            stop(wmsg("first value in HDF5 dataset '", object@name, "' ",
+                      "from file ", new_filepath, " is not ",
+                      "as expected"))
+
+        ## Set new path.
+        object@filepath <- new_filepath
+        object
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extract_array()
+###
+
+.extract_array_from_HDF5ArraySeed <- function(x, index)
+{
+    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
+    if (any(ans_dim == 0L)) {
+        ans <- x@first_val[0]
+        dim(ans) <- ans_dim
+    } else {
+        ans <- h5read2(path(x), x@name, index)
+    }
+    ans
+}
+
+setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### HDF5ArraySeed constructor
+###
+
 ### Return a HDF5ArraySeed object with NO dimnames!
 ### FIXME: Investigate the possiblity to store the dimnames in the HDF5 file
 ### and make dimnames() on the object returned by HDF5ArraySeed() bring them
 ### back.
 HDF5ArraySeed <- function(filepath, name, type=NA)
 {
-    if (!isSingleString(filepath))
-        stop(wmsg("'filepath' must be a single string specifying the path ",
-                  "to the HDF5 file where the dataset is located"))
-    filepath <- file_path_as_absolute(filepath)
+    filepath <- .normarg_path(filepath, "'filepath'")
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name ",
                   "of the dataset in the HDF5 file"))
@@ -84,7 +112,7 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
         stop(wmsg("'name' cannot be the empty string"))
     if (!isSingleStringOrNA(type))
         stop("'type' must be a single string or NA")
-    dim <- .get_h5dataset_dim(filepath, name)
+    dim <- h5dim(filepath, name)
     if (any(dim == 0L)) {
         if (is.na(type))
             stop(wmsg("This HDF5 dataset is empty! Don't know how to ",

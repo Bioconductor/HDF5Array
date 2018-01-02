@@ -30,6 +30,9 @@ exportMethods(
     ## Methods for generics defined in the methods package:
     coerce,
 
+    ## Methods for generics defined in the BiocGenerics package:
+    path, "path<-",
+
     ## Methods for generics defined in the DelayedArray package:
     extract_array, matrixClass, write_block_to_sink, DelayedArray
 )
