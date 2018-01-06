@@ -7,37 +7,63 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### h5dim()
+### h5dim() and h5chunkdim()
 ###
 
-.check_h5dim <- function(dim, name)
+### Return an object of class H5IdComponent representing an H5 dataset ID.
+.get_h5dataset <- function(filepath, name)
+{
+    if (substr(name, 1L, 1L) != "/")
+        name <- paste0("/", name)
+    group <- gsub("(.*/)[^/]*$", "\\1", name)
+    name <- gsub(".*/([^/]*)$", "\\1", name)
+    fid <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
+    on.exit(H5Fclose(fid))
+    gid <- H5Gopen(fid, group)
+    on.exit(H5Gclose(gid), add=TRUE)
+    H5Dopen(gid, name)
+}
+
+.check_h5dim <- function(dim, filepath, name, what="dimensions")
 {
     if (is.integer(dim))
         return(dim)
     if (any(dim > .Machine$integer.max)) {
         dim_in1string <- paste0(dim, collapse=" x ")
-        stop(wmsg("The dimensions of HDF5 dataset '", name, "' are: ",
-                  dim_in1string, "\n\nThe HDF5Array package only ",
-                  "supports datasets with all dimensions <= 2^31-1",
-                  " (this is ", .Machine$integer.max, ") at the moment."))
+        stop(wmsg("The ", what, " (", dim_in1string, ") ",
+                  "of HDF5 dataset '", name, "' ",
+                  "from file '", filepath, "' are too big.\n\n",
+                  "The HDF5Array package only supports datasets with ",
+                  "all ", what, " <= 2^31-1 (= ", .Machine$integer.max, ") ",
+                  "at the moment."))
     }
     as.integer(dim)
 }
 
 h5dim <- function(filepath, name)
 {
-    if (substr(name, 1L, 1L) != "/")
-        name <- paste0("/", name)
-    group <- gsub("(.*/)[^/]*$", "\\1", name)
-    name <- gsub(".*/([^/]*)$", "\\1", name)
-    f <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
-    on.exit(H5Fclose(f))
-    g <- H5Gopen(f, group)
-    on.exit(H5Gclose(g), add=TRUE)
-    d <- H5Dopen(g, name)
-    on.exit(H5Dclose(d), add=TRUE)
-    dim <- H5Sget_simple_extent_dims(H5Dget_space(d))$size
-    .check_h5dim(dim, name)
+    did <- .get_h5dataset(filepath, name)
+    on.exit(H5Dclose(did), add=TRUE)
+    sid <- H5Dget_space(did)
+    on.exit(H5Sclose(sid), add=TRUE)
+    dim <- H5Sget_simple_extent_dims(sid)$size
+    .check_h5dim(dim, filepath, name)
+}
+
+h5chunkdim <- function(filepath, name)
+{
+    did <- .get_h5dataset(filepath, name)
+    on.exit(H5Dclose(did), add=TRUE)
+    pid <- H5Dget_create_plist(did)
+    on.exit(H5Pclose(pid), add=TRUE)
+    if (H5Pget_layout(pid) != "H5D_CHUNKED")
+        return(NULL)
+    ## We use rev() to invert the order of the dimensions returned by
+    ## H5Pget_chunk(). It seems that H5Pget_chunk() should take care of
+    ## this though, for consistency with how rhdf5 handles the order of the
+    ## dimensions everywhere else (e.g. see ?H5Sget_simple_extent_dims).
+    chunkdim <- rev(H5Pget_chunk(pid))
+    .check_h5dim(chunkdim, filepath, name, what="chunk dimensions")
 }
 
 
