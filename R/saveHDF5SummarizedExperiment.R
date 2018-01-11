@@ -44,8 +44,7 @@
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
         a <- assays[[i]]
-        ## use @ to avoid check on file existence
-        seed(a)@filepath <- basename(path(seed(a)))
+        a@seed@filepath <- basename(a@seed@filepath)
         assays[[i]] <- a
     }
     assays
@@ -118,10 +117,11 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se")
         .stop_if_bad_dir(dir)
     for (i in seq_along(assays(ans))) {
         a <- assay(ans, i, withDimnames=FALSE)
-        if (!is(a, "HDF5Array") || !identical(path(seed(a)), "assays.h5") ||
+        if (!is(a, "HDF5Array") || !identical(a@seed@filepath, "assays.h5") ||
             !(a@seed@name %in% h5_datasets))
             .stop_if_bad_dir(dir)
-        path(seed(a)) <- file_path_as_absolute(file.path(dir, path(seed(a))))
+        a@seed@filepath <-
+            file_path_as_absolute(file.path(dir, a@seed@filepath))
         assay(ans, i, withDimnames=FALSE) <- a
     }
     ans
