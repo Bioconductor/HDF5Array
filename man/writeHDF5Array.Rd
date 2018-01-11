@@ -98,19 +98,18 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunk_dim=NULL, level=NULL,
 
 \seealso{
   \itemize{
+    \item \link{HDF5Array} objects.
+
     \item \code{\link{saveHDF5SummarizedExperiment}} and
-          \code{\link{loadHDF5SummarizedExperiment}} for saving/loading
-          an HDF5-based SummarizedExperiment object to/from disk.
+          \code{\link{loadHDF5SummarizedExperiment}} in this
+          package (the \pkg{HDF5Array} package) for saving/loading
+          an HDF5-based \link[SummarizedExperiment]{SummarizedExperiment}
+          object to/from disk.
 
     \item \link{HDF5-dump-management} for controlling the location of
           automatically created HDF5 datasets.
 
-    \item \link{HDF5Array} objects.
-
-    \item \link{DelayedArray} objects.
-
-    \item \link{DelayedArray-utils} for common operations on DelayedArray
-          objects.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
   }
 }
 
