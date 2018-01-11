@@ -86,10 +86,11 @@ HDF5ArraySeed(filepath, name, type=NA)
     \item \link{HDF5-dump-management} for controlling the location of
           automatically created HDF5 datasets.
 
-    \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
-          \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
-          the \pkg{SummarizedExperiment} package for saving/loading a
-          HDF5-based SummarizedExperiment object to/from disk.
+    \item \code{\link{saveHDF5SummarizedExperiment}} and
+          \code{\link{loadHDF5SummarizedExperiment}} in this
+          package (the \pkg{HDF5Array} package) for saving/loading
+          an HDF5-based \link[SummarizedExperiment]{SummarizedExperiment}
+          object to/from disk.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 

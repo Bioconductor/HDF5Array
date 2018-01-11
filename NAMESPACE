@@ -50,6 +50,7 @@ export(
     getHDF5DumpChunkDim,
     setHDF5DumpCompressionLevel, getHDF5DumpCompressionLevel,
     appendDatasetCreationToHDF5DumpLog, showHDF5DumpLog,
-    HDF5RealizationSink, writeHDF5Array, writeHDF5Dataset
+    HDF5RealizationSink, writeHDF5Array, writeHDF5Dataset,
+    saveHDF5SummarizedExperiment, loadHDF5SummarizedExperiment
 )
 

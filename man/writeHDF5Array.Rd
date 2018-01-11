@@ -98,10 +98,9 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunk_dim=NULL, level=NULL,
 
 \seealso{
   \itemize{
-    \item \code{\link[SummarizedExperiment]{saveHDF5SummarizedExperiment}} and
-          \code{\link[SummarizedExperiment]{loadHDF5SummarizedExperiment}} in
-          the \pkg{SummarizedExperiment} package for saving/loading a
-          HDF5-based SummarizedExperiment object to/from disk.
+    \item \code{\link{saveHDF5SummarizedExperiment}} and
+          \code{\link{loadHDF5SummarizedExperiment}} for saving/loading
+          an HDF5-based SummarizedExperiment object to/from disk.
 
     \item \link{HDF5-dump-management} for controlling the location of
           automatically created HDF5 datasets.
