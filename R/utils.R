@@ -40,14 +40,19 @@
     as.integer(dim)
 }
 
-h5dim <- function(filepath, name)
+### The TENxMatrixSeed() constructor defined in the TENxGenomics package
+### calls h5dim() with 'check=FALSE' in order to get the dimension of a
+### monodimensional array of length >= 2^31.
+h5dim <- function(filepath, name, check=TRUE)
 {
     did <- .get_h5dataset(filepath, name)
     on.exit(H5Dclose(did), add=TRUE)
     sid <- H5Dget_space(did)
     on.exit(H5Sclose(sid), add=TRUE)
     dim <- H5Sget_simple_extent_dims(sid)$size
-    .check_h5dim(dim, filepath, name)
+    if (check)
+        dim <- .check_h5dim(dim, filepath, name)
+    dim
 }
 
 h5chunkdim <- function(filepath, name)
