@@ -8,7 +8,7 @@ Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, Sequencing, Annotation, Coverage, GenomeAnnotation
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.5.13), rhdf5
-Imports: utils, tools, BiocGenerics, S4Vectors, IRanges
+Imports: utils, tools, BiocGenerics (>= 0.25.1), S4Vectors, IRanges
 Suggests: h5vcData, SummarizedExperiment (>= 1.9.6), GenomicRanges, BiocStyle
 License: Artistic-2.0
 Collate: utils.R
