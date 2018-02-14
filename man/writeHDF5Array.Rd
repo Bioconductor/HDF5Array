@@ -5,7 +5,7 @@
 \alias{HDF5RealizationSink}
 
 \alias{dimnames,HDF5RealizationSink-method}
-\alias{chunk_dim,HDF5RealizationSink-method}
+\alias{chunkdim,HDF5RealizationSink-method}
 \alias{write_block_to_sink,HDF5RealizationSink-method}
 
 \alias{coerce,HDF5RealizationSink,HDF5ArraySeed-method}
@@ -26,7 +26,7 @@
 }
 
 \usage{
-writeHDF5Array(x, filepath=NULL, name=NULL, chunk_dim=NULL, level=NULL,
+writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
                verbose=FALSE)
 }
 
@@ -52,7 +52,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunk_dim=NULL, level=NULL,
     If \code{NULL}, then the name returned by \code{\link{getHDF5DumpName}}
     will be used.
   }
-  \item{chunk_dim}{
+  \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.
     By default, \code{getHDF5DumpChunkDim(dim(x), type(x))} is used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.

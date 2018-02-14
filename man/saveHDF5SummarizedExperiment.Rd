@@ -13,7 +13,7 @@
 
 \usage{
 saveHDF5SummarizedExperiment(x, dir="my_h5_se", replace=FALSE,
-                             chunk_dim=NULL, level=NULL, verbose=FALSE)
+                             chunkdim=NULL, level=NULL, verbose=FALSE)
 loadHDF5SummarizedExperiment(dir="my_h5_se")
 }
 
@@ -32,7 +32,7 @@ loadHDF5SummarizedExperiment(dir="my_h5_se")
     If directory \code{dir} already exists, should it be replaced with a
     new one? The content of the existing directory will be lost!
   }
-  \item{chunk_dim, level}{
+  \item{chunkdim, level}{
     The dimensions of the chunks and the compression level to use for
     writting the assay data to disk.
     Passed to the internal calls to \code{writeHDF5Array}.

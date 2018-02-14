@@ -55,6 +55,7 @@ h5dim <- function(filepath, name, check=TRUE)
     dim
 }
 
+### Return NULL or an integer vector parallel to 'h5dim(filepath, name)'.
 h5chunkdim <- function(filepath, name)
 {
     did <- .get_h5dataset(filepath, name)
@@ -99,29 +100,29 @@ h5write2 <- function(obj, filepath, name, index=NULL)
 
 ### A simple wrapper around rhdf5::h5createDataset().
 h5createDataset2 <- function(filepath, name, dim, type="double",
-                             chunk_dim=NULL, level=6L)
+                             chunkdim=NULL, level=6L)
 {
     if (type == "character") {
         size <- max(nchar(name, type="width"))
     } else {
         size <- NULL
     }
-    if (is.null(chunk_dim)) {
+    if (is.null(chunkdim)) {
         ## Here is the trade-off: The shorter the chunks, the snappier the
         ## "show" method feels (on my laptop, it starts to feel sloppy with
         ## a chunk length > 10 millions). OTOH small chunks tend to slow down
         ## methods that do block processing (e.g. sum(), range(), etc...).
         ## A chunk length of 1 million seems a good compromise.
-        #chunk_dim <-
+        #chunkdim <-
         #    DelayedArray:::get_max_spacings_for_hypercube_blocks(dim,
         #                                                         1000000L)
-        chunk_dim <- dim
+        chunkdim <- dim
     }
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
     ok <- h5createDataset(filepath, name, dim, storage.mode=type,
-                          size=size, chunk=chunk_dim, level=level)
+                          size=size, chunk=chunkdim, level=level)
     if (!ok)
         stop(wmsg("failed to create dataset '", name, "' ",
                   "in file '", filepath, "'"), call.=FALSE)

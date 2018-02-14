@@ -330,16 +330,16 @@ init_HDF5_dataset_creation_global_counter <- function()
 ### Use a lock mechanism so is safe to use in the context of parallel
 ### execution.
 appendDatasetCreationToHDF5DumpLog <- function(filepath, name, dim, type,
-                                               chunk_dim, level)
+                                               chunkdim, level)
 {
     logfile <- get_HDF5_dump_logfile()
     locked_path <- lock_file(logfile)
     on.exit(unlock_file(logfile))
     counter <- .get_dataset_creation_global_counter(increment=TRUE)
     dims <- paste0(dim, collapse="x")
-    chunk_dims <- paste0(chunk_dim, collapse="x")
+    chunkdims <- paste0(chunkdim, collapse="x")
     cat(as.character(Sys.time()), counter,
-        filepath, name, dims, type, chunk_dims, level,
+        filepath, name, dims, type, chunkdims, level,
         sep="\t", file=locked_path, append=TRUE)
     cat("\n", file=locked_path, append=TRUE)
 }
@@ -347,7 +347,7 @@ appendDatasetCreationToHDF5DumpLog <- function(filepath, name, dim, type,
 showHDF5DumpLog <- function()
 {
     COLNAMES <- c("time", "counter",
-                  "filepath", "name", "dims", "type", "chunk_dims", "level")
+                  "filepath", "name", "dims", "type", "chunkdims", "level")
     ## The nb of lines in the log file is the current value of the dataset
     ## creation counter minus one.
     counter <- .get_dataset_creation_global_counter()
@@ -358,7 +358,7 @@ showHDF5DumpLog <- function()
                                name=character(0),
                                dims=character(0),
                                type=character(0),
-                               chunk_dims=character(0),
+                               chunkdims=character(0),
                                level=integer(0),
                                stringsAsFactors=FALSE)
     } else {
@@ -368,12 +368,12 @@ showHDF5DumpLog <- function()
         dump_log <- read.table(locked_path,
                                sep="\t", stringsAsFactors=FALSE)
         colnames(dump_log) <- COLNAMES
-        fmt <- "[%s] #%d In file '%s': creation of dataset '%s' (%s:%s, chunk_dims=%s, level=%d)"
+        fmt <- "[%s] #%d In file '%s': creation of dataset '%s' (%s:%s, chunkdims=%s, level=%d)"
         message(paste0(sprintf(fmt,
                                dump_log$time, dump_log$counter,
                                dump_log$filepath, dump_log$name,
                                dump_log$dims, dump_log$type,
-                               dump_log$chunk_dims, dump_log$level),
+                               dump_log$chunkdims, dump_log$level),
                        "\n"),
                 appendLF=FALSE)
     }

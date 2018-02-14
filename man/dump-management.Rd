@@ -46,7 +46,7 @@ showHDF5DumpLog()
 ## For developers:
 getHDF5DumpChunkDim(dim, type, ratio=75)
 appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
-                                   chunk_dim, level)
+                                   chunkdim, level)
 }
 
 \arguments{
@@ -111,7 +111,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   \item{ratio}{
     The number of chunks per block. By default, a ratio of 75 is used.
   }
-  \item{chunk_dim}{
+  \item{chunkdim}{
     The dimensions of the chunks.
   }
 }
@@ -174,7 +174,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
           (e.g. with \code{rhdf5::h5createDataset}) and before starting to
           write the data to disk. The values passed to
           \code{appendDatasetCreationToHDF5DumpLog} via the \code{filepath},
-          \code{name}, \code{dim}, \code{type}, \code{chunk_dim}, and
+          \code{name}, \code{dim}, \code{type}, \code{chunkdim}, and
           \code{level} arguments should be those that were passed to
           \code{rhdf5::h5createDataset} via the \code{file}, \code{dataset},
           \code{dims}, \code{storage.mode}, \code{chunk}, and \code{level}

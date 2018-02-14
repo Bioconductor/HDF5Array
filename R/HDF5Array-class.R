@@ -6,12 +6,14 @@
 setClass("HDF5ArraySeed",
     contains="Array",
     representation(
-        filepath="character",  # Absolute path to the HDF5 file so the object
-                               # doesn't break when the user changes the
-                               # working directory (e.g. with setwd()).
-        name="character",      # Name of the dataset in the HDF5 file.
+        filepath="character",       # Absolute path to the HDF5 file so the
+                                    # object doesn't break when the user
+                                    # changes the working directory (e.g. with
+                                    # setwd()).
+        name="character",           # Name of the dataset in the HDF5 file.
         dim="integer",
-        first_val="ANY"        # First value in the dataset.
+        first_val="ANY",            # First value in the dataset.
+        chunkdim="integer_OR_NULL"
     )
 )
 
@@ -76,6 +78,13 @@ setReplaceMethod("path", "HDF5ArraySeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### chunkdim() getter
+###
+
+setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### extract_array()
 ###
 
@@ -131,10 +140,12 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
                          "dataset (", detected_type, "). Ignoring the ",
                          "former."))
     }
+    chunkdim <- h5chunkdim(filepath, name)
     new2("HDF5ArraySeed", filepath=filepath,
                           name=name,
                           dim=dim,
-                          first_val=first_val)
+                          first_val=first_val,
+                          chunkdim=chunkdim)
 }
 
 
