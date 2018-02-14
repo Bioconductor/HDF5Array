@@ -13,7 +13,6 @@
 \alias{coerce,HDF5RealizationSink,DelayedArray-method}
 
 \alias{writeHDF5Array}
-\alias{writeHDF5Dataset}
 
 \alias{coerce,ANY,HDF5Array-method}
 \alias{coerce,DelayedArray,HDF5Array-method}

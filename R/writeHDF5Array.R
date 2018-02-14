@@ -144,8 +144,6 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
     as(sink, "HDF5Array")
 }
 
-writeHDF5Dataset <- function(...) .Defunct("writeHDF5Array")
-
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Coercion to HDF5Array.
