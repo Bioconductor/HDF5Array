@@ -114,8 +114,8 @@ h5createDataset2 <- function(filepath, name, dim, type="double",
         ## methods that do block processing (e.g. sum(), range(), etc...).
         ## A chunk length of 1 million seems a good compromise.
         #chunkdim <-
-        #    DelayedArray:::get_max_spacings_for_hypercube_blocks(dim,
-        #                                                         1000000L)
+        #    DelayedArray:::get_spacings_for_hypercube_capped_length_blocks(
+        #                       dim, 1000000L)
         chunkdim <- dim
     }
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.

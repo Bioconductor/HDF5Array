@@ -266,7 +266,7 @@ getHDF5DumpChunkDim <- function(dim, type, ratio=75)
     chunk_len <- as.integer(ceiling(max_block_len / ratio))
     ## 'max_block_len' must be a multiple of 'chunk_len'.
     stopifnot(max_block_len %% chunk_len == 0L)
-    DelayedArray:::get_max_spacings_for_linear_blocks(dim, chunk_len)
+    DelayedArray:::get_spacings_for_linear_capped_length_blocks(dim, chunk_len)
 }
 
 
