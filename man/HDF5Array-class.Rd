@@ -22,6 +22,7 @@
 \alias{HDF5Matrix}
 
 \alias{coerce,HDF5Array,HDF5Matrix-method}
+\alias{coerce,HDF5Matrix,HDF5Array-method}
 \alias{matrixClass,HDF5Array-method}
 
 \alias{coerce,ANY,HDF5Matrix-method}

@@ -163,9 +163,15 @@ setClass("HDF5Array", contains="DelayedArray")
 setClass("HDF5Matrix", contains=c("DelayedMatrix", "HDF5Array"))
 
 ### Automatic coercion method from HDF5Array to HDF5Matrix silently returns
-### a broken object (unfortunately these dummy automatic coercion methods don't
-### bother to validate the object they return). So we overwrite it.
+### a broken object (unfortunately these dummy automatic coercion methods
+### don't bother to validate the object they return). So we overwrite it.
 setAs("HDF5Array", "HDF5Matrix", function(from) new("HDF5Matrix", from))
+
+### The user should not be able to degrade an HDF5Matrix object to
+### an HDF5Array object so 'as(x, "HDF5Array", strict=TRUE)' should
+### fail or be a no-op when 'x' is an HDF5Matrix object. Making this
+### coercion a no-op seems to be the easiest (and safest) way to go.
+setAs("HDF5Matrix", "HDF5Array", function(from) from)  # no-op
 
 ### For internal use only.
 setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
