@@ -1,5 +1,5 @@
 ### =========================================================================
-### Save/load a HDF5-based SummarizedExperiment object
+### Save/load an HDF5-based SummarizedExperiment object
 ### -------------------------------------------------------------------------
 
 

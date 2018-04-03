@@ -107,7 +107,7 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 ### HDF5ArraySeed constructor
 ###
 
-### Return a HDF5ArraySeed object with NO dimnames!
+### Return an HDF5ArraySeed object with NO dimnames!
 ### FIXME: Investigate the possiblity to store the dimnames in the HDF5 file
 ### and make dimnames() on the object returned by HDF5ArraySeed() bring them
 ### back.
@@ -179,7 +179,7 @@ setMethod("matrixClass", "HDF5Array", function(x) "HDF5Matrix")
 .validate_HDF5Array <- function(x)
 {
     if (!is(x@seed, "HDF5ArraySeed"))
-        return(wmsg("'x@seed' must be a HDF5ArraySeed object"))
+        return(wmsg("'x@seed' must be an HDF5ArraySeed object"))
     TRUE
 }
 
@@ -198,14 +198,14 @@ setMethod("DelayedArray", "HDF5ArraySeed",
     function(seed) DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
 )
 
-### Works directly on a HDF5ArraySeed object, in which case it must be called
+### Works directly on an HDF5ArraySeed object, in which case it must be called
 ### with a single argument.
 HDF5Array <- function(filepath, name, type=NA)
 {
     if (is(filepath, "HDF5ArraySeed")) {
         if (!(missing(name) && identical(type, NA)))
             stop(wmsg("HDF5Array() must be called with a single argument ",
-                      "when passed a HDF5ArraySeed object"))
+                      "when passed an HDF5ArraySeed object"))
         seed <- filepath
     } else {
         seed <- HDF5ArraySeed(filepath, name, type=type)

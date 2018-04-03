@@ -86,7 +86,7 @@ setMethod("write_block_to_sink", "HDF5RealizationSink",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing a HDF5RealizationSink object.
+### Coercing an HDF5RealizationSink object.
 ###
 
 ### FIXME: This coercion needs to propagate the dimnames *thru* the HDF5 file.
@@ -124,8 +124,8 @@ setAs("HDF5RealizationSink", "DelayedArray",
 
 ### Write the dataset to the current dump if 'filepath' and 'name' are not
 ### specified.
-### Return a HDF5Array object pointing to the newly written HDF5 dataset on
-### disk.
+### Return an HDF5Array object pointing to the newly written HDF5 dataset
+### on disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs
 ### above in this file about this.
 writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
@@ -152,7 +152,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
 ### HDF5RealizationSink to HDF5Array is already taken care of by the specific
 ### method above and doesn't write anything to disk. So coercing to HDF5Array
 ### in general writes the object to disk *except* when the object to coerce is
-### a HDF5RealizationSink object.
+### an HDF5RealizationSink object.
 ###
 
 .as_HDF5Array <- function(from) writeHDF5Array(from)  # write to current dump
