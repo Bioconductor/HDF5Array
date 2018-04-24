@@ -195,7 +195,7 @@ setAs("ANY", "HDF5Matrix",
 ###
 
 setMethod("DelayedArray", "HDF5ArraySeed",
-    function(seed) DelayedArray:::new_DelayedArray(seed, Class="HDF5Array")
+    function(seed) new_DelayedArray(seed, Class="HDF5Array")
 )
 
 ### Works directly on an HDF5ArraySeed object, in which case it must be called
