@@ -262,10 +262,10 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 getHDF5DumpChunkDim <- function(dim, type, ratio=75)
 {
-    max_block_len <- DelayedArray:::get_max_block_length(type)
-    chunk_len <- as.integer(ceiling(max_block_len / ratio))
-    ## 'max_block_len' must be a multiple of 'chunk_len'.
-    stopifnot(max_block_len %% chunk_len == 0L)
+    block_maxlen <- DelayedArray:::get_default_block_maxlength(type)
+    chunk_len <- as.integer(ceiling(block_maxlen / ratio))
+    ## 'block_maxlen' must be a multiple of 'chunk_len'.
+    stopifnot(block_maxlen %% chunk_len == 0L)
     DelayedArray:::get_spacings_for_linear_capped_length_blocks(dim, chunk_len)
 }
 
