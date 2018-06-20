@@ -112,8 +112,7 @@ setAs("HDF5RealizationSink", "DelayedArray",
         ## HDF5ArraySeed does not propagate the dimnames at the moment. See
         ## FIXME above.
         ## TODO: Remove line below when FIXME above is addressed.
-        dimnames(ans) <- dimnames(from)
-        ans
+        DelayedArray:::set_dimnames(ans, dimnames(from))
     }
 )
 
