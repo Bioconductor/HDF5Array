@@ -140,7 +140,7 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
                          "dataset (", detected_type, "). Ignoring the ",
                          "former."))
     }
-    chunkdim <- h5chunkdim(filepath, name)
+    chunkdim <- h5chunkdim(filepath, name, adjust=TRUE)
     new2("HDF5ArraySeed", filepath=filepath,
                           name=name,
                           dim=dim,
