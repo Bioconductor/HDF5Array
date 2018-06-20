@@ -112,7 +112,7 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se")
     if (inherits(h5_content, "try-error"))
         .stop_if_bad_dir(dir)
     h5_datasets <- h5_content[ , "name"]
-    ans <- updateObject(readRDS(rds_path))
+    ans <- updateObject(readRDS(rds_path), check=FALSE)
     if (!is(ans, "SummarizedExperiment"))
         .stop_if_bad_dir(dir)
     for (i in seq_along(assays(ans))) {
