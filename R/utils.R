@@ -24,7 +24,7 @@
     H5Dopen(gid, name)
 }
 
-.check_h5dim <- function(dim, filepath, name, what="dimensions")
+.dim_as_integer <- function(dim, filepath, name, what="dimensions")
 {
     if (is.integer(dim))
         return(dim)
@@ -41,22 +41,22 @@
 }
 
 ### The TENxMatrixSeed() constructor defined in the TENxGenomics package
-### calls h5dim() with 'check=FALSE' in order to get the dimension of a
-### monodimensional array of length >= 2^31.
-h5dim <- function(filepath, name, check=TRUE)
+### calls h5dim() with 'as.integer=FALSE' in order to get the dimension
+### of a monodimensional array of length >= 2^31.
+h5dim <- function(filepath, name, as.integer=TRUE)
 {
     did <- .get_h5dataset(filepath, name)
     on.exit(H5Dclose(did), add=TRUE)
     sid <- H5Dget_space(did)
     on.exit(H5Sclose(sid), add=TRUE)
     dim <- H5Sget_simple_extent_dims(sid)$size
-    if (check)
-        dim <- .check_h5dim(dim, filepath, name)
+    if (as.integer)
+        dim <- .dim_as_integer(dim, filepath, name)
     dim
 }
 
 ### Return NULL or an integer vector parallel to 'h5dim(filepath, name)'.
-h5chunkdim <- function(filepath, name)
+h5chunkdim <- function(filepath, name, adjust=FALSE)
 {
     did <- .get_h5dataset(filepath, name)
     on.exit(H5Dclose(did), add=TRUE)
@@ -69,7 +69,18 @@ h5chunkdim <- function(filepath, name)
     ## this though, for consistency with how rhdf5 handles the order of the
     ## dimensions everywhere else (e.g. see ?H5Sget_simple_extent_dims).
     chunkdim <- rev(H5Pget_chunk(pid))
-    .check_h5dim(chunkdim, filepath, name, what="chunk dimensions")
+    chunkdim <- .dim_as_integer(chunkdim, filepath, name,
+                                what="chunk dimensions")
+    if (adjust) {
+        dim <- h5dim(filepath, name, as.integer=FALSE)
+        ## A sanity check that should never fail.
+        if (length(chunkdim) != length(dim) || any(chunkdim > pmax(dim, 1L)))
+            stop(wmsg("the chunk dimensions of HDF5 dataset '", name, "' ",
+                      "from file '", filepath, "' are not compatible with ",
+                      "its dimensions"))
+        chunkdim <- as.integer(pmin(dim, chunkdim))
+    }
+    chunkdim
 }
 
 
