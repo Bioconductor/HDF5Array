@@ -122,7 +122,7 @@ h5ls(tally_file)
 
 cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 
-cov1 <- drop(cov0[ , , 29000001:29000007])
+cov1 <- cov0[ , , 29000001:29000007]
 
 out_file <- tempfile()
 writeHDF5Array(cov1, out_file, "cov1")

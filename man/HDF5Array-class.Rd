@@ -129,7 +129,7 @@ dimnames(cov0)
 ## ---------------------------------------------------------------------
 ## SLICING (A.K.A. SUBSETTING)
 ## ---------------------------------------------------------------------
-cov1 <- drop(cov0[ , , 29000001:29000007])
+cov1 <- cov0[ , , 29000001:29000007]
 cov1
 
 dim(cov1)
@@ -137,7 +137,7 @@ as.array(cov1)
 stopifnot(identical(dim(as.array(cov1)), dim(cov1)))
 stopifnot(identical(dimnames(as.array(cov1)), dimnames(cov1)))
 
-cov2 <- drop(cov0[ , "+", 29000001:29000007])
+cov2 <- cov0[ , "+", 29000001:29000007]
 cov2
 as.matrix(cov2)
 
@@ -150,8 +150,8 @@ as.matrix(cov2)
  
 library(SummarizedExperiment)
 
-pcov <- drop(cov0[ , 1, ])  # coverage on plus strand
-mcov <- drop(cov0[ , 2, ])  # coverage on minus strand
+pcov <- cov0[ , 1, ]  # coverage on plus strand
+mcov <- cov0[ , 2, ]  # coverage on minus strand
 
 nrow(pcov)  # nb of samples
 ncol(pcov)  # length of Human chromosome 16

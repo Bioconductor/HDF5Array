@@ -222,7 +222,7 @@ B <- as(b, "HDF5Array")
 lsHDF5DumpFile()
 B
 
-C <- (log(2 * A + 0.88) - 5)^3 * t(drop(B[ , 1, ]))
+C <- (log(2 * A + 0.88) - 5)^3 * t(B[ , 1, ])
 as(C, "HDF5Array")  # realize C on disk
 lsHDF5DumpFile()
 
