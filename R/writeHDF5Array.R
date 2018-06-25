@@ -74,13 +74,11 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 
 setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 
-setMethod("write_block_to_sink", "HDF5RealizationSink",
-    function(block, sink, viewport)
+setMethod("write_block", "HDF5RealizationSink",
+    function(x, viewport, block)
     {
-        stopifnot(identical(dim(sink), refdim(viewport)),
-                  identical(dim(block), dim(viewport)))
         index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
-        h5write2(block, sink@filepath, sink@name, index=index)
+        h5write2(block, x@filepath, x@name, index=index)
     }
 )
 

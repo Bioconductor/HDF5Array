@@ -34,7 +34,7 @@ exportMethods(
     path, "path<-",
 
     ## Methods for generics defined in the DelayedArray package:
-    extract_array, matrixClass, write_block_to_sink, DelayedArray
+    extract_array, matrixClass, write_block, DelayedArray
 )
 
 

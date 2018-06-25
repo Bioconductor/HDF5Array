@@ -6,7 +6,7 @@
 
 \alias{dimnames,HDF5RealizationSink-method}
 \alias{chunkdim,HDF5RealizationSink-method}
-\alias{write_block_to_sink,HDF5RealizationSink-method}
+\alias{write_block,HDF5RealizationSink-method}
 
 \alias{coerce,HDF5RealizationSink,HDF5ArraySeed-method}
 \alias{coerce,HDF5RealizationSink,HDF5Array-method}
