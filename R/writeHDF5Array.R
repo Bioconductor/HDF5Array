@@ -34,6 +34,30 @@ setMethod("dimnames", "HDF5RealizationSink",
     }
 )
 
+.normarg_chunkdim <- function(chunkdim, dim)
+{
+    if (!(is.numeric(chunkdim) || is.logical(chunkdim) && all(is.na(chunkdim))))
+        stop(wmsg("'chunkdim' must be NULL or an integer vector"))
+    if (!is.integer(chunkdim))
+        chunkdim <- as.integer(chunkdim)
+    if (length(chunkdim) != length(dim))
+        stop(wmsg("'chunkdim' must be an integer vector of length ",
+                  "the number of dimensions of the object to write"))
+    if (!all(chunkdim <= dim, na.rm=TRUE))
+        stop(wmsg("the chunk dimensions specified in 'chunkdim' exceed ",
+                  "the dimensions of the object to write"))
+    if (any(chunkdim == 0L & dim != 0L, na.rm=TRUE))
+        stop(wmsg("'chunkdim' must contain non-zero values unless ",
+                  "the zero values correspond to dimensions in the ",
+                  "object to write that are also zero"))
+    chunkdim[is.na(chunkdim)] <- dim[is.na(chunkdim)]
+    if (prod(chunkdim) > .Machine$integer.max)
+        stop(wmsg("The chunk dimensions in 'chunkdim' are too big. The ",
+                  "product of the chunk dimensions should always be <= ",
+                  ".Machine$integer.max"))
+    chunkdim
+}
+
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, name=NULL,
@@ -52,7 +76,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     if (is.null(chunkdim)) {
         chunkdim <- getHDF5DumpChunkDim(dim, type)
     } else {
-        chunkdim <- as.integer(chunkdim)
+        chunkdim <- .normarg_chunkdim(chunkdim, dim)
     }
     if (is.null(level)) {
         level <- getHDF5DumpCompressionLevel()

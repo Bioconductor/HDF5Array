@@ -128,7 +128,7 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
                       "determine the type of an empty HDF5 dataset at the ",
                       "moment. Please use the 'type' argument to help me ",
                       "(see '?HDF5Array' for more information)."))
-        first_val <- match.fun(type)(1)  # fake value
+        first_val <- vector(type, 1L)  # fake value
         if (!is.atomic(first_val))
             stop(wmsg("invalid type: ", type))
     } else {

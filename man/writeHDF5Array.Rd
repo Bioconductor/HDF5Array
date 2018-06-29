@@ -113,6 +113,24 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## WRITE AN ORDINARY ARRAY AS HDF5 DATASET
+## ---------------------------------------------------------------------
+m <- matrix(runif(350, min=-1), nrow=25)
+out_file <- tempfile()
+
+M1 <- writeHDF5Array(m, out_file, name="M1", chunkdim=c(5, 5))
+M1
+chunkdim(M1)
+
+## ---------------------------------------------------------------------
+## WRITE A DelayedArray OBJECT AS HDF5 DATASET
+## ---------------------------------------------------------------------
+M2 <- log(t(DelayedArray(m)) + 1)
+M2 <- writeHDF5Array(M2, out_file, name="M2", chunkdim=c(5, 5))
+M2
+chunkdim(M2)
+
 library(rhdf5)
 library(h5vcData)
 
@@ -124,7 +142,6 @@ cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 
 cov1 <- cov0[ , , 29000001:29000007]
 
-out_file <- tempfile()
 writeHDF5Array(cov1, out_file, "cov1")
 h5ls(out_file)
 }
