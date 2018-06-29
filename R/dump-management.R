@@ -266,7 +266,7 @@ getHDF5DumpChunkDim <- function(dim, type, ratio=75)
     chunk_len <- as.integer(ceiling(block_maxlen / ratio))
     ## 'block_maxlen' must be a multiple of 'chunk_len'.
     stopifnot(block_maxlen %% chunk_len == 0L)
-    makeCappedVolumeBox(chunk_len, dim, "linear")
+    makeCappedVolumeBox(chunk_len, dim, "first-dim-grows-first")
 }
 
 
