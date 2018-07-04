@@ -91,8 +91,11 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     HDF5 dataset} to be written to the current \emph{HDF5 dump file}.
   }
   \item{shape}{
-    The shape of the physical chunks of the \emph{next automatic HDF5 dataset}
-    to be written to the current \emph{HDF5 dump file}.
+    A string specifying the shape of the physical chunks of the \emph{next
+    automatic HDF5 dataset} to be written to the current \emph{HDF5 dump file}.
+    See \code{\link[DelayedArray]{makeCappedVolumeBox}} in the
+    \pkg{DelayedArray} package for a description of the supported
+    shapes.
   }
   \item{level}{
     For \code{setHDF5DumpCompressionLevel}:
@@ -206,6 +209,9 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
 
     \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
           on which \code{lsHDF5DumpFile} is based.
+
+    \item \code{\link[DelayedArray]{makeCappedVolumeBox}} in the
+          \pkg{DelayedArray} package.
 
     \item \code{\link[DelayedArray]{type}} in the \pkg{DelayedArray} package.
   }
