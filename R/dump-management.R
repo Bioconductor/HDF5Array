@@ -282,6 +282,9 @@ getHDF5DumpChunkShape <- function()
     get("chunk_shape", envir=.dump_settings_envir)
 }
 
+### TODO: Replace 'dim' argument with 'x'. This will allow the default
+### **write** chunk dim to be set to the **read** chunk dim (i.e. to
+### 'chunkdim(x)') if this is known (i.e. if 'chunkdim(x)' is not NULL).
 getHDF5DumpChunkDim <- function(dim)
 {
     chunk_maxlen <- getHDF5DumpChunkMaxLength()

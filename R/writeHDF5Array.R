@@ -75,6 +75,9 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         name <- normalize_dump_name(name)
     }
     if (is.null(chunkdim)) {
+        ## TODO: Pass 'x' instead of 'dim' to getHDF5DumpChunkDim() and modify
+        ## getHDF5DumpChunkDim() to return 'chunkdim(x)' if it's not NULL.
+        ## See TODO comment in dump-management.R
         chunkdim <- getHDF5DumpChunkDim(dim)
     } else {
         chunkdim <- .normarg_chunkdim(chunkdim, dim)
