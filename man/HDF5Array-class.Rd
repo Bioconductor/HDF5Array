@@ -84,8 +84,8 @@ HDF5ArraySeed(filepath, name, type=NA)
     \item \code{\link{writeHDF5Array}} for writting an array-like object
           to an HDF5 file.
 
-    \item \link{HDF5-dump-management} for controlling the location of
-          automatically created HDF5 datasets.
+    \item \link{HDF5-dump-management} for controlling the location and
+          physical properties of automatically created HDF5 datasets.
 
     \item \code{\link{saveHDF5SummarizedExperiment}} and
           \code{\link{loadHDF5SummarizedExperiment}} in this

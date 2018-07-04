@@ -47,6 +47,8 @@ export(
     setHDF5DumpDir, getHDF5DumpDir,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,
+    setHDF5DumpChunkMaxLength, getHDF5DumpChunkMaxLength,
+    setHDF5DumpChunkShape, getHDF5DumpChunkShape,
     getHDF5DumpChunkDim,
     setHDF5DumpCompressionLevel, getHDF5DumpCompressionLevel,
     appendDatasetCreationToHDF5DumpLog, showHDF5DumpLog,

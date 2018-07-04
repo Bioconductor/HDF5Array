@@ -50,7 +50,8 @@ setMethod("dimnames", "HDF5RealizationSink",
         stop(wmsg("'chunkdim' must contain non-zero values unless ",
                   "the zero values correspond to dimensions in the ",
                   "object to write that are also zero"))
-    chunkdim[is.na(chunkdim)] <- dim[is.na(chunkdim)]
+    na_idx <- which(is.na(chunkdim))
+    chunkdim[na_idx] <- dim[na_idx]
     if (prod(chunkdim) > .Machine$integer.max)
         stop(wmsg("The chunk dimensions in 'chunkdim' are too big. The ",
                   "product of the chunk dimensions should always be <= ",
@@ -74,7 +75,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         name <- normalize_dump_name(name)
     }
     if (is.null(chunkdim)) {
-        chunkdim <- getHDF5DumpChunkDim(dim, type)
+        chunkdim <- getHDF5DumpChunkDim(dim)
     } else {
         chunkdim <- .normarg_chunkdim(chunkdim, dim)
     }

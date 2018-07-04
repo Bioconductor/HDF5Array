@@ -19,13 +19,13 @@
 {
     file.path(tempdir(), "HDF5Array_dump_files_global_counter")
 }
- 
+
 .get_dump_names_global_counter_filepath <- function()
 {
     file.path(tempdir(), "HDF5Array_dump_names_global_counter")
 }
 
-### Called by .onLoad() hook (see zzz.R file). 
+### Called by .onLoad() hook (see zzz.R file).
 init_HDF5_dump_files_global_counter <- function()
 {
     filepath <- .get_dump_files_global_counter_filepath()
@@ -257,16 +257,36 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Get the chunk dimensions
+### set/getHDF5DumpChunkMaxLength() and set/getHDF5DumpChunkShape()
 ###
 
-getHDF5DumpChunkDim <- function(dim, type, ratio=75)
+### Called by .onLoad() hook (see zzz.R file).
+setHDF5DumpChunkMaxLength <- function(maxlength=1000000L)
 {
-    block_maxlen <- DelayedArray:::get_default_block_maxlength(type)
-    chunk_len <- as.integer(ceiling(block_maxlen / ratio))
-    ## 'block_maxlen' must be a multiple of 'chunk_len'.
-    stopifnot(block_maxlen %% chunk_len == 0L)
-    makeCappedVolumeBox(chunk_len, dim, "first-dim-grows-first")
+    assign("chunk_maxlen", maxlength, envir=.dump_settings_envir)
+}
+
+getHDF5DumpChunkMaxLength <- function()
+{
+    get("chunk_maxlen", envir=.dump_settings_envir)
+}
+
+### Called by .onLoad() hook (see zzz.R file).
+setHDF5DumpChunkShape <- function(shape="scale")
+{
+    assign("chunk_shape", shape, envir=.dump_settings_envir)
+}
+
+getHDF5DumpChunkShape <- function()
+{
+    get("chunk_shape", envir=.dump_settings_envir)
+}
+
+getHDF5DumpChunkDim <- function(dim)
+{
+    chunk_maxlen <- getHDF5DumpChunkMaxLength()
+    chunk_shape <- getHDF5DumpChunkShape()
+    makeCappedVolumeBox(chunk_maxlen, dim, chunk_shape)
 }
 
 
@@ -314,7 +334,7 @@ get_HDF5_dump_logfile <- function()
     file.path(tempdir(), "HDF5Array_dataset_creation_global_counter")
 }
 
-### Called by .onLoad() hook (see zzz.R file). 
+### Called by .onLoad() hook (see zzz.R file).
 init_HDF5_dataset_creation_global_counter <- function()
 {
     filepath <- .get_dataset_creation_global_counter_filepath()

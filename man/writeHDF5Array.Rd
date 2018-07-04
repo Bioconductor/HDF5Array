@@ -53,12 +53,12 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
   }
   \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.
-    By default, \code{getHDF5DumpChunkDim(dim(x), type(x))} is used.
+    By default, \code{getHDF5DumpChunkDim(dim(x))} will be used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.
   }
   \item{level}{
     The compression level to use for writing the data to disk.
-    By default, \code{getHDF5DumpCompressionLevel()} is used.
+    By default, \code{getHDF5DumpCompressionLevel()} will be used.
     See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
   \item{verbose}{
@@ -73,6 +73,11 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
 
   Use \code{\link{setHDF5DumpFile}} and \code{\link{setHDF5DumpName}} to
   control the location of automatically created HDF5 datasets.
+
+  Use \code{\link{setHDF5DumpChunkMaxLength}},
+  \code{\link{setHDF5DumpChunkShape}}, and
+  \code{\link{setHDF5DumpCompressionLevel}}, to control the
+  physical properties of automatically created HDF5 datasets.
 }
 
 \value{
@@ -105,8 +110,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
           an HDF5-based \link[SummarizedExperiment]{SummarizedExperiment}
           object to/from disk.
 
-    \item \link{HDF5-dump-management} for controlling the location of
-          automatically created HDF5 datasets.
+    \item \link{HDF5-dump-management} to control the location and
+          physical properties of automatically created HDF5 datasets.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
   }

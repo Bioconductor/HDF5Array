@@ -13,6 +13,10 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
+\alias{setHDF5DumpChunkMaxLength}
+\alias{getHDF5DumpChunkMaxLength}
+\alias{setHDF5DumpChunkShape}
+\alias{getHDF5DumpChunkShape}
 \alias{getHDF5DumpChunkDim}
 
 \alias{setHDF5DumpCompressionLevel}
@@ -24,19 +28,23 @@
 \title{HDF5 dump management}
 
 \description{
-  A set of utilities to control the location of automatically created HDF5
-  datasets.
+  A set of utilities to control the location and physical properties of
+  automatically created HDF5 datasets.
 }
 
 \usage{
 setHDF5DumpDir(dir)
 setHDF5DumpFile(filepath)
 setHDF5DumpName(name)
+setHDF5DumpChunkMaxLength(maxlength=1000000L)
+setHDF5DumpChunkShape(shape="scale")
 setHDF5DumpCompressionLevel(level=6L)
 
 getHDF5DumpDir()
 getHDF5DumpFile(for.use=FALSE)
 getHDF5DumpName(for.use=FALSE)
+getHDF5DumpChunkMaxLength()
+getHDF5DumpChunkShape()
 getHDF5DumpCompressionLevel()
 
 lsHDF5DumpFile()
@@ -44,7 +52,7 @@ lsHDF5DumpFile()
 showHDF5DumpLog()
 
 ## For developers:
-getHDF5DumpChunkDim(dim, type, ratio=75)
+getHDF5DumpChunkDim(dim)
 appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
                                    chunkdim, level)
 }
@@ -78,6 +86,14 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     For \code{appendDatasetCreationToHDF5DumpLog}:
     See the Note TO DEVELOPERS below.
   }
+  \item{maxlength}{
+    The maximum length of the physical chunks of the \emph{next automatic
+    HDF5 dataset} to be written to the current \emph{HDF5 dump file}.
+  }
+  \item{shape}{
+    The shape of the physical chunks of the \emph{next automatic HDF5 dataset}
+    to be written to the current \emph{HDF5 dump file}.
+  }
   \item{level}{
     For \code{setHDF5DumpCompressionLevel}:
     The compression level to use for writting \emph{automatic HDF5 datasets}
@@ -107,9 +123,6 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
     of its call to \code{rhdf5::\link{h5createDataset}}.
     See the Note TO DEVELOPERS below for more information.
-  }
-  \item{ratio}{
-    The number of chunks per block. By default, a ratio of 75 is used.
   }
   \item{chunkdim}{
     The dimensions of the chunks.
@@ -148,9 +161,8 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
 
   \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
 
-  \code{getHDF5DumpChunkDim} returns the dimension of the chunks for the
-  specified \code{ratio}. By default a ratio of 75 is used i.e. the
-  \emph{automatic HDF5 dataset} are written to disk using 75 chunks per block.
+  \code{getHDF5DumpChunkDim} returns the dimensions of the physical chunks
+  that will be used to write the dataset to disk.
 }
 
 \note{
@@ -163,16 +175,15 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
           \code{getHDF5DumpFile(for.use=TRUE)} and
           \code{getHDF5DumpName(for.use=TRUE)}.
 
-    \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim, type)} (possibly
-          with a non-default \code{ratio}) to get reasonable chunk dimensions
-          to use for writting the data to disk. Or choose your own chunk
-          dimensions.
+    \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim)} to get reasonable
+          chunk dimensions to use for writting the dataset to disk. Or choose
+          your own chunk dimensions.
 
     \item Add an entry to the dump log by calling
           \code{appendDatasetCreationToHDF5DumpLog}.
           Typically, this should be done right after creating the dataset
           (e.g. with \code{rhdf5::h5createDataset}) and before starting to
-          write the data to disk. The values passed to
+          write the dataset to disk. The values passed to
           \code{appendDatasetCreationToHDF5DumpLog} via the \code{filepath},
           \code{name}, \code{dim}, \code{type}, \code{chunkdim}, and
           \code{level} arguments should be those that were passed to
