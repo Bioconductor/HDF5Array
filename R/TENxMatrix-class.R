@@ -11,7 +11,7 @@ setClass("TENxMatrixSeed",
                                  # changes the working directory (e.g. with
                                  # setwd()).
         group="character",       # Name of the group in the HDF5 file
-                                 # containing the 10xGenomics data.
+                                 # containing the 10x Genomics data.
         dim="integer",
         dimnames="list",
         col_ranges="data.frame"  # Can't use an IRanges object for this at the
@@ -34,7 +34,7 @@ setReplaceMethod("path", "TENxMatrixSeed",
     function(object, value)
     {
         new_filepath <- normarg_path(value, "the supplied path",
-                                            "10xGenomics data")
+                                            "10x Genomics dataset")
         old_filepath <- path(object)
         if (new_filepath != old_filepath)
             stop(wmsg("changing the path of a TENxMatrixSeed object ",
@@ -165,11 +165,11 @@ setMethod("chunkdim", "TENxMatrixSeed", function(x) c(nrow(x), 1L))
 
 TENxMatrixSeed <- function(filepath, group="mm10")
 {
-    filepath <- normarg_path(filepath, "'filepath'", "10xGenomics data")
+    filepath <- normarg_path(filepath, "'filepath'", "10x Genomics dataset")
     if (!isSingleString(group))
         stop(wmsg("'group' must be a single string specifying the name ",
                   "of the group in the HDF5 file containing the ",
-                  "10xGenomics data"))
+                  "10x Genomics data"))
     if (group == "")
         stop(wmsg("'group' cannot be the empty string"))
 

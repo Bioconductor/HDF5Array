@@ -31,21 +31,21 @@
 \alias{DelayedArray,HDF5ArraySeed-method}
 \alias{HDF5Array}
 
-\title{HDF5 datasets as array-like objects}
+\title{HDF5 datasets as DelayedArray objects}
 
 \description{
-  We provide 2 classes for representing an (on-disk) HDF5 dataset as an
-  array-like object in R:
+  We provide 2 classes for representing a conventional (i.e. dense) HDF5
+  dataset as an array-like object in R:
   \itemize{
-    \item HDF5Array: A high-level class HDF5Array that extends
-          \link{DelayedArray}. All the operations available on
-          \link{DelayedArray} objects work on HDF5Array objects.
+    \item HDF5Array: A high-level class that extends \link{DelayedArray}.
+          All the operations available for \link{DelayedArray} objects work
+          on HDF5Array objects.
 
-    \item HDF5ArraySeed: A low-level class for pointing to an HDF5 dataset. No
-          operation can be performed directly on an HDF5ArraySeed object. It
-          needs to be wrapped in a \link{DelayedArray} or HDF5Array object
-          first. An HDF5Array object is just an HDF5ArraySeed object wrapped
-          in a \link{DelayedArray} object.
+    \item HDF5ArraySeed: A low-level class for pointing to an HDF5 dataset.
+          No operation can be performed directly on an HDF5ArraySeed object.
+          It needs to be wrapped in a \link{DelayedArray} object first.
+          An HDF5Array object is just an HDF5ArraySeed object wrapped in
+          a \link{DelayedArray} object.
   }
 }
 
@@ -57,8 +57,8 @@ HDF5ArraySeed(filepath, name, type=NA)
 
 \arguments{
   \item{filepath}{
-    The path (as a single character string) to the HDF5 file where the dataset
-    is located.
+    The path (as a single character string) to the HDF5 file where the
+    dataset is located.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
@@ -75,12 +75,24 @@ HDF5ArraySeed(filepath, name, type=NA)
   An HDF5ArraySeed object for \code{HDF5ArraySeed()}.
 }
 
+\note{
+  The 1.3 Million Brain Cell Dataset and other datasets published by
+  10x Genomics use an HDF5-based sparse matrix representation instead of
+  the conventional (i.e. dense) HDF5 representation.
+
+  If your dataset uses the conventional (i.e. dense) HDF5 representation,
+  use the \code{HDF5Array()} constructor.
+
+  If your dataset uses the HDF5-based sparse matrix representation from
+  10x Genomics, use the \code{\link{TENxMatrix}()} constructor.
+}
+
 \seealso{
   \itemize{
     \item \link{DelayedArray} objects.
 
-    \item \link{DelayedArray-utils} for common operations on
-          \link{DelayedArray} objects.
+    \item \link{TENxMatrix} objects for representing 10x Genomics
+          datasets as \link{DelayedArray} objects.
 
     \item \code{\link{writeHDF5Array}} for writting an array-like object
           to an HDF5 file.
@@ -97,7 +109,7 @@ HDF5ArraySeed(filepath, name, type=NA)
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which HDF5Array
-          objects are implemented.
+          and HDF5ArraySeed objects are implemented.
 
     \item \link[base]{array} objects in base R.
   }
