@@ -15,7 +15,8 @@ import(rhdf5)
 
 exportClasses(
     HDF5ArraySeed, HDF5Array, HDF5Matrix,
-    HDF5RealizationSink
+    HDF5RealizationSink,
+    TENxMatrixSeed, TENxMatrix
 )
 
 
@@ -34,7 +35,7 @@ exportMethods(
     path, "path<-",
 
     ## Methods for generics defined in the DelayedArray package:
-    extract_array, matrixClass, write_block, DelayedArray
+    extract_array, matrixClass, DelayedArray, chunkdim, write_block
 )
 
 
@@ -53,6 +54,7 @@ export(
     setHDF5DumpCompressionLevel, getHDF5DumpCompressionLevel,
     appendDatasetCreationToHDF5DumpLog, showHDF5DumpLog,
     HDF5RealizationSink, writeHDF5Array,
-    saveHDF5SummarizedExperiment, loadHDF5SummarizedExperiment
+    saveHDF5SummarizedExperiment, loadHDF5SummarizedExperiment,
+    TENxMatrixSeed, TENxMatrix
 )
 

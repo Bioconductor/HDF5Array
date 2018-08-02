@@ -17,20 +17,19 @@ setClass("HDF5ArraySeed",
     )
 )
 
-setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
-
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### path() getter/setter
 ###
 
+### Does NOT access the file.
 setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
 
-.normarg_path <- function(path, what)
+normarg_path <- function(path, what1, what2)
 {
     if (!isSingleString(path))
-        stop(wmsg(what, " must be a single string specifying the path ",
-                  "to the HDF5 file where the dataset is located"))
+        stop(wmsg(what1, " must be a single string specifying the path ",
+                  "to the file where the ", what2, " is located"))
     file_path_as_absolute(path)
 }
 
@@ -47,7 +46,8 @@ setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
 setReplaceMethod("path", "HDF5ArraySeed",
     function(object, value)
     {
-        new_filepath <- .normarg_path(value, "supplied path")
+        new_filepath <- normarg_path(value, "the supplied path",
+                                            "HDF5 dataset")
 
         ## Check dim compatibility.
         new_dim <- h5dim(new_filepath, object@name)
@@ -78,10 +78,11 @@ setReplaceMethod("path", "HDF5ArraySeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### chunkdim() getter
+### dim() getter
 ###
 
-setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
+### Does NOT access the file.
+setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -104,6 +105,14 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### chunkdim() getter
+###
+
+### Does NOT access the file.
+setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### HDF5ArraySeed constructor
 ###
 
@@ -113,7 +122,7 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 ### back.
 HDF5ArraySeed <- function(filepath, name, type=NA)
 {
-    filepath <- .normarg_path(filepath, "'filepath'")
+    filepath <- normarg_path(filepath, "'filepath'", "HDF5 dataset")
     if (!isSingleString(name))
         stop(wmsg("'name' must be a single string specifying the name ",
                   "of the dataset in the HDF5 file"))
@@ -198,8 +207,8 @@ setMethod("DelayedArray", "HDF5ArraySeed",
     function(seed) new_DelayedArray(seed, Class="HDF5Array")
 )
 
-### Works directly on an HDF5ArraySeed object, in which case it must be called
-### with a single argument.
+### Works directly on an HDF5ArraySeed object, in which case it must be
+### called with a single argument.
 HDF5Array <- function(filepath, name, type=NA)
 {
     if (is(filepath, "HDF5ArraySeed")) {

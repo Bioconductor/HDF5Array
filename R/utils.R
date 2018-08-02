@@ -40,9 +40,8 @@
     as.integer(dim)
 }
 
-### The TENxMatrixSeed() constructor defined in the TENxGenomics package
-### calls h5dim() with 'as.integer=FALSE' in order to get the dimension
-### of a monodimensional array of length >= 2^31.
+### The TENxMatrixSeed() constructor calls h5dim() with 'as.integer=FALSE'
+### in order to get the dimension of a monodimensional array of length >= 2^31.
 h5dim <- function(filepath, name, as.integer=TRUE)
 {
     did <- .get_h5dataset(filepath, name)
