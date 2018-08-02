@@ -207,6 +207,21 @@ TENxMatrixSeed <- function(filepath, group="mm10")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Show
+###
+
+setMethod("show", "TENxMatrixSeed",
+    function(object)
+    {
+        cat(DelayedArray:::array_as_one_line_summary(object), ":\n", sep="")
+        cat("# dirname: ", dirname(object), "\n", sep="")
+        cat("# basename: ", basename(object), "\n", sep="")
+        cat("# group: ", object@group, "\n", sep="")
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### TENxMatrix objects
 ###
 

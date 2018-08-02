@@ -14,13 +14,15 @@
 \alias{extract_array,TENxMatrixSeed-method}
 \alias{chunkdim,TENxMatrixSeed-method}
 
+\alias{show,TENxMatrixSeed-method}
+
 % TENxMatrix
 
 \alias{class:TENxMatrix}
 \alias{TENxMatrix-class}
+\alias{TENxMatrix}
 
 \alias{DelayedArray,TENxMatrixSeed-method}
-\alias{TENxMatrix}
 
 \title{10x Genomics datasets as DelayedArray objects}
 
@@ -86,12 +88,30 @@ TENxMatrixSeed(filepath, group="mm10")
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which TENxMatrix
           and TENxMatrixSeed objects are implemented.
-
-    \item \link[base]{array} objects in base R.
   }
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## THE "1.3 Million Brain Cell Dataset" AS A DelayedArray OBJECT
+## ---------------------------------------------------------------------
+library(rhdf5)
+library(BiocFileCache)
+bfc <- BiocFileCache()
+
+oneM_url <- paste0(
+    "https://s3-us-west-2.amazonaws.com/",
+    "10x.files/samples/cell/1M_neurons/",
+    "1M_neurons_filtered_gene_bc_matrices_h5.h5"
+)
+path <- bfcrpath(bfc, oneM_url)
+h5ls(path)
+
+## The 1.3 Million Brain Cell Dataset is represented by the "mm10" group:
+oneM <- TENxMatrix(path, "mm10")
+oneM
+
+is(oneM, "DelayedArray")  # TRUE
 }
 \keyword{methods}
 \keyword{classes}

@@ -17,6 +17,7 @@
 
 \alias{class:HDF5Array}
 \alias{HDF5Array-class}
+\alias{HDF5Array}
 
 \alias{class:HDF5Matrix}
 \alias{HDF5Matrix-class}
@@ -29,7 +30,6 @@
 \alias{coerce,ANY,HDF5Matrix-method}
 
 \alias{DelayedArray,HDF5ArraySeed-method}
-\alias{HDF5Array}
 
 \title{HDF5 datasets as DelayedArray objects}
 
@@ -110,8 +110,6 @@ HDF5ArraySeed(filepath, name, type=NA)
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which HDF5Array
           and HDF5ArraySeed objects are implemented.
-
-    \item \link[base]{array} objects in base R.
   }
 }
 
@@ -129,6 +127,8 @@ h5ls(tally_file)
 ## Pick up "Coverages" dataset for Human chromosome 16:
 cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 cov0
+
+is(cov0, "DelayedArray")  # TRUE
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames
