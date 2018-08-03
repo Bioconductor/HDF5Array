@@ -1,7 +1,7 @@
 Package: HDF5Array
 Title: HDF5 backend for DelayedArray objects
 Description: Implements the HDF5Array and TENxMatrix classes, 2 convenient
-	and memory efficient array-like containers for on-disk representation
+	and memory-efficient array-like containers for on-disk representation
 	of HDF5 datasets. HDF5Array is for datasets that use the conventional
 	(i.e. dense) HDF5 representation. TENxMatrix is for datasets that
 	use the HDF5-based sparse matrix representation from 10x Genomics
