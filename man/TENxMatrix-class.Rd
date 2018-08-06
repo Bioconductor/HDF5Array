@@ -95,20 +95,22 @@ TENxMatrixSeed(filepath, group="mm10")
 ## ---------------------------------------------------------------------
 ## THE "1.3 Million Brain Cell Dataset" AS A DelayedArray OBJECT
 ## ---------------------------------------------------------------------
+## The 1.3 Million Brain Cell Dataset from 10x Genomics is available via
+## ExperimentHub:
+library(ExperimentHub)
+hub <- ExperimentHub()
+query(hub, "TENxBrainData")
+fname <- hub[["EH1039"]]
+
+## The structure of the file can be seen using the h5ls() command from
+## the rhdf5 package:
 library(rhdf5)
-library(BiocFileCache)
-bfc <- BiocFileCache()
+h5ls(fname)
 
-oneM_url <- paste0(
-    "https://s3-us-west-2.amazonaws.com/",
-    "10x.files/samples/cell/1M_neurons/",
-    "1M_neurons_filtered_gene_bc_matrices_h5.h5"
-)
-path <- bfcrpath(bfc, oneM_url)
-h5ls(path)
-
-## The 1.3 Million Brain Cell Dataset is represented by the "mm10" group:
-oneM <- TENxMatrix(path, "mm10")
+## The 1.3 Million Brain Cell Dataset is represented by the "mm10"
+## group. We point the TENxMatrix() constructor to this group to
+## create a TENxMatrix object representing the dataset:
+oneM <- TENxMatrix(fname, "mm10")
 oneM
 
 is(oneM, "DelayedArray")  # TRUE
