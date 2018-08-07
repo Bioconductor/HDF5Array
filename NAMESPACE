@@ -58,3 +58,18 @@ export(
     TENxMatrixSeed, TENxMatrix
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S4 generics defined in HDF5Array + export corresponding methods
+###
+
+export(
+    ## TENxMatrix-class.R:
+    extractNonZeroValuesByCol
+)
+
+### Exactly the same list as above.
+exportMethods(
+    extractNonZeroValuesByCol
+)
+

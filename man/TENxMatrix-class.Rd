@@ -24,6 +24,12 @@
 
 \alias{DelayedArray,TENxMatrixSeed-method}
 
+% extractNonZeroValuesByCol
+
+\alias{extractNonZeroValuesByCol}
+\alias{extractNonZeroValuesByCol,TENxMatrixSeed-method}
+\alias{extractNonZeroValuesByCol,TENxMatrix-method}
+
 \title{10x Genomics datasets as DelayedArray objects}
 
 \description{
@@ -51,6 +57,9 @@
 ## Constructor functions:
 TENxMatrix(filepath, group="mm10")
 TENxMatrixSeed(filepath, group="mm10")
+
+## A convenient data extractor:
+extractNonZeroValuesByCol(x, j)
 }
 
 \arguments{
@@ -61,12 +70,22 @@ TENxMatrixSeed(filepath, group="mm10")
   \item{group}{
     The name of the group in the HDF5 file containing the 10x Genomics data.
   }
+  \item{x}{
+    A TENxMatrix or TENxMatrixSeed object.
+  }
+  \item{j}{
+    An integer vector containing valid column indices.
+  }
 }
 
 \value{
-  A TENxMatrix object for \code{TENxMatrix()}.
+  \code{TENxMatrix}: A TENxMatrix object.
 
-  A TENxMatrixSeed object for \code{TENxMatrixSeed()}.
+  \code{TENxMatrixSeed}: A TENxMatrixSeed object.
+
+  \code{extractNonZeroValuesByCol}: A \link[IRanges]{NumericList} or
+  \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
+  with one list element per column index in \code{j}.
 }
 
 \note{
@@ -114,6 +133,18 @@ oneM <- TENxMatrix(fname, "mm10")
 oneM
 
 is(oneM, "DelayedArray")  # TRUE
+
+## extractNonZeroValuesByCol() is an efficient way to extract the
+## non-zero values in a compact form:
+counts_by_col <- extractNonZeroValuesByCol(oneM, 1:2500)
+counts_by_col
+
+## This provides a more efficient way to compute column summaries (such
+## as the sum or the square sums) than using something like colSums(oneM)
+## colSums(oneM * oneM):
+head(lengths(counts_by_col))      # nb of non-zero counts per column
+head(sum(counts_by_col))          # total count per column
+head(sum(counts_by_col * counts_by_col))  # total square count per column
 }
 \keyword{methods}
 \keyword{classes}

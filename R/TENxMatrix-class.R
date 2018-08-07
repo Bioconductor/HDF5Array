@@ -86,7 +86,8 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
 .get_genes <- function(filepath, group, idx=NULL)
     .get_TENx_component(filepath, group, "genes", idx=idx)
 
-.get_indices <- function(filepath, group, idx=NULL)
+### Return 0-based row indices.
+.get_row_indices <- function(filepath, group, idx=NULL)
     .get_TENx_component(filepath, group, "indices", idx=idx)
 
 .get_indptr <- function(filepath, group, idx=NULL)
@@ -102,7 +103,7 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_array()
+### .get_data_indices_by_col()
 ###
 
 ### S4Vectors:::fancy_mseq() does not accept 'offset' of type double yet so
@@ -116,34 +117,74 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
     seq_len(sum(lengths)) + rep.int(offsets, lengths)
 }
 
-.extract_array_from_TENxMatrixSeed <- function(x, index)
+### 'j' must be NULL or an integer vector containing valid col indices.
+### Return data indices in a NumericList object parallel to 'j' i.e. with
+### one list element per col index in 'j'.
+.get_data_indices_by_col <- function(x, j)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
-    ans <- array(0L, dim=ans_dim)
-
-    j <- index[[2L]]
     col_ranges <- x@col_ranges
-    if (is.null(j)) {
-        j <- seq_len(ncol(ans))
-    } else {
+    if (!is.null(j))
         col_ranges <- S4Vectors:::extract_data_frame_rows(col_ranges, j)
-    }
     start2 <- col_ranges[ , "start"]
     width2 <- col_ranges[ , "width"]
-    idx2 <- .fancy_mseq(width2, offset=start2 - 1)
-    i2 <- .get_indices(x@filepath, x@group, idx=idx2) + 1L
-    j2 <- rep.int(seq_along(j), width2)
+    idx2 <- .fancy_mseq(width2, offset=start2 - 1L)
+    relist(idx2, PartitioningByWidth(width2))
+}
 
-    i <- index[[1L]]
+### 'j' must be NULL or an integer vector containing valid col indices.
+### Return a NumericList or IntegerList object parallel to 'j' i.e. with
+### one list element per col index in 'j'.
+.get_data_by_col <- function(x, j)
+{
+    data_indices <- .get_data_indices_by_col(x, j)
+    idx2 <- unlist(data_indices, use.names=FALSE)
+    data <- .get_data(x@filepath, x@group, idx=idx2)
+    relist(data, data_indices)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .extract_sparse_data_from_TENxMatrixSeed()
+###
+
+### 'i' (or 'j') must be NULL or an integer vector containing valid
+### row (or col) indices.
+### Return the data in a data.frame with 3 columns: i, j, data.
+.extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+{
+    data_indices <- .get_data_indices_by_col(x, j)
+    idx2 <- unlist(data_indices, use.names=FALSE)
+    i2 <- .get_row_indices(x@filepath, x@group, idx=idx2) + 1L
+    j2 <- rep.int(seq_along(data_indices), lengths(data_indices))
     if (!is.null(i)) {
         m <- findMatches(i2, i)
         idx2 <- idx2[from(m)]
         i2 <- to(m)
         j2 <- j2[from(m)]
     }
+    data <- .get_data(x@filepath, x@group, idx=idx2)
+    data.frame(i=i2, j=j2, data=data, stringsAsFactors=FALSE)
+}
 
-    ans[cbind(i2, j2)] <- .get_data(x@filepath, x@group, idx=idx2)
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extract_array()
+###
+
+.make_matrix_from_sparse_data <- function(dim, sparse_data=NULL)
+{
+    ans <- array(0L, dim=dim)
+    ans[cbind(sparse_data$i, sparse_data$j)] <- sparse_data$data
     ans
+}
+
+.extract_array_from_TENxMatrixSeed <- function(x, index)
+{
+    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
+    i <- index[[1L]]
+    j <- index[[2L]]
+    sparse_data <- .extract_sparse_data_from_TENxMatrixSeed(x, i, j)
+    .make_matrix_from_sparse_data(ans_dim, sparse_data)
 }
 
 setMethod("extract_array", "TENxMatrixSeed",
@@ -259,4 +300,28 @@ TENxMatrix <- function(filepath, group="mm10")
     }
     DelayedArray(seed)
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extractNonZeroValuesByCol()
+###
+
+### Return a NumericList or IntegerList object parallel to 'j' i.e. with
+### one list element per col index in 'j'.
+setGeneric("extractNonZeroValuesByCol", signature="x",
+    function(x, j) standardGeneric("extractNonZeroValuesByCol")
+)
+
+setMethod("extractNonZeroValuesByCol", "TENxMatrixSeed",
+    function(x, j)
+    {
+        j <- DelayedArray:::normalizeSingleBracketSubscript2(j, ncol(x),
+                                                             colnames(x))
+        .get_data_by_col(x, j)
+    }
+)
+
+setMethod("extractNonZeroValuesByCol", "TENxMatrix",
+    function(x, j) extractNonZeroValuesByCol(x@seed, j)
+)
 
