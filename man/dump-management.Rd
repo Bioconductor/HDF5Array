@@ -13,8 +13,8 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
-\alias{setHDF5DumpChunkMaxLength}
-\alias{getHDF5DumpChunkMaxLength}
+\alias{setHDF5DumpChunkLength}
+\alias{getHDF5DumpChunkLength}
 \alias{setHDF5DumpChunkShape}
 \alias{getHDF5DumpChunkShape}
 \alias{getHDF5DumpChunkDim}
@@ -36,14 +36,14 @@
 setHDF5DumpDir(dir)
 setHDF5DumpFile(filepath)
 setHDF5DumpName(name)
-setHDF5DumpChunkMaxLength(maxlength=1000000L)
+setHDF5DumpChunkLength(length=1000000L)
 setHDF5DumpChunkShape(shape="scale")
 setHDF5DumpCompressionLevel(level=6L)
 
 getHDF5DumpDir()
 getHDF5DumpFile(for.use=FALSE)
 getHDF5DumpName(for.use=FALSE)
-getHDF5DumpChunkMaxLength()
+getHDF5DumpChunkLength()
 getHDF5DumpChunkShape()
 getHDF5DumpCompressionLevel()
 
@@ -86,7 +86,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     For \code{appendDatasetCreationToHDF5DumpLog}:
     See the Note TO DEVELOPERS below.
   }
-  \item{maxlength}{
+  \item{length}{
     The maximum length of the physical chunks of the \emph{next automatic
     HDF5 dataset} to be written to the current \emph{HDF5 dump file}.
   }

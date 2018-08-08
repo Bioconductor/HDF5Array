@@ -74,7 +74,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
   Use \code{\link{setHDF5DumpFile}} and \code{\link{setHDF5DumpName}} to
   control the location of automatically created HDF5 datasets.
 
-  Use \code{\link{setHDF5DumpChunkMaxLength}},
+  Use \code{\link{setHDF5DumpChunkLength}},
   \code{\link{setHDF5DumpChunkShape}}, and
   \code{\link{setHDF5DumpCompressionLevel}}, to control the
   physical properties of automatically created HDF5 datasets.

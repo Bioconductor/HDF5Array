@@ -257,18 +257,18 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### set/getHDF5DumpChunkMaxLength() and set/getHDF5DumpChunkShape()
+### set/getHDF5DumpChunkLength() and set/getHDF5DumpChunkShape()
 ###
 
 ### Called by .onLoad() hook (see zzz.R file).
-setHDF5DumpChunkMaxLength <- function(maxlength=1000000L)
+setHDF5DumpChunkLength <- function(length=1000000L)
 {
-    assign("chunk_maxlen", maxlength, envir=.dump_settings_envir)
+    assign("chunk_len", length, envir=.dump_settings_envir)
 }
 
-getHDF5DumpChunkMaxLength <- function()
+getHDF5DumpChunkLength <- function()
 {
-    get("chunk_maxlen", envir=.dump_settings_envir)
+    get("chunk_len", envir=.dump_settings_envir)
 }
 
 ### Called by .onLoad() hook (see zzz.R file).
@@ -287,9 +287,9 @@ getHDF5DumpChunkShape <- function()
 ### 'chunkdim(x)') if this is known (i.e. if 'chunkdim(x)' is not NULL).
 getHDF5DumpChunkDim <- function(dim)
 {
-    chunk_maxlen <- getHDF5DumpChunkMaxLength()
+    chunk_len <- getHDF5DumpChunkLength()
     chunk_shape <- getHDF5DumpChunkShape()
-    makeCappedVolumeBox(chunk_maxlen, dim, chunk_shape)
+    makeCappedVolumeBox(chunk_len, dim, chunk_shape)
 }
 
 
