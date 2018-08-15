@@ -278,6 +278,8 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
 ### extract_array()
 ###
 
+### 'sparse_data' must be a list with 3 parallel components (i, j, and data)
+### as returned by .extract_sparse_data_from_TENxMatrixSeed().
 .make_matrix_from_sparse_data <- function(dim, sparse_data=NULL)
 {
     ans <- array(0L, dim=dim)
@@ -285,35 +287,75 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
     ans
 }
 
+### 'nrow' and 'ncol' must be single integers.
+### 'i'and 'j' must be NULLs or integer vectors. If the latter, they must
+### be of length 'nrow' and 'ncol' and contain positive values.
+### 'ui' and/or 'uj' must be NULLs (if 'i' and/or 'j' are NULLs) or integer
+### vectors equal to 'unique(i)' and 'unique(j)', respectively.
+### 'sparse_data' must be a list with 3 parallel components (i, j, and data)
+### as returned by .extract_sparse_data_from_TENxMatrixSeed().
+### If 'i' and/or 'j' is NULL, the values in 'sparse_data$i' and/or
+### 'sparse_data$j' must be >= 1 and <= 'nrow' and/or 'ncol', respectively.
+### Otherwise they must be present in 'i' and/or 'j', respectively.
+.make_submatrix_from_remapped_sparse_data <- function(nrow, ncol,
+                                                      i, j, ui, uj,
+                                                      sparse_data)
+{
+    i2ui <- NULL
+    if (is.null(i)) {
+        umat_nrow <- nrow
+    } else {
+        sparse_data$i <- match(sparse_data$i, ui)
+        umat_nrow <- length(ui)
+        if (!identical(i, ui))
+            i2ui <- match(i, ui)
+    }
+    j2uj <- NULL
+    if (is.null(j)) {
+        umat_ncol <- ncol
+    } else {
+        sparse_data$j <- match(sparse_data$j, uj)
+        umat_ncol <- length(uj)
+        if (!identical(j, ui))
+            j2uj <- match(j, uj)
+    }
+    umat_dim <- c(umat_nrow, umat_ncol)
+    umat <- .make_matrix_from_sparse_data(umat_dim, sparse_data)
+    if (is.null(i2ui) && is.null(j2uj))
+        return(umat)
+    DelayedArray:::subset_by_Nindex(umat, list(i2ui, j2uj))
+}
+
 .extract_array_from_TENxMatrixSeed <- function(x, index)
 {
     ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L))
         return(array(integer(0), dim=ans_dim))  # return an empty matrix
+    ## Passing 'i' and 'j' thru as.integer() should not be necessary
+    ## because the list elements in 'index' are supposed to always be
+    ## integer vectors (or NULLs). We do it anyway, because, when called in
+    ## some special contexts (e.g. testing), extract_array() could receive
+    ## an 'index' where the list elements are numeric vectors or integer
+    ## vectors with attributes on them (e.g. names). However, in order to
+    ## make sure that a test like 'identical(i, ui)' will behave as expected,
+    ## we need to make sure that 'i' (and 'ui') are "naked" integer vectors.
     i <- index[[1L]]
-    ui <- if (is.null(i)) NULL else unique(i)
+    if (is.null(i)) {
+        ui <- NULL
+    } else {
+        i <- as.integer(i)  # make sure 'i' is a "naked" integer vector
+        ui <- unique(i)
+    }
     j <- index[[2L]]
-    uj <- if (is.null(j)) NULL else unique(j)
+    if (is.null(j)) {
+        uj <- NULL
+    } else {
+        j <- as.integer(j)  # make sure 'j' is a "naked" integer vector
+        uj <- unique(j)
+    }
     sparse_data <- .extract_sparse_data_from_TENxMatrixSeed(x, ui, uj)
-    if (is.null(ui)) {
-        umat_nrow <- nrow(x)
-        i2ui <- NULL
-    } else {
-        sparse_data$i <- match(sparse_data$i, ui)
-        umat_nrow <- length(ui)
-        i2ui <- match(i, ui)
-    }
-    if (is.null(uj)) {
-        umat_ncol <- ncol(x)
-        j2uj <- NULL
-    } else {
-        sparse_data$j <- match(sparse_data$j, uj)
-        umat_ncol <- length(uj)
-        j2uj <- match(j, uj)
-    }
-    umat_dim <- c(umat_nrow, umat_ncol)
-    umat <- .make_matrix_from_sparse_data(umat_dim, sparse_data)
-    DelayedArray:::subset_by_Nindex(umat, list(i2ui, j2uj))
+    .make_submatrix_from_remapped_sparse_data(ans_dim[[1L]], ans_dim[[2L]],
+                                              i, j, ui, uj, sparse_data)
 }
 
 setMethod("extract_array", "TENxMatrixSeed",
