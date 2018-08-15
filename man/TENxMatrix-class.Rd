@@ -40,16 +40,18 @@
   We provide 2 classes for representing a 10x Genomics dataset as a
   matrix-like object in R:
   \itemize{
-    \item TENxMatrix: A high-level class that extends \link{DelayedArray}.
-          All the operations available for \link{DelayedArray} objects work
-          on TENxMatrix objects.
+    \item TENxMatrix: A high-level class that extends
+          \link[DelayedArray]{DelayedArray}.
+          All the operations available for \link[DelayedArray]{DelayedArray}
+          objects work on TENxMatrix objects.
 
     \item TENxMatrixSeed: A low-level class for pointing to a 10x Genomics
           dataset.
           No operation can be performed directly on a TENxMatrixSeed object.
-          It needs to be wrapped in a \link{DelayedArray} object first.
+          It first needs to be wrapped in a \link[DelayedArray]{DelayedArray}
+          object.
           A TENxMatrix object is just a TENxMatrixSeed object wrapped in
-          a \link{DelayedArray} object.
+          a \link[DelayedArray]{DelayedArray} object.
   }
 }
 
@@ -98,10 +100,25 @@ extractNonZeroValuesByCol(x, j)
 
 \seealso{
   \itemize{
-    \item \link{DelayedArray} objects.
-
     \item \link{HDF5Array} objects for representing conventional (i.e.
-          dense) HDF5 datasets as \link{DelayedArray} objects.
+          dense) HDF5 datasets as \link[DelayedArray]{DelayedArray} objects.
+
+    \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
+          package.
+
+    \item \code{\link[parallel]{detectCores}} from the \pkg{parallel}
+          package.
+
+    \item \code{\link[BiocParallel]{MulticoreParam}} and
+          \code{\link[BiocParallel]{register}} from the \pkg{BiocParallel}
+          package.
+
+    \item \code{\link[DelayedArray]{setDefaultBlockSize}} in the
+          \pkg{DelayedArray} package.
+
+    \item \code{\link[DelayedArray]{colGrid}} and
+          \code{\link[DelayedArray]{blockApply}} in the
+          \pkg{DelayedArray} package.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
@@ -134,17 +151,90 @@ oneM
 
 is(oneM, "DelayedArray")  # TRUE
 
-## extractNonZeroValuesByCol() is an efficient way to extract the
-## non-zero values in a compact form:
-counts_by_col <- extractNonZeroValuesByCol(oneM, 1:2500)
-counts_by_col
+## Some examples of delayed operations:
+oneM != 0
+oneM^2
 
-## This provides a more efficient way to compute column summaries (such
-## as the sum or the square sums) than using something like colSums(oneM)
-## colSums(oneM * oneM):
-head(lengths(counts_by_col))      # nb of non-zero counts per column
-head(sum(counts_by_col))          # total count per column
-head(sum(counts_by_col * counts_by_col))  # total square count per column
+## ---------------------------------------------------------------------
+## SOME EXAMPLES OF ROW/COL SUMMARIZATION
+## ---------------------------------------------------------------------
+## In order to reduce computation times, we'll use only the first
+## 50000 columns of the 1.3 Million Brain Cell Dataset:
+oneM50k <- oneM[ , 1:50000]
+
+## Row/col summarization methods like rowSums() use a block-processing
+## mechanism behind the scene that can be controlled via global
+## settings. 2 important settings that can have a strong impact on
+## performance are the number of workers and the default block size.
+## On a modern Linux laptop with 8 core (as reported by
+## parallel::detectCores()) and 16 Gb of RAM, reasonably good
+## performance is achieved by setting the number of workers to 6
+## and the default block size to 500 Mb:
+register(MulticoreParam(workers=6))
+setDefaultBlockSize(5e8)
+DelayedArray:::set_verbose_block_processing(TRUE)
+
+## We're ready to compute the library sizes, number of genes expressed
+## per cell, and average expression across cells:
+system.time(lib_sizes <- colSums(oneM50k))
+system.time(n_exprs <- colSums(oneM50k != 0))
+system.time(ave_exprs <- rowMeans(oneM50k))
+
+## Note that the 3 computations above load the data in oneM50k 3 times
+## in memory. This can be avoided by computing the 3 summarizations in
+## a single pass with blockApply(). First we define the function that
+## we're going to apply to each block of data:
+FUN <- function(block)
+  list(colSums(block), colSums(block != 0), rowSums(block))
+
+## Then we call blockApply() to apply FUN() to each block. The blocks
+## are defined by the grid passed to the 'grid' argument. In this case
+## we supply a grid made with colGrid() to generate blocks of full
+## columns (see ?colGrid for more information):
+system.time({
+  block_results <- blockApply(oneM50k, FUN, grid=colGrid(oneM50k))
+})
+
+## 'block_results' is a list with 1 list element per block in
+## colGrid(oneM50k). Each list element is the result that was obtained
+## by applying FUN() on the block so is itself a list of length 3.
+## Let's combine the results:
+lib_sizes2 <- unlist(lapply(block_results, `[[`, 1L))
+n_exprs2 <- unlist(lapply(block_results, `[[`, 2L))
+block_rowsums <- unlist(lapply(block_results, `[[`, 3L), use.names=FALSE)
+tot_exprs <- rowSums(matrix(block_rowsums, nrow=nrow(oneM50k)))
+ave_exprs2 <- setNames(tot_exprs / ncol(oneM50k), rownames(oneM50k))
+
+## Sanity checks:
+stopifnot(all.equal(lib_sizes, lib_sizes2))
+stopifnot(all.equal(n_exprs, n_exprs2))
+stopifnot(all.equal(ave_exprs, ave_exprs2))
+
+## Reset default block size to factory settings:
+setDefaultBlockSize()
+DelayedArray:::set_verbose_block_processing(FALSE)
+
+## ---------------------------------------------------------------------
+## extractNonZeroValuesByCol()
+## ---------------------------------------------------------------------
+## extractNonZeroValuesByCol() provides a convenient way to extract the
+## non-zero values in a compact form:
+non_zeroes <- extractNonZeroValuesByCol(oneM, 1:50000)
+non_zeroes
+names(non_zeroes) <- colnames(oneM50k)
+
+## This can be used to compute some simple summaries like the library
+## sizes and the number of genes expressed per cell. It is more
+## efficient than using colSums(oneM50k) and colSums(oneM50k != 0):
+## FIXME: Right now it is not! This is because
+## extractNonZeroValuesByCol() has not been optimized yet and is very
+## slow. It could probably be made around 5x or 10x faster than it is!
+lib_sizes3 <- sum(non_zeroes)
+n_exprs3 <- lengths(non_zeroes)
+
+## Sanity checks:
+stopifnot(all.equal(lib_sizes, lib_sizes3))
+stopifnot(all.equal(n_exprs, n_exprs3))
 }
 \keyword{methods}
 \keyword{classes}

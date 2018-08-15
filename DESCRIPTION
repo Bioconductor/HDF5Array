@@ -9,7 +9,7 @@ Description: Implements the HDF5Array and TENxMatrix classes, 2 convenient
 	DelayedArray extensions, they support all operations supported by
 	DelayedArray objects. These operations can be either delayed or
 	block-processed.
-Version: 1.9.9
+Version: 1.9.10
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
@@ -18,7 +18,7 @@ biocViews: Infrastructure, DataRepresentation, DataImport,
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.7.25), rhdf5
 Imports: utils, tools, BiocGenerics (>= 0.25.1), S4Vectors, IRanges
 Suggests: h5vcData, SummarizedExperiment (>= 1.9.6), GenomicRanges,
-	ExperimentHub, BiocStyle
+	ExperimentHub, BiocParallel, BiocStyle
 License: Artistic-2.0
 Collate: utils.R
 	HDF5Array-class.R

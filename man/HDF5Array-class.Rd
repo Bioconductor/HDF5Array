@@ -37,15 +37,17 @@
   We provide 2 classes for representing a conventional (i.e. dense) HDF5
   dataset as an array-like object in R:
   \itemize{
-    \item HDF5Array: A high-level class that extends \link{DelayedArray}.
-          All the operations available for \link{DelayedArray} objects work
-          on HDF5Array objects.
+    \item HDF5Array: A high-level class that extends
+          \link[DelayedArray]{DelayedArray}.
+          All the operations available for \link[DelayedArray]{DelayedArray}
+          objects work on HDF5Array objects.
 
     \item HDF5ArraySeed: A low-level class for pointing to an HDF5 dataset.
           No operation can be performed directly on an HDF5ArraySeed object.
-          It needs to be wrapped in a \link{DelayedArray} object first.
+          It first needs to be wrapped in a \link[DelayedArray]{DelayedArray}
+          object.
           An HDF5Array object is just an HDF5ArraySeed object wrapped in
-          a \link{DelayedArray} object.
+          a \link[DelayedArray]{DelayedArray} object.
   }
 }
 
@@ -89,10 +91,11 @@ HDF5ArraySeed(filepath, name, type=NA)
 
 \seealso{
   \itemize{
-    \item \link{DelayedArray} objects.
-
     \item \link{TENxMatrix} objects for representing 10x Genomics
-          datasets as \link{DelayedArray} objects.
+          datasets as \link[DelayedArray]{DelayedArray} objects.
+
+    \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
+          package.
 
     \item \code{\link{writeHDF5Array}} for writting an array-like object
           to an HDF5 file.
