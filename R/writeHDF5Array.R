@@ -34,6 +34,8 @@ setMethod("dimnames", "HDF5RealizationSink",
     }
 )
 
+setMethod("type", "HDF5RealizationSink", function(x) x@type)
+
 .normarg_chunkdim <- function(chunkdim, dim)
 {
     if (!(is.numeric(chunkdim) || is.logical(chunkdim) && all(is.na(chunkdim))))
@@ -105,8 +107,8 @@ setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 setMethod("write_block", "HDF5RealizationSink",
     function(x, viewport, block)
     {
-        index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
-        h5write2(block, x@filepath, x@name, index=index)
+        h5write(block, x@filepath, x@name,
+                start=start(viewport), count=width(viewport))
     }
 )
 

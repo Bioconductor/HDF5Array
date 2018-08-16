@@ -84,7 +84,7 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Simple wrappers around rhdf5::h5read() and rhdf5::h5write()
+### A thin wrapper around rhdf5::h5read()
 ###
 
 h5read2 <- function(filepath, name, index=NULL)
@@ -94,13 +94,6 @@ h5read2 <- function(filepath, name, index=NULL)
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     suppressWarnings(h5read(filepath, name, index=index))
-}
-
-h5write2 <- function(obj, filepath, name, index=NULL)
-{
-    if (!is.null(index))
-        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
-    h5write(obj, filepath, name, index=index)
 }
 
 

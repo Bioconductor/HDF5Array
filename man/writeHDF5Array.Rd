@@ -5,6 +5,7 @@
 \alias{HDF5RealizationSink}
 
 \alias{dimnames,HDF5RealizationSink-method}
+\alias{type,HDF5RealizationSink-method}
 \alias{chunkdim,HDF5RealizationSink-method}
 \alias{write_block,HDF5RealizationSink-method}
 
