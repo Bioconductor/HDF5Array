@@ -24,11 +24,11 @@
 
 \alias{DelayedArray,TENxMatrixSeed-method}
 
-% extractNonZeroValuesByCol
+% extractNonZeroDataByCol
 
-\alias{extractNonZeroValuesByCol}
-\alias{extractNonZeroValuesByCol,TENxMatrixSeed-method}
-\alias{extractNonZeroValuesByCol,TENxMatrix-method}
+\alias{extractNonZeroDataByCol}
+\alias{extractNonZeroDataByCol,TENxMatrixSeed-method}
+\alias{extractNonZeroDataByCol,TENxMatrix-method}
 
 \title{10x Genomics datasets as DelayedArray objects}
 
@@ -61,7 +61,7 @@ TENxMatrix(filepath, group="mm10")
 TENxMatrixSeed(filepath, group="mm10")
 
 ## A convenient data extractor:
-extractNonZeroValuesByCol(x, j)
+extractNonZeroDataByCol(x, j)
 }
 
 \arguments{
@@ -85,9 +85,12 @@ extractNonZeroValuesByCol(x, j)
 
   \code{TENxMatrixSeed}: A TENxMatrixSeed object.
 
-  \code{extractNonZeroValuesByCol}: A \link[IRanges]{NumericList} or
-  \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
-  with one list element per column index in \code{j}.
+  \code{extractNonZeroDataByCol}: An \link[IRanges]{IntegerList} object
+  \emph{parallel} to \code{j} i.e. with one list element per column index
+  in \code{j}. The row indices of the values are not returned. Furthermore,
+  the values within a given list element can be returned in any order.
+  In particular you should not assume that they are ordered by ascending
+  row index.
 }
 
 \note{
@@ -124,6 +127,8 @@ extractNonZeroValuesByCol(x, j)
 
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which TENxMatrix
           and TENxMatrixSeed objects are implemented.
+
+    \item \link[IRanges]{IntegerList} objects in the \pkg{IRanges} package.
   }
 }
 
@@ -215,20 +220,24 @@ setDefaultBlockSize()
 DelayedArray:::set_verbose_block_processing(FALSE)
 
 ## ---------------------------------------------------------------------
-## extractNonZeroValuesByCol()
+## extractNonZeroDataByCol()
 ## ---------------------------------------------------------------------
-## extractNonZeroValuesByCol() provides a convenient way to extract the
-## non-zero values in a compact form:
-non_zeroes <- extractNonZeroValuesByCol(oneM, 1:50000)
+## extractNonZeroDataByCol() provides a convenient and very efficient
+## way to extract the non-zero data in a compact form:
+non_zeroes <- extractNonZeroDataByCol(oneM, 1:50000)  # takes < 5 sec.
+
+## The data is returned as an IntegerList object with one list element
+## per column and no row indices associated to the values in the object.
+## Furthermore, the values within a given list element can be returned
+## in any order:
 non_zeroes
+
 names(non_zeroes) <- colnames(oneM50k)
 
 ## This can be used to compute some simple summaries like the library
-## sizes and the number of genes expressed per cell. It is more
-## efficient than using colSums(oneM50k) and colSums(oneM50k != 0):
-## FIXME: Right now it is not! This is because
-## extractNonZeroValuesByCol() has not been optimized yet and is very
-## slow. It could probably be made around 5x or 10x faster than it is!
+## sizes and the number of genes expressed per cell. For these use
+## cases, it is a lot more efficient than using colSums(oneM50k) and
+## colSums(oneM50k != 0):
 lib_sizes3 <- sum(non_zeroes)
 n_exprs3 <- lengths(non_zeroes)
 

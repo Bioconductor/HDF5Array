@@ -144,10 +144,44 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
     relist(idx2, PartitioningByWidth(width2))
 }
 
-### 'j' must be NULL or an integer vector containing valid col indices.
-### Return a NumericList or IntegerList object parallel to 'j' i.e. with
-### one list element per col index in 'j'.
-.get_data_by_col <- function(x, j)
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .extract_data_from_adjacent_cols()
+###
+
+### 'j1' and 'j2' must be 2 single integers representing a valid range of
+### col indices.
+### If 'as.sparse=FALSE', return a NumericList or IntegerList object parallel
+### to 'j1:j2' i.e. with one list element per col index in 'j1:j2'.
+### If 'as.sparse=TRUE', return the sparse data in a list (NOT a data.frame)
+### with 3 parallel components: i, j, data. We choose list over data.frame
+### to avoid the overhead and some annoyances that come with the latter.
+.extract_data_from_adjacent_cols <- function(x, j1, j2, as.sparse=FALSE)
+{
+    j12 <- j1:j2
+    start <- x@col_ranges[j1, "start"]
+    count_per_col <- x@col_ranges[j12, "width"]
+    count <- sum(count_per_col)
+    data <- .linear_get_data(x@filepath, x@group, start=start, count=count)
+    if (!as.sparse)
+        return(relist(data, PartitioningByWidth(count_per_col)))
+    row_indices <- .linear_get_row_indices(x@filepath, x@group,
+                                           start=start, count=count) + 1L
+    col_indices <- rep.int(j12, count_per_col)
+    list(i=row_indices, j=col_indices, data=data)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .extract_non_zero_data_by_col()
+###
+
+### Extract non-zero data using the "random" method. This method is
+### based on h5read( , index=idx) which retrieves an arbitrary/random
+### subset of the data.
+### 'j' must be an integer vector containing valid col indices. It cannot
+### be NULL.
+.random_extract_non_zero_data_by_col <- function(x, j)
 {
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
@@ -155,54 +189,14 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
     relist(data, data_indices)
 }
 
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .extract_sparse_data_from_TENxMatrixSeed()
-###
-
-### 'i' must be NULL or an integer vector containing valid row indices.
-### 'j' must be an integer vector containing valid col indices. It cannot
-### be NULL.
-### Both 'i' and 'j' can contain duplicates. Duplicates in 'i' have no effect
-### on the output but duplicates in 'j' will produce duplicates in the output.
-.random_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+### Extract non-zero data using the "linear" method. This method is
+### based on h5read( , start=start, count=count) which retrieves a
+### linear subset of the data and is much faster than doing
+### h5read( , index=list(seq(start, length.out=count))).
+### 'j' must be NULL or an integer vector containing valid col indices. It
+### should not be empty.
+.linear_extract_non_zero_data_by_col <- function(x, j)
 {
-    stopifnot(is.null(i) || is.numeric(i), is.numeric(j))
-    data_indices <- .get_data_indices_by_col(x, j)
-    idx2 <- unlist(data_indices, use.names=FALSE)
-    row_indices <- .get_row_indices(x@filepath, x@group, idx=idx2) + 1L
-    col_indices <- rep.int(j, lengths(data_indices))
-    if (!is.null(i)) {
-        keep_idx <- which(row_indices %in% i)
-        idx2 <- idx2[keep_idx]
-        row_indices <- row_indices[keep_idx]
-        col_indices <- col_indices[keep_idx]
-    }
-    data <- .get_data(x@filepath, x@group, idx=idx2)
-    list(i=row_indices, j=col_indices, data=data)
-}
-
-### 'j1' and 'j2' must be 2 single integers representing a valid range of col
-### indices.
-.extract_sparse_data_from_TENxMatrixSeed_cols <- function(x, j1, j2)
-{
-    j12 <- j1:j2
-    start <- x@col_ranges[j1, "start"]
-    count_per_col <- x@col_ranges[j12, "width"]
-    count <- sum(count_per_col)
-    data <- .linear_get_data(x@filepath, x@group, start=start, count=count)
-    row_indices <- .linear_get_row_indices(x@filepath, x@group,
-                                           start=start, count=count) + 1L
-    col_indices <- rep.int(j12, count_per_col)
-    list(i=row_indices, j=col_indices, data=data)
-}
-
-### 'i' (or 'j') must be NULL or an integer vector containing valid row (or
-### col) indices. 'j' should not be empty.
-### The output is not affected by duplicates in 'i' or 'j'.
-.linear_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
-{
-    stopifnot(is.null(i) || is.numeric(i))
     if (is.null(j)) {
         j1 <- 1L
         j2 <- ncol(x)
@@ -211,24 +205,10 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
         j1 <- min(j)
         j2 <- max(j)
     }
-    sparse_data <- .extract_sparse_data_from_TENxMatrixSeed_cols(x, j1, j2)
-    if (is.null(i) && is.null(j))
-        return(sparse_data)
-    row_indices <- sparse_data$i
-    col_indices <- sparse_data$j
-    data <- sparse_data$data
-    if (is.null(i)) {
-        keep_me <- col_indices %in% j
-    } else if (is.null(j)) {
-        keep_me <- row_indices %in% i
-    } else {
-        keep_me <- (row_indices %in% i) & (col_indices %in% j)
-    }
-    keep_idx <- which(keep_me)
-    data <- data[keep_idx]
-    row_indices <- row_indices[keep_idx]
-    col_indices <- col_indices[keep_idx]
-    list(i=row_indices, j=col_indices, data=data)
+    non_zero_data <- .extract_data_from_adjacent_cols(x, j1, j2)
+    if (is.null(j))
+        return(non_zero_data)
+    non_zero_data[match(j, j1:j2)]
 }
 
 .normarg_method <- function(method, j)
@@ -253,8 +233,91 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
     if (ratio >= 0.2) "linear" else "random"
 }
 
-### 'i' (or 'j') must be NULL or an integer vector containing valid row (or
-### col) indices.
+### 'j' must be NULL or an integer vector containing valid col indices.
+### Return a NumericList or IntegerList object parallel to 'j' i.e. with
+### one list element per col index in 'j'.
+.extract_non_zero_data_by_col <-
+    function(x, j, method=c("auto", "random", "linear"))
+{
+    method <- match.arg(method)
+    method <- .normarg_method(method, j)
+    if (method == "random") {
+        .random_extract_non_zero_data_by_col(x, j)
+    } else {
+        .linear_extract_non_zero_data_by_col(x, j)
+    }
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .extract_sparse_data_from_TENxMatrixSeed()
+###
+
+### Extract sparse data using the "random" method. This method is
+### based on h5read( , index=idx) which retrieves an arbitrary/random
+### subset of the data.
+### 'i' must be NULL or an integer vector containing valid row indices.
+### 'j' must be an integer vector containing valid col indices. It cannot
+### be NULL.
+### Both 'i' and 'j' can contain duplicates. Duplicates in 'i' have no effect
+### on the output but duplicates in 'j' will produce duplicates in the output.
+.random_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+{
+    stopifnot(is.null(i) || is.numeric(i), is.numeric(j))
+    data_indices <- .get_data_indices_by_col(x, j)
+    idx2 <- unlist(data_indices, use.names=FALSE)
+    row_indices <- .get_row_indices(x@filepath, x@group, idx=idx2) + 1L
+    col_indices <- rep.int(j, lengths(data_indices))
+    if (!is.null(i)) {
+        keep_idx <- which(row_indices %in% i)
+        idx2 <- idx2[keep_idx]
+        row_indices <- row_indices[keep_idx]
+        col_indices <- col_indices[keep_idx]
+    }
+    data <- .get_data(x@filepath, x@group, idx=idx2)
+    list(i=row_indices, j=col_indices, data=data)
+}
+
+### Extract sparse data using the "linear" method. This method is
+### based on h5read( , start=start, count=count) which retrieves a
+### linear subset of the data and is much faster than doing
+### h5read( , index=list(seq(start, length.out=count))).
+### 'i' (or 'j') must be NULL or an integer vector containing valid
+### row (or col) indices. 'j' should not be empty.
+### The output is not affected by duplicates in 'i' or 'j'.
+.linear_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+{
+    stopifnot(is.null(i) || is.numeric(i))
+    if (is.null(j)) {
+        j1 <- 1L
+        j2 <- ncol(x)
+    } else {
+        stopifnot(is.numeric(j), length(j) != 0L)
+        j1 <- min(j)
+        j2 <- max(j)
+    }
+    sparse_data <- .extract_data_from_adjacent_cols(x, j1, j2, as.sparse=TRUE)
+    if (is.null(i) && is.null(j))
+        return(sparse_data)
+    row_indices <- sparse_data$i
+    col_indices <- sparse_data$j
+    data <- sparse_data$data
+    if (is.null(i)) {
+        keep_me <- col_indices %in% j
+    } else if (is.null(j)) {
+        keep_me <- row_indices %in% i
+    } else {
+        keep_me <- (row_indices %in% i) & (col_indices %in% j)
+    }
+    keep_idx <- which(keep_me)
+    data <- data[keep_idx]
+    row_indices <- row_indices[keep_idx]
+    col_indices <- col_indices[keep_idx]
+    list(i=row_indices, j=col_indices, data=data)
+}
+
+### 'i' (or 'j') must be NULL or an integer vector containing valid
+### row (or col) indices.
 ### Duplicates in 'i' are ok and won't affect the output.
 ### Duplicates in 'j' are ok but might introduce duplicates in the output
 ### so should be avoided.
@@ -474,25 +537,25 @@ TENxMatrix <- function(filepath, group="mm10")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extractNonZeroValuesByCol()
+### extractNonZeroDataByCol()
 ###
 
 ### Return a NumericList or IntegerList object parallel to 'j' i.e. with
 ### one list element per col index in 'j'.
-setGeneric("extractNonZeroValuesByCol", signature="x",
-    function(x, j) standardGeneric("extractNonZeroValuesByCol")
+setGeneric("extractNonZeroDataByCol", signature="x",
+    function(x, j) standardGeneric("extractNonZeroDataByCol")
 )
 
-setMethod("extractNonZeroValuesByCol", "TENxMatrixSeed",
+setMethod("extractNonZeroDataByCol", "TENxMatrixSeed",
     function(x, j)
     {
         j <- DelayedArray:::normalizeSingleBracketSubscript2(j, ncol(x),
                                                              colnames(x))
-        .get_data_by_col(x, j)
+        .extract_non_zero_data_by_col(x, j)
     }
 )
 
-setMethod("extractNonZeroValuesByCol", "TENxMatrix",
-    function(x, j) extractNonZeroValuesByCol(x@seed, j)
+setMethod("extractNonZeroDataByCol", "TENxMatrix",
+    function(x, j) extractNonZeroDataByCol(x@seed, j)
 )
 
