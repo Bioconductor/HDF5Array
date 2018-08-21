@@ -24,7 +24,11 @@
 
 \alias{DelayedArray,TENxMatrixSeed-method}
 
-% extractNonZeroDataByCol
+% sparsity() and extractNonZeroDataByCol()
+
+\alias{sparsity}
+\alias{sparsity,TENxMatrixSeed-method}
+\alias{sparsity,TENxMatrix-method}
 
 \alias{extractNonZeroDataByCol}
 \alias{extractNonZeroDataByCol,TENxMatrixSeed-method}
@@ -34,8 +38,8 @@
 
 \description{
   The 1.3 Million Brain Cell Dataset and other datasets published by
-  10x Genomics use an HDF5-based sparse matrix representation instead of
-  the conventional (i.e. dense) HDF5 representation.
+  10x Genomics use an HDF5-based sparse matrix representation instead
+  of the conventional (i.e. dense) HDF5 representation.
 
   We provide 2 classes for representing a 10x Genomics dataset as a
   matrix-like object in R:
@@ -60,7 +64,8 @@
 TENxMatrix(filepath, group="mm10")
 TENxMatrixSeed(filepath, group="mm10")
 
-## A convenient data extractor:
+## sparsity() and a convenient data extractor:
+sparsity(x)
 extractNonZeroDataByCol(x, j)
 }
 
@@ -85,6 +90,9 @@ extractNonZeroDataByCol(x, j)
 
   \code{TENxMatrixSeed}: A TENxMatrixSeed object.
 
+  \code{sparsity}: The number of zero-valued matrix elements in the
+  object divided by its total number of elements (a.k.a. its length).
+
   \code{extractNonZeroDataByCol}: A \link[IRanges]{NumericList} or
   \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
   with one list element per column index in \code{j}. The row indices
@@ -108,6 +116,9 @@ extractNonZeroDataByCol(x, j)
 
     \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
           package.
+
+    \item \code{\link{writeTENxMatrix}} for writing a matrix-like object
+          as an HDF5-based sparse matrix.
 
     \item \code{\link[parallel]{detectCores}} from the \pkg{parallel}
           package.
@@ -154,6 +165,7 @@ h5ls(fname)
 ## create a TENxMatrix object representing the dataset:
 oneM <- TENxMatrix(fname, "mm10")
 oneM
+sparsity(oneM)
 
 is(oneM, "DelayedArray")  # TRUE
 

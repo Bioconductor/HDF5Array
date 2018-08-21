@@ -44,8 +44,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
     \code{NULL} or the path (as a single string) to the (new or existing)
     HDF5 file where to write the dataset.
     If \code{NULL}, then the dataset will be written to the current \emph{HDF5
-    dump file} i.e. the path returned by \code{\link{getHDF5DumpFile}}
-    will be used.
+    dump file} i.e. to the file whose path is \code{\link{getHDF5DumpFile}}.
   }
   \item{name}{
     \code{NULL} or the name of the HDF5 dataset to write.
@@ -82,7 +81,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
 }
 
 \value{
-  An HDF5Array object pointing to the newly written HDF5 dataset on disk.
+  An \link{HDF5Array} object pointing to the newly written HDF5 dataset
+  on disk.
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
@@ -120,7 +120,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
 
 \examples{
 ## ---------------------------------------------------------------------
-## WRITE AN ORDINARY ARRAY AS HDF5 DATASET
+## WRITE AN ORDINARY ARRAY TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
 m <- matrix(runif(350, min=-1), nrow=25)
 out_file <- tempfile()
@@ -130,7 +130,7 @@ M1
 chunkdim(M1)
 
 ## ---------------------------------------------------------------------
-## WRITE A DelayedArray OBJECT AS HDF5 DATASET
+## WRITE A DelayedArray OBJECT TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
 M2 <- log(t(DelayedArray(m)) + 1)
 M2 <- writeHDF5Array(M2, out_file, name="M2", chunkdim=c(5, 5))

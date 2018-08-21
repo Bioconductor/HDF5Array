@@ -97,7 +97,7 @@ HDF5ArraySeed(filepath, name, type=NA)
     \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
           package.
 
-    \item \code{\link{writeHDF5Array}} for writting an array-like object
+    \item \code{\link{writeHDF5Array}} for writing an array-like object
           to an HDF5 file.
 
     \item \link{HDF5-dump-management} for controlling the location and

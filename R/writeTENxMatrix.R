@@ -194,7 +194,7 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=filepath, group=group)
 }
 
-### Support "append mode" only.
+### Support "appending mode" only.
 setMethod("write_block", "TENxRealizationSink",
     function(x, viewport, block)
     {
@@ -281,7 +281,10 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
     }
     write_array_to_sink(x, sink)
-    as(sink, "TENxMatrix")
+    ans <- as(sink, "TENxMatrix")
+    if (verbose)
+        message("sparsity: ", round(sparsity(ans), digits=2))
+    ans
 }
 
 
@@ -303,4 +306,5 @@ setAs("ANY", "TENxMatrix", .as_TENxMatrix)
 ### a broken object (unfortunately these dummy automatic coercion methods don't
 ### bother to validate the object they return). So we overwrite it.
 setAs("DelayedArray", "TENxMatrix", .as_TENxMatrix)
+setAs("DelayedMatrix", "TENxMatrix", .as_TENxMatrix)
 

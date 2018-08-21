@@ -551,8 +551,20 @@ TENxMatrix <- function(filepath, group="mm10")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extractNonZeroDataByCol()
+### sparsity() and extractNonZeroDataByCol()
 ###
+
+setGeneric("sparsity", signature="x", function(x) standardGeneric("sparsity"))
+
+setMethod("sparsity", "TENxMatrixSeed",
+    function(x)
+    {
+        data_len <- h5length(x@filepath, paste0(x@group, "/data"))
+        1 - data_len / length(x)
+    }
+)
+
+setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
 
 ### Return a NumericList or IntegerList object parallel to 'j' i.e. with
 ### one list element per col index in 'j'.

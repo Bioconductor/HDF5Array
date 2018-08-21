@@ -34,7 +34,7 @@ loadHDF5SummarizedExperiment(dir="my_h5_se")
   }
   \item{chunkdim, level}{
     The dimensions of the chunks and the compression level to use for
-    writting the assay data to disk.
+    writing the assay data to disk.
     Passed to the internal calls to \code{writeHDF5Array}.
     See \code{?\link{writeHDF5Array}} for more information.
   }

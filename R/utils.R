@@ -114,7 +114,7 @@ h5read2 <- function(filepath, name, index=NULL)
 ###
 
 ### Length of a one-dimensional HDF5 dataset.
-### Return the length as a single **numeric** (can be >= 2^31).
+### Return the length as a single integer (if < 2^31) or numeric (if >= 2^31).
 h5length <- function(filepath, name)
 {
     len <- h5dim(filepath, name, as.integer=FALSE)
@@ -126,7 +126,7 @@ h5length <- function(filepath, name)
 ### Return the length of the extended dataset.
 h5append <- function(data, filepath, name)
 {
-    old_len <- h5length(filepath, name)
+    old_len <- as.numeric(h5length(filepath, name))
     data_len <- length(data)
     new_len <- old_len + data_len
     h5set_extent(filepath, name, new_len)
@@ -160,7 +160,7 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
-    ok <- h5createDataset(filepath, name, dim, maxdim=maxdim,
+    ok <- h5createDataset(filepath, name, dim, maxdims=maxdim,
                           storage.mode=type, size=size,
                           chunk=chunkdim, level=level)
     if (!ok)

@@ -99,7 +99,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   }
   \item{level}{
     For \code{setHDF5DumpCompressionLevel}:
-    The compression level to use for writting \emph{automatic HDF5 datasets}
+    The compression level to use for writing \emph{automatic HDF5 datasets}
     to disk.
     See the \code{level} argument in \code{?rhdf5::\link{h5createDataset}}
     (in the \pkg{rhdf5} package) for more information about this.
@@ -160,7 +160,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   dataset}.
 
   \code{getHDF5DumpCompressionLevel} returns the compression level currently
-  used for writting \emph{automatic HDF5 datasets} to disk.
+  used for writing \emph{automatic HDF5 datasets} to disk.
 
   \code{showHDF5DumpLog} returns the dump log in an invisible data frame.
 
@@ -179,7 +179,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
           \code{getHDF5DumpName(for.use=TRUE)}.
 
     \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim)} to get reasonable
-          chunk dimensions to use for writting the dataset to disk. Or choose
+          chunk dimensions to use for writing the dataset to disk. Or choose
           your own chunk dimensions.
 
     \item Add an entry to the dump log by calling
@@ -202,7 +202,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
 
 \seealso{
   \itemize{
-    \item \code{\link{writeHDF5Array}} for writting an array-like object
+    \item \code{\link{writeHDF5Array}} for writing an array-like object
           to an HDF5 file.
 
     \item \link{HDF5Array} objects.
