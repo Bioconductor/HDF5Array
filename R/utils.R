@@ -98,12 +98,29 @@ h5read2 <- function(filepath, name, index=NULL)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Append data to a one-dimensional HDF5 dataset
+###
+
+### Return the length of the extended dataset.
+h5append <- function(data, filepath, name)
+{
+    old_len <- h5dim(filepath, name, as.integer=FALSE)
+    stopifnot(length(old_len) == 1L)
+    data_len <- length(data)
+    new_len <- old_len + data_len
+    h5set_extent(filepath, name, new_len)
+    h5write(data, filepath, name, start=old_len+1, count=data_len)
+    new_len
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### A simple wrapper around rhdf5::h5createDataset()
 ###
 
 ### A simple wrapper around rhdf5::h5createDataset().
-h5createDataset2 <- function(filepath, name, dim, type="double",
-                             chunkdim=NULL, level=6L)
+h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
+                             type="double", chunkdim=NULL, level=6L)
 {
     if (type == "character") {
         size <- max(nchar(name, type="width"))
@@ -122,8 +139,9 @@ h5createDataset2 <- function(filepath, name, dim, type="double",
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
-    ok <- h5createDataset(filepath, name, dim, storage.mode=type,
-                          size=size, chunk=chunkdim, level=level)
+    ok <- h5createDataset(filepath, name, dim, maxdim=maxdim,
+                          storage.mode=type, size=size,
+                          chunk=chunkdim, level=level)
     if (!ok)
         stop(wmsg("failed to create dataset '", name, "' ",
                   "in file '", filepath, "'"), call.=FALSE)

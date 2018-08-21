@@ -26,4 +26,5 @@ Collate: utils.R
 	writeHDF5Array.R
 	saveHDF5SummarizedExperiment.R
 	TENxMatrix-class.R
+	writeTENxMatrix.R
 	zzz.R

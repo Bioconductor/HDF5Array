@@ -8,7 +8,7 @@
 ### HDF5RealizationSink objects
 ###
 ### The HDF5RealizationSink class is a concrete RealizationSink subclass that
-### implements an HDF5 realization sink.
+### implements an HDF5Array realization sink.
 ###
 
 setClass("HDF5RealizationSink",
