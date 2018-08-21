@@ -44,10 +44,7 @@
 ### i.e. the nb of columns written so far + 1.
 .get_current_col_index <- function(filepath, group)
 {
-    name <- paste0(group, "/indptr")
-    ans <- h5dim(filepath, name)
-    stopifnot(length(ans) == 1L)
-    ans
+    h5length(filepath, paste0(group, "/indptr"))
 }
 
 .append_data <- function(filepath, group, data)
@@ -66,8 +63,7 @@
 .append_indptr <- function(filepath, group, col_indices, ncol)
 {
     name <- paste0(group, "/indptr")
-    old_len <- h5dim(filepath, name)
-    stopifnot(length(old_len) == 1L)
+    old_len <- h5length(filepath, name)
     old_data_len <- as.vector(h5read(filepath, name, start=old_len, count=1L))
     indptr <- end(PartitioningByEnd(col_indices, NG=ncol)) + old_data_len
     new_len <- h5append(indptr, filepath, name)

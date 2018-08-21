@@ -85,12 +85,12 @@ extractNonZeroDataByCol(x, j)
 
   \code{TENxMatrixSeed}: A TENxMatrixSeed object.
 
-  \code{extractNonZeroDataByCol}: An \link[IRanges]{IntegerList} object
-  \emph{parallel} to \code{j} i.e. with one list element per column index
-  in \code{j}. The row indices of the values are not returned. Furthermore,
-  the values within a given list element can be returned in any order.
-  In particular you should not assume that they are ordered by ascending
-  row index.
+  \code{extractNonZeroDataByCol}: A \link[IRanges]{NumericList} or
+  \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
+  with one list element per column index in \code{j}. The row indices
+  of the values are not returned. Furthermore, the values within a given
+  list element can be returned in any order. In particular you should not
+  assume that they are ordered by ascending row index.
 }
 
 \note{
@@ -128,7 +128,8 @@ extractNonZeroDataByCol(x, j)
     \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which TENxMatrix
           and TENxMatrixSeed objects are implemented.
 
-    \item \link[IRanges]{IntegerList} objects in the \pkg{IRanges} package.
+    \item \link[IRanges]{NumericList} and \link[IRanges]{IntegerList}
+          objects in the \pkg{IRanges} package.
   }
 }
 

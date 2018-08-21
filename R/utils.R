@@ -7,6 +7,18 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### h5exists()
+###
+
+h5exists <- function(filepath, name)
+{
+    fid <- H5Fopen(filepath)
+    on.exit(H5Fclose(fid))
+    H5Lexists(fid, name)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### h5dim() and h5chunkdim()
 ###
 
@@ -98,14 +110,23 @@ h5read2 <- function(filepath, name, index=NULL)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Append data to a one-dimensional HDF5 dataset
+### Manipulate one-dimensional HDF5 datasets
 ###
 
+### Length of a one-dimensional HDF5 dataset.
+### Return the length as a single **numeric** (can be >= 2^31).
+h5length <- function(filepath, name)
+{
+    len <- h5dim(filepath, name, as.integer=FALSE)
+    stopifnot(length(len) == 1L)
+    len
+}
+
+### Append data to a one-dimensional HDF5 dataset.
 ### Return the length of the extended dataset.
 h5append <- function(data, filepath, name)
 {
-    old_len <- h5dim(filepath, name, as.integer=FALSE)
-    stopifnot(length(old_len) == 1L)
+    old_len <- h5length(filepath, name)
     data_len <- length(data)
     new_len <- old_len + data_len
     h5set_extent(filepath, name, new_len)

@@ -57,7 +57,9 @@ setMethod("dim", "TENxMatrixSeed", function(x) x@dim)
 ###
 
 ### Does NOT access the file.
-setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
+setMethod("dimnames", "TENxMatrixSeed",
+    function(x) DelayedArray:::simplify_NULL_dimnames(x@dimnames)
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -104,15 +106,27 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
 
 ### Return the rownames of the matrix.
 .get_genes <- function(filepath, group, idx=NULL)
+{
+    if (!h5exists(filepath, paste0(group, "/genes")))
+        return(NULL)
     .get_TENx_component(filepath, group, "genes", idx=idx)
+}
 
 ### Currently unused.
 .get_gene_names <- function(filepath, group, idx=NULL)
+{
+    if (!h5exists(filepath, paste0(group, "/gene_names")))
+        return(NULL)
     .get_TENx_component(filepath, group, "gene_names", idx=idx)
+}
 
 ### Return the colnames of the matrix.
 .get_barcodes <- function(filepath, group, idx=NULL)
+{
+    if (!h5exists(filepath, paste0(group, "/barcodes")))
+        return(NULL)
     .get_TENx_component(filepath, group, "barcodes", idx=idx)
+}
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -392,8 +406,11 @@ setMethod("dimnames", "TENxMatrixSeed", function(x) x@dimnames)
 .extract_array_from_TENxMatrixSeed <- function(x, index)
 {
     ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
-    if (any(ans_dim == 0L))
-        return(array(integer(0), dim=ans_dim))  # return an empty matrix
+    if (any(ans_dim == 0L)) {
+        ## Return an empty matrix.
+        data <- .get_data(x@filepath, x@group, idx=integer(0))
+        return(array(data, dim=ans_dim))
+    }
     ## Passing 'i' and 'j' thru as.integer() should not be necessary
     ## because the list elements in 'index' are supposed to always be
     ## integer vectors (or NULLs). We do it anyway, because, when called in
@@ -454,18 +471,15 @@ TENxMatrixSeed <- function(filepath, group="mm10")
 
     ## dimnames
     rownames <- .get_genes(filepath, group)
-    stopifnot(length(rownames) == dim[[1L]])
+    stopifnot(is.null(rownames) || length(rownames) == dim[[1L]])
     colnames <- .get_barcodes(filepath, group)
-    stopifnot(length(colnames) == dim[[2L]])
+    stopifnot(is.null(colnames) || length(colnames) == dim[[2L]])
     dimnames <- list(rownames, colnames)
 
     ## col_ranges
-    ## "/data" and "/indices" are monodimensional arrays of length >= 2^31 so
-    ## we need to call h5dim() with 'as.integer=FALSE'.
-    data_len <- h5dim(filepath, paste0(group, "/data"), as.integer=FALSE)
-    stopifnot(length(data_len) == 1L)
-    indices_len <- h5dim(filepath, paste0(group, "/indices"), as.integer=FALSE)
-    stopifnot(identical(data_len, indices_len))
+    data_len <- h5length(filepath, paste0(group, "/data"))
+    indices_len <- h5length(filepath, paste0(group, "/indices"))
+    stopifnot(data_len == indices_len)
     indptr <- .get_indptr(filepath, group)
     stopifnot(length(indptr) == dim[[2L]] + 1L,
               indptr[[1L]] == 0L,
