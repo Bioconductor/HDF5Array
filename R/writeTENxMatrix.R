@@ -9,34 +9,72 @@
 ### to it
 ###
 
-.create_data <- function(filepath, group, dim, type, level=0L)
+.write_shape <- function(filepath, group, dim)
+{
+    name <- paste0(group, "/shape")
+    h5write(dim, filepath, name, level=0L)
+    appendDatasetCreationToHDF5DumpLog(filepath, name,
+                                       dim=length(dim), type=typeof(dim),
+                                       chunkdim=length(dim), level=0L)
+}
+
+.write_genes <- function(filepath, group, genes)
+{
+    name <- paste0(group, "/genes")
+    h5write(genes, filepath, name, level=0L)
+    appendDatasetCreationToHDF5DumpLog(filepath, name,
+                                       dim=length(genes), type=typeof(genes),
+                                       chunkdim=length(genes), level=0L)
+}
+
+.write_barcodes <- function(filepath, group, barcodes)
+{
+    name <- paste0(group, "/barcodes")
+    h5write(barcodes, filepath, name, level=0L)
+    appendDatasetCreationToHDF5DumpLog(filepath, name,
+                                       dim=length(barcodes),
+                                       type=typeof(barcodes),
+                                       chunkdim=length(barcodes), level=0L)
+}
+
+.create_empty_data <- function(filepath, group, maxlen, type, level=0L)
 {
     name <- paste0(group, "/data")
-    h5createDataset2(filepath, name,
-                     dim=0, maxdim=prod(dim),
-                     type=type, chunkdim=16384L, level=level)
+    dim <- 0
+    chunkdim <- 16384L
+    h5createDataset2(filepath, name, dim, maxdim=maxlen,
+                     type=type, chunkdim=chunkdim, level=level)
+    appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
+                                       chunkdim, level)
 }
 
-.create_row_indices <- function(filepath, group, dim, level=0L)
+.create_empty_row_indices <- function(filepath, group, maxlen, level=0L)
 {
     name <- paste0(group, "/indices")
-    h5createDataset2(filepath, name,
-                     dim=0, maxdim=prod(dim),
-                     type="integer", chunkdim=8192L, level=level)
+    dim <- 0
+    chunkdim <- 8192L
+    h5createDataset2(filepath, name, dim, maxdim=maxlen,
+                     type="integer", chunkdim=chunkdim, level=level)
+    appendDatasetCreationToHDF5DumpLog(filepath, name, dim, "integer",
+                                       chunkdim, level)
 }
 
-.create_indptr <- function(filepath, group, dim, level=0L)
+.create_empty_indptr <- function(filepath, group, ncol, level=0L)
 {
     name <- paste0(group, "/indptr")
+    dim <- 0
+    maxlen <- ncol + 1L  # will actually be the final length
+    chunkdim <- 8192L
     ## The values in the "indptr" dataset will be sorted and its last value
     ## (which is also its biggest) should always be the length of the "data"
     ## and "indices" datasets, so it can be >= 2^31. Because we don't know
     ## how to write values that are >= 2^31 to a dataset of type INTEGER
     ## (see https://github.com/grimbough/rhdf5/issues/21), we make the
     ## dataset of type FLOAT.
-    h5createDataset2(filepath, name,
-                     dim=0, maxdim=dim[[2L]] + 1L,
-                     type="double", chunkdim=8192L, level=level)
+    h5createDataset2(filepath, name, dim, maxdim=maxlen,
+                     type="double", chunkdim=chunkdim, level=level)
+    appendDatasetCreationToHDF5DumpLog(filepath, name, maxlen, "double",
+                                       chunkdim, level)
     h5append(0, filepath, name)
 }
 
@@ -140,13 +178,18 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
         stop(wmsg("failed to create group '", group, "' ",
                   "in file '", filepath, "'"), call.=FALSE)
 
-    h5write(dim, filepath, paste0(group, "/shape"))
-    .create_data(filepath, group, dim, type, level=level)
-    .create_row_indices(filepath, group, dim, level=level)
-    .create_indptr(filepath, group, dim, level=level)
-
-    #appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
-    #                                   chunkdim, level)
+    .write_shape(filepath, group, dim)
+    if (!is.null(dimnames)) {
+        rownames <- dimnames[[1L]]
+        if (!is.null(rownames))
+            .write_genes(filepath, group, rownames)
+        colnames <- dimnames[[2L]]
+        if (!is.null(colnames))
+            .write_barcodes(filepath, group, colnames)
+    }
+    .create_empty_data(filepath, group, prod(dim), type, level=level)
+    .create_empty_row_indices(filepath, group, prod(dim), level=level)
+    .create_empty_indptr(filepath, group, dim[[2L]], level=level)
     new2("TENxRealizationSink", dim=dim, dimnames=dimnames, type=type,
                                 filepath=filepath, group=group)
 }

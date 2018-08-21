@@ -89,7 +89,8 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     } else {
         level <- normalize_compression_level(level)
     }
-    h5createDataset2(filepath, name, dim, type, chunkdim, level)
+    h5createDataset2(filepath, name, dim,
+                     type=type, chunkdim=chunkdim, level=level)
     appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
                                        chunkdim, level)
     if (is.null(dimnames)) {
