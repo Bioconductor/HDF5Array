@@ -187,15 +187,15 @@ setMethod("dimnames", "TENxMatrixSeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .extract_non_zero_data_by_col()
+### .extract_nonzero_data_by_col()
 ###
 
-### Extract non-zero data using the "random" method. This method is
+### Extract nonzero data using the "random" method. This method is
 ### based on h5read( , index=idx) which retrieves an arbitrary/random
 ### subset of the data.
 ### 'j' must be an integer vector containing valid col indices. It cannot
 ### be NULL.
-.random_extract_non_zero_data_by_col <- function(x, j)
+.random_extract_nonzero_data_by_col <- function(x, j)
 {
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
@@ -203,13 +203,13 @@ setMethod("dimnames", "TENxMatrixSeed",
     relist(data, data_indices)
 }
 
-### Extract non-zero data using the "linear" method. This method is
+### Extract nonzero data using the "linear" method. This method is
 ### based on h5read( , start=start, count=count) which retrieves a
 ### linear subset of the data and is much faster than doing
 ### h5read( , index=list(seq(start, length.out=count))).
 ### 'j' must be NULL or an integer vector containing valid col indices. It
 ### should not be empty.
-.linear_extract_non_zero_data_by_col <- function(x, j)
+.linear_extract_nonzero_data_by_col <- function(x, j)
 {
     if (is.null(j)) {
         j1 <- 1L
@@ -219,10 +219,10 @@ setMethod("dimnames", "TENxMatrixSeed",
         j1 <- min(j)
         j2 <- max(j)
     }
-    non_zero_data <- .extract_data_from_adjacent_cols(x, j1, j2)
+    nonzero_data <- .extract_data_from_adjacent_cols(x, j1, j2)
     if (is.null(j))
-        return(non_zero_data)
-    non_zero_data[match(j, j1:j2)]
+        return(nonzero_data)
+    nonzero_data[match(j, j1:j2)]
 }
 
 .normarg_method <- function(method, j)
@@ -250,15 +250,15 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### 'j' must be NULL or an integer vector containing valid col indices.
 ### Return a NumericList or IntegerList object parallel to 'j' i.e. with
 ### one list element per col index in 'j'.
-.extract_non_zero_data_by_col <-
+.extract_nonzero_data_by_col <-
     function(x, j, method=c("auto", "random", "linear"))
 {
     method <- match.arg(method)
     method <- .normarg_method(method, j)
     if (method == "random") {
-        .random_extract_non_zero_data_by_col(x, j)
+        .random_extract_nonzero_data_by_col(x, j)
     } else {
-        .linear_extract_non_zero_data_by_col(x, j)
+        .linear_extract_nonzero_data_by_col(x, j)
     }
 }
 
@@ -579,20 +579,20 @@ setMethod("read_sparse_block", "TENxMatrix",
 
 ### Return a NumericList or IntegerList object parallel to 'j' i.e. with
 ### one list element per col index in 'j'.
-setGeneric("extractNonZeroDataByCol", signature="x",
-    function(x, j) standardGeneric("extractNonZeroDataByCol")
+setGeneric("extractNonzeroDataByCol", signature="x",
+    function(x, j) standardGeneric("extractNonzeroDataByCol")
 )
 
-setMethod("extractNonZeroDataByCol", "TENxMatrixSeed",
+setMethod("extractNonzeroDataByCol", "TENxMatrixSeed",
     function(x, j)
     {
         j <- DelayedArray:::normalizeSingleBracketSubscript2(j, ncol(x),
                                                              colnames(x))
-        .extract_non_zero_data_by_col(x, j)
+        .extract_nonzero_data_by_col(x, j)
     }
 )
 
-setMethod("extractNonZeroDataByCol", "TENxMatrix",
-    function(x, j) extractNonZeroDataByCol(x@seed, j)
+setMethod("extractNonzeroDataByCol", "TENxMatrix",
+    function(x, j) extractNonzeroDataByCol(x@seed, j)
 )
 

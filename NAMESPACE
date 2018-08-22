@@ -68,11 +68,11 @@ export(
 
 export(
     ## TENxMatrix-class.R:
-    sparsity, extractNonZeroDataByCol
+    sparsity, extractNonzeroDataByCol
 )
 
 ### Exactly the same list as above.
 exportMethods(
-    sparsity, extractNonZeroDataByCol
+    sparsity, extractNonzeroDataByCol
 )
 

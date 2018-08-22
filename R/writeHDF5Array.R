@@ -49,7 +49,7 @@ setMethod("type", "HDF5RealizationSink", function(x) x@type)
         stop(wmsg("the chunk dimensions specified in 'chunkdim' exceed ",
                   "the dimensions of the object to write"))
     if (any(chunkdim == 0L & dim != 0L, na.rm=TRUE))
-        stop(wmsg("'chunkdim' must contain non-zero values unless ",
+        stop(wmsg("'chunkdim' must contain nonzero values unless ",
                   "the zero values correspond to dimensions in the ",
                   "object to write that are also zero"))
     na_idx <- which(is.na(chunkdim))

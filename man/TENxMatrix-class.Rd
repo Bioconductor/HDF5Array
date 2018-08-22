@@ -34,9 +34,9 @@
 \alias{read_sparse_block,TENxMatrixSeed-method}
 \alias{read_sparse_block,TENxMatrix-method}
 
-\alias{extractNonZeroDataByCol}
-\alias{extractNonZeroDataByCol,TENxMatrixSeed-method}
-\alias{extractNonZeroDataByCol,TENxMatrix-method}
+\alias{extractNonzeroDataByCol}
+\alias{extractNonzeroDataByCol,TENxMatrixSeed-method}
+\alias{extractNonzeroDataByCol,TENxMatrix-method}
 
 \title{10x Genomics datasets as DelayedArray objects}
 
@@ -70,7 +70,7 @@ TENxMatrixSeed(filepath, group="mm10")
 
 ## sparsity() and a convenient data extractor:
 sparsity(x)
-extractNonZeroDataByCol(x, j)
+extractNonzeroDataByCol(x, j)
 }
 
 \arguments{
@@ -97,7 +97,7 @@ extractNonZeroDataByCol(x, j)
   \code{sparsity}: The number of zero-valued matrix elements in the
   object divided by its total number of elements (a.k.a. its length).
 
-  \code{extractNonZeroDataByCol}: A \link[IRanges]{NumericList} or
+  \code{extractNonzeroDataByCol}: A \link[IRanges]{NumericList} or
   \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
   with one list element per column index in \code{j}. The row indices
   of the values are not returned. Furthermore, the values within a given
@@ -237,26 +237,26 @@ setDefaultBlockSize()
 DelayedArray:::set_verbose_block_processing(FALSE)
 
 ## ---------------------------------------------------------------------
-## extractNonZeroDataByCol()
+## extractNonzeroDataByCol()
 ## ---------------------------------------------------------------------
-## extractNonZeroDataByCol() provides a convenient and very efficient
-## way to extract the non-zero data in a compact form:
-non_zeroes <- extractNonZeroDataByCol(oneM, 1:50000)  # takes < 5 sec.
+## extractNonzeroDataByCol() provides a convenient and very efficient
+## way to extract the nonzero data in a compact form:
+nonzeroes <- extractNonzeroDataByCol(oneM, 1:50000)  # takes < 5 sec.
 
 ## The data is returned as an IntegerList object with one list element
 ## per column and no row indices associated to the values in the object.
 ## Furthermore, the values within a given list element can be returned
 ## in any order:
-non_zeroes
+nonzeroes
 
-names(non_zeroes) <- colnames(oneM50k)
+names(nonzeroes) <- colnames(oneM50k)
 
 ## This can be used to compute some simple summaries like the library
 ## sizes and the number of genes expressed per cell. For these use
 ## cases, it is a lot more efficient than using colSums(oneM50k) and
 ## colSums(oneM50k != 0):
-lib_sizes3 <- sum(non_zeroes)
-n_exprs3 <- lengths(non_zeroes)
+lib_sizes3 <- sum(nonzeroes)
+n_exprs3 <- lengths(nonzeroes)
 
 ## Sanity checks:
 stopifnot(all.equal(lib_sizes, lib_sizes3))
