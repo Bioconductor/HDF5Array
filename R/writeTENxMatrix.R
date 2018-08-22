@@ -212,16 +212,17 @@ setMethod("write_sparse_block", "TENxRealizationSink",
 
         ## Append the nonzero data.
         new_data_len1 <- .append_data(x@filepath, x@group,
-                                      sparse_block$data)
+                                      sparse_block@nzdata)
 
         ## Append the 0-based row indices of the nonzero data.
         new_data_len2 <- .append_row_indices(x@filepath, x@group,
-                                             sparse_block$i - 1L)
+                                             sparse_block@aind[ , 1L] - 1L)
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
         new_data_len3 <- .append_indptr(x@filepath, x@group,
-                                        sparse_block$j, ncol(viewport))
+                                        sparse_block@aind[ , 2L],
+                                        ncol(viewport))
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
     }
 )
