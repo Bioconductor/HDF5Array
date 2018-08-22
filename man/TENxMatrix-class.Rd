@@ -24,11 +24,15 @@
 
 \alias{DelayedArray,TENxMatrixSeed-method}
 
-% sparsity() and extractNonZeroDataByCol()
+% sparsity
 
 \alias{sparsity}
 \alias{sparsity,TENxMatrixSeed-method}
 \alias{sparsity,TENxMatrix-method}
+
+\alias{read_sparse_block}
+\alias{read_sparse_block,TENxMatrixSeed-method}
+\alias{read_sparse_block,TENxMatrix-method}
 
 \alias{extractNonZeroDataByCol}
 \alias{extractNonZeroDataByCol,TENxMatrixSeed-method}

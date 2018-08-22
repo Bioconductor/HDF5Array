@@ -103,6 +103,11 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 
 setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Writing data to an HDF5RealizationSink object
+###
+
 setMethod("write_block", "HDF5RealizationSink",
     function(x, viewport, block)
     {
@@ -113,7 +118,7 @@ setMethod("write_block", "HDF5RealizationSink",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an HDF5RealizationSink object.
+### Coercing an HDF5RealizationSink object
 ###
 
 ### FIXME: This coercion needs to propagate the dimnames *thru* the HDF5 file.
@@ -173,7 +178,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercion to HDF5Array.
+### Coercion to HDF5Array
 ###
 ### The methods below write the object to disk. Note that coercion from
 ### HDF5RealizationSink to HDF5Array is already taken care of by the specific

@@ -6,6 +6,7 @@
 
 \alias{dimnames,TENxRealizationSink-method}
 \alias{type,TENxRealizationSink-method}
+\alias{write_sparse_block,TENxRealizationSink-method}
 \alias{write_block,TENxRealizationSink-method}
 \alias{close,TENxRealizationSink-method}
 

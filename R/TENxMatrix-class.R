@@ -355,15 +355,6 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### extract_array()
 ###
 
-### 'sparse_data' must be a list with 3 parallel components (i, j, and data)
-### as returned by .extract_sparse_data_from_TENxMatrixSeed().
-.make_matrix_from_sparse_data <- function(dim, sparse_data=NULL)
-{
-    ans <- array(0L, dim=dim)
-    ans[cbind(sparse_data$i, sparse_data$j)] <- sparse_data$data
-    ans
-}
-
 ### 'nrow' and 'ncol' must be single integers.
 ### 'i'and 'j' must be NULLs or integer vectors. If the latter, they must
 ### be of length 'nrow' and 'ncol' and contain positive values.
@@ -397,7 +388,7 @@ setMethod("dimnames", "TENxMatrixSeed",
             j2uj <- match(j, uj)
     }
     umat_dim <- c(umat_nrow, umat_ncol)
-    umat <- .make_matrix_from_sparse_data(umat_dim, sparse_data)
+    umat <- sparse2dense(umat_dim, sparse_data)
     if (is.null(i2ui) && is.null(j2uj))
         return(umat)
     DelayedArray:::subset_by_Nindex(umat, list(i2ui, j2uj))
@@ -551,7 +542,7 @@ TENxMatrix <- function(filepath, group="mm10")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### sparsity() and extractNonZeroDataByCol()
+### Taking advantage of sparsity
 ###
 
 setGeneric("sparsity", signature="x", function(x) standardGeneric("sparsity"))
@@ -565,6 +556,26 @@ setMethod("sparsity", "TENxMatrixSeed",
 )
 
 setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
+
+setMethod("read_sparse_block", "TENxMatrixSeed",
+    function(x, viewport)
+    {
+        index <- DelayedArray:::makeNindexFromArrayViewport(
+                                          viewport,
+                                          expand.RangeNSBS=TRUE)
+        i <- index[[1L]]
+        j <- index[[2L]]
+        sparse_data <- .extract_sparse_data_from_TENxMatrixSeed(x, i, j)
+        offsets <- start(viewport) - 1L
+        sparse_data$i <- sparse_data$i - offsets[[1L]]
+        sparse_data$j <- sparse_data$j - offsets[[2L]]
+        as.data.frame(sparse_data, stringsAsFactors=FALSE)
+    }
+)
+
+setMethod("read_sparse_block", "TENxMatrix",
+    function(x, viewport) read_sparse_block(x@seed, viewport)
+)
 
 ### Return a NumericList or IntegerList object parallel to 'j' i.e. with
 ### one list element per col index in 'j'.

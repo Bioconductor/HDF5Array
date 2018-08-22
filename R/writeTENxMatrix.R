@@ -178,44 +178,63 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=filepath, group=group)
 }
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Writing data to a TENxRealizationSink object
+###
+
+.check_viewport <- function(viewport, x)
+{
+    if (!identical(nrow(viewport), nrow(x)))
+        stop(wmsg("The \"write_block\" and \"write_sparse_block\" methods ",
+                  "for ", class(x), " objects can only be used to write ",
+                  "a block to a viewport that spans full columns i.e. to ",
+                  "a viewport such that 'nrow(viewport) == nrow(x)'."))
+
+    current_col_idx <- .get_current_col_index(x@filepath, x@group)
+    if (!identical(start(viewport)[[2L]], current_col_idx))
+        stop(wmsg("The block to write is not adjacent to the last ",
+                  "written block.\n\n",
+                  "The \"write_block\" and \"write_sparse_block\" methods ",
+                  "for ", class(x), " objects can only be used ",
+                  "in \"appending mode\", that is, each block must be ",
+                  "written to a viewport that is adjacent to the viewport ",
+                  "where the previous block was written (with the exception ",
+                  "of the 1st written block which must be written to a ",
+                  "viewport that starts at the beginning of the sink)."))
+}
+
 ### Support "appending mode" only.
-setMethod("write_block", "TENxRealizationSink",
-    function(x, viewport, block)
+setMethod("write_sparse_block", "TENxRealizationSink",
+    function(x, viewport, sparse_block)
     {
-        if (!identical(nrow(block), nrow(x)))
-            stop(wmsg("The \"write_block\" method for ", class(x), " objects ",
-                      "can only be used to write blocks of full columns ",
-                      "i.e. blocks such that 'nrow(block) == nrow(x)'."))
-
-        current_col_idx <- .get_current_col_index(x@filepath, x@group)
-        if (!identical(start(viewport)[[2L]], current_col_idx))
-            stop(wmsg("The block to write is not adjacent to the last ",
-                      "written block. ",
-                      "The \"write_block\" method for ", class(x), " objects ",
-                      "can only be used to append blocks i.e. the new block ",
-                      "to write must be adjacent to the last written block ",
-                      "(except for the 1st written block which must be ",
-                      "written at the beginning of the sink)."))
-
-        non_zero_data_aind <- which(block != 0L, arr.ind=TRUE)
+        .check_viewport(viewport, x)
 
         ## Append the non-zero data.
         new_data_len1 <- .append_data(x@filepath, x@group,
-                                      block[non_zero_data_aind])
+                                      sparse_block$data)
 
         ## Append the 0-based row indices of the non-zero data.
         new_data_len2 <- .append_row_indices(x@filepath, x@group,
-                                      non_zero_data_aind[ , "row"] - 1L)
+                                             sparse_block$i - 1L)
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
         new_data_len3 <- .append_indptr(x@filepath, x@group,
-                                      non_zero_data_aind[ , "col"],
-                                      ncol(block))
+                                        sparse_block$j, ncol(viewport))
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
     }
 )
 
+setMethod("write_block", "TENxRealizationSink",
+    function(x, viewport, block)
+    {
+        sparse_block <- dense2sparse(block)
+        write_sparse_block(x, viewport, sparse_block)
+    }
+)
+
+### Only performs some sanity checks (there is actually nothing to close).
 setMethod("close", "TENxRealizationSink",
     function(con)
     {
@@ -229,7 +248,7 @@ setMethod("close", "TENxRealizationSink",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an TENxRealizationSink object.
+### Coercing an TENxRealizationSink object
 ###
 
 setAs("TENxRealizationSink", "TENxMatrixSeed",
@@ -273,7 +292,7 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercion to TENxMatrix.
+### Coercion to TENxMatrix
 ###
 ### The methods below write the object to disk. Note that coercion from
 ### TENxRealizationSink to TENxMatrix is already taken care of by the specific
