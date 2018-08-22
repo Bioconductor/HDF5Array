@@ -51,7 +51,7 @@
                                 type="integer", chunkdim=16384L, level=level)
 }
 
-.create_empty_indptr <- function(filepath, group, ncol, level)
+.create_empty_indptr <- function(filepath, group, ncol)
 {
     name <- paste0(group, "/indptr")
     ## The values in the "indptr" dataset will be sorted and its last value
@@ -61,7 +61,7 @@
     ## (see https://github.com/grimbough/rhdf5/issues/21), we make the
     ## dataset of type FLOAT.
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=ncol+1L,
-                                type="double", chunkdim=4096L, level=level)
+                                type="double", chunkdim=4096L, level=0L)
     h5append(0, filepath, name)
 }
 
@@ -173,7 +173,7 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
     }
     .create_empty_data(filepath, group, prod(dim), type, level)
     .create_empty_row_indices(filepath, group, prod(dim), level)
-    .create_empty_indptr(filepath, group, dim[[2L]], level)
+    .create_empty_indptr(filepath, group, dim[[2L]])
     new2("TENxRealizationSink", dim=dim, dimnames=dimnames, type=type,
                                 filepath=filepath, group=group)
 }
