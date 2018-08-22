@@ -141,21 +141,12 @@ h5append <- function(data, filepath, name)
 
 ### A simple wrapper around rhdf5::h5createDataset().
 h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
-                             type="double", chunkdim=NULL, level=6L)
+                             type="double", chunkdim=dim, level=6L)
 {
     if (type == "character") {
         size <- max(nchar(name, type="width"))
     } else {
         size <- NULL
-    }
-    if (is.null(chunkdim)) {
-        ## Here is the trade-off: The shorter the chunks, the snappier the
-        ## "show" method feels (on my laptop, it starts to feel sloppy with
-        ## a chunk length > 10 millions). OTOH small chunks tend to slow down
-        ## methods that do block processing (e.g. sum(), range(), etc...).
-        ## A chunk length of 1 million seems a good compromise.
-        #chunkdim <- makeCappedVolumeBox(1000000L, dim, "hypercube")
-        chunkdim <- dim
     }
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.

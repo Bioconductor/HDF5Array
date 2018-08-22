@@ -9,72 +9,59 @@
 ### to it
 ###
 
-.write_shape <- function(filepath, group, dim)
+.write_TENx_component <- function(filepath, group, name, data,
+                                  chunk.length=NULL)
 {
-    name <- paste0(group, "/shape")
-    h5write(dim, filepath, name, level=0L)
-    appendDatasetCreationToHDF5DumpLog(filepath, name,
-                                       dim=length(dim), type=typeof(dim),
-                                       chunkdim=length(dim), level=0L)
+    name <- paste0(group, "/", name)
+    data_len <- length(data)
+    chunk_len <- if (is.null(chunk.length)) data_len else chunk.length
+    create_and_log_HDF5_dataset(filepath, name, dim=data_len,
+                                type=typeof(data), chunkdim=chunk_len, level=0L)
+    h5write(data, filepath, name)
+}
+
+.write_shape <- function(filepath, group, shape)
+{
+    .write_TENx_component(filepath, group, "shape", shape)
 }
 
 .write_genes <- function(filepath, group, genes)
 {
-    name <- paste0(group, "/genes")
-    h5write(genes, filepath, name, level=0L)
-    appendDatasetCreationToHDF5DumpLog(filepath, name,
-                                       dim=length(genes), type=typeof(genes),
-                                       chunkdim=length(genes), level=0L)
+    .write_TENx_component(filepath, group, "genes", genes,
+                          chunk.length=2048L)
 }
 
 .write_barcodes <- function(filepath, group, barcodes)
 {
-    name <- paste0(group, "/barcodes")
-    h5write(barcodes, filepath, name, level=0L)
-    appendDatasetCreationToHDF5DumpLog(filepath, name,
-                                       dim=length(barcodes),
-                                       type=typeof(barcodes),
-                                       chunkdim=length(barcodes), level=0L)
+    .write_TENx_component(filepath, group, "barcodes", barcodes,
+                          chunk.length=4096L)
 }
 
-.create_empty_data <- function(filepath, group, maxlen, type, level=0L)
+.create_empty_data <- function(filepath, group, maxlen, type, level)
 {
     name <- paste0(group, "/data")
-    dim <- 0
-    chunkdim <- 16384L
-    h5createDataset2(filepath, name, dim, maxdim=maxlen,
-                     type=type, chunkdim=chunkdim, level=level)
-    appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
-                                       chunkdim, level)
+    create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=maxlen,
+                                type=type, chunkdim=16384L, level=level)
 }
 
-.create_empty_row_indices <- function(filepath, group, maxlen, level=0L)
+.create_empty_row_indices <- function(filepath, group, maxlen, level)
 {
     name <- paste0(group, "/indices")
-    dim <- 0
-    chunkdim <- 8192L
-    h5createDataset2(filepath, name, dim, maxdim=maxlen,
-                     type="integer", chunkdim=chunkdim, level=level)
-    appendDatasetCreationToHDF5DumpLog(filepath, name, dim, "integer",
-                                       chunkdim, level)
+    create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=maxlen,
+                                type="integer", chunkdim=16384L, level=level)
 }
 
-.create_empty_indptr <- function(filepath, group, ncol, level=0L)
+.create_empty_indptr <- function(filepath, group, ncol, level)
 {
     name <- paste0(group, "/indptr")
-    dim <- 0
-    maxlen <- ncol + 1L  # will actually be the final length
-    chunkdim <- 8192L
     ## The values in the "indptr" dataset will be sorted and its last value
     ## (which is also its biggest) should always be the length of the "data"
     ## and "indices" datasets, so it can be >= 2^31. Because we don't know
     ## how to write values that are >= 2^31 to a dataset of type INTEGER
     ## (see https://github.com/grimbough/rhdf5/issues/21), we make the
     ## dataset of type FLOAT.
-    h5createDataset2(filepath, name, dim, maxdim=maxlen,
-                     type="double", chunkdim=chunkdim, level=level)
-    appendDatasetCreationToHDF5DumpLog(filepath, name, maxlen, "double",
-                                       chunkdim, level)
+    create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=ncol+1L,
+                                type="double", chunkdim=4096L, level=level)
     h5append(0, filepath, name)
 }
 
@@ -165,13 +152,10 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
     } else {
         group <- normalize_dump_name(group)
     }
-    ## Let's not compress for now.
     if (is.null(level)) {
-        #level <- getHDF5DumpCompressionLevel()
-        level <- 0L
+        level <- getHDF5DumpCompressionLevel()
     } else {
-        #level <- normalize_compression_level(level)
-        stop(wmsg("'level' not supported yet"))
+        level <- normalize_compression_level(level)
     }
     ok <- h5createGroup(filepath, group)
     if (!ok)
@@ -187,9 +171,9 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
         if (!is.null(colnames))
             .write_barcodes(filepath, group, colnames)
     }
-    .create_empty_data(filepath, group, prod(dim), type, level=level)
-    .create_empty_row_indices(filepath, group, prod(dim), level=level)
-    .create_empty_indptr(filepath, group, dim[[2L]], level=level)
+    .create_empty_data(filepath, group, prod(dim), type, level)
+    .create_empty_row_indices(filepath, group, prod(dim), level)
+    .create_empty_indptr(filepath, group, dim[[2L]], level)
     new2("TENxRealizationSink", dim=dim, dimnames=dimnames, type=type,
                                 filepath=filepath, group=group)
 }

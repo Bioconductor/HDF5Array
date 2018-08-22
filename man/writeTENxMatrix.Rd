@@ -61,7 +61,9 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
     will be used.
   }
   \item{level}{
-    Not supported yet.
+    The compression level to use for writing the data to disk.
+    By default, \code{getHDF5DumpCompressionLevel()} will be used.
+    See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
