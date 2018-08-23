@@ -36,8 +36,11 @@ exportMethods(
     path, "path<-",
 
     ## Methods for generics defined in the DelayedArray package:
-    extract_array, type, matrixClass, DelayedArray, chunkdim,
-    read_sparse_block, write_sparse_block, write_block, close
+    extract_array, type,
+    sparsity,
+    read_sparse_block, write_sparse_block, write_block,
+    matrixClass, DelayedArray, chunkdim,
+    close
 )
 
 
@@ -68,11 +71,11 @@ export(
 
 export(
     ## TENxMatrix-class.R:
-    sparsity, extractNonzeroDataByCol
+    extractNonzeroDataByCol
 )
 
 ### Exactly the same list as above.
 exportMethods(
-    sparsity, extractNonzeroDataByCol
+    extractNonzeroDataByCol
 )
 
