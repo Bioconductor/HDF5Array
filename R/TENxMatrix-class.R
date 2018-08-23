@@ -298,13 +298,11 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### based on h5read( , start=start, count=count) which retrieves a
 ### linear subset of the data and is much faster than doing
 ### h5read( , index=list(seq(start, length.out=count))).
-### 'i' (or 'j') must be NULL or an integer vector containing valid
-### row (or col) indices. 'j' should not be empty.
-### The output is not affected by duplicates in 'i' or 'j'.
+### 'j' must be NULL or a non-empty integer vector containing valid
+### col indices.  ### The output is not affected by duplicates in 'j'.
 ### Return a SparseArraySeed object.
-.linear_extract_SparseArraySeed_from_TENxMatrixSeed <- function(x, i, j)
+.linear_extract_SparseArraySeed_from_TENxMatrixSeed <- function(x, j)
 {
-    stopifnot(is.null(i) || is.numeric(i))
     if (is.null(j)) {
         j1 <- 1L
         j2 <- ncol(x)
@@ -313,48 +311,24 @@ setMethod("dimnames", "TENxMatrixSeed",
         j1 <- min(j)
         j2 <- max(j)
     }
-    sas <- .extract_data_from_adjacent_cols(x, j1, j2, as.sparse=TRUE)
-
-    ## TODO: Wrap the dance below into some sort of multi-dimensional
-    ## subsetting helper for SparseArraySeed objects. Don't use "[" for this
-    ## because it wouldn't be clear what to do in the 1-dimension case
-    ## (we probably should have a "[" method that supports subsetting along
-    ## the **length** of the SparseArraySeed object).
-    if (is.null(i) && is.null(j))
-        return(sas)
-    ans_aind <- aind(sas)
-    row_indices <- ans_aind[ , 1L]
-    col_indices <- ans_aind[ , 2L]
-    if (is.null(i)) {
-        keep_me <- col_indices %in% j
-    } else if (is.null(j)) {
-        keep_me <- row_indices %in% i
-    } else {
-        keep_me <- (row_indices %in% i) & (col_indices %in% j)
-    }
-    ## TODO: Define and use a "[" method for SparseArraySeed objects for 
-    ## doing this.
-    keep_idx <- which(keep_me)
-    sas@aind <- ans_aind[keep_idx, , drop=FALSE]
-    sas@nzdata <- sas@nzdata[keep_idx]
-    sas
+    .extract_data_from_adjacent_cols(x, j1, j2, as.sparse=TRUE)
 }
 
-### 'i' (or 'j') must be NULL or an integer vector containing valid
-### row (or col) indices.
-### Duplicates in 'i' are ok and won't affect the output.
-### Duplicates in 'j' are ok but might introduce duplicates in the output
-### so should be avoided.
+### Duplicates in 'index[[1]]' are ok and won't affect the output.
+### Duplicates in 'index[[2]]' are ok but might introduce duplicates
+### in the output so should be avoided.
 ### Return a SparseArraySeed object.
 .extract_SparseArraySeed_from_TENxMatrixSeed <-
-    function(x, i, j, method=c("auto", "random", "linear"))
+    function(x, index, method=c("auto", "random", "linear"))
 {
+    i <- index[[1L]]
+    j <- index[[2L]]
     method <- match.arg(method)
     method <- .normarg_method(method, j)
     if (method == "random") {
         .random_extract_SparseArraySeed_from_TENxMatrixSeed(x, i, j)
     } else {
-        .linear_extract_SparseArraySeed_from_TENxMatrixSeed(x, i, j)
+        .linear_extract_SparseArraySeed_from_TENxMatrixSeed(x, j)
     }
 }
 
@@ -363,79 +337,16 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### extract_array()
 ###
 
-### 'nrow' and 'ncol' must be single integers.
-### 'i'and 'j' must be NULLs or integer vectors. If the latter, they must
-### be of length 'nrow' and 'ncol' and contain positive values.
-### 'ui' and/or 'uj' must be NULLs (if 'i' and/or 'j' are NULLs) or
-### integer vectors equal to 'unique(i)' and 'unique(j)', respectively.
-### 'sas' must be a SparseArraySeed object.
-### If 'i' and/or 'j' is NULL, the values in 'aind(sas)[ , 1]'
-### and/or 'aind(sas)[ , 2]' must be >= 1 and <= 'nrow' and/or
-### 'ncol', respectively. Otherwise they must be present in 'i' and/or 'j',
-### respectively.
-.make_submatrix_from_remapped_SparseArraySeed <- function(nrow, ncol,
-                                                      i, j, ui, uj,
-                                                      sas)
-{
-    stopifnot(is(sas, "SparseArraySeed"))
-    i2ui <- NULL
-    if (is.null(i)) {
-        umat_nrow <- nrow
-    } else {
-        sas@aind[ , 1L] <- match(sas@aind[ , 1L], ui)
-        umat_nrow <- length(ui)
-        if (!identical(i, ui))
-            i2ui <- match(i, ui)
-    }
-    j2uj <- NULL
-    if (is.null(j)) {
-        umat_ncol <- ncol
-    } else {
-        sas@aind[ , 2L] <- match(sas@aind[ , 2L], uj)
-        umat_ncol <- length(uj)
-        if (!identical(j, ui))
-            j2uj <- match(j, uj)
-    }
-    sas@dim <- c(umat_nrow, umat_ncol)
-    umat <- sparse2dense(sas)
-    if (is.null(i2ui) && is.null(j2uj))
-        return(umat)
-    DelayedArray:::subset_by_Nindex(umat, list(i2ui, j2uj))
-}
-
 .extract_array_from_TENxMatrixSeed <- function(x, index)
 {
     ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L)) {
         ## Return an empty matrix.
-        data <- .get_data(x@filepath, x@group, idx=integer(0))
-        return(array(data, dim=ans_dim))
+        data0 <- .get_data(x@filepath, x@group, idx=integer(0))
+        return(array(data0, dim=ans_dim))
     }
-    ## Passing 'i' and 'j' thru as.integer() should not be necessary
-    ## because the list elements in 'index' are supposed to always be
-    ## integer vectors (or NULLs). We do it anyway, because, when called in
-    ## some special contexts (e.g. testing), extract_array() could receive
-    ## an 'index' where the list elements are numeric vectors or integer
-    ## vectors with attributes on them (e.g. names). However, in order to
-    ## make sure that a test like 'identical(i, ui)' will behave as expected,
-    ## we need to make sure that 'i' (and 'ui') are "naked" integer vectors.
-    i <- index[[1L]]
-    if (is.null(i)) {
-        ui <- NULL
-    } else {
-        i <- as.integer(i)  # make sure 'i' is a "naked" integer vector
-        ui <- unique(i)
-    }
-    j <- index[[2L]]
-    if (is.null(j)) {
-        uj <- NULL
-    } else {
-        j <- as.integer(j)  # make sure 'j' is a "naked" integer vector
-        uj <- unique(j)
-    }
-    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, ui, uj)
-    .make_submatrix_from_remapped_SparseArraySeed(ans_dim[[1L]], ans_dim[[2L]],
-                                                  i, j, ui, uj, sas)
+    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, index)
+    extract_array(sas, index)
 }
 
 setMethod("extract_array", "TENxMatrixSeed",
@@ -567,14 +478,10 @@ setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
 .read_sparse_block_from_TENxMatrixSeed <- function(x, viewport)
 {
     index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
-    i <- index[[1L]]
-    j <- index[[2L]]
-    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, i, j)
-    offsets <- start(viewport) - 1L
-    sas@aind[ , 1L] <- sas@aind[ , 1L] - offsets[[1L]]
-    sas@aind[ , 2L] <- sas@aind[ , 2L] - offsets[[2L]]
-    sas@dim <- dim(viewport)
-    sas
+    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, index)
+    ## TODO: Replace this with 'read_sparse_block(sas, viewport)' once
+    ## the method for SparseArraySeed objects is defined in DelayedArray.
+    DelayedArray:::read_sparse_block_from_SparseArraySeed(sas, viewport)
 }
 
 setMethod("read_sparse_block", "TENxMatrixSeed",
