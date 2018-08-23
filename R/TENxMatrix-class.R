@@ -167,7 +167,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### col indices.
 ### If 'as.sparse=FALSE', return a NumericList or IntegerList object parallel
 ### to 'j1:j2' i.e. with one list element per col index in 'j1:j2'.
-### If 'as.sparse=TRUE', return a SparseData object.
+### If 'as.sparse=TRUE', return a SparseArray object.
 .extract_data_from_adjacent_cols <- function(x, j1, j2, as.sparse=FALSE)
 {
     j12 <- j1:j2
@@ -182,8 +182,7 @@ setMethod("dimnames", "TENxMatrixSeed",
                                            start=start, count=count) + 1L
     col_indices <- rep.int(j12, count_per_col)
     ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
-    new2("SparseData" , dim=dim(x), aind=ans_aind, nzdata=ans_nzdata,
-                        check=FALSE)
+    SparseArray(dim(x), ans_aind, ans_nzdata, check=FALSE)
 }
 
 
@@ -265,7 +264,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .extract_sparse_data_from_TENxMatrixSeed()
+### .extract_SparseArray_from_TENxMatrixSeed()
 ###
 
 ### Extract sparse data using the "random" method. This method is
@@ -276,8 +275,8 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### be NULL.
 ### Both 'i' and 'j' can contain duplicates. Duplicates in 'i' have no effect
 ### on the output but duplicates in 'j' will produce duplicates in the output.
-### Return a SparseData object.
-.random_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+### Return a SparseArray object.
+.random_extract_SparseArray_from_TENxMatrixSeed <- function(x, i, j)
 {
     stopifnot(is.null(i) || is.numeric(i), is.numeric(j))
     data_indices <- .get_data_indices_by_col(x, j)
@@ -292,8 +291,7 @@ setMethod("dimnames", "TENxMatrixSeed",
     }
     ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
     ans_nzdata <- .get_data(x@filepath, x@group, idx=idx2)
-    new2("SparseData" , dim=dim(x), aind=ans_aind, nzdata=ans_nzdata,
-                        check=FALSE)
+    SparseArray(dim(x), ans_aind, ans_nzdata, check=FALSE)
 }
 
 ### Extract sparse data using the "linear" method. This method is
@@ -303,8 +301,8 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### 'i' (or 'j') must be NULL or an integer vector containing valid
 ### row (or col) indices. 'j' should not be empty.
 ### The output is not affected by duplicates in 'i' or 'j'.
-### Return a SparseData object.
-.linear_extract_sparse_data_from_TENxMatrixSeed <- function(x, i, j)
+### Return a SparseArray object.
+.linear_extract_SparseArray_from_TENxMatrixSeed <- function(x, i, j)
 {
     stopifnot(is.null(i) || is.numeric(i))
     if (is.null(j)) {
@@ -315,16 +313,16 @@ setMethod("dimnames", "TENxMatrixSeed",
         j1 <- min(j)
         j2 <- max(j)
     }
-    sparse_data <- .extract_data_from_adjacent_cols(x, j1, j2, as.sparse=TRUE)
+    sparse_array <- .extract_data_from_adjacent_cols(x, j1, j2, as.sparse=TRUE)
 
     ## TODO: Wrap the dance below into some sort of multi-dimensional
-    ## subsetting helper for SparseData objects. Don't use "[" for this
+    ## subsetting helper for SparseArray objects. Don't use "[" for this
     ## because it wouldn't be clear what to do in the 1-dimension case
     ## (we probably should have a "[" method that supports subsetting along
-    ## the **length** of the SparseData object).
+    ## the **length** of the SparseArray object).
     if (is.null(i) && is.null(j))
-        return(sparse_data)
-    ans_aind <- aind(sparse_data)
+        return(sparse_array)
+    ans_aind <- aind(sparse_array)
     row_indices <- ans_aind[ , 1L]
     col_indices <- ans_aind[ , 2L]
     if (is.null(i)) {
@@ -334,12 +332,12 @@ setMethod("dimnames", "TENxMatrixSeed",
     } else {
         keep_me <- (row_indices %in% i) & (col_indices %in% j)
     }
-    ## TODO: Define and use a "[" method for SparseData objects for doing
+    ## TODO: Define and use a "[" method for SparseArray objects for doing
     ## this.
     keep_idx <- which(keep_me)
-    sparse_data@aind <- ans_aind[keep_idx, , drop=FALSE]
-    sparse_data@nzdata <- sparse_data@nzdata[keep_idx]
-    sparse_data
+    sparse_array@aind <- ans_aind[keep_idx, , drop=FALSE]
+    sparse_array@nzdata <- sparse_array@nzdata[keep_idx]
+    sparse_array
 }
 
 ### 'i' (or 'j') must be NULL or an integer vector containing valid
@@ -347,16 +345,16 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### Duplicates in 'i' are ok and won't affect the output.
 ### Duplicates in 'j' are ok but might introduce duplicates in the output
 ### so should be avoided.
-### Return a SparseData object.
-.extract_sparse_data_from_TENxMatrixSeed <-
+### Return a SparseArray object.
+.extract_SparseArray_from_TENxMatrixSeed <-
     function(x, i, j, method=c("auto", "random", "linear"))
 {
     method <- match.arg(method)
     method <- .normarg_method(method, j)
     if (method == "random") {
-        .random_extract_sparse_data_from_TENxMatrixSeed(x, i, j)
+        .random_extract_SparseArray_from_TENxMatrixSeed(x, i, j)
     } else {
-        .linear_extract_sparse_data_from_TENxMatrixSeed(x, i, j)
+        .linear_extract_SparseArray_from_TENxMatrixSeed(x, i, j)
     }
 }
 
@@ -370,21 +368,21 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### be of length 'nrow' and 'ncol' and contain positive values.
 ### 'ui' and/or 'uj' must be NULLs (if 'i' and/or 'j' are NULLs) or
 ### integer vectors equal to 'unique(i)' and 'unique(j)', respectively.
-### 'sparse_data' must be a SparseData object.
-### If 'i' and/or 'j' is NULL, the values in 'aind(sparse_data)[ , 1]'
-### and/or 'aind(sparse_data)[ , 2]' must be >= 1 and <= 'nrow' and/or
+### 'sparse_array' must be a SparseArray object.
+### If 'i' and/or 'j' is NULL, the values in 'aind(sparse_array)[ , 1]'
+### and/or 'aind(sparse_array)[ , 2]' must be >= 1 and <= 'nrow' and/or
 ### 'ncol', respectively. Otherwise they must be present in 'i' and/or 'j',
 ### respectively.
-.make_submatrix_from_remapped_sparse_data <- function(nrow, ncol,
+.make_submatrix_from_remapped_SparseArray <- function(nrow, ncol,
                                                       i, j, ui, uj,
-                                                      sparse_data)
+                                                      sparse_array)
 {
-    stopifnot(is(sparse_data, "SparseData"))
+    stopifnot(is(sparse_array, "SparseArray"))
     i2ui <- NULL
     if (is.null(i)) {
         umat_nrow <- nrow
     } else {
-        sparse_data@aind[ , 1L] <- match(sparse_data@aind[ , 1L], ui)
+        sparse_array@aind[ , 1L] <- match(sparse_array@aind[ , 1L], ui)
         umat_nrow <- length(ui)
         if (!identical(i, ui))
             i2ui <- match(i, ui)
@@ -393,13 +391,13 @@ setMethod("dimnames", "TENxMatrixSeed",
     if (is.null(j)) {
         umat_ncol <- ncol
     } else {
-        sparse_data@aind[ , 2L] <- match(sparse_data@aind[ , 2L], uj)
+        sparse_array@aind[ , 2L] <- match(sparse_array@aind[ , 2L], uj)
         umat_ncol <- length(uj)
         if (!identical(j, ui))
             j2uj <- match(j, uj)
     }
-    sparse_data@dim <- c(umat_nrow, umat_ncol)
-    umat <- sparse2dense(sparse_data)
+    sparse_array@dim <- c(umat_nrow, umat_ncol)
+    umat <- sparse2dense(sparse_array)
     if (is.null(i2ui) && is.null(j2uj))
         return(umat)
     DelayedArray:::subset_by_Nindex(umat, list(i2ui, j2uj))
@@ -435,9 +433,9 @@ setMethod("dimnames", "TENxMatrixSeed",
         j <- as.integer(j)  # make sure 'j' is a "naked" integer vector
         uj <- unique(j)
     }
-    sparse_data <- .extract_sparse_data_from_TENxMatrixSeed(x, ui, uj)
-    .make_submatrix_from_remapped_sparse_data(ans_dim[[1L]], ans_dim[[2L]],
-                                              i, j, ui, uj, sparse_data)
+    sparse_array <- .extract_SparseArray_from_TENxMatrixSeed(x, ui, uj)
+    .make_submatrix_from_remapped_SparseArray(ans_dim[[1L]], ans_dim[[2L]],
+                                              i, j, ui, uj, sparse_array)
 }
 
 setMethod("extract_array", "TENxMatrixSeed",
@@ -575,12 +573,12 @@ setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
                                       expand.RangeNSBS=TRUE)
     i <- index[[1L]]
     j <- index[[2L]]
-    sparse_data <- .extract_sparse_data_from_TENxMatrixSeed(x, i, j)
+    sparse_array <- .extract_SparseArray_from_TENxMatrixSeed(x, i, j)
     offsets <- start(viewport) - 1L
-    sparse_data@aind[ , 1L] <- sparse_data@aind[ , 1L] - offsets[[1L]]
-    sparse_data@aind[ , 2L] <- sparse_data@aind[ , 2L] - offsets[[2L]]
-    sparse_data@dim <- dim(viewport)
-    sparse_data
+    sparse_array@aind[ , 1L] <- sparse_array@aind[ , 1L] - offsets[[1L]]
+    sparse_array@aind[ , 2L] <- sparse_array@aind[ , 2L] - offsets[[2L]]
+    sparse_array@dim <- dim(viewport)
+    sparse_array
 }
 
 setMethod("read_sparse_block", "TENxMatrixSeed",
