@@ -37,7 +37,7 @@ exportMethods(
 
     ## Methods for generics defined in the DelayedArray package:
     extract_array, type,
-    sparsity,
+    sparsity, isSparse,
     read_sparse_block, write_sparse_block, write_block,
     matrixClass, DelayedArray, chunkdim,
     close

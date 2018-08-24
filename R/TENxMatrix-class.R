@@ -484,6 +484,10 @@ setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
     DelayedArray:::read_sparse_block_from_SparseArraySeed(sas, viewport)
 }
 
+### This is about **structural** sparsity, not about quantitative sparsity
+### measured by sparsity().
+setMethod("isSparse", "TENxMatrixSeed", function(x) TRUE)
+
 setMethod("read_sparse_block", "TENxMatrixSeed",
     .read_sparse_block_from_TENxMatrixSeed
 )
