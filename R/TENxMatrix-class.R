@@ -264,19 +264,19 @@ setMethod("dimnames", "TENxMatrixSeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .extract_SparseArraySeed_from_TENxMatrixSeed()
+### .load_SparseArraySeed_from_TENxMatrixSeed()
 ###
 
-### Extract sparse data using the "random" method. This method is
-### based on h5read( , index=idx) which retrieves an arbitrary/random
-### subset of the data.
+### Load sparse data using the "random" method.
+### This method is based on h5read( , index=idx) which retrieves an
+### arbitrary/random subset of the data.
 ### 'i' must be NULL or an integer vector containing valid row indices.
 ### 'j' must be an integer vector containing valid col indices. It cannot
 ### be NULL.
 ### Both 'i' and 'j' can contain duplicates. Duplicates in 'i' have no effect
 ### on the output but duplicates in 'j' will produce duplicates in the output.
 ### Return a SparseArraySeed object.
-.random_extract_SparseArraySeed_from_TENxMatrixSeed <- function(x, i, j)
+.random_load_SparseArraySeed_from_TENxMatrixSeed <- function(x, i, j)
 {
     stopifnot(is.null(i) || is.numeric(i), is.numeric(j))
     data_indices <- .get_data_indices_by_col(x, j)
@@ -294,14 +294,14 @@ setMethod("dimnames", "TENxMatrixSeed",
     SparseArraySeed(dim(x), ans_aind, ans_nzdata, check=FALSE)
 }
 
-### Extract sparse data using the "linear" method. This method is
-### based on h5read( , start=start, count=count) which retrieves a
-### linear subset of the data and is much faster than doing
+### Load sparse data using the "linear" method.
+### This method is based on h5read( , start=start, count=count) which
+### retrieves a linear subset of the data and is much faster than doing
 ### h5read( , index=list(seq(start, length.out=count))).
 ### 'j' must be NULL or a non-empty integer vector containing valid
 ### col indices.  ### The output is not affected by duplicates in 'j'.
 ### Return a SparseArraySeed object.
-.linear_extract_SparseArraySeed_from_TENxMatrixSeed <- function(x, j)
+.linear_load_SparseArraySeed_from_TENxMatrixSeed <- function(x, j)
 {
     if (is.null(j)) {
         j1 <- 1L
@@ -318,7 +318,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### Duplicates in 'index[[2]]' are ok but might introduce duplicates
 ### in the output so should be avoided.
 ### Return a SparseArraySeed object.
-.extract_SparseArraySeed_from_TENxMatrixSeed <-
+.load_SparseArraySeed_from_TENxMatrixSeed <-
     function(x, index, method=c("auto", "random", "linear"))
 {
     i <- index[[1L]]
@@ -326,9 +326,9 @@ setMethod("dimnames", "TENxMatrixSeed",
     method <- match.arg(method)
     method <- .normarg_method(method, j)
     if (method == "random") {
-        .random_extract_SparseArraySeed_from_TENxMatrixSeed(x, i, j)
+        .random_load_SparseArraySeed_from_TENxMatrixSeed(x, i, j)
     } else {
-        .linear_extract_SparseArraySeed_from_TENxMatrixSeed(x, j)
+        .linear_load_SparseArraySeed_from_TENxMatrixSeed(x, j)
     }
 }
 
@@ -345,8 +345,8 @@ setMethod("dimnames", "TENxMatrixSeed",
         data0 <- .get_data(x@filepath, x@group, idx=integer(0))
         return(array(data0, dim=ans_dim))
     }
-    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, index)
-    extract_array(sas, index)
+    sas <- .load_SparseArraySeed_from_TENxMatrixSeed(x, index)  # I/O
+    extract_array(sas, index)  # in-memory
 }
 
 setMethod("extract_array", "TENxMatrixSeed",
@@ -475,18 +475,41 @@ setMethod("sparsity", "TENxMatrixSeed",
 
 setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
 
-.read_sparse_block_from_TENxMatrixSeed <- function(x, viewport)
-{
-    index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
-    sas <- .extract_SparseArraySeed_from_TENxMatrixSeed(x, index)
-    ## TODO: Replace this with 'read_sparse_block(sas, viewport)' once
-    ## the method for SparseArraySeed objects is defined in DelayedArray.
-    DelayedArray:::read_sparse_block_from_SparseArraySeed(sas, viewport)
-}
-
 ### This is about **structural** sparsity, not about quantitative sparsity
 ### measured by sparsity().
 setMethod("isSparse", "TENxMatrixSeed", function(x) TRUE)
+
+.extract_sparse_array_from_TENxMatrixSeed <- function(x, index)
+{
+    sas <- .load_SparseArraySeed_from_TENxMatrixSeed(x, index)  # I/O
+    extract_sparse_array(sas, index)  # in-memory
+}
+
+setMethod("extract_sparse_array", "TENxMatrixSeed",
+    .extract_sparse_array_from_TENxMatrixSeed
+)
+
+### The default "read_sparse_block" method defined in DelayedArray would work
+### just fine on a TENxMatrixSeed object (thanks to the "extract_sparse_array"
+### method for TENxMatrixSeed objects defined above), but we overwrite it with
+### the method below which is slightly more efficient. That's because the
+### method below calls read_sparse_block() on the SparseArraySeed object
+### returned by .load_SparseArraySeed_from_TENxMatrixSeed() and this is
+### faster than calling extract_sparse_array() on the same object (which
+### is what the "extract_sparse_array" method for TENxMatrixSeed would do
+### when called by the default "read_sparse_block" method).
+### Not sure the difference is significant enough for this extra method to
+### be worth it though, because, time is really dominated by I/O here, that
+### is, by the call to .load_SparseArraySeed_from_TENxMatrixSeed().
+.read_sparse_block_from_TENxMatrixSeed <- function(x, viewport)
+{
+    index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
+    sas <- .load_SparseArraySeed_from_TENxMatrixSeed(x, index)  # I/O
+    ## Unlike the "extract_sparse_array" method for TENxMatrixSeed objects
+    ## defined above, we use read_sparse_block() here, which is faster than
+    ## using extract_sparse_array().
+    read_sparse_block(sas, viewport)  # in-memory
+}
 
 setMethod("read_sparse_block", "TENxMatrixSeed",
     .read_sparse_block_from_TENxMatrixSeed
