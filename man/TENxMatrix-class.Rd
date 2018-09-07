@@ -129,11 +129,8 @@ extractNonzeroDataByCol(x, j)
     \item \code{\link[parallel]{detectCores}} from the \pkg{parallel}
           package.
 
-    \item \code{\link[BiocParallel]{MulticoreParam}} and
-          \code{\link[BiocParallel]{register}} from the \pkg{BiocParallel}
-          package.
-
-    \item \code{\link[DelayedArray]{setDefaultBlockSize}} in the
+    \item \code{\link[DelayedArray]{setAutoBPPARAM}} and
+          \code{\link[DelayedArray]{setAutoBlockSize}} in the
           \pkg{DelayedArray} package.
 
     \item \code{\link[DelayedArray]{colGrid}} and
@@ -189,13 +186,14 @@ oneM50k <- oneM[ , 1:50000]
 ## Row/col summarization methods like rowSums() use a block-processing
 ## mechanism behind the scene that can be controlled via global
 ## settings. 2 important settings that can have a strong impact on
-## performance are the number of workers and the default block size.
-## On a modern Linux laptop with 8 core (as reported by
-## parallel::detectCores()) and 16 Gb of RAM, reasonably good
-## performance is achieved by setting the number of workers to 6
-## and the default block size to 500 Mb:
-register(MulticoreParam(workers=6))
-setDefaultBlockSize(5e8)
+## performance are the automatic number of workers and automatic block
+## size, controlled by setAutoBPPARAM() and setAutoBlockSize()
+## respectively. On a modern Linux laptop with 8 core (as reported
+## by parallel::detectCores()) and 16 Gb of RAM, reasonably good
+## performance is achieved by setting the automatic number of workers
+## to 6 and automatic block size to 500 Mb:
+setAutoBPPARAM(MulticoreParam(workers=6))
+setAutoBlockSize(5e8)
 DelayedArray:::set_verbose_block_processing(TRUE)
 
 ## We're ready to compute the library sizes, number of genes expressed
@@ -234,8 +232,10 @@ stopifnot(all.equal(lib_sizes, lib_sizes2))
 stopifnot(all.equal(n_exprs, n_exprs2))
 stopifnot(all.equal(ave_exprs, ave_exprs2))
 
-## Reset default block size to factory settings:
-setDefaultBlockSize()
+## Reset automatic number of workers and automatic block size to factory
+## settings:
+setAutoBPPARAM()
+setAutoBlockSize()
 DelayedArray:::set_verbose_block_processing(FALSE)
 
 ## ---------------------------------------------------------------------

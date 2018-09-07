@@ -139,7 +139,7 @@ is(cov0, "DelayedArray")  # TRUE
 dim(cov0)
 
 dimnames(cov0)
-dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"))
+dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"), NULL)
 dimnames(cov0)
 
 ## ---------------------------------------------------------------------
