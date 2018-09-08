@@ -477,7 +477,7 @@ setMethod("sparsity", "TENxMatrix", function(x) sparsity(x@seed))
 
 ### This is about **structural** sparsity, not about quantitative sparsity
 ### measured by sparsity().
-setMethod("isSparse", "TENxMatrixSeed", function(x) TRUE)
+setMethod("is_sparse", "TENxMatrixSeed", function(x) TRUE)
 
 .extract_sparse_array_from_TENxMatrixSeed <- function(x, index)
 {

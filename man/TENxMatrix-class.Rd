@@ -30,7 +30,7 @@
 \alias{sparsity,TENxMatrixSeed-method}
 \alias{sparsity,TENxMatrix-method}
 
-\alias{isSparse,TENxMatrixSeed-method}
+\alias{is_sparse,TENxMatrixSeed-method}
 \alias{extract_sparse_array,TENxMatrixSeed-method}
 
 \alias{read_sparse_block,TENxMatrixSeed-method}
