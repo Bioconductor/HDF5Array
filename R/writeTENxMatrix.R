@@ -10,19 +10,26 @@
 ###
 
 .write_TENx_component <- function(filepath, group, name, data,
-                                  chunk.length=NULL)
+                                  H5type=NULL, chunk.length=NULL)
 {
     name <- paste0(group, "/", name)
     data_len <- length(data)
-    chunk_len <- if (is.null(chunk.length)) data_len else chunk.length
+    if (is.null(chunk.length) || chunk.length > data_len) {
+        chunk_len <- data_len
+    } else {
+        chunk_len <- chunk.length
+    }
     create_and_log_HDF5_dataset(filepath, name, dim=data_len,
-                                type=typeof(data), chunkdim=chunk_len, level=0L)
+                                type=typeof(data), H5type=H5type,
+                                chunkdim=chunk_len, level=0L)
     h5write(data, filepath, name)
 }
 
 .write_shape <- function(filepath, group, shape)
 {
-    .write_TENx_component(filepath, group, "shape", shape)
+    ## Standard HDF5 type H5T_STD_U32LE: unsigned 32-bit integer, little-endian
+    .write_TENx_component(filepath, group, "shape", shape,
+                          H5type="H5T_STD_U32LE")
 }
 
 .write_genes <- function(filepath, group, genes)
@@ -47,21 +54,19 @@
 .create_empty_row_indices <- function(filepath, group, maxlen, level)
 {
     name <- paste0(group, "/indices")
+    ## Standard HDF5 type H5T_STD_U32LE: unsigned 32-bit integer, little-endian
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=maxlen,
-                                type="integer", chunkdim=16384L, level=level)
+                                type="integer", H5type="H5T_STD_U32LE",
+                                chunkdim=16384L, level=level)
 }
 
 .create_empty_indptr <- function(filepath, group, ncol)
 {
     name <- paste0(group, "/indptr")
-    ## The values in the "indptr" dataset will be sorted and its last value
-    ## (which is also its biggest) should always be the length of the "data"
-    ## and "indices" datasets, so it can be >= 2^31. Because we don't know
-    ## how to write values that are >= 2^31 to a dataset of type INTEGER
-    ## (see https://github.com/grimbough/rhdf5/issues/21), we make the
-    ## dataset of type FLOAT.
+    ## Standard HDF5 type H5T_STD_U32LE: unsigned 32-bit integer, little-endian
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=ncol+1L,
-                                type="double", chunkdim=4096L, level=0L)
+                                type="integer", H5type="H5T_STD_U32LE",
+                                chunkdim=4096L, level=0L)
     h5append(0, filepath, name)
 }
 

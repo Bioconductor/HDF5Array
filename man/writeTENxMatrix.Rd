@@ -96,6 +96,28 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## A SIMPLE EXAMPLE
+## ---------------------------------------------------------------------
+m0 <- matrix(0L, nrow=25, ncol=12,
+             dimnames=list(letters[1:25], LETTERS[1:12]))
+m0[cbind(2:24, c(12:1, 2:12))] <- 100L + sample(55L, 23, replace=TRUE)
+out_file <- tempfile()
+M0 <- writeTENxMatrix(m0, out_file, group="m0")
+M0
+sparsity(M0)
+
+path(M0)  # same as 'out_file'
+
+## Use the h5ls() command from the rhdf5 package to see the structure of
+## the file:
+library(rhdf5)
+h5ls(path(M0))
+
+## ---------------------------------------------------------------------
+## USING THE "1.3 Million Brain Cell Dataset"
+## ---------------------------------------------------------------------
+
 ## The 1.3 Million Brain Cell Dataset from 10x Genomics is available via
 ## ExperimentHub:
 library(ExperimentHub)
