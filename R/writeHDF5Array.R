@@ -172,7 +172,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
     }
-    write_array_to_sink(x, sink)
+    BLOCK_write_to_sink(x, sink)
     as(sink, "HDF5Array")
 }
 

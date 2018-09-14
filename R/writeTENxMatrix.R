@@ -254,7 +254,7 @@ setMethod("close", "TENxRealizationSink",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Coercing an TENxRealizationSink object
+### Coercing a TENxRealizationSink object
 ###
 
 setAs("TENxRealizationSink", "TENxMatrixSeed",
@@ -276,7 +276,7 @@ setAs("TENxRealizationSink", "DelayedArray",
 
 ### Write the dataset to the current dump if 'filepath' and 'group' are not
 ### specified.
-### Return an TENxMatrix object pointing to the newly written HDF5-based
+### Return a TENxMatrix object pointing to the newly written HDF5-based
 ### sparse matrix on disk.
 writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
                             level=NULL, verbose=FALSE)
@@ -289,7 +289,7 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
     }
-    write_array_to_sink(x, sink)
+    BLOCK_write_to_sink(x, sink)
     ans <- as(sink, "TENxMatrix")
     if (verbose)
         message("sparsity: ", round(sparsity(ans), digits=2))
@@ -304,7 +304,7 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
 ### TENxRealizationSink to TENxMatrix is already taken care of by the specific
 ### method above and doesn't write anything to disk. So coercing to TENxMatrix
 ### in general writes the object to disk *except* when the object to coerce is
-### an TENxRealizationSink object.
+### a TENxRealizationSink object.
 ###
 
 .as_TENxMatrix <- function(from) writeTENxMatrix(from)  # write to current dump
