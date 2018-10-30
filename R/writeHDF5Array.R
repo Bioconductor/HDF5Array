@@ -133,7 +133,7 @@ setAs("HDF5RealizationSink", "HDF5ArraySeed",
 ### propagate them when coercion from HDF5RealizationSink to HDF5ArraySeed
 ### propagates them. See FIXME above.
 setAs("HDF5RealizationSink", "HDF5Array",
-    function(from) HDF5Array(as(from, "HDF5ArraySeed"))
+    function(from) DelayedArray(as(from, "HDF5ArraySeed"))
 )
 
 setAs("HDF5RealizationSink", "DelayedArray",

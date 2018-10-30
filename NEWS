@@ -1,0 +1,24 @@
+CHANGES IN VERSION 1.10.0
+-------------------------
+
+NEW FEATURES
+
+    o Implement the TENxMatrix container (DelayedArray backend for the
+      HDF5-based sparse matrix representation used by 10x Genomics).
+      Also add writeTENxMatrix() and coercion to TENxMatrix.
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o By default automatic HDF5 datasets (e.g. the dataset that gets written
+      to disk when calling 'as(x, "HDF5Array")') now are created with chunks
+      of 1 million array elements (revious default was 1/75 of
+      'getAutoBlockLength(x)'). This can be controlled with new low-level
+      utilities get/setHDF5DumpChunkLength().
+
+    o By default automatic HDF5 datasets now are created with chunks of
+      shape "scale" instead of "first-dim-grows-first". This can be
+      controlled with new low-level utilities get/setHDF5DumpChunkShape().
+
+    o getHDF5DumpChunkDim() looses the 'type' and 'ratio' arguments (only 'dim'
+      is left).
+
