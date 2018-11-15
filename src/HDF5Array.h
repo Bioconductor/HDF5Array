@@ -3,10 +3,10 @@
 
 /* h5read_lab.c */
 
-SEXP C_simple_h5read(
+SEXP C_h5mread(
 	SEXP filepath,
 	SEXP name,
-	SEXP start,
-	SEXP count
+	SEXP starts,
+	SEXP counts
 );
 
