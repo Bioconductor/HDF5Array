@@ -12,34 +12,6 @@
 
 static char errmsg_buf[256];
 
-/* 'counts' can be R_NilValue. */
-static int shallow_check_starts_counts(SEXP starts, SEXP counts)
-{
-	int starts_len, counts_len;
-
-	if (!isVectorList(starts)) {  // IS_LIST() is broken
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts' must be a list");
-		return -1;
-	}
-	starts_len = LENGTH(starts);
-	if (counts != R_NilValue) {
-		if (!isVectorList(counts)) {  // IS_LIST() is broken
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts' must be a list (or NULL)");
-			return -1;
-		}
-		counts_len = LENGTH(counts);
-		if (starts_len != counts_len) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'starts' and 'counts' must have "
-				 "the same length");
-			return -1;
-		}
-	}
-	return starts_len;
-}
-
 #define	NOT_A_FINITE_NUMBER(x) \
 	(R_IsNA(x) || R_IsNaN(x) || (x) == R_PosInf || (x) == R_NegInf)
 
@@ -79,6 +51,109 @@ static int get_elt_as_llint(SEXP x, int i, long long int *val,
 	return 0;
 }
 
+/* Unlike get_elt_as_llint() above, doesn't check anything. */
+static inline long long int get_trusted_elt(SEXP x, int i)
+{
+	return IS_INTEGER(x) ? (long long int) INTEGER(x)[i] :
+			       (long long int) REAL(x)[i];
+}
+
+
+/****************************************************************************
+ * C_reduce_starts()
+ */
+
+#ifdef NOT_READY_YET
+/* Note that this does something very similar to what coercion from integer
+   (or numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
+   in IRanges) but this coercion does not support start values >= 2^31 at
+   the moment. */
+static int reduce_start(SEXP start, void *start_buf, int start_buf_is_int,
+			IntAE *count_buf, int along)
+{
+	int n, i;
+	long long int tmp;
+
+	n = LENGTH(start);
+	for (i = 0; i < n; i++) {
+		tmp = IS_INTEGER(start) ? (long long int) INTEGER(start)[i]
+					: (long long int) REAL(start)[i];
+
+	}
+}
+
+/* --- .Call ENTRY POINT ---
+ * Return a list of length 2. The 1st list element is the list of reduced
+ * starts, the 2nd list element the list of corresponding 'counts'.
+ * The 2 lists have the same shape i.e. same length() and same lengths().
+ */
+SEXP C_reduce_starts(SEXP starts)
+{
+	int starts_len, along, can_be_reduced;
+	SEXP ans, start;
+	long long unsigned start_max;
+
+	if (!isVectorList(starts))  // IS_LIST() is broken
+		error("'starts' must be a list");
+	starts_len = LENGTH(starts);
+
+	for (along = 0; along < starts_len; along++) {
+		start = VECTOR_ELT(starts, along);
+
+		/* 1st pass */
+		// Check that start is INTEGER or NUMERIC, and that all values
+		// in it are non-NA, non-NaN, finite, positive, and in strictly
+		// ascending order.
+		// Find the reduced length.
+		// If reduced length < current length then it can be reduced.
+                // If it can, return max value.
+		start_len = LENGTH(start);
+
+		/* 2nd pass */
+		if (reduced_len < ) {
+			start_buf = start_max > INT_MAX ? aa : bb;
+			if (start_max > INT_MAX) {
+				start_buf = 1;
+			}
+			reduce_start(start, start_buf, count_buf, along);
+		}
+	}
+	return ans;
+}
+#endif
+
+
+/****************************************************************************
+ * C_h5mread()
+ */
+
+static int shallow_check_starts_counts(SEXP starts, SEXP counts)
+{
+	int starts_len, counts_len;
+
+	if (!isVectorList(starts)) {  // IS_LIST() is broken
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "'starts' must be a list");
+		return -1;
+	}
+	starts_len = LENGTH(starts);
+	if (counts != R_NilValue) {
+		if (!isVectorList(counts)) {  // IS_LIST() is broken
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "'counts' must be a list (or NULL)");
+			return -1;
+		}
+		counts_len = LENGTH(counts);
+		if (starts_len != counts_len) {
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "'starts' and 'counts' must have "
+				 "the same length");
+			return -1;
+		}
+	}
+	return starts_len;
+}
+
 static int check_starts_counts_along(int along,
 				     int dset_rank, const hsize_t *dset_dims,
 				     SEXP starts, SEXP counts,
@@ -98,18 +173,20 @@ static int check_starts_counts_along(int along,
 	n = LENGTH(start);
 	if (counts != R_NilValue) {
 		count = VECTOR_ELT(counts, along);
-		if (!(IS_INTEGER(count) || IS_NUMERIC(count))) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts[[%d]]' must be "
-				 "an integer vector", along + 1);
-			return -1;
-		}
-		if (LENGTH(count) != n) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts[[%d]]' must have the "
-				 "same length as 'starts[[%d]]'",
-				 along + 1, along + 1);
-			return -1;
+		if (count != R_NilValue) {
+			if (!(IS_INTEGER(count) || IS_NUMERIC(count))) {
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "'counts[[%d]]' must be an integer "
+					 "vector (or NULL)", along + 1);
+				return -1;
+			}
+			if (LENGTH(count) != n) {
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "'counts[[%d]]' must have the "
+					 "same length as 'starts[[%d]]'",
+					 along + 1, along + 1);
+				return -1;
+			}
 		}
 	}
 	nregion[along] = n;
@@ -129,7 +206,7 @@ static int check_starts_counts_along(int along,
 				 along + 1, i);
 			return -1;
 		}
-		if (counts != R_NilValue) {
+		if (counts != R_NilValue && count != R_NilValue) {
 			ret = get_elt_as_llint(count, i, &c, "counts", along);
 			if (ret < 0)
 				return -1;
@@ -161,7 +238,6 @@ static int check_starts_counts_along(int along,
 	return 0;
 }
 
-/* 'counts' can be R_NilValue. */
 static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 				    SEXP starts, SEXP counts,
 				    int *nregion, int *count_sums,
@@ -169,17 +245,19 @@ static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 {
 	int along, ret;
 
-	if (!(isVectorList(starts) && LENGTH(starts) == dset_rank)) {
+	/* We already know that 'starts' is a list. */
+	if (LENGTH(starts) != dset_rank) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts' must be a list with one list "
-			 "element per dimension in the dataset");
+			 "'starts' must have one list element "
+			 "per dimension in the dataset");
 		return -1;
 	}
+	/* We already know that 'counts' is a list (or NULL). */
 	if (counts != R_NilValue) {
-		if (!(isVectorList(counts) && LENGTH(counts) == dset_rank)) {
+		if (LENGTH(counts) != dset_rank) {
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts' must be a list with one list "
-				 "element per dimension in the dataset");
+				 "'counts' must have one list element "
+				 "per dimension in the dataset");
 			return -1;
 		}
 	}
@@ -211,19 +289,19 @@ static int add_region_to_read(hid_t file_space_id, int dset_rank,
 {
 	int along, i, ret;
 	SEXP start, count;
-	hsize_t tmp;
+	long long int tmp;
 
 	for (along = 0; along < dset_rank; along++) {
 		i = region_idx[along];
 		start = VECTOR_ELT(starts, along);
-		tmp = IS_INTEGER(start) ? (hsize_t) INTEGER(start)[i]
-					: (hsize_t) REAL(start)[i];
+		tmp = get_trusted_elt(start, i);
 		offset_buf[dset_rank - 1 - along] = tmp - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
-			tmp = IS_INTEGER(count) ? (hsize_t) INTEGER(count)[i]
-						: (hsize_t) REAL(count)[i];
-			count_buf[dset_rank - 1 - along] = tmp;
+			if (count != R_NilValue) {
+				tmp = get_trusted_elt(count, i);
+				count_buf[dset_rank - 1 - along] = tmp;
+			}
 		}
 	}
 	ret = H5Sselect_hyperslab(file_space_id, H5S_SELECT_OR,
