@@ -1,7 +1,7 @@
 #include <Rdefines.h>
 
 
-/* simple_h5read.c */
+/* h5read_lab.c */
 
 SEXP C_simple_h5read(
 	SEXP filepath,

@@ -5,7 +5,7 @@
 
 static const R_CallMethodDef callMethods[] = {
 
-/* simple_h5read.c */
+/* h5read_lab.c */
 	CALLMETHOD_DEF(C_simple_h5read, 4),
 
 	{NULL, NULL, 0}
