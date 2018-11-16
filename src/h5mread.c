@@ -3,6 +3,7 @@
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "HDF5Array.h"
+#include "S4Vectors_interface.h"
 #include "hdf5.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -58,69 +59,172 @@ static inline long long int get_trusted_elt(SEXP x, int i)
 			       (long long int) REAL(x)[i];
 }
 
+static inline void set_trusted_elt(SEXP x, int i, long long int val)
+{
+	if (IS_INTEGER(x))
+		INTEGER(x)[i] = val;
+	else
+		REAL(x)[i] = val;
+	return;
+}
+
 
 /****************************************************************************
  * C_reduce_starts()
  */
 
-#ifdef NOT_READY_YET
-/* Note that this does something very similar to what coercion from integer
-   (or numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
-   in IRanges) but this coercion does not support start values >= 2^31 at
-   the moment. */
-static int reduce_start(SEXP start, void *start_buf, int start_buf_is_int,
-			IntAE *count_buf, int along)
+static int compute_reduction(SEXP start, int *reduction,
+			     long long int *maxstart,
+			     int along)
 {
-	int n, i;
-	long long int tmp;
+	int n, i, ret;
+	long long int e, s;
+
+	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "'starts[[%d]]' must be "
+			 "an integer vector (or NULL)", along + 1);
+		return -1;
+	}
+	n = LENGTH(start);
+	*reduction = *maxstart = 0;
+	e = 0;
+	for (i = 0; i < n; i++) {
+		ret = get_elt_as_llint(start, i, &s, "starts", along);
+		if (ret < 0)
+			return -1;
+		if (s <= e) {
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "starts[[%d]][%d] is <= 0 or <= "
+				 "starts[[%d]][%d]",
+				 along + 1, i + 1, along + 1, i);
+			return -1;
+		}
+		if (i == 0 || s != e + 1)
+			*maxstart = s;
+		else
+			(*reduction)++;
+		e = s;
+	}
+	return 0;
+}
+
+/*
+ * Note that this does something similar to what coercion from integer (or
+ * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
+ * in IRanges) and also to what reduce() does on an IRanges object. However
+ * we cannot use these things because we want to be able to handle start
+ * values that are >= 2^31 and these things don't support this at the moment.
+ */
+static SEXP reduce_start(SEXP start, int reduction, long long int maxstart,
+			int *count_out)
+{
+	int n, i, j;
+	SEXP reduced_start;
+	long long int e, s;
 
 	n = LENGTH(start);
+	reduced_start =
+		PROTECT(allocVector(maxstart <= INT_MAX ? INTSXP : REALSXP,
+				    n - reduction));
+	e = 0;
+	j = -1;
 	for (i = 0; i < n; i++) {
-		tmp = IS_INTEGER(start) ? (long long int) INTEGER(start)[i]
-					: (long long int) REAL(start)[i];
-
+		s = get_trusted_elt(start, i);
+		if (i == 0 || s != e + 1) {
+			j++;
+			set_trusted_elt(reduced_start, j, s);
+			count_out[j] = 1;
+		} else {
+			count_out[j]++;
+		}
+		e = s;
 	}
+	UNPROTECT(1);
+	return reduced_start;
 }
 
 /* --- .Call ENTRY POINT ---
- * Return a list of length 2. The 1st list element is the list of reduced
- * starts, the 2nd list element is the list of corresponding 'counts'.
- * The 2 lists have the same shape i.e. same length() and same lengths().
+ * Return a list of length 2 or NULL if 'starts' cannot be reduced.
+ * The 1st list element is the list of reduced starts, the 2nd list element
+ * is the list of corresponding 'counts'. The 2 lists have the same shape
+ * i.e. same length() and same lengths().
  */
 SEXP C_reduce_starts(SEXP starts)
 {
-	int starts_len, along, can_be_reduced;
-	SEXP ans, start;
-	long long unsigned start_max;
+	int rank, along, ret, n, i;
+	IntAE *reduction_buf;
+	int reduction;
+	LLongAE *maxstart_buf;
+	long long int maxstart;
+	long long unsigned int total_reduction;
+	SEXP start, ans, ans_starts, ans_counts, reduced_start, count;
 
 	if (!isVectorList(starts))  // IS_LIST() is broken
 		error("'starts' must be a list");
-	starts_len = LENGTH(starts);
+	rank = LENGTH(starts);
+	reduction_buf = new_IntAE(rank, rank, 0);
+	maxstart_buf = new_LLongAE(rank, rank, 0);
 
 	/* 1st pass */
-	for (along = 0; along < starts_len; along++) {
+	total_reduction = 0;
+	for (along = 0; along < rank; along++) {
 		start = VECTOR_ELT(starts, along);
-
-		// Check that start is INTEGER or NUMERIC, and that all values
-		// in it are non-NA, non-NaN, finite, positive, and in strictly
-		// ascending order.
-		// Find the reduced length.
-		// If reduced length < current length then it can be reduced.
-                // If it can, return max value.
+		if (start == R_NilValue)
+			continue;
+		ret = compute_reduction(start, &reduction, &maxstart,
+					   along);
+		if (ret < 0)
+			error(errmsg_buf);
+		reduction_buf->elts[along] = reduction;
+		maxstart_buf->elts[along] = maxstart;
+		total_reduction += reduction;
 	}
 
+	if (total_reduction == 0)
+		return R_NilValue;
+
+	ans = PROTECT(NEW_LIST(2));
+	ans_starts = PROTECT(NEW_LIST(rank));
+	SET_VECTOR_ELT(ans, 0, ans_starts);
+	UNPROTECT(1);
+	ans_counts = PROTECT(NEW_LIST(rank));
+	SET_VECTOR_ELT(ans, 1, ans_counts);
+	UNPROTECT(1);
 
 	/* 2nd pass */
-	if (reduced_len < ) {
-		start_buf = start_max > INT_MAX ? aa : bb;
-		if (start_max > INT_MAX) {
-			start_buf = 1;
+	for (along = 0; along < rank; along++) {
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		n = LENGTH(start);
+		reduction = reduction_buf->elts[along];
+		maxstart = maxstart_buf->elts[along];
+		if (reduction == 0) {
+			if (IS_NUMERIC(start) && maxstart <= INT_MAX) {
+				reduced_start = PROTECT(NEW_INTEGER(n));
+				for (i = 0; i < n; i++)
+					INTEGER(reduced_start)[i] =
+						(int) REAL(start)[i];
+			} else {
+				reduced_start = PROTECT(duplicate(start));
+			}
+			SET_VECTOR_ELT(ans_starts, along, reduced_start);
+			UNPROTECT(1);
+			continue;
 		}
-		reduce_start(start, start_buf, count_buf, along);
+		count = PROTECT(NEW_INTEGER(n - reduction));
+		SET_VECTOR_ELT(ans_counts, along, count);
+		UNPROTECT(1);
+		reduced_start = PROTECT(reduce_start(start,
+						     reduction, maxstart,
+						     INTEGER(count)));
+		SET_VECTOR_ELT(ans_starts, along, reduced_start);
+		UNPROTECT(1);
 	}
+	UNPROTECT(1);
 	return ans;
 }
-#endif
 
 
 /****************************************************************************

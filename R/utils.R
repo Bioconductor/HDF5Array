@@ -99,6 +99,14 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
+reduce_starts <- function(starts)
+{
+    ans <- .Call("C_reduce_starts", starts, PACKAGE="HDF5Array")
+    if (is.null(ans))
+        return(starts)
+    ans
+}
+
 h5mread <- function(filepath, name, starts, counts=NULL)
 {
     .Call("C_h5mread", filepath, name, starts, counts, PACKAGE="HDF5Array")
