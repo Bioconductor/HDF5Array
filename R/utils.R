@@ -99,14 +99,21 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
-reduce_starts <- function(starts)
+### The selection must be strictly ascending along each dimension.
+### If 'dim' is provided, it must also be within the extend of each dimension.
+### Return NULL if the selection could not be reduced.
+### Typical usage:
+###     reduced <- reduce_selection(starts, counts)
+###     if (!is.null(reduced)) {
+###         starts <- reduced[[1L]]
+###         counts <- counts[[1L]]
+###     }
+reduce_selection <- function(starts, counts=NULL, dim=NULL)
 {
-    ans <- .Call("C_reduce_starts", starts, PACKAGE="HDF5Array")
-    if (is.null(ans))
-        return(starts)
-    ans
+    .Call("C_reduce_selection", starts, counts, dim, PACKAGE="HDF5Array")
 }
 
+### The selection must be strictly ascending along each dimension.
 h5mread <- function(filepath, name, starts, counts=NULL)
 {
     .Call("C_h5mread", filepath, name, starts, counts, PACKAGE="HDF5Array")

@@ -3,7 +3,7 @@
 
 /* h5mread.c */
 
-SEXP C_reduce_starts(SEXP starts);
+SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim);
 
 SEXP C_h5mread(
 	SEXP filepath,
