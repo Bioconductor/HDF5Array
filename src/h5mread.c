@@ -68,199 +68,10 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 	return;
 }
 
-
-/****************************************************************************
- * C_reduce_starts()
- */
-
-static int compute_reduction(SEXP start, int *reduction,
-			     long long int *maxstart,
-			     int along)
-{
-	int n, i, ret;
-	long long int e, s;
-
-	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts[[%d]]' must be "
-			 "an integer vector (or NULL)", along + 1);
-		return -1;
-	}
-	n = LENGTH(start);
-	*reduction = *maxstart = 0;
-	e = 0;
-	for (i = 0; i < n; i++) {
-		ret = get_elt_as_llint(start, i, &s, "starts", along);
-		if (ret < 0)
-			return -1;
-		if (s <= e) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "starts[[%d]][%d] is <= 0 or <= "
-				 "starts[[%d]][%d]",
-				 along + 1, i + 1, along + 1, i);
-			return -1;
-		}
-		if (i == 0 || s != e + 1)
-			*maxstart = s;
-		else
-			(*reduction)++;
-		e = s;
-	}
-	return 0;
-}
-
-/*
- * Note that this does something similar to what coercion from integer (or
- * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
- * in IRanges) and also to what reduce() does on an IRanges object. However
- * we cannot use these things because we want to be able to handle start
- * values that are >= 2^31 and these things don't support this at the moment.
- */
-static SEXP reduce_start(SEXP start, int reduction, long long int maxstart,
-			int *count_out)
-{
-	int n, i, j;
-	SEXP reduced_start;
-	long long int e, s;
-
-	n = LENGTH(start);
-	reduced_start =
-		PROTECT(allocVector(maxstart <= INT_MAX ? INTSXP : REALSXP,
-				    n - reduction));
-	e = 0;
-	j = -1;
-	for (i = 0; i < n; i++) {
-		s = get_trusted_elt(start, i);
-		if (i == 0 || s != e + 1) {
-			j++;
-			set_trusted_elt(reduced_start, j, s);
-			count_out[j] = 1;
-		} else {
-			count_out[j]++;
-		}
-		e = s;
-	}
-	UNPROTECT(1);
-	return reduced_start;
-}
-
-/* --- .Call ENTRY POINT ---
- * Return a list of length 2 or NULL if 'starts' cannot be reduced.
- * The 1st list element is the list of reduced starts, the 2nd list element
- * is the list of corresponding 'counts'. The 2 lists have the same shape
- * i.e. same length() and same lengths().
- */
-SEXP C_reduce_starts(SEXP starts)
-{
-	int rank, along, ret, n, i;
-	IntAE *reduction_buf;
-	int reduction;
-	LLongAE *maxstart_buf;
-	long long int maxstart;
-	long long unsigned int total_reduction;
-	SEXP start, ans, ans_starts, ans_counts, reduced_start, count;
-
-	if (!isVectorList(starts))  // IS_LIST() is broken
-		error("'starts' must be a list");
-	rank = LENGTH(starts);
-	reduction_buf = new_IntAE(rank, rank, 0);
-	maxstart_buf = new_LLongAE(rank, rank, 0);
-
-	/* 1st pass */
-	total_reduction = 0;
-	for (along = 0; along < rank; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		ret = compute_reduction(start, &reduction, &maxstart,
-					   along);
-		if (ret < 0)
-			error(errmsg_buf);
-		reduction_buf->elts[along] = reduction;
-		maxstart_buf->elts[along] = maxstart;
-		total_reduction += reduction;
-	}
-
-	if (total_reduction == 0)
-		return R_NilValue;
-
-	ans = PROTECT(NEW_LIST(2));
-	ans_starts = PROTECT(NEW_LIST(rank));
-	SET_VECTOR_ELT(ans, 0, ans_starts);
-	UNPROTECT(1);
-	ans_counts = PROTECT(NEW_LIST(rank));
-	SET_VECTOR_ELT(ans, 1, ans_counts);
-	UNPROTECT(1);
-
-	/* 2nd pass */
-	for (along = 0; along < rank; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		n = LENGTH(start);
-		reduction = reduction_buf->elts[along];
-		maxstart = maxstart_buf->elts[along];
-		if (reduction == 0) {
-			if (IS_NUMERIC(start) && maxstart <= INT_MAX) {
-				reduced_start = PROTECT(NEW_INTEGER(n));
-				for (i = 0; i < n; i++)
-					INTEGER(reduced_start)[i] =
-						(int) REAL(start)[i];
-			} else {
-				reduced_start = PROTECT(duplicate(start));
-			}
-			SET_VECTOR_ELT(ans_starts, along, reduced_start);
-			UNPROTECT(1);
-			continue;
-		}
-		count = PROTECT(NEW_INTEGER(n - reduction));
-		SET_VECTOR_ELT(ans_counts, along, count);
-		UNPROTECT(1);
-		reduced_start = PROTECT(reduce_start(start,
-						     reduction, maxstart,
-						     INTEGER(count)));
-		SET_VECTOR_ELT(ans_starts, along, reduced_start);
-		UNPROTECT(1);
-	}
-	UNPROTECT(1);
-	return ans;
-}
-
-
-/****************************************************************************
- * C_h5mread()
- */
-
-static int shallow_check_starts_counts(SEXP starts, SEXP counts)
-{
-	int starts_len, counts_len;
-
-	if (!isVectorList(starts)) {  // IS_LIST() is broken
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts' must be a list");
-		return -1;
-	}
-	starts_len = LENGTH(starts);
-	if (counts != R_NilValue) {
-		if (!isVectorList(counts)) {  // IS_LIST() is broken
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts' must be a list (or NULL)");
-			return -1;
-		}
-		counts_len = LENGTH(counts);
-		if (starts_len != counts_len) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'starts' and 'counts' must have "
-				 "the same length");
-			return -1;
-		}
-	}
-	return starts_len;
-}
-
-static int check_starts_counts_along(int along, hsize_t d,
-				     SEXP starts, SEXP counts,
-				     int *nregion, int *count_sums)
+static int check_starts_counts_along(int along, long long int d,
+			SEXP starts, SEXP counts,
+			int *nstart, int *count_sums,
+			int *nregion, long long int *last_region_start)
 {
 	SEXP start, count;
 	int n, i, ret;
@@ -276,7 +87,6 @@ static int check_starts_counts_along(int along, hsize_t d,
 				 along + 1, along + 1);
 			return -1;
 		}
-		nregion[along] = 1;
 		if (d > INT_MAX) {
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
 				 "too many elements (>= 2^31) selected "
@@ -284,7 +94,11 @@ static int check_starts_counts_along(int along, hsize_t d,
 				 along + 1);
 			return -1;
 		}
-		count_sums[along] = d;
+		nstart[along] = count_sums[along] = d;
+		if (nregion != NULL)
+			nregion[along] = d != 0;
+		if (last_region_start != NULL)
+			last_region_start[along] = 1;
 		return 0;
 	}
 	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
@@ -309,8 +123,10 @@ static int check_starts_counts_along(int along, hsize_t d,
 			return -1;
 		}
 	}
-	nregion[along] = n;
+	nstart[along] = n;
 	count_sum = 0;
+	if (nregion != NULL)
+		nregion[along] = 0;
 	c = 1;
 	e = 0;
 	for (i = 0; i < n; i++) {
@@ -318,13 +134,33 @@ static int check_starts_counts_along(int along, hsize_t d,
 		if (ret < 0)
 			return -1;
 		if (s <= e) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "starts[[%d]][%d] is <= 0 or < "
-				 "starts[[%d]][%d] + counts[[%d]][%d]",
-				 along + 1, i + 1,
-				 along + 1, i,
-				 along + 1, i);
+			if (e == 0) {
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "starts[[%d]][%d] is <= 0",
+					 along + 1, i + 1);
+				return -1;
+			}
+			/* Selection along dimension not strictly ascending. */
+			if (count != R_NilValue)
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "starts[[%d]][%d] is < "
+					 "starts[[%d]][%d] + counts[[%d]][%d]",
+					 along + 1, i + 1,
+					 along + 1, i,
+					 along + 1, i);
+			else
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "starts[[%d]][%d] is <= "
+					 "starts[[%d]][%d]",
+					 along + 1, i + 1,
+					 along + 1, i);
 			return -1;
+		}
+		if (i == 0 || s != e + 1) {
+			if (nregion != NULL)
+				nregion[along]++;
+			if (last_region_start != NULL)
+				last_region_start[along] = s;
 		}
 		if (count != R_NilValue) {
 			ret = get_elt_as_llint(count, i, &c, "counts", along);
@@ -338,7 +174,7 @@ static int check_starts_counts_along(int along, hsize_t d,
 			}
 		}
 		e = s + c - 1;  // could overflow! (FIXME)
-		if (e > d) {
+		if (d >= 0 && e > d) {
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
 				 "starts[[%d]][%d] + counts[[%d]][%d] - 1 "
 				 "is greater than dimension %d\n  "
@@ -359,12 +195,187 @@ static int check_starts_counts_along(int along, hsize_t d,
 	return 0;
 }
 
+
+/****************************************************************************
+ * C_reduce_starts()
+ */
+
+/*
+ * Note that this does something similar to what coercion from integer (or
+ * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
+ * in IRanges) and also to what reduce() does on an IRanges object. However
+ * we cannot use these things because we want to be able to handle start
+ * values that are >= 2^31 and these things don't support this at the moment.
+ */
+static SEXP reduce_start(SEXP start,
+			 int nregion, long long int last_region_start,
+			 int *count_out)
+{
+	int n, i, j;
+	SEXP reduced_start;
+	long long int e, s;
+
+	n = LENGTH(start);
+	reduced_start = PROTECT(
+		allocVector(last_region_start <= INT_MAX ? INTSXP : REALSXP,
+			    nregion));
+	e = 0;
+	j = -1;
+	for (i = 0; i < n; i++) {
+		s = get_trusted_elt(start, i);
+		if (i == 0 || s != e + 1) {
+			j++;
+			set_trusted_elt(reduced_start, j, s);
+			count_out[j] = 1;
+		} else {
+			count_out[j]++;
+		}
+		e = s;
+	}
+	UNPROTECT(1);
+	return reduced_start;
+}
+
+/*
+ * Return a list of length 2.
+ * The 1st list element is the list of reduced starts, the 2nd list element
+ * is the list of corresponding 'counts'. The 2 lists have the same shape
+ * i.e. same length() and same lengths().
+ */
+static SEXP reduce_starts(SEXP starts, int *status)
+{
+	int ndim, along, ret, n, i;
+	IntAE *nstart_buf;
+	IntAE *nregion_buf;
+	LLongAE *last_region_start_buf;
+	int nregion;
+	long long int last_region_start;
+	long long unsigned int total_reduction;
+	SEXP start, ans, ans_starts, ans_counts, reduced_start, count;
+
+	ndim = LENGTH(starts);
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	nregion_buf = new_IntAE(ndim, ndim, 0);
+	last_region_start_buf = new_LLongAE(ndim, ndim, 0);
+
+	/* 1st pass */
+	total_reduction = 0;
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		ret = check_starts_counts_along(along, -1,
+			starts, R_NilValue,
+			nstart_buf->elts, nstart_buf->elts,
+			nregion_buf->elts, last_region_start_buf->elts);
+		if (ret < 0) {
+			*status = -1;
+			return R_NilValue;
+		}
+		total_reduction += nstart_buf->elts[along] -
+				   nregion_buf->elts[along];
+	}
+
+	if (total_reduction == 0) {
+		*status = 0;
+		return R_NilValue;
+	}
+
+	ans = PROTECT(NEW_LIST(2));
+	ans_starts = PROTECT(NEW_LIST(ndim));
+	SET_VECTOR_ELT(ans, 0, ans_starts);
+	UNPROTECT(1);
+	ans_counts = PROTECT(NEW_LIST(ndim));
+	SET_VECTOR_ELT(ans, 1, ans_counts);
+	UNPROTECT(1);
+
+	/* 2nd pass */
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		n = LENGTH(start);
+		nregion = nregion_buf->elts[along];
+		last_region_start = last_region_start_buf->elts[along];
+		if (nregion == n) {
+			/* No reduction. */
+			if (IS_NUMERIC(start) && last_region_start <= INT_MAX) {
+				reduced_start = PROTECT(NEW_INTEGER(n));
+				for (i = 0; i < n; i++)
+					INTEGER(reduced_start)[i] =
+						(int) REAL(start)[i];
+			} else {
+				reduced_start = PROTECT(duplicate(start));
+			}
+			SET_VECTOR_ELT(ans_starts, along, reduced_start);
+			UNPROTECT(1);
+			continue;
+		}
+		count = PROTECT(NEW_INTEGER(nregion));
+		SET_VECTOR_ELT(ans_counts, along, count);
+		UNPROTECT(1);
+		reduced_start = PROTECT(reduce_start(start,
+						     nregion,
+						     last_region_start,
+						     INTEGER(count)));
+		SET_VECTOR_ELT(ans_starts, along, reduced_start);
+		UNPROTECT(1);
+	}
+	UNPROTECT(1);
+	*status = 1;
+	return ans;
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_reduce_starts(SEXP starts)
+{
+	SEXP ans;
+	int status;
+
+	if (!isVectorList(starts))  // IS_LIST() is broken
+		error("'starts' must be a list");
+	ans = reduce_starts(starts, &status);  // no need to PROTECT()
+	if (status < 0)
+		error(errmsg_buf);
+	return ans;
+}
+
+
+/****************************************************************************
+ * C_h5mread()
+ */
+
+static int shallow_check_starts_counts(SEXP starts, SEXP counts)
+{
+	int ndim, counts_len;
+
+	if (!isVectorList(starts)) {  // IS_LIST() is broken
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "'starts' must be a list");
+		return -1;
+	}
+	ndim = LENGTH(starts);
+	if (counts != R_NilValue) {
+		if (!isVectorList(counts)) {  // IS_LIST() is broken
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "'counts' must be a list (or NULL)");
+			return -1;
+		}
+		counts_len = LENGTH(counts);
+		if (counts_len != ndim) {
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "'starts' and 'counts' must have "
+				 "the same length");
+			return -1;
+		}
+	}
+	return ndim;
+}
+
 static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 				    SEXP starts, SEXP counts,
-				    int *nregion, int *count_sums,
-				    R_xlen_t *ans_len)
+				    int *nstart, int *count_sums)
 {
 	int along, ret;
+	long long int d;
 
 	/* We already know that 'starts' is a list. */
 	if (LENGTH(starts) != dset_rank) {
@@ -382,15 +393,15 @@ static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 			return -1;
 		}
 	}
-	*ans_len = 1;
 	for (along = 0; along < dset_rank; along++) {
+		d = dset_dims[dset_rank - 1 - along];
 		ret = check_starts_counts_along(
-				along, dset_dims[dset_rank - 1 - along],
+				along, d,
 				starts, counts,
-				nregion, count_sums);
+				nstart, count_sums,
+				NULL, NULL);
 		if (ret < 0)
 			return -1;
-		*ans_len *= count_sums[along];
 	}
 	return 0;
 }
@@ -438,13 +449,13 @@ static int add_region_to_read(hid_t file_space_id, int dset_rank,
 	return 0;
 }
 
-static int next_region(int dset_rank, const int *nregion, int *region_idx)
+static int next_region(int dset_rank, const int *nstart, int *region_idx)
 {
 	int along, i;
 
 	for (along = 0; along < dset_rank; along++) {
 		i = region_idx[along] + 1;
-		if (i < nregion[along]) {
+		if (i < nstart[along]) {
 			region_idx[along] = i;
 			return 1;
 		}
@@ -455,7 +466,7 @@ static int next_region(int dset_rank, const int *nregion, int *region_idx)
 
 static int set_regions_to_read(hid_t file_space_id,
 			       int dset_rank, const hsize_t *dset_dims,
-			       SEXP starts, SEXP counts, const int *nregion)
+			       SEXP starts, SEXP counts, const int *nstart)
 {
 	int ret, *region_idx, along, h5along;
 	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
@@ -465,7 +476,7 @@ static int set_regions_to_read(hid_t file_space_id,
 	if (ret < 0)
 		return -1;
 	for (along = 0; along < dset_rank; along++)
-		if (nregion[along] == 0)
+		if (nstart[along] == 0)
 			return 0;  // no region to set
 
 	/* Allocate 'offset_buf' and 'count_buf'. */
@@ -515,7 +526,7 @@ static int set_regions_to_read(hid_t file_space_id,
 					 offset_buf, count_buf);
 		if (ret < 0)
 			break;
-	} while (next_region(dset_rank, nregion, region_idx));
+	} while (next_region(dset_rank, nstart, region_idx));
 	printf("nb of hyperslabs = %llu\n", n);
 	free(region_idx);
 	free(offset_buf);
@@ -523,11 +534,12 @@ static int set_regions_to_read(hid_t file_space_id,
 }
 
 static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
-				int *count_sums, R_xlen_t *ans_len)
+				int *count_sums)
 {
 	hid_t file_space_id;
-	int dset_rank, *nregion, ret;
+	int dset_rank, ret;
 	hsize_t *dset_dims;
+	IntAE *nstart_buf;
 
 	file_space_id = H5Dget_space(dset_id);
 	if (file_space_id < 0) {
@@ -557,22 +569,13 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 		return -1;
 	}
 
-	/* Allocate and set 'nregion'. */
-	nregion = (int *) malloc(dset_rank * sizeof(int));
-	if (nregion == NULL) {
-		free(dset_dims);
-		H5Sclose(file_space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'nregion'");
-		return -1;
-	}
+	nstart_buf = new_IntAE(dset_rank, dset_rank, 0);
 
-	/* This call will populate 'nregion' and 'count_sums', and will
-	   set 'ans_len'. */
-	ret = deep_check_starts_counts(dset_rank, dset_dims, starts, counts,
-				       nregion, count_sums, ans_len);
+	/* This call will populate 'nstart' and 'count_sums'. */
+	ret = deep_check_starts_counts(dset_rank, dset_dims,
+				       starts, counts,
+				       nstart_buf->elts, count_sums);
 	if (ret < 0) {
-		free(nregion);
 		free(dset_dims);
 		H5Sclose(file_space_id);
 		return -1;
@@ -580,8 +583,7 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 
 	ret = set_regions_to_read(file_space_id,
 				  dset_rank, dset_dims,
-				  starts, counts, nregion);
-	free(nregion);
+				  starts, counts, nstart_buf->elts);
 	free(dset_dims);
 	if (ret < 0) {
 		H5Sclose(file_space_id);
@@ -630,47 +632,41 @@ static hid_t prepare_mem_space(int dset_rank, const int *count_sums)
 /* Return R_NilValue if error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts)
 {
-	int starts_len, *count_sums, along, ret;
+	int ndim, along, ret;
+	IntAE *count_sums_buf;
 	hid_t file_space_id, mem_space_id;
 	R_xlen_t ans_len;
 	SEXP ans, ans_dim;
 
-	starts_len = shallow_check_starts_counts(starts, counts);
-	if (starts_len < 0)
+	ndim = shallow_check_starts_counts(starts, counts);
+	if (ndim < 0)
 		return R_NilValue;
 
-	/* Allocate 'count_sums'. */
-	count_sums = (int *) malloc(starts_len * sizeof(int));
-	if (count_sums == NULL) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'count_sums'");
-		return R_NilValue;
-	}
+	count_sums_buf = new_IntAE(ndim, ndim, 0);
 
 	/* Prepare 'file_space_id'. */
 	file_space_id = prepare_file_space(dset_id, starts, counts,
-					   count_sums, &ans_len);
-	if (file_space_id < 0) {
-		free(count_sums);
+					   count_sums_buf->elts);
+	if (file_space_id < 0)
 		return R_NilValue;
-	}
+
+	ans_dim = PROTECT(NEW_INTEGER(ndim));
+	ans_len = 1;
+	for (along = 0; along < ndim; along++)
+		ans_len *= INTEGER(ans_dim)[along] =
+				count_sums_buf->elts[along];
 
 	if (ans_len != 0) {
 		/* Prepare 'mem_space_id'. */
-		mem_space_id = prepare_mem_space(starts_len, count_sums);
+		mem_space_id = prepare_mem_space(ndim, count_sums_buf->elts);
 		if (mem_space_id < 0) {
 			H5Sclose(file_space_id);
-			free(count_sums);
 			return R_NilValue;
 		}
 	}
 
 	ans = PROTECT(NEW_INTEGER(ans_len));
-	ans_dim = PROTECT(NEW_INTEGER(starts_len));
-	for (along = 0; along < starts_len; along++)
-		INTEGER(ans_dim)[along] = count_sums[along];
 	SET_DIM(ans, ans_dim);
-	UNPROTECT(1);
 
 	if (ans_len != 0) {
 		ret = H5Dread(dset_id, H5T_NATIVE_INT,
@@ -680,8 +676,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts)
 	}
 
 	H5Sclose(file_space_id);
-	free(count_sums);
-	UNPROTECT(1);
+	UNPROTECT(2);
 	if (ans_len != 0 && ret < 0) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 		         "H5Dread() returned an error");
