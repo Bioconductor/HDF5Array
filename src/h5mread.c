@@ -10,14 +10,15 @@
 #include <string.h>  /* for memcpy */
 #include <limits.h>  /* for INT_MAX, LLONG_MAX, LLONG_MIN */
 
+//#include <time.h>
 
 static char errmsg_buf[256];
 
 #define	NOT_A_FINITE_NUMBER(x) \
 	(R_IsNA(x) || R_IsNaN(x) || (x) == R_PosInf || (x) == R_NegInf)
 
-static int get_untrusted_elt(SEXP x, int i, long long int *val,
-			     const char *what, int along)
+static inline int get_untrusted_elt(SEXP x, int i, long long int *val,
+				    const char *what, int along)
 {
 	int tmp1;
 	double tmp2;
@@ -110,37 +111,70 @@ static void set_error_for_selection_too_large(int along1)
 }
 
 static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
-							    SEXP count)
+							    int starts_only)
 {
 	const char *msg = "selection must be strictly ascending "
 			  "along each dimension, but\n  you have:";
-	if (count != R_NilValue)
+	if (starts_only)
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "%s starts[[%d]][%d] <= starts[[%d]][%d]",
+			 msg, along1, i + 1, along1, i);
+	else
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 			 "%s starts[[%d]][%d] < starts[[%d]][%d] + "
 			 "counts[[%d]][%d]",
 			 msg, along1, i + 1, along1, i, along1, i);
-	else
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] <= starts[[%d]][%d]",
-			 msg, along1, i + 1, along1, i);
 	return;
 }
 
-static void set_errmsg_for_selection_beyond_dim(int along1, int i, SEXP count)
+static void set_errmsg_for_selection_beyond_dim(int along1, int i,
+						int starts_only)
 {
 	const char *msg = "selection must be within extent of "
 			  "dataset, but you\n  have:";
-	if (count != R_NilValue)
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] + counts[[%d]][%d] - 1 "
-			 "> dimension %d in dataset",
-			 msg, along1, i + 1, along1, i + 1, along1);
-	else
+	if (starts_only)
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 			 "%s starts[[%d]][%d] "
 			 "> dimension %d in dataset",
 			 msg, along1, i + 1, along1);
+	else
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "%s starts[[%d]][%d] + counts[[%d]][%d] - 1 "
+			 "> dimension %d in dataset",
+			 msg, along1, i + 1, along1, i + 1, along1);
 	return;
+}
+
+static inline int get_untrusted_start(SEXP start, int i, long long int *s,
+				      int along,
+				      long long int e,
+				      int *nblock,
+				      long long int *last_block_start,
+				      int starts_only)
+{
+	int ret;
+
+	ret = get_untrusted_elt(start, i, s, "starts", along);
+	if (ret < 0)
+		return -1;
+	if (*s <= e) {
+		if (e == 0) {
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "starts[[%d]][%d] is <= 0",
+				 along + 1, i + 1);
+			return -1;
+		}
+		set_errmsg_for_non_strictly_ascending_selection(
+				along + 1, i, starts_only);
+		return -1;
+	}
+	if (i == 0 || *s != e + 1) {
+		if (nblock != NULL)
+			nblock[along]++;
+		if (last_block_start != NULL)
+			last_block_start[along] = *s;
+	}
+	return 0;
 }
 
 static int check_starts_counts_along(int along, long long int d,
@@ -150,7 +184,7 @@ static int check_starts_counts_along(int along, long long int d,
 {
 	SEXP start, count;
 	int n, i, ret;
-	long long int cs, c, e, s;
+	long long int e, s, cs, c;
 
 	start = VECTOR_ELT(starts, along);
 	count = counts != R_NilValue ? VECTOR_ELT(counts, along) : R_NilValue;
@@ -197,33 +231,32 @@ static int check_starts_counts_along(int along, long long int d,
 		}
 	}
 	nstart[along] = n;
-	cs = 0;
 	if (nblock != NULL)
 		nblock[along] = 0;
-	c = 1;
 	e = 0;
-	for (i = 0; i < n; i++) {
-		ret = get_untrusted_elt(start, i, &s, "starts", along);
-		if (ret < 0)
-			return -1;
-		if (s <= e) {
-			if (e == 0) {
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "starts[[%d]][%d] is <= 0",
-					 along + 1, i + 1);
+	if (count == R_NilValue) {
+		for (i = 0; i < n; i++) {
+			ret = get_untrusted_start(start, i, &s, along,
+						  e, nblock, last_block_start,
+						  1);
+			if (ret < 0)
+				return -1;
+			e = s;
+			if (d >= 0 && e > d) {
+				set_errmsg_for_selection_beyond_dim(
+					along + 1, i, 1);
 				return -1;
 			}
-			set_errmsg_for_non_strictly_ascending_selection(
-				along + 1, i, count);
-			return -1;
 		}
-		if (i == 0 || s != e + 1) {
-			if (nblock != NULL)
-				nblock[along]++;
-			if (last_block_start != NULL)
-				last_block_start[along] = s;
-		}
-		if (count != R_NilValue) {
+		count_sum[along] = n;
+	} else {
+		cs = 0;
+		for (i = 0; i < n; i++) {
+			ret = get_untrusted_start(start, i, &s, along,
+						  e, nblock, last_block_start,
+						  0);
+			if (ret < 0)
+				return -1;
 			ret = get_untrusted_elt(count, i, &c, "counts", along);
 			if (ret < 0)
 				return -1;
@@ -233,20 +266,20 @@ static int check_starts_counts_along(int along, long long int d,
 					 along + 1, i + 1);
 				return -1;
 			}
+			e = s + c - 1;	// could overflow! (FIXME)
+			if (d >= 0 && e > d) {
+				set_errmsg_for_selection_beyond_dim(
+					along + 1, i, 0);
+				return -1;
+			}
+			cs += c;	// could overflow! (FIXME)
+			if (cs > INT_MAX) {
+				set_error_for_selection_too_large(along + 1);
+				return -1;
+			}
 		}
-		e = s + c - 1;  // could overflow! (FIXME)
-		if (d >= 0 && e > d) {
-			set_errmsg_for_selection_beyond_dim(
-				along + 1, i, count);
-			return -1;
-		}
-		cs += c;  // could overflow! (FIXME)
-		if (cs > INT_MAX) {
-			set_error_for_selection_too_large(along + 1);
-			return -1;
-		}
+		count_sum[along] = cs;
 	}
-	count_sum[along] = cs;
 	return 0;
 }
 
@@ -286,17 +319,31 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 	n = LENGTH(start_in);
 	e = 0;
 	j = -1;
-	for (i = 0; i < n; i++) {
-		s = get_trusted_elt(start_in, i);
-		c = count_in != R_NilValue ? get_trusted_elt(count_in, i) : 1;
-		if (i == 0 || s != e + 1) {
-			j++;
-			set_trusted_elt(start_out, j, s);
-			count_out[j] = c;
-		} else {
-			count_out[j] += c;
+	if (count_in == R_NilValue) {
+		for (i = 0; i < n; i++) {
+			s = get_trusted_elt(start_in, i);
+			if (i == 0 || s != e + 1) {
+				j++;
+				set_trusted_elt(start_out, j, s);
+				count_out[j] = 1;
+			} else {
+				count_out[j]++;
+			}
+			e = s;
 		}
-		e = s + c - 1;
+	} else {
+		for (i = 0; i < n; i++) {
+			s = get_trusted_elt(start_in, i);
+			c = get_trusted_elt(count_in, i);
+			if (i == 0 || s != e + 1) {
+				j++;
+				set_trusted_elt(start_out, j, s);
+				count_out[j] = c;
+			} else {
+				count_out[j] += c;
+			}
+			e = s + c - 1;
+		}
 	}
 	return;
 }
@@ -368,6 +415,7 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 
 	/* 1st pass */
+	//clock_t t0 = clock();
 	total_reduction = 0;
 	for (along = 0; along < ndim; along++) {
 		ret = check_starts_counts_along(along, -1,
@@ -381,6 +429,7 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 		total_reduction += nstart_buf->elts[along] -
 				   nblock_buf->elts[along];
 	}
+	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 
 	if (total_reduction == 0) {
 		*status = 0;
@@ -388,6 +437,7 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 	}
 
 	/* 2nd pass */
+	//t0 = clock();
 	ans = PROTECT(NEW_LIST(2));
 	reduced_starts = PROTECT(NEW_LIST(ndim));
 	SET_VECTOR_ELT(ans, 0, reduced_starts);
@@ -403,6 +453,7 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 			reduced_starts, reduced_counts);
 	}
 	UNPROTECT(1);
+	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	*status = 1;
 	return ans;
 }
@@ -567,10 +618,6 @@ static int set_region_to_read(hid_t file_space_id,
 	n = 0;
 	do {
 		n++;
-		//printf("- indices for block %llu:", n);
-		//for (along = 0; along < dset_rank; along++)
-		//	printf(" %d", blockidx_buf->elts[along]);
-		//printf("\n");
 		ret = add_block_to_read(file_space_id, dset_rank,
 					starts, counts, blockidx_buf->elts,
 					offset_buf, count_buf);
