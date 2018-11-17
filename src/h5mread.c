@@ -169,10 +169,8 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 		return -1;
 	}
 	if (i == 0 || *s != e + 1) {
-		if (nblock != NULL)
-			nblock[along]++;
-		if (last_block_start != NULL)
-			last_block_start[along] = *s;
+		nblock[along]++;
+		last_block_start[along] = *s;
 	}
 	return 0;
 }
@@ -202,10 +200,8 @@ static int check_starts_counts_along(int along, long long int d,
 		}
 		nstart[along] = 1;
 		count_sum[along] = d;
-		if (nblock != NULL)
-			nblock[along] = d != 0;
-		if (last_block_start != NULL)
-			last_block_start[along] = 1;
+		nblock[along] = d != 0;
+		last_block_start[along] = 1;
 		return 0;
 	}
 	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
@@ -231,8 +227,7 @@ static int check_starts_counts_along(int along, long long int d,
 		}
 	}
 	nstart[along] = n;
-	if (nblock != NULL)
-		nblock[along] = 0;
+	nblock[along] = 0;
 	e = 0;
 	if (count == R_NilValue) {
 		for (i = 0; i < n; i++) {
@@ -279,6 +274,26 @@ static int check_starts_counts_along(int along, long long int d,
 			}
 		}
 		count_sum[along] = cs;
+	}
+	return 0;
+}
+
+static int check_starts_counts(SEXP starts, SEXP counts,
+			       const long long int *dim,
+			       int *nstart, int *count_sum,
+			       int *nblock, long long int *last_block_start)
+{
+	int ndim, along, ret;
+
+	ndim = LENGTH(starts);
+	for (along = 0; along < ndim; along++) {
+		ret = check_starts_counts_along(
+				along, dim != NULL ? dim[along] : -1,
+				starts, counts,
+				nstart, count_sum,
+				nblock, last_block_start);
+		if (ret < 0)
+			return -1;
 	}
 	return 0;
 }
@@ -398,10 +413,9 @@ static void reduce_selection_along(int along,
  */
 static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 {
-	int ndim, along, ret;
+	int ndim, ret, along;
 	IntAE *nstart_buf, *count_sum_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
-	long long unsigned int total_reduction;
 	SEXP ans, reduced_starts, reduced_counts;
 
 	ndim = shallow_check_starts_counts(starts, counts);
@@ -416,25 +430,26 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 
 	/* 1st pass */
 	//clock_t t0 = clock();
-	total_reduction = 0;
-	for (along = 0; along < ndim; along++) {
-		ret = check_starts_counts_along(along, -1,
-				starts, counts,
-				nstart_buf->elts, count_sum_buf->elts,
-				nblock_buf->elts, last_block_start_buf->elts);
-		if (ret < 0) {
-			*status = -1;
-			return R_NilValue;
-		}
-		total_reduction += nstart_buf->elts[along] -
-				   nblock_buf->elts[along];
+	ret = check_starts_counts(starts, counts, NULL,
+				  nstart_buf->elts, count_sum_buf->elts,
+				  nblock_buf->elts, last_block_start_buf->elts);
+	if (ret < 0) {
+		*status = -1;
+		return R_NilValue;
 	}
 	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 
-	if (total_reduction == 0) {
-		*status = 0;
-		return R_NilValue;
+	*status = 0;
+	for (along = 0; along < ndim; along++) {
+		/* nblock_buf->elts[along] should always be <=
+		   nstart_buf->elts[along] */
+		if (nblock_buf->elts[along] < nstart_buf->elts[along]) {
+			*status = 1;
+			break;
+		}
 	}
+	if (*status == 0)
+		return R_NilValue;
 
 	/* 2nd pass */
 	//t0 = clock();
@@ -454,7 +469,6 @@ static SEXP reduce_selection(SEXP starts, SEXP counts, int *status)
 	}
 	UNPROTECT(1);
 	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	*status = 1;
 	return ans;
 }
 
@@ -484,8 +498,10 @@ static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 				    SEXP starts, SEXP counts,
 				    int *nstart, int *count_sum)
 {
-	int along, ret;
-	long long int d;
+	LLongAE *dim_buf;
+	IntAE *nblock_buf;
+	LLongAE *last_block_start_buf;
+	int along, h5along, ret;
 
 	/* We already know that 'starts' is a list. */
 	if (LENGTH(starts) != dset_rank) {
@@ -494,26 +510,21 @@ static int deep_check_starts_counts(int dset_rank, const hsize_t *dset_dims,
 			 "per dimension in the dataset");
 		return -1;
 	}
-	/* We already know that 'counts' is a list (or NULL). */
-	if (counts != R_NilValue) {
-		if (LENGTH(counts) != dset_rank) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts' must have one list element "
-				 "per dimension in the dataset");
-			return -1;
-		}
+
+	dim_buf = new_LLongAE(dset_rank, dset_rank, 0);
+	nblock_buf = new_IntAE(dset_rank, dset_rank, 0);
+	last_block_start_buf = new_LLongAE(dset_rank, dset_rank, 0);
+
+	for (along = 0, h5along = dset_rank - 1;
+	     along < dset_rank;
+	     along++, h5along--)
+	{
+		dim_buf->elts[along] = (long long int) dset_dims[h5along];
 	}
-	for (along = 0; along < dset_rank; along++) {
-		d = dset_dims[dset_rank - 1 - along];
-		ret = check_starts_counts_along(
-				along, d,
-				starts, counts,
-				nstart, count_sum,
-				NULL, NULL);
-		if (ret < 0)
-			return -1;
-	}
-	return 0;
+	ret = check_starts_counts(starts, counts, dim_buf->elts,
+				  nstart, count_sum,
+				  nblock_buf->elts, last_block_start_buf->elts);
+	return ret;
 }
 
 /* Should we use H5Sselect_hyperslab() or H5Sselect_elements() for this?
