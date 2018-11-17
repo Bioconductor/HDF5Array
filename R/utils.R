@@ -114,9 +114,12 @@ reduce_selection <- function(starts, counts=NULL, dim=NULL)
 }
 
 ### The selection must be strictly ascending along each dimension.
-h5mread <- function(filepath, name, starts, counts=NULL)
+### By default the supplied selection is checked and reduced (if it can be).
+### Set 'noreduce' to TRUE to skip the reduction step.
+h5mread <- function(filepath, name, starts, counts=NULL, noreduce=FALSE)
 {
-    .Call("C_h5mread", filepath, name, starts, counts, PACKAGE="HDF5Array")
+    .Call("C_h5mread", filepath, name, starts, counts, noreduce,
+                       PACKAGE="HDF5Array")
 }
 
 
