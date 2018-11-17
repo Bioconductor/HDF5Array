@@ -26,26 +26,42 @@ static inline int get_untrusted_elt(SEXP x, int i, long long int *val,
 	if (IS_INTEGER(x)) {
 		tmp1 = INTEGER(x)[i];
 		if (tmp1 == NA_INTEGER) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "%s[[%d]][%d] is NA",
-				 what, along + 1, i + 1);
+			if (along < 0)
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[%d] is NA",
+					 what, i + 1);
+			else
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[[%d]][%d] is NA",
+					 what, along + 1, i + 1);
 			return -1;
 		}
 		*val = (long long int) tmp1;
 	} else {
 		tmp2 = REAL(x)[i];
 		if (NOT_A_FINITE_NUMBER(tmp2)) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "%s[[%d]][%d] is NA or NaN "
-				 "or not a finite number",
-				 what, along + 1, i + 1);
+			if (along < 0)
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[%d] is NA or NaN "
+					 "or not a finite number",
+					 what, i + 1);
+			else
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[[%d]][%d] is NA or NaN "
+					 "or not a finite number",
+					 what, along + 1, i + 1);
 			return -1;
 		}
 		if (tmp2 > (double) LLONG_MAX ||
 		    tmp2 < (double) LLONG_MIN) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "%s[[%d]][%d] is too large (= %e)",
-				 what, along + 1, i + 1, tmp2);
+			if (along < 0)
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[%d] is too large (= %e)",
+					 what, i + 1, tmp2);
+			else
+				snprintf(errmsg_buf, sizeof(errmsg_buf),
+					 "%s[[%d]][%d] is too large (= %e)",
+					 what, along + 1, i + 1, tmp2);
 			return -1;
 		}
 		*val = (long long int) tmp2;
@@ -76,7 +92,7 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 
 static int shallow_check_starts_counts(SEXP starts, SEXP counts)
 {
-	int ndim, counts_len;
+	int ndim;
 
 	if (!isVectorList(starts)) {  // IS_LIST() is broken
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
@@ -90,11 +106,10 @@ static int shallow_check_starts_counts(SEXP starts, SEXP counts)
 				 "'counts' must be a list (or NULL)");
 			return -1;
 		}
-		counts_len = LENGTH(counts);
-		if (counts_len != ndim) {
+		if (LENGTH(counts) != ndim) {
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'starts' and 'counts' must have "
-				 "the same length");
+				 "'starts' and 'counts' "
+				 "must have the same length");
 			return -1;
 		}
 	}
@@ -220,8 +235,8 @@ static int check_starts_counts_along(int along, SEXP starts, SEXP counts,
 		}
 		if (LENGTH(count) != n) {
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts[[%d]]' must have the "
-				 "same length as 'starts[[%d]]'",
+				 "'starts[[%d]]' and 'counts[[%d]]' "
+				 "must have the same length",
 				 along + 1, along + 1);
 			return -1;
 		}
@@ -445,6 +460,7 @@ static SEXP reduce_selection(SEXP starts, SEXP counts,
 }
 
 /* --- .Call ENTRY POINT ---
+ * Negative values in 'dim' are treated as infinite dimensions.
  * Return a list of length 2 or NULL if the selection could not be reduced.
  * The 1st list element is the list of reduced starts and the 2nd list element
  * the list of reduced 'counts'. The 2 lists have the same shape i.e. same
@@ -452,18 +468,32 @@ static SEXP reduce_selection(SEXP starts, SEXP counts,
  */
 SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 {
-	int ndim, ret;
+	int ndim, along, ret;
+	LLongAE *dim_buf;
 	IntAE *nstart_buf, *count_sum_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	int *nstart, *count_sum, *nblock;
-	long long int *last_block_start;
-
-	if (dim != R_NilValue)
-		error("'dim' not supported yet, sorry!");
+	long long int *dim_p, d, *last_block_start;
 
 	ndim = shallow_check_starts_counts(starts, counts);
 	if (ndim < 0)
 		error(errmsg_buf);
+	if (dim == R_NilValue) {
+		dim_p = NULL;
+	} else {
+		if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
+			error("'dim' must be an integer vector (or NULL)");
+		if (LENGTH(dim) != ndim)
+			error("'starts' and 'dim' must have the same length");
+		dim_buf = new_LLongAE(ndim, ndim, 0);
+		dim_p = dim_buf->elts;
+		for (along = 0; along < ndim; along++) {
+			ret = get_untrusted_elt(dim, along, &d, "dim", -1);
+			if (ret < 0)
+				error(errmsg_buf);
+			dim_p[along] = d;
+		}
+	}
 
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	count_sum_buf = new_IntAE(ndim, ndim, 0);
@@ -477,7 +507,7 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 
 	/* 1st pass */
 	//clock_t t0 = clock();
-	ret = check_starts_counts(starts, counts, NULL,
+	ret = check_starts_counts(starts, counts, dim_p,
 				  nstart, count_sum,
 				  nblock, last_block_start);
 	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
