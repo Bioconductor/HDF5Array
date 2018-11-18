@@ -561,9 +561,25 @@ static int deep_check_starts_counts(int ndim, const hsize_t *dset_dims,
 	return ret;
 }
 
-static int add_block_to_read(hid_t file_space_id, int ndim,
-			     SEXP starts, SEXP counts, const int *blockidx,
-			     hsize_t *offset_buf, hsize_t *count_buf)
+static int next_midx(int ndim, const int *nstart, int *midx)
+{
+	int along, i;
+
+	for (along = 0; along < ndim; along++) {
+		i = midx[along] + 1;
+		if (i < nstart[along]) {
+			midx[along] = i;
+			return 1;
+		}
+		midx[along] = 0;
+	}
+	return 0;
+}
+
+static int select_hyperslab(hid_t file_space_id, int ndim,
+			    SEXP starts, SEXP counts,
+			    const int *midx,
+			    hsize_t *offset_buf, hsize_t *count_buf)
 {
 	int along, h5along, i, ret;
 	SEXP start, count;
@@ -574,7 +590,7 @@ static int add_block_to_read(hid_t file_space_id, int ndim,
 		if (start == R_NilValue)
 			continue;
 		h5along = ndim - 1 - along;
-		i = blockidx[along];
+		i = midx[along];
 		offset_buf[h5along] = get_trusted_elt(start, i) - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
@@ -594,36 +610,18 @@ static int add_block_to_read(hid_t file_space_id, int ndim,
 	return 0;
 }
 
-static int next_block(int ndim, const int *nstart, int *blockidx)
+static int select_hyperslabs(hid_t file_space_id,
+			     int ndim, const hsize_t *dset_dims,
+			     SEXP starts, SEXP counts, const int *nstart)
 {
-	int along, i;
-
-	for (along = 0; along < ndim; along++) {
-		i = blockidx[along] + 1;
-		if (i < nstart[along]) {
-			blockidx[along] = i;
-			return 1;
-		}
-		blockidx[along] = 0;
-	}
-	return 0;
-}
-
-static int set_region_to_read(hid_t file_space_id,
-			      int ndim, const hsize_t *dset_dims,
-			      SEXP starts, SEXP counts, const int *nstart)
-{
-	int ret, along, h5along;
+	int along, h5along, ret;
 	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
-	IntAE *blockidx_buf;
-	long long unsigned n;
+	IntAE *midx_buf;
+	size_t n;
 
-	ret = H5Sselect_none(file_space_id);
-	if (ret < 0)
-		return -1;
 	for (along = 0; along < ndim; along++)
 		if (nstart[along] == 0)
-			return 0;  // empty region (no block)
+			return 0;  // empty region (no hyperslab)
 
 	/* Allocate 'offset_buf' and 'count_buf'. */
 	offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
@@ -645,20 +643,69 @@ static int set_region_to_read(hid_t file_space_id,
 		}
 	}
 
-	/* Add one block at a time. */
-	blockidx_buf = new_IntAE(ndim, ndim, 0);
+	/* Walk on the blocks. */
+	midx_buf = new_IntAE(ndim, ndim, 0);
 	n = 0;
 	do {
 		n++;
-		ret = add_block_to_read(file_space_id, ndim,
-					starts, counts, blockidx_buf->elts,
-					offset_buf, count_buf);
+		ret = select_hyperslab(file_space_id, ndim,
+				       starts, counts,
+				       midx_buf->elts,
+				       offset_buf, count_buf);
 		if (ret < 0)
 			break;
-	} while (next_block(ndim, nstart, blockidx_buf->elts));
+	} while (next_midx(ndim, nstart, midx_buf->elts));
 
-	printf("nb of hyperslabs = %llu\n", n);
+	printf("nb of hyperslabs = %lu\n", n);  // = prod(nstart)
 	free(offset_buf);
+	return ret;
+}
+
+static int select_elements(hid_t file_space_id,
+			   int ndim, const hsize_t *dset_dims,
+			   SEXP starts, const int *ans_dim)
+{
+	size_t num_elements;
+	int along, i, ret;
+	hsize_t *coord_buf, *coord_p;
+	IntAE *midx_buf;
+	SEXP start;
+	long long int coord;
+
+	num_elements = 1;
+	for (along = 0; along < ndim; along++)
+		num_elements *= ans_dim[along];
+	printf("nb of elements = %lu\n", num_elements);  // = length(ans)
+	if (num_elements == 0)
+		return 0;  // no elements
+
+	/* Allocate 'coord_buf'. */
+	coord_buf = (hsize_t *) malloc(num_elements * ndim * sizeof(hsize_t));
+	if (coord_buf == NULL) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "failed to allocate memory for 'coord_buf'");
+		return -1;
+	}
+
+	/* Walk on the elements. */
+	midx_buf = new_IntAE(ndim, ndim, 0);
+	coord_p = coord_buf;
+	do {
+		for (along = ndim - 1; along >= 0; along--) {
+			i = midx_buf->elts[along];
+			start = VECTOR_ELT(starts, along);
+			if (start == R_NilValue) {
+				coord = i;
+			} else {
+				coord = get_trusted_elt(start, i) - 1;
+			}
+			*(coord_p++) = (hsize_t) coord;
+		}
+	} while (next_midx(ndim, ans_dim, midx_buf->elts));
+
+	ret = H5Sselect_elements(file_space_id, H5S_SELECT_APPEND,
+				 num_elements, coord_buf);
+	free(coord_buf);
 	return ret;
 }
 
@@ -729,9 +776,18 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 		nstart = nblock;
 	}
 
-	ret = set_region_to_read(file_space_id,
-				 ndim, dset_dims,
-				 starts, counts, nstart);
+	ret = H5Sselect_none(file_space_id);
+	if (ret < 0)
+		return -1;
+
+	ret = counts != R_NilValue ? select_hyperslabs(file_space_id,
+						ndim, dset_dims,
+						starts, counts, nstart)
+				   : select_elements(file_space_id,
+						ndim, dset_dims,
+						starts, ans_dim);
+	if (ret < 0)
+		return -1;
 
 	if (nstart == nblock)
 		UNPROTECT(1);  // unprotect 'reduced'
