@@ -209,14 +209,19 @@ static int check_starts_counts_along(int along, SEXP starts, SEXP counts,
 				 along + 1, along + 1);
 			return -1;
 		}
-		if (d > INT_MAX) {
-			set_error_for_selection_too_large(along + 1);
-			return -1;
+		if (d >= 0) {
+			if (d > INT_MAX) {
+				set_error_for_selection_too_large(along + 1);
+				return -1;
+			}
+			nstart[along] = count_sum[along] = d;
+			nblock[along] = d != 0;
+			last_block_start[along] = 1;
+		} else {
+			/* 'count_sum' is undefined in that case. */
+			nstart[along] = nblock[along] = 1;
+			last_block_start[along] = 1;
 		}
-		nstart[along] = 1;
-		count_sum[along] = d;
-		nblock[along] = d != 0;
-		last_block_start[along] = 1;
 		return 0;
 	}
 	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
