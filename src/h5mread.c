@@ -535,6 +535,53 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
  *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
 */
 
+static int get_ans_type(hid_t dset_id, SEXPTYPE *ans_type)
+{
+	hid_t type_id;
+	H5T_class_t class;
+	const char *classname;
+
+	type_id = H5Dget_type(dset_id);
+	if (type_id < 0) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Dget_type() returned an error");
+		return -1;
+	}
+	class = H5Tget_class(type_id);
+	H5Tclose(type_id);
+	if (class == H5T_NO_CLASS) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Tget_class() returned an error");
+		return -1;
+	}
+	if (class == H5T_INTEGER) {
+		*ans_type = INTSXP;
+		return 0;
+	}
+	if (class == H5T_FLOAT) {
+		*ans_type = REALSXP;
+		return 0;
+	}
+	switch (class) {
+		case H5T_TIME: classname = "H5T_TIME"; break;
+		case H5T_STRING: classname = "H5T_STRING"; break;
+		case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
+		case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
+		case H5T_COMPOUND: classname = "H5T_COMPOUND"; break;
+		case H5T_REFERENCE: classname = "H5T_REFERENCE"; break;
+		case H5T_ENUM: classname = "H5T_ENUM"; break;
+		case H5T_VLEN: classname = "H5T_VLEN"; break;
+		case H5T_ARRAY: classname = "H5T_ARRAY"; break;
+		default:
+		    snprintf(errmsg_buf, sizeof(errmsg_buf),
+			     "unknown dataset class identifier: %d", class);
+		return -1;
+	}
+	snprintf(errmsg_buf, sizeof(errmsg_buf),
+		 "unsupported dataset class: %s", classname);
+	return -1;
+}
+
 static int deep_check_starts_counts(int ndim, const hsize_t *dset_dims,
 			SEXP starts, SEXP counts,
 			int *nstart, int *ans_dim,
@@ -610,14 +657,15 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 	return 0;
 }
 
-static int select_hyperslabs(hid_t file_space_id,
-			     int ndim, const hsize_t *dset_dims,
-			     SEXP starts, SEXP counts, const int *nstart)
+/* Return nb of hyperslabs (or -1 if error). */
+static long long int select_hyperslabs(hid_t file_space_id,
+			int ndim, const hsize_t *dset_dims,
+			SEXP starts, SEXP counts, const int *nstart)
 {
+	long long int num_hyperslabs;
 	int along, h5along, ret;
 	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
 	IntAE *midx_buf;
-	size_t n;
 
 	for (along = 0; along < ndim; along++)
 		if (nstart[along] == 0)
@@ -645,9 +693,9 @@ static int select_hyperslabs(hid_t file_space_id,
 
 	/* Walk on the blocks. */
 	midx_buf = new_IntAE(ndim, ndim, 0);
-	n = 0;
+	num_hyperslabs = 0;
 	do {
-		n++;
+		num_hyperslabs++;
 		ret = select_hyperslab(file_space_id, ndim,
 				       starts, counts,
 				       midx_buf->elts,
@@ -656,14 +704,15 @@ static int select_hyperslabs(hid_t file_space_id,
 			break;
 	} while (next_midx(ndim, nstart, midx_buf->elts));
 
-	printf("nb of hyperslabs = %lu\n", n);  // = prod(nstart)
+	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(nstart)
 	free(offset_buf);
-	return ret;
+	return num_hyperslabs;
 }
 
-static int select_elements(hid_t file_space_id,
-			   int ndim, const hsize_t *dset_dims,
-			   SEXP starts, const int *ans_dim)
+/* Return nb of elements (or -1 if error). */
+static long long int select_elements(hid_t file_space_id,
+			int ndim, const hsize_t *dset_dims,
+			SEXP starts, const int *ans_dim)
 {
 	size_t num_elements;
 	int along, i, ret;
@@ -675,7 +724,7 @@ static int select_elements(hid_t file_space_id,
 	num_elements = 1;
 	for (along = 0; along < ndim; along++)
 		num_elements *= ans_dim[along];
-	printf("nb of elements = %lu\n", num_elements);  // = length(ans)
+	//printf("nb of elements = %lu\n", num_elements);  // = length(ans)
 	if (num_elements == 0)
 		return 0;  // no elements
 
@@ -706,7 +755,9 @@ static int select_elements(hid_t file_space_id,
 	ret = H5Sselect_elements(file_space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	free(coord_buf);
-	return ret;
+	if (ret < 0)
+		return -1;
+	return (long long int) num_elements;
 }
 
 static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
@@ -718,7 +769,7 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	int *nstart, *nblock;
-	long long int *last_block_start;
+	long long int *last_block_start, nselection;
 	SEXP reduced;
 
 	file_space_id = H5Dget_space(dset_id);
@@ -780,12 +831,18 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 	if (ret < 0)
 		return -1;
 
-	ret = counts != R_NilValue ? select_hyperslabs(file_space_id,
-						ndim, dset_dims,
-						starts, counts, nstart)
-				   : select_elements(file_space_id,
-						ndim, dset_dims,
-						starts, ans_dim);
+	//clock_t t0 = clock();
+	nselection = counts != R_NilValue ?
+		select_hyperslabs(file_space_id,
+				ndim, dset_dims,
+				starts, counts, nstart) :
+		select_elements(file_space_id,
+				ndim, dset_dims,
+				starts, ans_dim);
+	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
+	//printf("time for setting selection: %e\n", dt);
+	//printf("nselection: %lld, time per selection unit: %e\n",
+	//	nselection, dt / nselection);
 	if (ret < 0)
 		return -1;
 
@@ -836,10 +893,16 @@ static hid_t prepare_mem_space(int ndim, const int *ans_dim)
 /* Return R_NilValue if error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce)
 {
-	int ndim, along, ret;
+	int ret, ndim, along;
+	SEXPTYPE ans_type;
 	SEXP ans_dim, ans;
-	hid_t file_space_id, mem_space_id;
+	hid_t file_space_id, mem_space_id, mem_type_id;
 	R_xlen_t ans_len;
+	void *buf;
+
+	ret = get_ans_type(dset_id, &ans_type);
+	if (ret < 0)
+		return R_NilValue;
 
 	ndim = shallow_check_starts_counts(starts, counts);
 	if (ndim < 0)
@@ -869,13 +932,23 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce)
 		}
 	}
 
-	ans = PROTECT(NEW_INTEGER(ans_len));
+	ans = PROTECT(allocVector(ans_type, ans_len));
 	SET_DIM(ans, ans_dim);
 
 	if (ans_len != 0) {
-		ret = H5Dread(dset_id, H5T_NATIVE_INT,
+		if (ans_type == INTSXP) {
+			buf = INTEGER(ans);
+			mem_type_id = H5T_NATIVE_INT;
+		} else {
+			buf = REAL(ans);
+			mem_type_id = H5T_NATIVE_DOUBLE;
+		}
+		//clock_t t0 = clock();
+		ret = H5Dread(dset_id, mem_type_id,
 			      mem_space_id, file_space_id,
-			      H5P_DEFAULT, INTEGER(ans));
+			      H5P_DEFAULT, buf);
+		//printf("time for reading data from selection: %e\n",
+		//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 		H5Sclose(mem_space_id);
 	}
 
