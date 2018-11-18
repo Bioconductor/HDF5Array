@@ -51,6 +51,7 @@ exportMethods(
 ###
 
 export(
+    reduce_selection, h5mread,
     HDF5ArraySeed, HDF5Array,
     setHDF5DumpDir, getHDF5DumpDir,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,

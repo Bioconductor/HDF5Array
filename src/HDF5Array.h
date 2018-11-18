@@ -10,6 +10,7 @@ SEXP C_h5mread(
 	SEXP name,
 	SEXP starts,
 	SEXP counts,
-	SEXP noreduce
+	SEXP noreduce,
+	SEXP as_integer
 );
 

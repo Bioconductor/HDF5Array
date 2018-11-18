@@ -535,12 +535,17 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
  *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
 */
 
-static int get_ans_type(hid_t dset_id, SEXPTYPE *ans_type)
+static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 {
 	hid_t type_id;
 	H5T_class_t class;
+	size_t size;
 	const char *classname;
 
+	if (as_int) {
+		*ans_type = INTSXP;
+		return 0;
+	}
 	type_id = H5Dget_type(dset_id);
 	if (type_id < 0) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
@@ -548,14 +553,21 @@ static int get_ans_type(hid_t dset_id, SEXPTYPE *ans_type)
 		return -1;
 	}
 	class = H5Tget_class(type_id);
+	size = H5Tget_size(type_id);
 	H5Tclose(type_id);
 	if (class == H5T_NO_CLASS) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 		         "H5Tget_class() returned an error");
 		return -1;
 	}
+	if (size == 0) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Tget_size() returned 0");
+		return -1;
+	}
+
 	if (class == H5T_INTEGER) {
-		*ans_type = INTSXP;
+		*ans_type = size <= sizeof(int) ? INTSXP : REALSXP;
 		return 0;
 	}
 	if (class == H5T_FLOAT) {
@@ -891,7 +903,8 @@ static hid_t prepare_mem_space(int ndim, const int *ans_dim)
 }
 
 /* Return R_NilValue if error. */
-static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce)
+static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
+		    int as_int)
 {
 	int ret, ndim, along;
 	SEXPTYPE ans_type;
@@ -900,7 +913,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce)
 	R_xlen_t ans_len;
 	void *buf;
 
-	ret = get_ans_type(dset_id, &ans_type);
+	ret = get_ans_type(dset_id, as_int, &ans_type);
 	if (ret < 0)
 		return R_NilValue;
 
@@ -964,10 +977,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce)
 
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5mread(SEXP filepath, SEXP name,
-	       SEXP starts, SEXP counts, SEXP noreduce)
+	       SEXP starts, SEXP counts, SEXP noreduce, SEXP as_integer)
 {
 	SEXP filepath0, name0, ans;
-	int noreduce0;
+	int noreduce0, as_int;
 	hid_t file_id, dset_id;
 
 	/* Check 'filepath'. */
@@ -989,6 +1002,11 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'noreduce' must be TRUE or FALSE");
 	noreduce0 = LOGICAL(noreduce)[0];
 
+	/* Check 'as_integer'. */
+	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
+		error("'as_integer' must be TRUE or FALSE");
+	as_int = LOGICAL(as_integer)[0];
+
 	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
 	if (file_id < 0)
 		error("failed to open file %s", CHAR(filepath0));
@@ -998,7 +1016,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("failed to open dataset %s from file %s",
 		      CHAR(name0), CHAR(filepath0));
 	}
-	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0));
+	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0, as_int));
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ans == R_NilValue) {
