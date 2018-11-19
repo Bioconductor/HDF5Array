@@ -540,6 +540,12 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
  *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
 */
 
+typedef struct {
+	int ndim;
+	hsize_t *dim;
+	hid_t space_id;
+} DataInfo;
+
 static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 {
 	hid_t type_id;
@@ -599,25 +605,83 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 	return -1;
 }
 
-static int deep_check_starts_counts(int ndim, const hsize_t *dset_dims,
-			SEXP starts, SEXP counts,
-			int *nstart, int *ans_dim,
-			int *nblock, long long int *last_block_start)
+static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 {
-	LLongAE *dim_buf;
-	int along, h5along, ret;
+	hid_t space_id;
+	int ret, dset_ndim;
+	hsize_t *dim;
 
-	/* We already know that 'starts' is a list. */
-	if (LENGTH(starts) != ndim) {
+	space_id = H5Dget_space(dset_id);
+	if (space_id < 0) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Dget_space() returned an error");
+		return -1;
+	}
+
+	dset_ndim = H5Sget_simple_extent_ndims(space_id);
+	if (dset_ndim < 0) {
+		H5Sclose(space_id);
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Sget_simple_extent_ndims() returned an error");
+		return -1;
+	}
+
+	if (ndim != dset_ndim) {
+		H5Sclose(space_id);
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 			 "'starts' must have one list element "
 			 "per dimension in the dataset");
 		return -1;
 	}
 
+	ret = H5Sselect_none(space_id);
+	if (ret < 0) {
+		H5Sclose(space_id);
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Sselect_none() returned an error");
+		return -1;
+	}
+
+	/* Allocate and set 'dim'. */
+	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
+	if (dim == NULL) {
+		H5Sclose(space_id);
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "failed to allocate memory for 'dim'");
+		return -1;
+	}
+	if (H5Sget_simple_extent_dims(space_id, dim, NULL) != ndim) {
+		free(dim);
+		H5Sclose(space_id);
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "H5Sget_simple_extent_dims() returned "
+			 "an unexpected value");
+		return -1;
+	}
+	dset_info->ndim = ndim;
+	dset_info->dim = dim;
+	dset_info->space_id = space_id;
+	return 0;
+}
+
+static void destroy_dset_info(DataInfo *dset_info)
+{
+	free(dset_info->dim);
+	H5Sclose(dset_info->space_id);
+}
+
+static int deep_check_starts_counts(const DataInfo *dset_info,
+			SEXP starts, SEXP counts,
+			int *nstart, int *ans_dim,
+			int *nblock, long long int *last_block_start)
+{
+	int ndim, along, h5along, ret;
+	LLongAE *dim_buf;
+
+	ndim = dset_info->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] = (long long int) dset_dims[h5along];
+		dim_buf->elts[along] = (long long int) dset_info->dim[h5along];
 
 	ret = check_starts_counts(starts, counts, dim_buf->elts,
 				  nstart, ans_dim,
@@ -674,16 +738,16 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 	return 0;
 }
 
-/* Return nb of hyperslabs (or -1 if error). */
-static long long int select_hyperslabs(hid_t file_space_id,
-			int ndim, const hsize_t *dset_dims,
+/* Return nb of hyperslabs (or -1 on error). */
+static long long int select_hyperslabs(const DataInfo *dset_info,
 			SEXP starts, SEXP counts, const int *nstart)
 {
+	int ndim, along, h5along, ret;
 	long long int num_hyperslabs;
-	int along, h5along, ret;
 	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
 	IntAE *midx_buf;
 
+	ndim = dset_info->ndim;
 	for (along = 0; along < ndim; along++)
 		if (nstart[along] == 0)
 			return 0;  // empty region (no hyperslab)
@@ -702,7 +766,7 @@ static long long int select_hyperslabs(hid_t file_space_id,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
 			offset_buf[h5along] = 0;
-			count_buf[h5along] = dset_dims[h5along];
+			count_buf[h5along] = dset_info->dim[h5along];
 		} else {
 			count_buf[h5along] = 1;
 		}
@@ -713,7 +777,7 @@ static long long int select_hyperslabs(hid_t file_space_id,
 	num_hyperslabs = 0;
 	do {
 		num_hyperslabs++;
-		ret = select_hyperslab(file_space_id, ndim,
+		ret = select_hyperslab(dset_info->space_id, ndim,
 				       starts, counts,
 				       midx_buf->elts,
 				       offset_buf, count_buf);
@@ -726,18 +790,18 @@ static long long int select_hyperslabs(hid_t file_space_id,
 	return num_hyperslabs;
 }
 
-/* Return nb of elements (or -1 if error). */
-static long long int select_elements(hid_t file_space_id,
-			int ndim, const hsize_t *dset_dims,
+/* Return nb of elements (or -1 on error). */
+static long long int select_elements(const DataInfo *dset_info,
 			SEXP starts, const int *ans_dim)
 {
+	int ndim, along, i, ret;
 	size_t num_elements;
-	int along, i, ret;
 	hsize_t *coord_buf, *coord_p;
 	IntAE *midx_buf;
 	SEXP start;
 	long long int coord;
 
+	ndim = dset_info->ndim;
 	num_elements = 1;
 	for (along = 0; along < ndim; along++)
 		num_elements *= ans_dim[along];
@@ -769,7 +833,7 @@ static long long int select_elements(hid_t file_space_id,
 		}
 	} while (next_midx(ndim, ans_dim, midx_buf->elts));
 
-	ret = H5Sselect_elements(file_space_id, H5S_SELECT_APPEND,
+	ret = H5Sselect_elements(dset_info->space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	free(coord_buf);
 	if (ret < 0)
@@ -777,44 +841,18 @@ static long long int select_elements(hid_t file_space_id,
 	return (long long int) num_elements;
 }
 
-static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
-				int *ans_dim, int noreduce)
+static int prepare_file_space(const DataInfo *dset_info,
+			      SEXP starts, SEXP counts,
+			      int *ans_dim, int noreduce)
 {
-	hid_t file_space_id;
 	int ndim, ret;
-	hsize_t *dset_dims;
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	int *nstart, *nblock;
 	long long int *last_block_start, nselection;
 	SEXP reduced;
 
-	file_space_id = H5Dget_space(dset_id);
-	if (file_space_id < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Dget_space() returned an error");
-		return -1;
-	}
-
-	ndim = H5Sget_simple_extent_ndims(file_space_id);
-
-	/* Allocate and set 'dset_dims'. */
-	dset_dims = (hsize_t *) malloc(ndim * sizeof(hsize_t));
-	if (dset_dims == NULL) {
-		H5Sclose(file_space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'dset_dims'");
-		return -1;
-	}
-	if (H5Sget_simple_extent_dims(file_space_id, dset_dims, NULL) != ndim) {
-		free(dset_dims);
-		H5Sclose(file_space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "H5Sget_simple_extent_dims() returned "
-			 "an unexpected value");
-		return -1;
-	}
-
+	ndim = dset_info->ndim;
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
@@ -825,15 +863,12 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 
 	/* This call will populate 'nstart', 'ans_dim', 'nblock',
 	   and 'last_block_start'. */
-	ret = deep_check_starts_counts(ndim, dset_dims,
+	ret = deep_check_starts_counts(dset_info,
 				starts, counts,
 				nstart, ans_dim,
 				nblock, last_block_start);
-	if (ret < 0) {
-		free(dset_dims);
-		H5Sclose(file_space_id);
+	if (ret < 0)
 		return -1;
-	}
 
 	if (!noreduce && selection_can_be_reduced(ndim, nstart, nblock)) {
 		reduced = PROTECT(reduce_selection(starts, counts,
@@ -844,55 +879,42 @@ static hid_t prepare_file_space(hid_t dset_id, SEXP starts, SEXP counts,
 		nstart = nblock;
 	}
 
-	ret = H5Sselect_none(file_space_id);
-	if (ret < 0)
-		return -1;
-
 	//clock_t t0 = clock();
 	nselection = counts != R_NilValue ?
-		select_hyperslabs(file_space_id,
-				ndim, dset_dims,
-				starts, counts, nstart) :
-		select_elements(file_space_id,
-				ndim, dset_dims,
-				starts, ans_dim);
+		     select_hyperslabs(dset_info, starts, counts, nstart) :
+		     select_elements(dset_info, starts, ans_dim);
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
 	//printf("time for setting selection: %e\n", dt);
 	//printf("nselection: %lld, time per selection unit: %e\n",
 	//	nselection, dt / nselection);
-	if (ret < 0)
+	if (nselection < 0)
 		return -1;
 
 	if (nstart == nblock)
 		UNPROTECT(1);  // unprotect 'reduced'
 
-	free(dset_dims);
-	if (ret < 0) {
-		H5Sclose(file_space_id);
-		return -1;
-	}
-	return file_space_id;
+	return 0;
 }
 
 static hid_t prepare_mem_space(int ndim, const int *ans_dim)
 {
-	hsize_t *dims;
+	hsize_t *dim;
 	int along, h5along, ret;
 	hid_t mem_space_id;
 
-	/* Allocate and set 'dims'. */
-	dims = (hsize_t *) malloc(ndim * sizeof(hsize_t));
-	if (dims == NULL) {
+	/* Allocate and set 'dim'. */
+	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
+	if (dim == NULL) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'dims'");
+			 "failed to allocate memory for 'dim'");
 		return -1;
 	}
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dims[h5along] = ans_dim[along];
+		dim[h5along] = ans_dim[along];
 
-	mem_space_id = H5Screate_simple(ndim, dims, NULL);
+	mem_space_id = H5Screate_simple(ndim, dim, NULL);
 	if (mem_space_id < 0) {
-		free(dims);
+		free(dim);
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
 		         "H5Screate_simple() returned an error");
 		return -1;
@@ -903,18 +925,19 @@ static hid_t prepare_mem_space(int ndim, const int *ans_dim)
 		         "H5Sselect_hyperslab() returned an error");
 		return -1;
 	}
-	free(dims);
+	free(dim);
 	return mem_space_id;
 }
 
-/* Return R_NilValue if error. */
+/* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int)
 {
 	int ret, ndim, along;
 	SEXPTYPE ans_type;
+	DataInfo dset_info;
 	SEXP ans_dim, ans;
-	hid_t file_space_id, mem_space_id, mem_type_id;
+	hid_t mem_space_id, mem_type_id;
 	R_xlen_t ans_len;
 	void *buf;
 
@@ -926,13 +949,18 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ndim < 0)
 		return R_NilValue;
 
+	ret = get_dset_info(dset_id, ndim, &dset_info);
+	if (ret < 0)
+		return R_NilValue;
+
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
 
-	/* Prepare 'file_space_id'. */
-	file_space_id = prepare_file_space(dset_id, starts, counts,
-					   INTEGER(ans_dim), noreduce);
-	if (file_space_id < 0) {
+	/* Prepare the "file space". */
+	ret = prepare_file_space(&dset_info, starts, counts,
+				 INTEGER(ans_dim), noreduce);
+	if (ret < 0) {
 		UNPROTECT(1);
+		destroy_dset_info(&dset_info);
 		return R_NilValue;
 	}
 
@@ -941,11 +969,11 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		ans_len *= INTEGER(ans_dim)[along];
 
 	if (ans_len != 0) {
-		/* Prepare 'mem_space_id'. */
+		/* Prepare the "memory space". */
 		mem_space_id = prepare_mem_space(ndim, INTEGER(ans_dim));
 		if (mem_space_id < 0) {
-			H5Sclose(file_space_id);
 			UNPROTECT(1);
+			destroy_dset_info(&dset_info);
 			return R_NilValue;
 		}
 	}
@@ -963,14 +991,14 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		}
 		//clock_t t0 = clock();
 		ret = H5Dread(dset_id, mem_type_id,
-			      mem_space_id, file_space_id,
+			      mem_space_id, dset_info.space_id,
 			      H5P_DEFAULT, buf);
 		//printf("time for reading data from selection: %e\n",
 		//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 		H5Sclose(mem_space_id);
 	}
 
-	H5Sclose(file_space_id);
+	destroy_dset_info(&dset_info);
 	UNPROTECT(2);
 	if (ans_len != 0 && ret < 0) {
 		snprintf(errmsg_buf, sizeof(errmsg_buf),

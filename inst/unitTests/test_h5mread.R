@@ -39,36 +39,39 @@ test_reduce_selection <- function()
 
 test_h5mread <- function()
 {
-    do_tests <- function(filepath, name, m) {
-        current <- h5mread(filepath, name, starts=list(NULL, NULL))
+    do_tests <- function(m, filepath, name, as.integer=FALSE) {
+        read <- function(starts, counts=NULL)
+            h5mread(filepath, name, starts=starts, counts=counts,
+                    as.integer=as.integer)
+
+        current <- read(list(NULL, NULL))
         checkIdentical(m, current)
 
-        current <- h5mread(filepath, name, starts=list(c(2:5, 7:10), NULL))
+        current <- read(list(c(2:5, 7:10), NULL))
         checkIdentical(m[c(2:5, 7:10), , drop=FALSE], current)
 
-        current <- h5mread(filepath, name, starts=list(NULL, 1:2))
+        current <- read(list(NULL, 1:2))
         checkIdentical(m[ , 1:2, drop=FALSE], current)
 
-        current <- h5mread(filepath, name, starts=list(7:10, c(1:2, 5)))
+        current <- read(list(7:10, c(1:2, 5)))
         checkIdentical(m[7:10, c(1:2, 5), drop=FALSE], current)
 
-        starts <- list(integer(0), integer(0))
-        current <- h5mread(filepath, name, starts=starts)
+        current <- read(list(integer(0), integer(0)))
         checkIdentical(m[integer(0), integer(0), drop=FALSE], current)
 
         starts <- list(integer(0), 4L)
         counts <- list(integer(0), 2L)
-        current <- h5mread(filepath, name, starts=starts, counts=counts)
+        current <- read(starts, counts)
         checkIdentical(m[integer(0), 4:5, drop=FALSE], current)
 
         starts <- list(5L, integer(0))
         counts <- list(4L, integer(0))
-        current <- h5mread(filepath, name, starts=starts, counts=counts)
+        current <- read(starts, counts)
         checkIdentical(m[5:8, integer(0), drop=FALSE], current)
 
         starts <- list(c(2L, 5L), 4L)
         counts <- list(c(3L, 4L), 2L)
-        current <- h5mread(filepath, name, starts=starts, counts=counts)
+        current <- read(starts, counts)
         checkIdentical(m[2:8, 4:5, drop=FALSE], current)
     }
 
@@ -76,12 +79,15 @@ test_h5mread <- function()
 
     m0 <- matrix(1:60, ncol=6)
     M0 <- as(m0, "HDF5Array")
-    do_tests(M0@seed@filepath, M0@seed@name, m0)
+    do_tests(m0, M0@seed@filepath, M0@seed@name)
 
     ## with an array of doubles
 
-    m1 <- matrix(runif(60), ncol=6)
+    m1 <- matrix(10 * runif(60), ncol=6)
     M1 <- as(m1, "HDF5Array")
-    do_tests(M1@seed@filepath, M1@seed@name, m1)
+    do_tests(m1, M1@seed@filepath, M1@seed@name)
+
+    storage.mode(m1) <- "integer"
+    do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE)
 }
 
