@@ -629,8 +629,10 @@ static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 	if (ndim != dset_ndim) {
 		H5Sclose(space_id);
 		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts' must have one list element "
-			 "per dimension in the dataset");
+			 "Dataset has %d dimensions but 'starts' has %d list "
+			 "element%s.\n  'starts' must have one list element "
+			 "per dimension in the dataset.",
+			 dset_ndim, ndim, ndim > 1 ? "s" : "");
 		return -1;
 	}
 
@@ -841,35 +843,18 @@ static long long int select_elements(const DataInfo *dset_info,
 	return (long long int) num_elements;
 }
 
-static int prepare_file_space(const DataInfo *dset_info,
-			      SEXP starts, SEXP counts,
-			      int *ans_dim, int noreduce)
+static int set_selection(const DataInfo *dset_info,
+			 SEXP starts, SEXP counts, int noreduce,
+			 const int *nstart,
+			 const int *ans_dim,
+			 const int *nblock,
+			 const long long int *last_block_start)
 {
-	int ndim, ret;
-	IntAE *nstart_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
-	int *nstart, *nblock;
-	long long int *last_block_start, nselection;
+	int ndim;
 	SEXP reduced;
+	long long int nselection;
 
 	ndim = dset_info->ndim;
-	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-
-	nstart = nstart_buf->elts;
-	nblock = nblock_buf->elts;
-	last_block_start = last_block_start_buf->elts;
-
-	/* This call will populate 'nstart', 'ans_dim', 'nblock',
-	   and 'last_block_start'. */
-	ret = deep_check_starts_counts(dset_info,
-				starts, counts,
-				nstart, ans_dim,
-				nblock, last_block_start);
-	if (ret < 0)
-		return -1;
-
 	if (!noreduce && selection_can_be_reduced(ndim, nstart, nblock)) {
 		reduced = PROTECT(reduce_selection(starts, counts,
 						   ans_dim,
@@ -887,13 +872,11 @@ static int prepare_file_space(const DataInfo *dset_info,
 	//printf("time for setting selection: %e\n", dt);
 	//printf("nselection: %lld, time per selection unit: %e\n",
 	//	nselection, dt / nselection);
-	if (nselection < 0)
-		return -1;
 
 	if (nstart == nblock)
 		UNPROTECT(1);  // unprotect 'reduced'
 
-	return 0;
+	return nselection < 0 ? -1 : 0;
 }
 
 static hid_t prepare_mem_space(int ndim, const int *ans_dim)
@@ -937,6 +920,12 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	SEXPTYPE ans_type;
 	DataInfo dset_info;
 	SEXP ans_dim, ans;
+
+	IntAE *nstart_buf, *nblock_buf;
+	LLongAE *last_block_start_buf;
+	int *nstart, *nblock;
+	long long int *last_block_start;
+
 	hid_t mem_space_id, mem_type_id;
 	R_xlen_t ans_len;
 	void *buf;
@@ -955,28 +944,32 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
 
-	/* Prepare the "file space". */
-	ret = prepare_file_space(&dset_info, starts, counts,
-				 INTEGER(ans_dim), noreduce);
-	if (ret < 0) {
-		UNPROTECT(1);
-		destroy_dset_info(&dset_info);
-		return R_NilValue;
-	}
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	nblock_buf = new_IntAE(ndim, ndim, 0);
+	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+
+	nstart = nstart_buf->elts;
+	nblock = nblock_buf->elts;
+	last_block_start = last_block_start_buf->elts;
+
+	/* This call will populate 'nstart', 'ans_dim', 'nblock',
+	   and 'last_block_start'. */
+	ret = deep_check_starts_counts(&dset_info,
+				       starts, counts,
+				       nstart, INTEGER(ans_dim),
+				       nblock, last_block_start);
+	if (ret < 0)
+		goto on_error1;
+
+	ret = set_selection(&dset_info, starts, counts, noreduce,
+			    nstart, INTEGER(ans_dim),
+			    nblock, last_block_start);
+	if (ret < 0)
+		goto on_error1;
 
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= INTEGER(ans_dim)[along];
-
-	if (ans_len != 0) {
-		/* Prepare the "memory space". */
-		mem_space_id = prepare_mem_space(ndim, INTEGER(ans_dim));
-		if (mem_space_id < 0) {
-			UNPROTECT(1);
-			destroy_dset_info(&dset_info);
-			return R_NilValue;
-		}
-	}
 
 	ans = PROTECT(allocVector(ans_type, ans_len));
 	SET_DIM(ans, ans_dim);
@@ -989,6 +982,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 			buf = REAL(ans);
 			mem_type_id = H5T_NATIVE_DOUBLE;
 		}
+		/* Prepare the "memory space". */
+		mem_space_id = prepare_mem_space(ndim, INTEGER(ans_dim));
+		if (mem_space_id < 0)
+			goto on_error2;
 		//clock_t t0 = clock();
 		ret = H5Dread(dset_id, mem_type_id,
 			      mem_space_id, dset_info.space_id,
@@ -996,16 +993,23 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		//printf("time for reading data from selection: %e\n",
 		//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 		H5Sclose(mem_space_id);
+		if (ret < 0) {
+			snprintf(errmsg_buf, sizeof(errmsg_buf),
+				 "H5Dread() returned an error");
+			goto on_error2;
+		}
 	}
 
 	destroy_dset_info(&dset_info);
 	UNPROTECT(2);
-	if (ans_len != 0 && ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Dread() returned an error");
-		return R_NilValue;
-	}
 	return ans;
+
+    on_error2:
+	UNPROTECT(1);
+    on_error1:
+	UNPROTECT(1);
+	destroy_dset_info(&dset_info);
+	return R_NilValue;
 }
 
 /* --- .Call ENTRY POINT --- */
