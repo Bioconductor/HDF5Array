@@ -23,10 +23,11 @@ reduce_selection <- function(starts, counts=NULL, dim=NULL)
 ### By default the supplied selection is checked and reduced (if it can be).
 ### Set 'noreduce' to TRUE to skip the reduction step.
 ### Set 'as.integer' to TRUE to force returning the result as an integer array.
-h5mread <- function(filepath, name, starts, counts=NULL,
-                    noreduce=FALSE, as.integer=FALSE)
+h5mread <- function(filepath, name, starts, counts=NULL, noreduce=FALSE,
+                    method=1L, as.integer=FALSE)
 {
-    .Call("C_h5mread", filepath, name, starts, counts, noreduce, as.integer,
+    .Call("C_h5mread", filepath, name, starts, counts, noreduce,
+                       method, as.integer,
                        PACKAGE="HDF5Array")
 }
 

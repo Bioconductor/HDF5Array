@@ -541,9 +541,9 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 */
 
 typedef struct {
+	hid_t dset_id, space_id;
 	int ndim;
 	hsize_t *dim;
-	hid_t space_id;
 } DataInfo;
 
 static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
@@ -608,7 +608,7 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 {
 	hid_t space_id;
-	int ret, dset_ndim;
+	int dset_ndim;
 	hsize_t *dim;
 
 	space_id = H5Dget_space(dset_id);
@@ -636,14 +636,6 @@ static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 		return -1;
 	}
 
-	ret = H5Sselect_none(space_id);
-	if (ret < 0) {
-		H5Sclose(space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_none() returned an error");
-		return -1;
-	}
-
 	/* Allocate and set 'dim'. */
 	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
 	if (dim == NULL) {
@@ -660,9 +652,10 @@ static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 			 "an unexpected value");
 		return -1;
 	}
+	dset_info->dset_id = dset_id;
+	dset_info->space_id = space_id;
 	dset_info->ndim = ndim;
 	dset_info->dim = dim;
-	dset_info->space_id = space_id;
 	return 0;
 }
 
@@ -753,6 +746,13 @@ static long long int select_hyperslabs(const DataInfo *dset_info,
 	for (along = 0; along < ndim; along++)
 		if (nstart[along] == 0)
 			return 0;  // empty region (no hyperslab)
+
+	ret = H5Sselect_none(dset_info->space_id);
+	if (ret < 0) {
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+		         "H5Sselect_none() returned an error");
+		return -1;
+	}
 
 	/* Allocate 'offset_buf' and 'count_buf'. */
 	offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
@@ -912,9 +912,57 @@ static hid_t prepare_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
+static int read_data1(const DataInfo *dset_info,
+		      SEXP starts, SEXP counts, int noreduce,
+		      const int *nstart,
+		      const int *ans_dim,
+		      const int *nblock,
+		      const long long int *last_block_start,
+		      void *buf,
+		      hid_t mem_type_id)
+{
+	int ret;
+	hid_t mem_space_id;
+
+	ret = set_selection(dset_info, starts, counts, noreduce,
+			    nstart, ans_dim,
+			    nblock, last_block_start);
+	if (ret < 0)
+		return -1;
+
+	/* Prepare the "memory space". */
+	mem_space_id = prepare_mem_space(dset_info->ndim, ans_dim);
+	if (mem_space_id < 0)
+		return -1;
+
+	//clock_t t0 = clock();
+	ret = H5Dread(dset_info->dset_id, mem_type_id,
+		      mem_space_id, dset_info->space_id,
+		      H5P_DEFAULT, buf);
+	//printf("time for reading data from selection: %e\n",
+	//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
+	H5Sclose(mem_space_id);
+	if (ret < 0)
+		snprintf(errmsg_buf, sizeof(errmsg_buf),
+			 "H5Dread() returned an error");
+	return ret;
+}
+
+static int read_data2(const DataInfo *dset_info,
+		      SEXP starts, SEXP counts, int noreduce,
+		      const int *nstart,
+		      const int *ans_dim,
+		      const int *nblock,
+		      const long long int *last_block_start,
+		      void *buf,
+		      hid_t mem_type_id)
+{
+	return 0;
+}
+
 /* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
-		    int as_int)
+		    int method, int as_int)
 {
 	int ret, ndim, along;
 	SEXPTYPE ans_type;
@@ -926,7 +974,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	int *nstart, *nblock;
 	long long int *last_block_start;
 
-	hid_t mem_space_id, mem_type_id;
+	hid_t mem_type_id;
 	R_xlen_t ans_len;
 	void *buf;
 
@@ -961,43 +1009,40 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ret < 0)
 		goto on_error1;
 
-	ret = set_selection(&dset_info, starts, counts, noreduce,
-			    nstart, INTEGER(ans_dim),
-			    nblock, last_block_start);
-	if (ret < 0)
-		goto on_error1;
-
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= INTEGER(ans_dim)[along];
-
 	ans = PROTECT(allocVector(ans_type, ans_len));
 	SET_DIM(ans, ans_dim);
 
+	if (ans_type == INTSXP) {
+		buf = INTEGER(ans);
+		mem_type_id = H5T_NATIVE_INT;
+	} else {
+		buf = REAL(ans);
+		mem_type_id = H5T_NATIVE_DOUBLE;
+	}
+
 	if (ans_len != 0) {
-		if (ans_type == INTSXP) {
-			buf = INTEGER(ans);
-			mem_type_id = H5T_NATIVE_INT;
-		} else {
-			buf = REAL(ans);
-			mem_type_id = H5T_NATIVE_DOUBLE;
-		}
-		/* Prepare the "memory space". */
-		mem_space_id = prepare_mem_space(ndim, INTEGER(ans_dim));
-		if (mem_space_id < 0)
-			goto on_error2;
-		//clock_t t0 = clock();
-		ret = H5Dread(dset_id, mem_type_id,
-			      mem_space_id, dset_info.space_id,
-			      H5P_DEFAULT, buf);
-		//printf("time for reading data from selection: %e\n",
-		//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
-		H5Sclose(mem_space_id);
-		if (ret < 0) {
+		if (method == 1) {
+			ret = read_data1(&dset_info,
+				 starts, counts, noreduce,
+				 nstart, INTEGER(ans_dim),
+				 nblock, last_block_start,
+				 buf, mem_type_id);
+		} else if (method == 2) {
+			ret = read_data2(&dset_info,
+				 starts, counts, noreduce,
+				 nstart, INTEGER(ans_dim),
+				 nblock, last_block_start,
+				 buf, mem_type_id);
+		} else if (method != 0) {
+			ret = -1;
 			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "H5Dread() returned an error");
-			goto on_error2;
+				 "'method' must be 0, 1, or 2");
 		}
+		if (ret < 0)
+			goto on_error2;
 	}
 
 	destroy_dset_info(&dset_info);
@@ -1014,10 +1059,11 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5mread(SEXP filepath, SEXP name,
-	       SEXP starts, SEXP counts, SEXP noreduce, SEXP as_integer)
+	       SEXP starts, SEXP counts, SEXP noreduce,
+	       SEXP method, SEXP as_integer)
 {
 	SEXP filepath0, name0, ans;
-	int noreduce0, as_int;
+	int noreduce0, method0, as_int;
 	hid_t file_id, dset_id;
 
 	/* Check 'filepath'. */
@@ -1039,6 +1085,11 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'noreduce' must be TRUE or FALSE");
 	noreduce0 = LOGICAL(noreduce)[0];
 
+	/* Check 'method'. */
+	if (!(IS_INTEGER(method) && LENGTH(method) == 1))
+		error("'method' must be a single integer");
+	method0 = INTEGER(method)[0];
+
 	/* Check 'as_integer'. */
 	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
 		error("'as_integer' must be TRUE or FALSE");
@@ -1053,7 +1104,8 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("failed to open dataset %s from file %s",
 		      CHAR(name0), CHAR(filepath0));
 	}
-	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0, as_int));
+	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
+			      method0, as_int));
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ans == R_NilValue) {
