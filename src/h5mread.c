@@ -1,24 +1,10 @@
 /****************************************************************************
  *       Experimenting with alternate rhdf5::h5read() implementations       *
  *                            Author: H. Pag\`es                            *
- ****************************************************************************
- *
- * Some useful links:
- * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
- * - Documentation of H5Dread():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
- * - An H5Dread() example:
- *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
- * - Documentation of H5DOread_chunk():
- *     https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html
- * - An H5DOread_chunk() example is in:
- *     hdf5-1.10.3/hl/test/test_h5do_compat.c
-*/
+ ****************************************************************************/
 #include "HDF5Array.h"
 #include "S4Vectors_interface.h"
 #include "hdf5.h"
-#include "hdf5_hl.h"
 
 #include <stdlib.h>  /* for malloc, free */
 
@@ -26,9 +12,9 @@
 
 
 typedef struct {
-	hid_t dset_id, space_id;
+	hid_t dset_id, space_id, plist_id;
 	int ndim;
-	hsize_t *dim;
+	hsize_t *h5dim, *h5chunkdim;
 } DSetDesc;
 
 
@@ -93,9 +79,9 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 
 static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 {
-	hid_t space_id;
+	hid_t space_id, plist_id;
 	int dset_ndim;
-	hsize_t *dim;
+	hsize_t *h5dim, *h5chunkdim;
 
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
@@ -121,30 +107,57 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 		return -1;
 	}
 
-	/* Allocate and set 'dim'. */
-	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
-	if (dim == NULL) {
+	plist_id = H5Dget_create_plist(dset_id);
+	if (plist_id < 0) {
 		H5Sclose(space_id);
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory for 'dim'");
+		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
 		return -1;
 	}
-	if (H5Sget_simple_extent_dims(space_id, dim, NULL) != ndim) {
-		free(dim);
+
+	/* Allocate 'h5dim' and 'h5chunkdim'. */
+	h5dim = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
+	if (h5dim == NULL) {
+		H5Pclose(plist_id);
+		H5Sclose(space_id);
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'h5dim' and 'h5chunkdim'");
+		return -1;
+	}
+	h5chunkdim = h5dim + ndim;
+
+	/* Set 'h5dim'. */
+	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
+		free(h5dim);
+		H5Pclose(plist_id);
 		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
 		return -1;
 	}
+
+	/* Set 'h5chunkdim'. */
+	if (H5Pget_chunk(plist_id, ndim, h5chunkdim) != ndim) {
+		free(h5dim);
+		H5Pclose(plist_id);
+		H5Sclose(space_id);
+		PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
+				    "an unexpected value");
+		return -1;
+	}
+
 	dset_desc->dset_id = dset_id;
 	dset_desc->space_id = space_id;
+	dset_desc->plist_id = plist_id;
 	dset_desc->ndim = ndim;
-	dset_desc->dim = dim;
+	dset_desc->h5dim = h5dim;
+	dset_desc->h5chunkdim = h5chunkdim;
 	return 0;
 }
 
 static void destroy_dset_desc(DSetDesc *dset_desc)
 {
-	free(dset_desc->dim);
+	free(dset_desc->h5dim);
+	H5Pclose(dset_desc->plist_id);
 	H5Sclose(dset_desc->space_id);
 }
 
@@ -159,7 +172,8 @@ static int check_selection(const DSetDesc *dset_desc,
 	ndim = dset_desc->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] = (long long int) dset_desc->dim[h5along];
+		dim_buf->elts[along] =
+			(long long int) dset_desc->h5dim[h5along];
 
 	ret = _deep_check_selection(starts, counts, dim_buf->elts,
 				    nstart, ans_dim,
@@ -169,23 +183,23 @@ static int check_selection(const DSetDesc *dset_desc,
 
 static hid_t get_mem_space(int ndim, const int *ans_dim)
 {
-	hsize_t *dim;
+	hsize_t *h5dim;
 	int along, h5along;
 	hid_t mem_space_id;
 
-	/* Allocate and set 'dim'. */
-	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
-	if (dim == NULL) {
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory for 'dim'");
+	/* Allocate and set 'h5dim'. */
+	h5dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
+	if (h5dim == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory for 'h5dim'");
 		return -1;
 	}
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim[h5along] = ans_dim[along];
+		h5dim[h5along] = ans_dim[along];
 
-	mem_space_id = H5Screate_simple(ndim, dim, NULL);
+	mem_space_id = H5Screate_simple(ndim, h5dim, NULL);
 	if (mem_space_id < 0)
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
-	free(dim);
+	free(h5dim);
 	return mem_space_id;
 }
 
@@ -207,17 +221,25 @@ static int next_midx(int ndim, int *midx, const int *nstart)
 
 /****************************************************************************
  * read_data1()
+ *
+ * Some useful links:
+ * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
+ *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
+ * - Documentation of H5Dread():
+ *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
+ * - An H5Dread() example:
+ *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
  */
 
 static int select_hyperslab(hid_t file_space_id, int ndim,
 			    SEXP starts, SEXP counts,
 			    const int *midx, int moved_along,
-			    hsize_t *offset_buf, hsize_t *count_buf)
+			    hsize_t *h5offset_buf, hsize_t *h5count_buf)
 {
 	int along, h5along, i, ret;
 	SEXP start, count;
 
-	/* Set 'offset_buf' and 'count_buf'. */
+	/* Set 'h5offset_buf' and 'h5count_buf'. */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -226,17 +248,18 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
+		h5offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
 			if (count != R_NilValue)
-				count_buf[h5along] = _get_trusted_elt(count, i);
+				h5count_buf[h5along] =
+					_get_trusted_elt(count, i);
 		}
 	}
 
 	/* Add to current selection. */
 	ret = H5Sselect_hyperslab(file_space_id, H5S_SELECT_OR,
-				  offset_buf, NULL, count_buf, NULL);
+				  h5offset_buf, NULL, h5count_buf, NULL);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
@@ -250,7 +273,7 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 {
 	int ndim, along, h5along, moved_along, ret;
 	long long int num_hyperslabs;
-	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
+	hsize_t *h5offset_buf, *h5count_buf;  // hyperslab offsets and dims
 	IntAE *midx_buf;
 
 	ndim = dset_desc->ndim;
@@ -264,22 +287,22 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 		return -1;
 	}
 
-	/* Allocate 'offset_buf' and 'count_buf'. */
-	offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
-	if (offset_buf == NULL) {
+	/* Allocate 'h5offset_buf' and 'h5count_buf'. */
+	h5offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
+	if (h5offset_buf == NULL) {
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'offset_buf' and 'count_buf'");
+				    "for 'h5offset_buf' and 'h5count_buf'");
 		return -1;
 	}
-	count_buf = offset_buf + ndim;
+	h5count_buf = h5offset_buf + ndim;
 
-	/* Initialize 'offset_buf' and 'count_buf'. */
+	/* Initialize 'h5offset_buf' and 'h5count_buf'. */
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
-			offset_buf[h5along] = 0;
-			count_buf[h5along] = dset_desc->dim[h5along];
+			h5offset_buf[h5along] = 0;
+			h5count_buf[h5along] = dset_desc->h5dim[h5along];
 		} else {
-			count_buf[h5along] = 1;
+			h5count_buf[h5along] = 1;
 		}
 	}
 
@@ -292,14 +315,14 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 		ret = select_hyperslab(dset_desc->space_id, ndim,
 				       starts, counts,
 				       midx_buf->elts, moved_along,
-				       offset_buf, count_buf);
+				       h5offset_buf, h5count_buf);
 		if (ret < 0)
 			break;
 		moved_along = next_midx(ndim, midx_buf->elts, nstart);
 	} while (moved_along < ndim);
 
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(nstart)
-	free(offset_buf);
+	free(h5offset_buf);
 	return num_hyperslabs;
 }
 
@@ -398,7 +421,7 @@ static int read_data1(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const int *nblock,
 		      const long long int *last_block_start,
-		      void *buf, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ret;
 
@@ -417,7 +440,7 @@ static int read_data1(const DSetDesc *dset_desc,
 	//clock_t t0 = clock();
 	ret = H5Dread(dset_desc->dset_id, mem_type_id,
 		      mem_space_id, dset_desc->space_id,
-		      H5P_DEFAULT, buf);
+		      H5P_DEFAULT, out);
 	//printf("time for reading data from selection: %e\n",
 	//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	if (ret < 0)
@@ -433,16 +456,16 @@ static int read_data1(const DSetDesc *dset_desc,
 static int read_selection_unit(const DSetDesc *dset_desc,
 		SEXP starts, SEXP counts,
 		const int *midx, int moved_along,
-		hsize_t *src_offset_buf, hsize_t *count_buf,
-		hsize_t *dest_offset_buf,
-		void *buf, hid_t mem_space_id, hid_t mem_type_id)
+		hsize_t *h5offset_in_buf, hsize_t *h5count_buf,
+		hsize_t *h5offset_out_buf,
+		void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ndim, along, h5along, i, ret;
 	SEXP start, count;
 
 	ndim = dset_desc->ndim;
 
-	/* Set 'src_offset_buf', 'count_buf', and 'dest_offset_buf'. */
+	/* Set 'h5offset_in_buf', 'h5count_buf', and 'h5offset_out_buf'. */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -451,28 +474,29 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		src_offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
+		h5offset_in_buf[h5along] = _get_trusted_elt(start, i) - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
 			if (count != R_NilValue)
-				count_buf[h5along] = _get_trusted_elt(count, i);
+				h5count_buf[h5along] =
+					_get_trusted_elt(count, i);
 		}
 		if (along < moved_along) {
-			dest_offset_buf[h5along] = 0;
+			h5offset_out_buf[h5along] = 0;
 		} else {
-			dest_offset_buf[h5along] += count_buf[h5along];
+			h5offset_out_buf[h5along] += h5count_buf[h5along];
 		}
 	}
 
 	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
-				  src_offset_buf, NULL, count_buf, NULL);
+				  h5offset_in_buf, NULL, h5count_buf, NULL);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
 	}
 
 	ret = H5Sselect_hyperslab(mem_space_id, H5S_SELECT_SET,
-				  dest_offset_buf, NULL, count_buf, NULL);
+				  h5offset_out_buf, NULL, h5count_buf, NULL);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
@@ -480,7 +504,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 
 	return H5Dread(dset_desc->dset_id, mem_type_id,
 		       mem_space_id, dset_desc->space_id,
-		       H5P_DEFAULT, buf);
+		       H5P_DEFAULT, out);
 }
 
 static int read_data2(const DSetDesc *dset_desc,
@@ -489,34 +513,36 @@ static int read_data2(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const int *nblock,
 		      const long long int *last_block_start,
-		      void *buf, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
-	hsize_t *src_offset_buf, *count_buf, *dest_offset_buf;
+	hsize_t *h5offset_in_buf, *h5count_buf, *h5offset_out_buf;
 	IntAE *midx_buf;
 	long long int num_selection_units;
 
 	ndim = dset_desc->ndim;
 
-	/* Allocate 'src_offset_buf', 'count_buf', and 'dest_offset_buf'. */
-	src_offset_buf = (hsize_t *) malloc(3 * ndim * sizeof(hsize_t));
-	if (src_offset_buf == NULL) {
+	/* Allocate 'h5offset_in_buf', 'h5count_buf', and 'h5offset_out_buf'. */
+	h5offset_in_buf = (hsize_t *) malloc(3 * ndim * sizeof(hsize_t));
+	if (h5offset_in_buf == NULL) {
 		PRINT_TO_ERRMSG_BUF(
 			"failed to allocate memory "
-			"for 'src_offset_buf', 'count_buf', "
-			"and 'dest_offset_buf'");
+			"for 'h5offset_in_buf', 'h5count_buf', "
+			"and 'h5offset_out_buf'");
 		return -1;
 	}
-	count_buf = src_offset_buf + ndim;
-	dest_offset_buf = count_buf + ndim;
+	h5count_buf = h5offset_in_buf + ndim;
+	h5offset_out_buf = h5count_buf + ndim;
 
-	/* Initialize 'src_offset_buf', 'count_buf', and 'dest_offset_buf'. */
+	/* Initialize 'h5offset_in_buf', 'h5count_buf',
+	   and 'h5offset_out_buf'. */
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
-			src_offset_buf[h5along] = dest_offset_buf[h5along] = 0;
-			count_buf[h5along] = dset_desc->dim[h5along];
+			h5offset_in_buf[h5along] =
+				h5offset_out_buf[h5along] = 0;
+			h5count_buf[h5along] = dset_desc->h5dim[h5along];
 		} else {
-			count_buf[h5along] = 1;
+			h5count_buf[h5along] = 1;
 		}
 	}
 
@@ -529,23 +555,78 @@ static int read_data2(const DSetDesc *dset_desc,
 		ret = read_selection_unit(dset_desc,
 					  starts, counts,
 					  midx_buf->elts, moved_along,
-					  src_offset_buf, count_buf,
-					  dest_offset_buf,
-					  buf, mem_space_id, mem_type_id);
+					  h5offset_in_buf, h5count_buf,
+					  h5offset_out_buf,
+					  out, mem_space_id, mem_type_id);
 		if (ret < 0)
 			break;
 		moved_along = next_midx(ndim, midx_buf->elts, nstart);
 	} while (moved_along < ndim);
 
 	//printf("nb of selection units = %lld\n", num_selection_units); // = prod(nstart)
-	free(src_offset_buf);
+	free(h5offset_in_buf);
 	return ret;
 }
 
 
 /****************************************************************************
  * read_data3()
+ *
+ * - Documentation of H5DOread_chunk():
+ *     https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html
+ * - An H5DOread_chunk() example is in:
+ *     hdf5-1.10.3/hl/test/test_h5do_compat.c
  */
+#ifdef HAS_HDF5_HL
+#include "hdf5_hl.h"
+#endif
+
+static int read_chunk(const DSetDesc *dset_desc,
+		      const int *midx, int moved_along,
+		      hsize_t *h5offset_buf, hsize_t *h5count_buf,
+		      const hsize_t *h5zeros_buf,
+		      void *chunkbuf, hid_t mem_space_id, hid_t mem_type_id)
+{
+	int ndim, along, h5along, ret;
+	hsize_t h5chunk_d;
+
+	ndim = dset_desc->ndim;
+
+	/* Set 'h5offset_buf' and 'h5count_buf'. */
+	for (along = 0; along < ndim; along++) {
+		if (along > moved_along)
+			break;
+		h5along = ndim - 1 - along;
+		h5chunk_d = dset_desc->h5chunkdim[h5along];
+		if (along < moved_along) {
+			h5offset_buf[h5along] = 0;
+		} else {
+			h5offset_buf[h5along] += h5chunk_d;
+		}
+		h5count_buf[h5along] = dset_desc->h5dim[h5along] -
+				       h5offset_buf[h5along];
+		if (h5count_buf[h5along] > h5chunk_d)
+			h5count_buf[h5along] = h5chunk_d;
+	}
+
+	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
+				  h5offset_buf, NULL, h5count_buf, NULL);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
+		return -1;
+	}
+
+	ret = H5Sselect_hyperslab(mem_space_id, H5S_SELECT_SET,
+				  h5zeros_buf, NULL, h5count_buf, NULL);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
+		return -1;
+	}
+
+	return H5Dread(dset_desc->dset_id, mem_type_id,
+		       mem_space_id, dset_desc->space_id,
+		       H5P_DEFAULT, chunkbuf);
+}
 
 static int read_data3(const DSetDesc *dset_desc,
 		      SEXP starts, SEXP counts, int noreduce,
@@ -553,10 +634,97 @@ static int read_data3(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const int *nblock,
 		      const long long int *last_block_start,
-		      void *buf, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
-	error("not ready yet");
+	int ndim, along, h5along, moved_along, ret;
+	long long unsigned int chunk_len;
+	void *chunkbuf;
+	hsize_t *h5offset_buf, *h5count_buf, *h5zeros_buf;
+	IntAE *midx_buf, *nchunk_buf;
+	long long int num_chunks, ndot;
+
+	ndim = dset_desc->ndim;
+	mem_space_id = H5Screate_simple(ndim, dset_desc->h5chunkdim, NULL);
+	if (mem_space_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
+		return -1;
+	}
+
+	chunk_len = 1;
+	for (along = 0; along < ndim; along++)
+		chunk_len *= dset_desc->h5chunkdim[along];
+	printf("chunk_len = %llu\n", chunk_len);
+
+	if (mem_type_id == H5T_NATIVE_INT) {
+		chunkbuf = malloc(chunk_len * sizeof(int));
+        } else {
+		chunkbuf = malloc(chunk_len * sizeof(double));
+	}
+	if (chunkbuf == NULL)
+		return -1;
+
+        /* Allocate 'h5offset_buf', 'h5count_buf', and 'h5zeros_buf'. */
+        h5offset_buf = (hsize_t *) malloc(3 * ndim * sizeof(hsize_t));
+        if (h5offset_buf == NULL) {
+		free(chunkbuf);
+                PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+                                    "for 'h5offset_buf', 'h5count_buf', "
+				    "and 'h5zeros_buf'");
+                return -1;
+        }
+        h5count_buf = h5offset_buf + ndim;
+        h5zeros_buf = h5count_buf + ndim;
+
+	/* Walk on the chunks. */
+	midx_buf = new_IntAE(ndim, ndim, 0);
+	nchunk_buf = new_IntAE(ndim, ndim, 0);
+	printf("nchunk_buf:");
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		h5zeros_buf[h5along] = 0;
+		nchunk_buf->elts[along] =
+		    dset_desc->h5dim[h5along] / dset_desc->h5chunkdim[h5along];
+		if (dset_desc->h5dim[h5along] % dset_desc->h5chunkdim[h5along])
+			nchunk_buf->elts[along]++;
+		printf(" %d", nchunk_buf->elts[along]);
+	}
+	printf("\n");
+
+	num_chunks = ndot = 0;
+	moved_along = ndim;
+	do {
+		num_chunks++;
+		if (num_chunks % 20000 == 0) {
+			printf(".");
+			if (++ndot % 50 == 0)
+				printf(" [%lld chunks processed]\n",
+				       num_chunks);
+			fflush(stdout);
+		}
+		ret = read_chunk(dset_desc,
+				 midx_buf->elts, moved_along,
+				 h5offset_buf, h5count_buf, h5zeros_buf,
+				 chunkbuf, mem_space_id, mem_type_id);
+		if (ret < 0)
+			break;
+		moved_along = next_midx(ndim, midx_buf->elts, nchunk_buf->elts);
+	} while (moved_along < ndim);
+	printf("\n");
+
+	printf("nb of chunks = %lld\n", num_chunks);
+
+	free(h5offset_buf);
+	free(chunkbuf);
 	return 0;
+
+#ifdef HAS_HDF5_HL
+	//error("not ready yet");
+	//return 0;
+#else
+	//PRINT_TO_ERRMSG_BUF(
+	//	"method 3 requires the HDF5 High Level library but "
+	//	"your version of\n  Rhdf5lib does not seem to have it");
+	//return -1;
+#endif
 }
 
 
@@ -579,7 +747,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	long long int *last_block_start;
 
 	R_xlen_t ans_len;
-	void *buf;
+	void *out;
 	hid_t mem_space_id, mem_type_id;
 
 	ret = get_ans_type(dset_id, as_int, &ans_type);
@@ -620,10 +788,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	SET_DIM(ans, ans_dim);
 
 	if (ans_type == INTSXP) {
-		buf = INTEGER(ans);
+		out = INTEGER(ans);
 		mem_type_id = H5T_NATIVE_INT;
 	} else {
-		buf = REAL(ans);
+		out = REAL(ans);
 		mem_type_id = H5T_NATIVE_DOUBLE;
 	}
 
@@ -637,19 +805,19 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 				starts, counts, noreduce,
 				nstart, INTEGER(ans_dim),
 				nblock, last_block_start,
-				buf, mem_space_id, mem_type_id);
+				out, mem_space_id, mem_type_id);
 		} else if (method == 2) {
 			ret = read_data2(&dset_desc,
 				starts, counts, noreduce,
 				nstart, INTEGER(ans_dim),
 				nblock, last_block_start,
-				buf, mem_space_id, mem_type_id);
+				out, mem_space_id, mem_type_id);
 		} else if (method == 3) {
 			ret = read_data3(&dset_desc,
 				starts, counts, noreduce,
 				nstart, INTEGER(ans_dim),
 				nblock, last_block_start,
-				buf, mem_space_id, mem_type_id);
+				out, mem_space_id, mem_type_id);
 		} else if (method != 0) {
 			ret = -1;
 			PRINT_TO_ERRMSG_BUF("'method' must be 0, 1, 2, or 3");
