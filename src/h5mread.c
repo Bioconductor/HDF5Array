@@ -1,550 +1,40 @@
 /****************************************************************************
  *       Experimenting with alternate rhdf5::h5read() implementations       *
  *                            Author: H. Pag\`es                            *
- ****************************************************************************/
-#include "HDF5Array.h"
-#include "S4Vectors_interface.h"
-#include "hdf5.h"
-
-#include <stdlib.h>  /* for malloc, free */
-#include <string.h>  /* for memcpy */
-#include <limits.h>  /* for INT_MAX, LLONG_MAX, LLONG_MIN */
-
-//#include <time.h>
-
-static char errmsg_buf[256];
-
-#define	NOT_A_FINITE_NUMBER(x) \
-	(R_IsNA(x) || R_IsNaN(x) || (x) == R_PosInf || (x) == R_NegInf)
-
-static inline int get_untrusted_elt(SEXP x, int i, long long int *val,
-				    const char *what, int along)
-{
-	int tmp1;
-	double tmp2;
-
-	if (IS_INTEGER(x)) {
-		tmp1 = INTEGER(x)[i];
-		if (tmp1 == NA_INTEGER) {
-			if (along < 0)
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[%d] is NA",
-					 what, i + 1);
-			else
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[[%d]][%d] is NA",
-					 what, along + 1, i + 1);
-			return -1;
-		}
-		*val = (long long int) tmp1;
-	} else {
-		tmp2 = REAL(x)[i];
-		if (NOT_A_FINITE_NUMBER(tmp2)) {
-			if (along < 0)
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[%d] is NA or NaN "
-					 "or not a finite number",
-					 what, i + 1);
-			else
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[[%d]][%d] is NA or NaN "
-					 "or not a finite number",
-					 what, along + 1, i + 1);
-			return -1;
-		}
-		if (tmp2 > (double) LLONG_MAX ||
-		    tmp2 < (double) LLONG_MIN) {
-			if (along < 0)
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[%d] is too large (= %e)",
-					 what, i + 1, tmp2);
-			else
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "%s[[%d]][%d] is too large (= %e)",
-					 what, along + 1, i + 1, tmp2);
-			return -1;
-		}
-		*val = (long long int) tmp2;
-	}
-	return 0;
-}
-
-/* Unlike get_untrusted_elt() above, doesn't check anything. */
-static inline long long int get_trusted_elt(SEXP x, int i)
-{
-	return IS_INTEGER(x) ? (long long int) INTEGER(x)[i] :
-			       (long long int) REAL(x)[i];
-}
-
-static inline void set_trusted_elt(SEXP x, int i, long long int val)
-{
-	if (IS_INTEGER(x))
-		INTEGER(x)[i] = val;
-	else
-		REAL(x)[i] = val;
-	return;
-}
-
-
-/****************************************************************************
- * Low-level helpers for checking the selection
- */
-
-static int shallow_check_starts_counts(SEXP starts, SEXP counts)
-{
-	int ndim;
-
-	if (!isVectorList(starts)) {  // IS_LIST() is broken
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts' must be a list");
-		return -1;
-	}
-	ndim = LENGTH(starts);
-	if (counts != R_NilValue) {
-		if (!isVectorList(counts)) {  // IS_LIST() is broken
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts' must be a list (or NULL)");
-			return -1;
-		}
-		if (LENGTH(counts) != ndim) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'starts' and 'counts' "
-				 "must have the same length");
-			return -1;
-		}
-	}
-	return ndim;
-}
-
-static void set_error_for_selection_too_large(int along1)
-{
-	snprintf(errmsg_buf, sizeof(errmsg_buf),
-		 "too many elements (>= 2^31) selected "
-		 "along dimension %d of dataset",
-		 along1);
-	return;
-}
-
-static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
-							    int starts_only)
-{
-	const char *msg = "selection must be strictly ascending "
-			  "along each dimension, but\n  you have:";
-	if (starts_only)
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] <= starts[[%d]][%d]",
-			 msg, along1, i + 1, along1, i);
-	else
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] < starts[[%d]][%d] + "
-			 "counts[[%d]][%d]",
-			 msg, along1, i + 1, along1, i, along1, i);
-	return;
-}
-
-static void set_errmsg_for_selection_beyond_dim(int along1, int i,
-						int starts_only)
-{
-	const char *msg = "selection must be within extent of "
-			  "dataset, but you\n  have:";
-	if (starts_only)
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] "
-			 "> dimension %d in dataset",
-			 msg, along1, i + 1, along1);
-	else
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "%s starts[[%d]][%d] + counts[[%d]][%d] - 1 "
-			 "> dimension %d in dataset",
-			 msg, along1, i + 1, along1, i + 1, along1);
-	return;
-}
-
-static inline int get_untrusted_start(SEXP start, int i, long long int *s,
-				      int along,
-				      long long int e,
-				      int *nblock,
-				      long long int *last_block_start,
-				      int starts_only)
-{
-	int ret;
-
-	ret = get_untrusted_elt(start, i, s, "starts", along);
-	if (ret < 0)
-		return -1;
-	if (*s <= e) {
-		if (e == 0) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "starts[[%d]][%d] is <= 0",
-				 along + 1, i + 1);
-			return -1;
-		}
-		set_errmsg_for_non_strictly_ascending_selection(
-				along + 1, i, starts_only);
-		return -1;
-	}
-	if (i == 0 || *s != e + 1) {
-		nblock[along]++;
-		last_block_start[along] = *s;
-	}
-	return 0;
-}
-
-static int check_starts_counts_along(int along, SEXP starts, SEXP counts,
-			long long int d,
-			int *nstart, int *count_sum,
-			int *nblock, long long int *last_block_start)
-{
-	SEXP start, count;
-	int n, i, ret;
-	long long int e, s, cs, c;
-
-	start = VECTOR_ELT(starts, along);
-	count = counts != R_NilValue ? VECTOR_ELT(counts, along) : R_NilValue;
-	if (start == R_NilValue) {
-		if (count != R_NilValue) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "if 'starts[[%d]]' is NULL then 'counts' "
-				 "or 'counts[[%d]]' must also be NULL",
-				 along + 1, along + 1);
-			return -1;
-		}
-		if (d >= 0) {
-			if (d > INT_MAX) {
-				set_error_for_selection_too_large(along + 1);
-				return -1;
-			}
-			nstart[along] = count_sum[along] = d;
-			nblock[along] = d != 0;
-			last_block_start[along] = 1;
-		} else {
-			/* 'count_sum' is undefined in that case. */
-			nstart[along] = nblock[along] = 1;
-			last_block_start[along] = 1;
-		}
-		return 0;
-	}
-	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "'starts[[%d]]' must be "
-			 "an integer vector (or NULL)", along + 1);
-		return -1;
-	}
-	n = LENGTH(start);
-	if (count != R_NilValue) {
-		if (!(IS_INTEGER(count) || IS_NUMERIC(count))) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'counts[[%d]]' must be an integer "
-				 "vector (or NULL)", along + 1);
-			return -1;
-		}
-		if (LENGTH(count) != n) {
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'starts[[%d]]' and 'counts[[%d]]' "
-				 "must have the same length",
-				 along + 1, along + 1);
-			return -1;
-		}
-	}
-	nstart[along] = n;
-	nblock[along] = 0;
-	e = 0;
-	if (count == R_NilValue) {
-		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along,
-						  e, nblock, last_block_start,
-						  1);
-			if (ret < 0)
-				return -1;
-			e = s;
-			if (d >= 0 && e > d) {
-				set_errmsg_for_selection_beyond_dim(
-					along + 1, i, 1);
-				return -1;
-			}
-		}
-		count_sum[along] = n;
-	} else {
-		cs = 0;
-		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along,
-						  e, nblock, last_block_start,
-						  0);
-			if (ret < 0)
-				return -1;
-			ret = get_untrusted_elt(count, i, &c, "counts", along);
-			if (ret < 0)
-				return -1;
-			if (c <= 0) {
-				snprintf(errmsg_buf, sizeof(errmsg_buf),
-					 "counts[[%d]][%d] is <= 0",
-					 along + 1, i + 1);
-				return -1;
-			}
-			e = s + c - 1;	// could overflow! (FIXME)
-			if (d >= 0 && e > d) {
-				set_errmsg_for_selection_beyond_dim(
-					along + 1, i, 0);
-				return -1;
-			}
-			cs += c;	// could overflow! (FIXME)
-			if (cs > INT_MAX) {
-				set_error_for_selection_too_large(along + 1);
-				return -1;
-			}
-		}
-		count_sum[along] = cs;
-	}
-	return 0;
-}
-
-static int check_starts_counts(SEXP starts, SEXP counts,
-			       const long long int *dim,
-			       int *nstart, int *count_sum,
-			       int *nblock, long long int *last_block_start)
-{
-	int ndim, along, ret;
-
-	ndim = LENGTH(starts);
-	for (along = 0; along < ndim; along++) {
-		ret = check_starts_counts_along(along, starts, counts,
-						dim != NULL ? dim[along] : -1,
-						nstart, count_sum,
-						nblock, last_block_start);
-		if (ret < 0)
-			return -1;
-	}
-	return 0;
-}
-
-
-/****************************************************************************
- * C_reduce_selection()
- */
-
-static int selection_can_be_reduced(int ndim,
-				    const int *nstart, const int *nblock)
-{
-	int along;
-
-	for (along = 0; along < ndim; along++) {
-		/* nblock[along] should always be <= nstart[along] */
-		if (nblock[along] < nstart[along])
-			return 1;
-	}
-	return 0;
-}
-
-static SEXP dup_or_coerce_to_INTSXP(SEXP x, int dup)
-{
-	int x_len, i;
-	SEXP ans;
-
-	if (dup)
-		return duplicate(x);
-	x_len = LENGTH(x);
-	ans = PROTECT(NEW_INTEGER(x_len));
-	for (i = 0; i < x_len; i++)
-		INTEGER(ans)[i] = (int) REAL(x)[i];
-	UNPROTECT(1);
-	return ans;
-}
-
-/*
- * Note that this does something similar to what coercion from integer (or
- * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
- * in IRanges). However we cannot re-use this here because we want to be able
- * to handle start values that are >= 2^31 which this coercion doesn't support
- * at the moment.
- */
-static void stitch_selection(SEXP start_in, SEXP count_in,
-			     SEXP start_out, int *count_out)
-{
-	int n, i, j;
-	long long int e, s, c;
-
-	n = LENGTH(start_in);
-	e = 0;
-	j = -1;
-	if (count_in == R_NilValue) {
-		for (i = 0; i < n; i++) {
-			s = get_trusted_elt(start_in, i);
-			if (i == 0 || s != e + 1) {
-				j++;
-				set_trusted_elt(start_out, j, s);
-				count_out[j] = 1;
-			} else {
-				count_out[j]++;
-			}
-			e = s;
-		}
-	} else {
-		for (i = 0; i < n; i++) {
-			s = get_trusted_elt(start_in, i);
-			c = get_trusted_elt(count_in, i);
-			if (i == 0 || s != e + 1) {
-				j++;
-				set_trusted_elt(start_out, j, s);
-				count_out[j] = c;
-			} else {
-				count_out[j] += c;
-			}
-			e = s + c - 1;
-		}
-	}
-	return;
-}
-
-static void reduce_selection_along(int along, SEXP starts, SEXP counts,
-				   const int *count_sum,
-				   const int *nblock,
-				   const long long int *last_block_start,
-				   SEXP reduced_starts, SEXP reduced_counts)
-{
-	SEXP start, count, reduced_start, reduced_count;
-	int n, dup;
-	SEXPTYPE type;
-
-	start = VECTOR_ELT(starts, along);
-	if (start == R_NilValue)
-		return;
-	n = LENGTH(start);
-	count = counts != R_NilValue ? VECTOR_ELT(counts, along) : R_NilValue;
-	if (nblock[along] == n) {
-		/* Nothing to stitch. */
-		dup = IS_INTEGER(start) || last_block_start[along] > INT_MAX;
-		reduced_start = PROTECT(dup_or_coerce_to_INTSXP(start, dup));
-		SET_VECTOR_ELT(reduced_starts, along, reduced_start);
-		UNPROTECT(1);
-		if (count_sum[along] == n)
-			return;
-		dup = IS_INTEGER(count);
-		reduced_count = PROTECT(dup_or_coerce_to_INTSXP(count, dup));
-		SET_VECTOR_ELT(reduced_counts, along, reduced_count);
-		UNPROTECT(1);
-		return;
-	}
-	/* Stitch. */
-	type = last_block_start[along] <= INT_MAX ? INTSXP : REALSXP;
-	reduced_start = PROTECT(allocVector(type, nblock[along]));
-	SET_VECTOR_ELT(reduced_starts, along, reduced_start);
-	UNPROTECT(1);
-	reduced_count = PROTECT(NEW_INTEGER(nblock[along]));
-	SET_VECTOR_ELT(reduced_counts, along, reduced_count);
-	UNPROTECT(1);
-	stitch_selection(start, count, reduced_start, INTEGER(reduced_count));
-	return;
-}
-
-static SEXP reduce_selection(SEXP starts, SEXP counts,
-			     const int *count_sum,
-			     const int *nblock,
-			     const long long int *last_block_start)
-{
-	int ndim, along;
-	SEXP ans, reduced_starts, reduced_counts;
-
-	//clock_t t0 = clock();
-	ndim = LENGTH(starts);
-	ans = PROTECT(NEW_LIST(2));
-	reduced_starts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 0, reduced_starts);
-	UNPROTECT(1);
-	reduced_counts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 1, reduced_counts);
-	UNPROTECT(1);
-	for (along = 0; along < ndim; along++) {
-		reduce_selection_along(along, starts, counts,
-				       count_sum,
-				       nblock, last_block_start,
-				       reduced_starts, reduced_counts);
-	}
-	UNPROTECT(1);
-	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	return ans;
-}
-
-/* --- .Call ENTRY POINT ---
- * Negative values in 'dim' are treated as infinite dimensions.
- * Return a list of length 2 or NULL if the selection could not be reduced.
- * The 1st list element is the list of reduced starts and the 2nd list element
- * the list of reduced 'counts'. The 2 lists have the same shape i.e. same
- * length() and same lengths().
- */
-SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
-{
-	int ndim, along, ret;
-	LLongAE *dim_buf;
-	IntAE *nstart_buf, *count_sum_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
-	int *nstart, *count_sum, *nblock;
-	long long int *dim_p, d, *last_block_start;
-
-	ndim = shallow_check_starts_counts(starts, counts);
-	if (ndim < 0)
-		error(errmsg_buf);
-	if (dim == R_NilValue) {
-		dim_p = NULL;
-	} else {
-		if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
-			error("'dim' must be an integer vector (or NULL)");
-		if (LENGTH(dim) != ndim)
-			error("'starts' and 'dim' must have the same length");
-		dim_buf = new_LLongAE(ndim, ndim, 0);
-		dim_p = dim_buf->elts;
-		for (along = 0; along < ndim; along++) {
-			ret = get_untrusted_elt(dim, along, &d, "dim", -1);
-			if (ret < 0)
-				error(errmsg_buf);
-			dim_p[along] = d;
-		}
-	}
-
-	nstart_buf = new_IntAE(ndim, ndim, 0);
-	count_sum_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-
-	nstart = nstart_buf->elts;
-	count_sum = count_sum_buf->elts;
-	nblock = nblock_buf->elts;
-	last_block_start = last_block_start_buf->elts;
-
-	/* 1st pass */
-	//clock_t t0 = clock();
-	ret = check_starts_counts(starts, counts, dim_p,
-				  nstart, count_sum,
-				  nblock, last_block_start);
-	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	if (ret < 0)
-		error(errmsg_buf);
-
-	if (!selection_can_be_reduced(ndim, nstart, nblock))
-		return R_NilValue;
-
-	/* 2nd pass */
-	return reduce_selection(starts, counts,
-				count_sum, nblock, last_block_start);
-}
-
-
-/****************************************************************************
- * C_h5mread()
+ ****************************************************************************
  *
  * Some useful links:
  * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
- *     https://support.hdfgroup.org/HDF5/doc1.8/RM/RM_H5S.html
+ *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
  * - Documentation of H5Dread():
  *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
- * - A useful example:
+ * - An H5Dread() example:
  *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
+ * - Documentation of H5DOread_chunk():
+ *     https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html
+ * - An H5DOread_chunk() example is in:
+ *     hdf5-1.10.3/hl/test/test_h5do_compat.c
 */
+#include "HDF5Array.h"
+#include "S4Vectors_interface.h"
+#include "hdf5.h"
+#include "hdf5_hl.h"
+
+#include <stdlib.h>  /* for malloc, free */
+
+//#include <time.h>
+
 
 typedef struct {
 	hid_t dset_id, space_id;
 	int ndim;
 	hsize_t *dim;
-} DataInfo;
+} DSetDesc;
+
+
+/****************************************************************************
+ * Low-level helpers
+ */
 
 static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 {
@@ -559,21 +49,18 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 	}
 	type_id = H5Dget_type(dset_id);
 	if (type_id < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Dget_type() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		return -1;
 	}
 	class = H5Tget_class(type_id);
 	size = H5Tget_size(type_id);
 	H5Tclose(type_id);
 	if (class == H5T_NO_CLASS) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Tget_class() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		return -1;
 	}
 	if (size == 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Tget_size() returned 0");
+		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
 		return -1;
 	}
 
@@ -596,16 +83,15 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 		case H5T_VLEN: classname = "H5T_VLEN"; break;
 		case H5T_ARRAY: classname = "H5T_ARRAY"; break;
 		default:
-		    snprintf(errmsg_buf, sizeof(errmsg_buf),
-			     "unknown dataset class identifier: %d", class);
-		return -1;
+		    PRINT_TO_ERRMSG_BUF("unknown dataset class identifier: %d",
+					class);
+		    return -1;
 	}
-	snprintf(errmsg_buf, sizeof(errmsg_buf),
-		 "unsupported dataset class: %s", classname);
+	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s", classname);
 	return -1;
 }
 
-static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
+static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 {
 	hid_t space_id;
 	int dset_ndim;
@@ -613,26 +99,25 @@ static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Dget_space() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
 		return -1;
 	}
 
 	dset_ndim = H5Sget_simple_extent_ndims(space_id);
 	if (dset_ndim < 0) {
 		H5Sclose(space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sget_simple_extent_ndims() returned an error");
+		PRINT_TO_ERRMSG_BUF(
+			"H5Sget_simple_extent_ndims() returned an error");
 		return -1;
 	}
 
 	if (ndim != dset_ndim) {
 		H5Sclose(space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "Dataset has %d dimensions but 'starts' has %d list "
-			 "element%s.\n  'starts' must have one list element "
-			 "per dimension in the dataset.",
-			 dset_ndim, ndim, ndim > 1 ? "s" : "");
+		PRINT_TO_ERRMSG_BUF(
+			"Dataset has %d dimensions but 'starts' has %d list "
+			"element%s.\n  'starts' must have one list element "
+			"per dimension in the dataset.",
+			dset_ndim, ndim, ndim > 1 ? "s" : "");
 		return -1;
 	}
 
@@ -640,47 +125,45 @@ static int get_dset_info(hid_t dset_id, int ndim, DataInfo *dset_info)
 	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
 	if (dim == NULL) {
 		H5Sclose(space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'dim'");
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory for 'dim'");
 		return -1;
 	}
 	if (H5Sget_simple_extent_dims(space_id, dim, NULL) != ndim) {
 		free(dim);
 		H5Sclose(space_id);
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "H5Sget_simple_extent_dims() returned "
-			 "an unexpected value");
+		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
+				    "an unexpected value");
 		return -1;
 	}
-	dset_info->dset_id = dset_id;
-	dset_info->space_id = space_id;
-	dset_info->ndim = ndim;
-	dset_info->dim = dim;
+	dset_desc->dset_id = dset_id;
+	dset_desc->space_id = space_id;
+	dset_desc->ndim = ndim;
+	dset_desc->dim = dim;
 	return 0;
 }
 
-static void destroy_dset_info(DataInfo *dset_info)
+static void destroy_dset_desc(DSetDesc *dset_desc)
 {
-	free(dset_info->dim);
-	H5Sclose(dset_info->space_id);
+	free(dset_desc->dim);
+	H5Sclose(dset_desc->space_id);
 }
 
-static int deep_check_starts_counts(const DataInfo *dset_info,
-			SEXP starts, SEXP counts,
-			int *nstart, int *ans_dim,
-			int *nblock, long long int *last_block_start)
+static int check_selection(const DSetDesc *dset_desc,
+			   SEXP starts, SEXP counts,
+			   int *nstart, int *ans_dim,
+			   int *nblock, long long int *last_block_start)
 {
 	int ndim, along, h5along, ret;
 	LLongAE *dim_buf;
 
-	ndim = dset_info->ndim;
+	ndim = dset_desc->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] = (long long int) dset_info->dim[h5along];
+		dim_buf->elts[along] = (long long int) dset_desc->dim[h5along];
 
-	ret = check_starts_counts(starts, counts, dim_buf->elts,
-				  nstart, ans_dim,
-				  nblock, last_block_start);
+	ret = _deep_check_selection(starts, counts, dim_buf->elts,
+				    nstart, ans_dim,
+				    nblock, last_block_start);
 	return ret;
 }
 
@@ -693,8 +176,7 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	/* Allocate and set 'dim'. */
 	dim = (hsize_t *) malloc(ndim * sizeof(hsize_t));
 	if (dim == NULL) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'dim'");
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory for 'dim'");
 		return -1;
 	}
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
@@ -702,8 +184,7 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 
 	mem_space_id = H5Screate_simple(ndim, dim, NULL);
 	if (mem_space_id < 0)
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Screate_simple() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
 	free(dim);
 	return mem_space_id;
 }
@@ -723,6 +204,11 @@ static int next_midx(int ndim, int *midx, const int *nstart)
 	return along;
 }
 
+
+/****************************************************************************
+ * read_data1()
+ */
+
 static int select_hyperslab(hid_t file_space_id, int ndim,
 			    SEXP starts, SEXP counts,
 			    const int *midx, int moved_along,
@@ -740,11 +226,11 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		offset_buf[h5along] = get_trusted_elt(start, i) - 1;
+		offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
 			if (count != R_NilValue)
-				count_buf[h5along] = get_trusted_elt(count, i);
+				count_buf[h5along] = _get_trusted_elt(count, i);
 		}
 	}
 
@@ -752,15 +238,14 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 	ret = H5Sselect_hyperslab(file_space_id, H5S_SELECT_OR,
 				  offset_buf, NULL, count_buf, NULL);
 	if (ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_hyperslab() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
 	}
 	return 0;
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
-static long long int select_hyperslabs(const DataInfo *dset_info,
+static long long int select_hyperslabs(const DSetDesc *dset_desc,
 			SEXP starts, SEXP counts, const int *nstart)
 {
 	int ndim, along, h5along, moved_along, ret;
@@ -768,24 +253,22 @@ static long long int select_hyperslabs(const DataInfo *dset_info,
 	hsize_t *offset_buf, *count_buf;  // hyperslab offsets and dims
 	IntAE *midx_buf;
 
-	ndim = dset_info->ndim;
+	ndim = dset_desc->ndim;
 	for (along = 0; along < ndim; along++)
 		if (nstart[along] == 0)
 			return 0;  // empty region (no hyperslab)
 
-	ret = H5Sselect_none(dset_info->space_id);
+	ret = H5Sselect_none(dset_desc->space_id);
 	if (ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_none() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
 	}
 
 	/* Allocate 'offset_buf' and 'count_buf'. */
 	offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
 	if (offset_buf == NULL) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'offset_buf' "
-			 "and 'count_buf'");
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'offset_buf' and 'count_buf'");
 		return -1;
 	}
 	count_buf = offset_buf + ndim;
@@ -794,7 +277,7 @@ static long long int select_hyperslabs(const DataInfo *dset_info,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
 			offset_buf[h5along] = 0;
-			count_buf[h5along] = dset_info->dim[h5along];
+			count_buf[h5along] = dset_desc->dim[h5along];
 		} else {
 			count_buf[h5along] = 1;
 		}
@@ -806,7 +289,7 @@ static long long int select_hyperslabs(const DataInfo *dset_info,
 	moved_along = ndim;
 	do {
 		num_hyperslabs++;
-		ret = select_hyperslab(dset_info->space_id, ndim,
+		ret = select_hyperslab(dset_desc->space_id, ndim,
 				       starts, counts,
 				       midx_buf->elts, moved_along,
 				       offset_buf, count_buf);
@@ -821,7 +304,7 @@ static long long int select_hyperslabs(const DataInfo *dset_info,
 }
 
 /* Return nb of elements (or -1 on error). */
-static long long int select_elements(const DataInfo *dset_info,
+static long long int select_elements(const DSetDesc *dset_desc,
 			SEXP starts, const int *ans_dim)
 {
 	int ndim, along, moved_along, i, ret;
@@ -831,7 +314,7 @@ static long long int select_elements(const DataInfo *dset_info,
 	SEXP start;
 	long long int coord;
 
-	ndim = dset_info->ndim;
+	ndim = dset_desc->ndim;
 	num_elements = 1;
 	for (along = 0; along < ndim; along++)
 		num_elements *= ans_dim[along];
@@ -842,8 +325,8 @@ static long long int select_elements(const DataInfo *dset_info,
 	/* Allocate 'coord_buf'. */
 	coord_buf = (hsize_t *) malloc(num_elements * ndim * sizeof(hsize_t));
 	if (coord_buf == NULL) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'coord_buf'");
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'coord_buf'");
 		return -1;
 	}
 
@@ -858,14 +341,14 @@ static long long int select_elements(const DataInfo *dset_info,
 			if (start == R_NilValue) {
 				coord = i;
 			} else {
-				coord = get_trusted_elt(start, i) - 1;
+				coord = _get_trusted_elt(start, i) - 1;
 			}
 			*(coord_p++) = (hsize_t) coord;
 		}
 		moved_along = next_midx(ndim, midx_buf->elts, ans_dim);
 	} while (moved_along < ndim);
 
-	ret = H5Sselect_elements(dset_info->space_id, H5S_SELECT_APPEND,
+	ret = H5Sselect_elements(dset_desc->space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	free(coord_buf);
 	if (ret < 0)
@@ -873,7 +356,7 @@ static long long int select_elements(const DataInfo *dset_info,
 	return (long long int) num_elements;
 }
 
-static int set_selection(const DataInfo *dset_info,
+static int set_selection(const DSetDesc *dset_desc,
 			 SEXP starts, SEXP counts, int noreduce,
 			 const int *nstart,
 			 const int *ans_dim,
@@ -884,11 +367,11 @@ static int set_selection(const DataInfo *dset_info,
 	SEXP reduced;
 	long long int nselection;
 
-	ndim = dset_info->ndim;
-	if (!noreduce && selection_can_be_reduced(ndim, nstart, nblock)) {
-		reduced = PROTECT(reduce_selection(starts, counts,
-						   ans_dim,
-						   nblock, last_block_start));
+	ndim = dset_desc->ndim;
+	if (!noreduce && _selection_can_be_reduced(ndim, nstart, nblock)) {
+		reduced = PROTECT(_reduce_selection(starts, counts,
+						    ans_dim,
+						    nblock, last_block_start));
 		starts = VECTOR_ELT(reduced, 0);
 		counts = VECTOR_ELT(reduced, 1);
 		nstart = nblock;
@@ -896,8 +379,8 @@ static int set_selection(const DataInfo *dset_info,
 
 	//clock_t t0 = clock();
 	nselection = counts != R_NilValue ?
-		     select_hyperslabs(dset_info, starts, counts, nstart) :
-		     select_elements(dset_info, starts, ans_dim);
+		     select_hyperslabs(dset_desc, starts, counts, nstart) :
+		     select_elements(dset_desc, starts, ans_dim);
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
 	//printf("time for setting selection: %e\n", dt);
 	//printf("nselection: %lld, time per selection unit: %e\n",
@@ -909,7 +392,7 @@ static int set_selection(const DataInfo *dset_info,
 	return nselection < 0 ? -1 : 0;
 }
 
-static int read_data1(const DataInfo *dset_info,
+static int read_data1(const DSetDesc *dset_desc,
 		      SEXP starts, SEXP counts, int noreduce,
 		      const int *nstart,
 		      const int *ans_dim,
@@ -919,7 +402,7 @@ static int read_data1(const DataInfo *dset_info,
 {
 	int ret;
 
-	ret = set_selection(dset_info, starts, counts, noreduce,
+	ret = set_selection(dset_desc, starts, counts, noreduce,
 			    nstart, ans_dim,
 			    nblock, last_block_start);
 	if (ret < 0)
@@ -927,24 +410,27 @@ static int read_data1(const DataInfo *dset_info,
 
 	ret = H5Sselect_all(mem_space_id);
 	if (ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_all() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Sselect_all() returned an error");
 		return -1;
 	}
 
 	//clock_t t0 = clock();
-	ret = H5Dread(dset_info->dset_id, mem_type_id,
-		      mem_space_id, dset_info->space_id,
+	ret = H5Dread(dset_desc->dset_id, mem_type_id,
+		      mem_space_id, dset_desc->space_id,
 		      H5P_DEFAULT, buf);
 	//printf("time for reading data from selection: %e\n",
 	//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	if (ret < 0)
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "H5Dread() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	return ret;
 }
 
-static int read_selection_unit(const DataInfo *dset_info,
+
+/****************************************************************************
+ * read_data2()
+ */
+
+static int read_selection_unit(const DSetDesc *dset_desc,
 		SEXP starts, SEXP counts,
 		const int *midx, int moved_along,
 		hsize_t *src_offset_buf, hsize_t *count_buf,
@@ -954,7 +440,7 @@ static int read_selection_unit(const DataInfo *dset_info,
 	int ndim, along, h5along, i, ret;
 	SEXP start, count;
 
-	ndim = dset_info->ndim;
+	ndim = dset_desc->ndim;
 
 	/* Set 'src_offset_buf', 'count_buf', and 'dest_offset_buf'. */
 	for (along = 0; along < ndim; along++) {
@@ -965,11 +451,11 @@ static int read_selection_unit(const DataInfo *dset_info,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		src_offset_buf[h5along] = get_trusted_elt(start, i) - 1;
+		src_offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
 		if (counts != R_NilValue) {
 			count = VECTOR_ELT(counts, along);
 			if (count != R_NilValue)
-				count_buf[h5along] = get_trusted_elt(count, i);
+				count_buf[h5along] = _get_trusted_elt(count, i);
 		}
 		if (along < moved_along) {
 			dest_offset_buf[h5along] = 0;
@@ -978,48 +464,47 @@ static int read_selection_unit(const DataInfo *dset_info,
 		}
 	}
 
-	ret = H5Sselect_hyperslab(dset_info->space_id, H5S_SELECT_SET,
+	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
 				  src_offset_buf, NULL, count_buf, NULL);
 	if (ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_hyperslab() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
 	}
 
 	ret = H5Sselect_hyperslab(mem_space_id, H5S_SELECT_SET,
 				  dest_offset_buf, NULL, count_buf, NULL);
 	if (ret < 0) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-		         "H5Sselect_hyperslab() returned an error");
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
 		return -1;
 	}
 
-	return H5Dread(dset_info->dset_id, mem_type_id,
-		       mem_space_id, dset_info->space_id,
+	return H5Dread(dset_desc->dset_id, mem_type_id,
+		       mem_space_id, dset_desc->space_id,
 		       H5P_DEFAULT, buf);
 }
 
-static int read_data2(const DataInfo *dset_info,
-			SEXP starts, SEXP counts, int noreduce,
-		const int *nstart,
-		const int *ans_dim,
-		const int *nblock,
-		const long long int *last_block_start,
-		void *buf, hid_t mem_space_id, hid_t mem_type_id)
+static int read_data2(const DSetDesc *dset_desc,
+		      SEXP starts, SEXP counts, int noreduce,
+		      const int *nstart,
+		      const int *ans_dim,
+		      const int *nblock,
+		      const long long int *last_block_start,
+		      void *buf, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
 	hsize_t *src_offset_buf, *count_buf, *dest_offset_buf;
 	IntAE *midx_buf;
 	long long int num_selection_units;
 
-	ndim = dset_info->ndim;
+	ndim = dset_desc->ndim;
 
 	/* Allocate 'src_offset_buf', 'count_buf', and 'dest_offset_buf'. */
 	src_offset_buf = (hsize_t *) malloc(3 * ndim * sizeof(hsize_t));
 	if (src_offset_buf == NULL) {
-		snprintf(errmsg_buf, sizeof(errmsg_buf),
-			 "failed to allocate memory for 'src_offset_buf', "
-			 "'count_buf', and 'dest_offset_buf'");
+		PRINT_TO_ERRMSG_BUF(
+			"failed to allocate memory "
+			"for 'src_offset_buf', 'count_buf', "
+			"and 'dest_offset_buf'");
 		return -1;
 	}
 	count_buf = src_offset_buf + ndim;
@@ -1029,7 +514,7 @@ static int read_data2(const DataInfo *dset_info,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
 			src_offset_buf[h5along] = dest_offset_buf[h5along] = 0;
-			count_buf[h5along] = dset_info->dim[h5along];
+			count_buf[h5along] = dset_desc->dim[h5along];
 		} else {
 			count_buf[h5along] = 1;
 		}
@@ -1041,7 +526,7 @@ static int read_data2(const DataInfo *dset_info,
 	moved_along = ndim;
 	do {
 		num_selection_units++;
-		ret = read_selection_unit(dset_info,
+		ret = read_selection_unit(dset_desc,
 					  starts, counts,
 					  midx_buf->elts, moved_along,
 					  src_offset_buf, count_buf,
@@ -1057,13 +542,35 @@ static int read_data2(const DataInfo *dset_info,
 	return ret;
 }
 
+
+/****************************************************************************
+ * read_data3()
+ */
+
+static int read_data3(const DSetDesc *dset_desc,
+		      SEXP starts, SEXP counts, int noreduce,
+		      const int *nstart,
+		      const int *ans_dim,
+		      const int *nblock,
+		      const long long int *last_block_start,
+		      void *buf, hid_t mem_space_id, hid_t mem_type_id)
+{
+	error("not ready yet");
+	return 0;
+}
+
+
+/****************************************************************************
+ * C_h5mread()
+ */
+
 /* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int method, int as_int)
 {
 	int ret, ndim, along;
 	SEXPTYPE ans_type;
-	DataInfo dset_info;
+	DSetDesc dset_desc;
 	SEXP ans_dim, ans;
 
 	IntAE *nstart_buf, *nblock_buf;
@@ -1079,11 +586,11 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ret < 0)
 		return R_NilValue;
 
-	ndim = shallow_check_starts_counts(starts, counts);
+	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
 		return R_NilValue;
 
-	ret = get_dset_info(dset_id, ndim, &dset_info);
+	ret = get_dset_desc(dset_id, ndim, &dset_desc);
 	if (ret < 0)
 		return R_NilValue;
 
@@ -1099,10 +606,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	/* This call will populate 'nstart', 'ans_dim', 'nblock',
 	   and 'last_block_start'. */
-	ret = deep_check_starts_counts(&dset_info,
-				       starts, counts,
-				       nstart, INTEGER(ans_dim),
-				       nblock, last_block_start);
+	ret = check_selection(&dset_desc,
+			      starts, counts,
+			      nstart, INTEGER(ans_dim),
+			      nblock, last_block_start);
 	if (ret < 0)
 		goto on_error1;
 
@@ -1120,34 +627,39 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		mem_type_id = H5T_NATIVE_DOUBLE;
 	}
 
-	mem_space_id = get_mem_space(dset_info.ndim, INTEGER(ans_dim));
+	mem_space_id = get_mem_space(dset_desc.ndim, INTEGER(ans_dim));
 	if (mem_space_id < 0)
 		goto on_error2;
 
 	if (ans_len != 0) {
 		if (method == 1) {
-			ret = read_data1(&dset_info,
-				 starts, counts, noreduce,
-				 nstart, INTEGER(ans_dim),
-				 nblock, last_block_start,
-				 buf, mem_space_id, mem_type_id);
+			ret = read_data1(&dset_desc,
+				starts, counts, noreduce,
+				nstart, INTEGER(ans_dim),
+				nblock, last_block_start,
+				buf, mem_space_id, mem_type_id);
 		} else if (method == 2) {
-			ret = read_data2(&dset_info,
-				 starts, counts, noreduce,
-				 nstart, INTEGER(ans_dim),
-				 nblock, last_block_start,
-				 buf, mem_space_id, mem_type_id);
+			ret = read_data2(&dset_desc,
+				starts, counts, noreduce,
+				nstart, INTEGER(ans_dim),
+				nblock, last_block_start,
+				buf, mem_space_id, mem_type_id);
+		} else if (method == 3) {
+			ret = read_data3(&dset_desc,
+				starts, counts, noreduce,
+				nstart, INTEGER(ans_dim),
+				nblock, last_block_start,
+				buf, mem_space_id, mem_type_id);
 		} else if (method != 0) {
 			ret = -1;
-			snprintf(errmsg_buf, sizeof(errmsg_buf),
-				 "'method' must be 0, 1, or 2");
+			PRINT_TO_ERRMSG_BUF("'method' must be 0, 1, 2, or 3");
 		}
 		if (ret < 0)
 			goto on_error3;
 	}
 
 	H5Sclose(mem_space_id);
-	destroy_dset_info(&dset_info);
+	destroy_dset_desc(&dset_desc);
 	UNPROTECT(2);
 	return ans;
 
@@ -1157,7 +669,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	UNPROTECT(1);
     on_error1:
 	UNPROTECT(1);
-	destroy_dset_info(&dset_info);
+	destroy_dset_desc(&dset_desc);
 	return R_NilValue;
 }
 
@@ -1214,7 +726,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	H5Fclose(file_id);
 	if (ans == R_NilValue) {
 		UNPROTECT(1);
-		error(errmsg_buf);
+		error(_HDF5Array_errmsg_buf);
 	}
 	UNPROTECT(1);
 	return ans;
