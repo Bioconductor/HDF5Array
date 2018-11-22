@@ -6,7 +6,10 @@
 #include "S4Vectors_interface.h"
 #include "hdf5.h"
 
+#include <zlib.h>
+
 #include <stdlib.h>  /* for malloc, free */
+#include <string.h>  /* for memcmp */
 
 //#include <time.h>
 
@@ -571,43 +574,43 @@ static int read_data2(const DSetDesc *dset_desc,
 
 /****************************************************************************
  * read_data3()
- *
- * - Documentation of H5DOread_chunk():
- *     https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html
- * - An H5DOread_chunk() example is in:
- *     hdf5-1.10.3/hl/test/test_h5do_compat.c
  */
-#ifdef HAS_HDF5_HL
-#include "hdf5_hl.h"
-#endif
 
-static int read_chunk(const DSetDesc *dset_desc,
-		      const int *midx, int moved_along,
-		      hsize_t *h5offset_buf, hsize_t *h5count_buf,
-		      const hsize_t *h5zeros_buf,
-		      void *chunkbuf, hid_t mem_space_id, hid_t mem_type_id)
+static void set_offset_and_count_bufs(const DSetDesc *dset_desc,
+				      int moved_along,
+				      hsize_t *h5offset_buf,
+				      hsize_t *h5count_buf)
 {
-	int ndim, along, h5along, ret;
+	int ndim, along, h5along;
 	hsize_t h5chunk_d;
 
 	ndim = dset_desc->ndim;
-
-	/* Set 'h5offset_buf' and 'h5count_buf'. */
-	for (along = 0; along < ndim; along++) {
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (along > moved_along)
 			break;
-		h5along = ndim - 1 - along;
 		h5chunk_d = dset_desc->h5chunkdim[h5along];
-		if (along < moved_along) {
-			h5offset_buf[h5along] = 0;
-		} else {
+		if (along == moved_along) {
 			h5offset_buf[h5along] += h5chunk_d;
+		} else {
+			h5offset_buf[h5along] = 0;
 		}
 		h5count_buf[h5along] = dset_desc->h5dim[h5along] -
 				       h5offset_buf[h5along];
 		if (h5count_buf[h5along] > h5chunk_d)
 			h5count_buf[h5along] = h5chunk_d;
 	}
+	return;
+}
+
+/* It takes about 218s on my laptop to load all the chunks from the EH1040
+ * dataset (big 10x Genomics brain dataset in dense format, chunks of 100x100,
+ * wrapped in the TENxBrainData package). That's 60 microseconds per chunk! */
+static int read_chunk(const DSetDesc *dset_desc,
+		      const hsize_t *h5offset_buf, const hsize_t *h5count_buf,
+		      const hsize_t *h5zeros_buf,
+		      void *chunkout, hid_t mem_space_id, hid_t mem_type_id)
+{
+	int ret;
 
 	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
 				  h5offset_buf, NULL, h5count_buf, NULL);
@@ -625,8 +628,137 @@ static int read_chunk(const DSetDesc *dset_desc,
 
 	return H5Dread(dset_desc->dset_id, mem_type_id,
 		       mem_space_id, dset_desc->space_id,
-		       H5P_DEFAULT, chunkbuf);
+		       H5P_DEFAULT, chunkout);
 }
+
+/*
+static int uncompress_chunk_data(const void *compressed_chunk_data,
+				 hsize_t compressed_size,
+				 void *uncompressed_chunk_data,
+				 size_t uncompressed_size)
+{
+	int ret;
+	uLong destLen;
+
+	destLen = uncompressed_size;
+	ret = uncompress((Bytef *) uncompressed_chunk_data, &destLen,
+			 compressed_chunk_data, (uLong) compressed_size);
+	if (ret == Z_OK) {
+		if (destLen == uncompressed_size)
+			return 0;
+		PRINT_TO_ERRMSG_BUF("error in uncompress_chunk_data(): "
+				    "chunk data smaller than expected "
+				    "after decompression");
+		return -1;
+	}
+	switch (ret) {
+	    case Z_MEM_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "not enough memory to uncompress chunk");
+	    break;
+	    case Z_BUF_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "not enough room in output buffer");
+	    break;
+	    case Z_DATA_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "chunk data corrupted or incomplete");
+	    break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unknown error in uncompress()");
+	}
+	return -1;
+}
+
+static void test_zlib_compress2_uncompress_cycle(int level)
+{
+	const int chunk_len = 100000;
+	int chunk_data[chunk_len], buf[chunk_len], buf2[chunk_len];
+	uLongf chunk_size = sizeof(chunk_data), compressed_size;
+	int i, ret;
+
+	for (i = 0; i < chunk_len; i++)
+		chunk_data[i] = 99999999 - 777 * i;
+	compressed_size = sizeof(buf);
+	printf("ok1\n");
+	ret = compress2((Bytef *) buf, &compressed_size,
+			(Bytef *) chunk_data, chunk_size, level);
+	printf("ok2\n");
+	if (ret != 0)
+		error("compress2() returned an error");
+	printf("size of compressed data = %lu\n", compressed_size);
+	ret = uncompress_chunk_data(buf, (hsize_t) compressed_size,
+				    buf2, chunk_size);
+	if (ret != 0)
+		error(_HDF5Array_errmsg_buf);
+	if (memcmp(chunk_data, buf2, chunk_size) != 0)
+		error("data differs");
+	return;
+}
+*/
+
+/*
+ * For some unclear reason, H5Dread_chunk() is NOT listed here:
+ *   https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html
+ * Header file for declaration:
+ *   hdf5-1.10.3/src/H5Dpublic.h
+ * See hdf5-1.10.3/test/direct_chunk.c for plenty of examples.
+ *
+ * Call stack for H5Dread_chunk()
+ *   H5Dread_chunk                (H5Dio.c)
+ *     H5D__chunk_direct_read     (H5Dchunk.c)
+ *       H5F_block_read           (H5Fio.c)
+ *         H5PB_read              (H5PB.c)
+ *           H5F__accum_read      (H5Faccum.c)
+ *             or
+ *           H5FD_read            (H5FDint.c)
+ *            ??
+ *
+ * Call stack for H5Dread()
+ *   H5Dread                      (H5Dio.c)
+ *     H5D__read                  (H5Dio.c)
+ *       H5D__chunk_read          (H5Dchunk.c)
+ *         H5D__select_read
+ *           or
+ *         H5D__scatgath_read     (H5Dscatgath.c)
+ *           H5D__gather_file     (H5Dscatgath.c)
+ *       call ser_read member of a H5D_layout_ops_t object
+ *            ??
+ *
+static int direct_read_chunk(const DSetDesc *dset_desc,
+			     const hsize_t *h5offset_buf,
+			     void *chunkout, void *compressed_chunk_data,
+			     size_t chunk_size)
+{
+	int ret;
+	hsize_t chunk_storage_size;
+	uint32_t filters;
+
+	ret = H5Dget_chunk_storage_size(dset_desc->dset_id,
+					h5offset_buf, &chunk_storage_size);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Dget_chunk_storage_size() "
+				    "returned an error");
+		return -1;
+	}
+	if (chunk_storage_size > chunk_size) {
+		PRINT_TO_ERRMSG_BUF("H5Dget_chunk_storage_size() returned "
+				    "an unexpected chunk storage size (%llu)",
+				    chunk_storage_size);
+		return -1;
+	}
+	if (chunk_storage_size == chunk_size)
+		compressed_chunk_data = chunkout;
+	ret = H5Dread_chunk(dset_desc->dset_id, H5P_DEFAULT,
+			    h5offset_buf, &filters, compressed_chunk_data);
+	if (ret < 0)
+		return -1;
+	if (chunk_storage_size == chunk_size)
+		return 0;
+	return uncompress_chunk_data(compressed_chunk_data, chunk_storage_size,
+				     chunkout, chunk_size);
+}
+*/
 
 static int read_data3(const DSetDesc *dset_desc,
 		      SEXP starts, SEXP counts, int noreduce,
@@ -637,8 +769,8 @@ static int read_data3(const DSetDesc *dset_desc,
 		      void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
-	long long unsigned int chunk_len;
-	void *chunkbuf;
+	size_t chunk_len, chunk_size;
+	void *chunkout; // *chunkout2, *compressed_chunk_data;
 	hsize_t *h5offset_buf, *h5count_buf, *h5zeros_buf;
 	IntAE *midx_buf, *nchunk_buf;
 	long long int num_chunks, ndot;
@@ -653,20 +785,23 @@ static int read_data3(const DSetDesc *dset_desc,
 	chunk_len = 1;
 	for (along = 0; along < ndim; along++)
 		chunk_len *= dset_desc->h5chunkdim[along];
-	printf("chunk_len = %llu\n", chunk_len);
+	printf("chunk_len = %lu\n", chunk_len);
 
 	if (mem_type_id == H5T_NATIVE_INT) {
-		chunkbuf = malloc(chunk_len * sizeof(int));
+		chunk_size = chunk_len * sizeof(int);
         } else {
-		chunkbuf = malloc(chunk_len * sizeof(double));
+		chunk_size = chunk_len * sizeof(double);
 	}
-	if (chunkbuf == NULL)
+	chunkout = malloc(3 * chunk_size);
+	if (chunkout == NULL)
 		return -1;
+	//chunkout2 = chunkout + chunk_len;
+	//compressed_chunk_data = chunkout2 + chunk_len;
 
         /* Allocate 'h5offset_buf', 'h5count_buf', and 'h5zeros_buf'. */
         h5offset_buf = (hsize_t *) malloc(3 * ndim * sizeof(hsize_t));
         if (h5offset_buf == NULL) {
-		free(chunkbuf);
+		free(chunkout);
                 PRINT_TO_ERRMSG_BUF("failed to allocate memory "
                                     "for 'h5offset_buf', 'h5count_buf', "
 				    "and 'h5zeros_buf'");
@@ -700,12 +835,42 @@ static int read_data3(const DSetDesc *dset_desc,
 				       num_chunks);
 			fflush(stdout);
 		}
+		set_offset_and_count_bufs(dset_desc,
+				 moved_along, h5offset_buf, h5count_buf);
+
 		ret = read_chunk(dset_desc,
-				 midx_buf->elts, moved_along,
 				 h5offset_buf, h5count_buf, h5zeros_buf,
-				 chunkbuf, mem_space_id, mem_type_id);
+				 chunkout, mem_space_id, mem_type_id);
 		if (ret < 0)
 			break;
+/*
+		// Doesn't work yet! (For some obscure reason, trying to
+		// decompress the chunk data fails with uncompress() returns
+		// Z_DATA_ERROR (data corrupted or incomplete).
+		ret = direct_read_chunk(dset_desc, h5offset_buf,
+					chunkout2, compressed_chunk_data,
+					chunk_size);
+		if (ret < 0)
+			break;
+
+		if (memcmp(chunkout, chunkout2, chunk_len) != 0) {
+			printf("chunkout:\n");
+			for (size_t i = 0; i < 10; i++) {
+			  for (size_t j = 0; j < 10; j++)
+			    printf(" %4d", ((int *) chunkout)[i + 100 * j]);
+			  printf("\n");
+			}
+			printf("chunkout2:\n");
+			for (size_t i = 0; i < 10; i++) {
+			  for (size_t j = 0; j < 10; j++)
+			    printf(" %4d", ((int *) chunkout2)[i + 100 * j]);
+			  printf("\n");
+			}
+			PRINT_TO_ERRMSG_BUF("chunkout != chunkout2");
+			ret = -1;
+			break;
+		}
+*/
 		moved_along = next_midx(ndim, midx_buf->elts, nchunk_buf->elts);
 	} while (moved_along < ndim);
 	printf("\n");
@@ -713,18 +878,8 @@ static int read_data3(const DSetDesc *dset_desc,
 	printf("nb of chunks = %lld\n", num_chunks);
 
 	free(h5offset_buf);
-	free(chunkbuf);
-	return 0;
-
-#ifdef HAS_HDF5_HL
-	//error("not ready yet");
-	//return 0;
-#else
-	//PRINT_TO_ERRMSG_BUF(
-	//	"method 3 requires the HDF5 High Level library but "
-	//	"your version of\n  Rhdf5lib does not seem to have it");
-	//return -1;
-#endif
+	free(chunkout);
+	return ret;
 }
 
 
@@ -849,6 +1004,8 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	SEXP filepath0, name0, ans;
 	int noreduce0, method0, as_int;
 	hid_t file_id, dset_id;
+
+	//test_zlib_compress2_uncompress_cycle(9);
 
 	/* Check 'filepath'. */
 	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
