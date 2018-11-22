@@ -1,5 +1,5 @@
 #include <Rdefines.h>
-
+#include "S4Vectors_interface.h"
 
 #define ERRMSG_BUF_LENGTH 256
 
@@ -30,6 +30,21 @@ int _deep_check_selection(
 	int *count_sum,
 	int *nblock,
 	long long int *last_block_start
+);
+
+int _map_starts_to_chunks(
+	SEXP starts,
+	const long long int *dim,
+	const long long int *chunkdim,
+	int *nstart,
+	IntAEAE *breakpoint_bufs,
+	IntAEAE *chunkidx_bufs
+);
+
+SEXP C_map_starts_to_chunks(
+	SEXP starts,
+	SEXP dim,
+	SEXP chunkdim
 );
 
 int _selection_can_be_reduced(

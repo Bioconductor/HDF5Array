@@ -19,6 +19,12 @@ reduce_selection <- function(starts, counts=NULL, dim=NULL)
     .Call("C_reduce_selection", starts, counts, dim, PACKAGE="HDF5Array")
 }
 
+### NOT exported!
+map_starts_to_chunks <- function(starts, dim, chunkdim)
+{
+    .Call("C_map_starts_to_chunks", starts, dim, chunkdim, PACKAGE="HDF5Array")
+}
+
 ### The selection must be strictly ascending along each dimension.
 ### By default the supplied selection is checked and reduced (if it can be).
 ### Set 'noreduce' to TRUE to skip the reduction step.

@@ -3,7 +3,6 @@
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "HDF5Array.h"
-#include "S4Vectors_interface.h"
 
 #include <limits.h>  /* for INT_MAX, LLONG_MAX, LLONG_MIN */
 
@@ -16,6 +15,17 @@ char _HDF5Array_errmsg_buf[ERRMSG_BUF_LENGTH];
 /****************************************************************************
  * Low-level helpers
  */
+
+static int check_INTEGER_or_NUMERIC(SEXP x, const char *what, int along)
+{
+	if (!(IS_INTEGER(x) || IS_NUMERIC(x))) {
+		PRINT_TO_ERRMSG_BUF("'%s[[%d]]' must be an "
+				    "integer vector (or NULL)",
+				    what, along + 1);
+		return -1;
+	}
+	return 0;
+}
 
 #define	NOT_A_FINITE_NUMBER(x) \
 	(R_IsNA(x) || R_IsNaN(x) || (x) == R_PosInf || (x) == R_NegInf)
@@ -75,9 +85,12 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 
 
 /****************************************************************************
- * Checking the array selection
+ * Shallow check the array selection
  */
 
+/* Only check that 'starts' is a list and that 'counts' is NULL or a list
+   of the same length as 'starts'.
+   Return the nb of list elements in 'starts'. */
 int _shallow_check_selection(SEXP starts, SEXP counts)
 {
 	int ndim;
@@ -102,10 +115,15 @@ int _shallow_check_selection(SEXP starts, SEXP counts)
 	return ndim;
 }
 
+
+/****************************************************************************
+ * Deep check the array selection
+ */
+
 static void set_error_for_selection_too_large(int along1)
 {
 	PRINT_TO_ERRMSG_BUF("too many elements (>= 2^31) selected "
-			    "along dimension %d of dataset", along1);
+			    "along dimension %d of array", along1);
 	return;
 }
 
@@ -128,16 +146,16 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 						int starts_only)
 {
 	const char *msg = "selection must be within extent of "
-			  "dataset, but you\n  have:";
+			  "array, but you\n  have:";
 	if (starts_only)
 		PRINT_TO_ERRMSG_BUF(
 			"%s starts[[%d]][%d] "
-			"> dimension %d in dataset",
+			"> dimension %d in array",
 			msg, along1, i + 1, along1);
 	else
 		PRINT_TO_ERRMSG_BUF(
 			"%s starts[[%d]][%d] + counts[[%d]][%d] - 1 "
-			"> dimension %d in dataset",
+			"> dimension %d in array",
 			msg, along1, i + 1, along1, i + 1, along1);
 	return;
 }
@@ -145,80 +163,69 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 				      int along,
 				      long long int e,
-				      int *nblock,
-				      long long int *last_block_start,
 				      int starts_only)
 {
-	int ret;
-
-	ret = get_untrusted_elt(start, i, s, "starts", along);
-	if (ret < 0)
+	if (get_untrusted_elt(start, i, s, "starts", along) < 0)
 		return -1;
-	if (*s <= e) {
-		if (e == 0) {
-			PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
-					    along + 1, i + 1);
-			return -1;
-		}
+	if (*s > e)
+		return 0;
+	if (e == 0) {
+		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
+				    along + 1, i + 1);
+	} else {
 		set_errmsg_for_non_strictly_ascending_selection(
-				along + 1, i, starts_only);
+			along + 1, i, starts_only);
+	}
+	return -1;
+}
+
+static int check_selection_along_NULL_start(SEXP count, int along,
+			long long int d,
+			int *nstart, int *count_sum,
+			int *nblock, long long int *last_block_start)
+{
+	if (count != R_NilValue) {
+		PRINT_TO_ERRMSG_BUF(
+			"if 'starts[[%d]]' is NULL then 'counts' "
+			"or 'counts[[%d]]' must also be NULL",
+			along + 1, along + 1);
 		return -1;
 	}
-	if (i == 0 || *s != e + 1) {
-		nblock[along]++;
-		last_block_start[along] = *s;
+	if (d >= 0) {
+		if (d > INT_MAX) {
+			set_error_for_selection_too_large(along + 1);
+			return -1;
+		}
+		nstart[along] = count_sum[along] = d;
+		nblock[along] = d != 0;
+		last_block_start[along] = 1;
+	} else {
+		/* 'count_sum' is undefined in that case. */
+		nstart[along] = nblock[along] = 1;
+		last_block_start[along] = 1;
 	}
 	return 0;
 }
 
-static int check_selection_along(int along, SEXP starts, SEXP counts,
-				 long long int d,
-				 int *nstart, int *count_sum,
-				 int *nblock, long long int *last_block_start)
+static int check_selection_along(SEXP start, SEXP count, int along,
+			long long int d,
+			int *nstart, int *count_sum,
+			int *nblock, long long int *last_block_start)
 {
-	SEXP start, count;
 	int n, i, ret;
 	long long int e, s, cs, c;
 
-	start = VECTOR_ELT(starts, along);
-	count = counts != R_NilValue ? VECTOR_ELT(counts, along) : R_NilValue;
-	if (start == R_NilValue) {
-		if (count != R_NilValue) {
-			PRINT_TO_ERRMSG_BUF(
-				"if 'starts[[%d]]' is NULL then 'counts' "
-				"or 'counts[[%d]]' must also be NULL",
-				along + 1, along + 1);
-			return -1;
-		}
-		if (d >= 0) {
-			if (d > INT_MAX) {
-				set_error_for_selection_too_large(along + 1);
-				return -1;
-			}
-			nstart[along] = count_sum[along] = d;
-			nblock[along] = d != 0;
-			last_block_start[along] = 1;
-		} else {
-			/* 'count_sum' is undefined in that case. */
-			nstart[along] = nblock[along] = 1;
-			last_block_start[along] = 1;
-		}
-		return 0;
-	}
-	if (!(IS_INTEGER(start) || IS_NUMERIC(start))) {
-		PRINT_TO_ERRMSG_BUF(
-			"'starts[[%d]]' must be an "
-			"integer vector (or NULL)", along + 1);
+	if (start == R_NilValue)
+		return check_selection_along_NULL_start(count, along,
+				d,
+				nstart, count_sum,
+				nblock, last_block_start);
+	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
-	}
 	n = LENGTH(start);
 	if (count != R_NilValue) {
-		if (!(IS_INTEGER(count) || IS_NUMERIC(count))) {
-			PRINT_TO_ERRMSG_BUF(
-				"'counts[[%d]]' must be an "
-				"integer vector (or NULL)", along + 1);
+		if (check_INTEGER_or_NUMERIC(count, "counts", along) < 0)
 			return -1;
-		}
 		if (LENGTH(count) != n) {
 			PRINT_TO_ERRMSG_BUF(
 				"'starts[[%d]]' and 'counts[[%d]]' "
@@ -232,11 +239,13 @@ static int check_selection_along(int along, SEXP starts, SEXP counts,
 	e = 0;
 	if (count == R_NilValue) {
 		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along,
-						  e, nblock, last_block_start,
-						  1);
+			ret = get_untrusted_start(start, i, &s, along, e, 1);
 			if (ret < 0)
 				return -1;
+			if (i == 0 || s != e + 1) {
+				nblock[along]++;
+				last_block_start[along] = s;
+			}
 			e = s;
 			if (d >= 0 && e > d) {
 				set_errmsg_for_selection_beyond_dim(
@@ -248,11 +257,13 @@ static int check_selection_along(int along, SEXP starts, SEXP counts,
 	} else {
 		cs = 0;
 		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along,
-						  e, nblock, last_block_start,
-						  0);
+			ret = get_untrusted_start(start, i, &s, along, e, 0);
 			if (ret < 0)
 				return -1;
+			if (i == 0 || s != e + 1) {
+				nblock[along]++;
+				last_block_start[along] = s;
+			}
 			ret = get_untrusted_elt(count, i, &c, "counts", along);
 			if (ret < 0)
 				return -1;
@@ -278,16 +289,29 @@ static int check_selection_along(int along, SEXP starts, SEXP counts,
 	return 0;
 }
 
+/* Assume that 'starts' is a list and that 'counts' is NULL or a list
+   of the same length as 'starts'. This should have been checked
+   by _shallow_check_selection() already so is not checked again.
+
+   'dim' is assumed to be NULL or to have the same length as 'starts'.
+
+   'nstart', 'count_sum', 'nblock', and 'last_block_start' are assumed
+   to have the same length as 'starts'.
+*/
 int _deep_check_selection(SEXP starts, SEXP counts,
 			  const long long int *dim,
 			  int *nstart, int *count_sum,
 			  int *nblock, long long int *last_block_start)
 {
 	int ndim, along, ret;
+	SEXP start, count;
 
 	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
-		ret = check_selection_along(along, starts, counts,
+		start = VECTOR_ELT(starts, along);
+		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
+					     : R_NilValue;
+		ret = check_selection_along(start, count, along,
 					    dim != NULL ? dim[along] : -1,
 					    nstart, count_sum,
 					    nblock, last_block_start);
@@ -295,6 +319,193 @@ int _deep_check_selection(SEXP starts, SEXP counts,
 			return -1;
 	}
 	return 0;
+}
+
+
+/****************************************************************************
+ * Map array selection to chunks
+ */
+
+static int map_start_to_chunks(SEXP start, int along,
+		long long int d, long long int chunkd,
+		int *nstart,
+		IntAE *breakpoint_buf, IntAE *chunkidx_buf)
+{
+	int n, i, ret;
+	size_t buf_nelt;
+	long long int e, s, chunk_idx, prev_chunk_idx;
+
+	if (start == R_NilValue) {
+		if (d > INT_MAX) {
+			set_error_for_selection_too_large(along + 1);
+			return -1;
+		}
+		nstart[along] = d;
+		return 0;
+	}
+	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
+		return -1;
+	if (IntAE_get_nelt(breakpoint_buf) != 0 ||
+	    IntAE_get_nelt(chunkidx_buf) != 0) {
+		/* Should never happen! */
+		PRINT_TO_ERRMSG_BUF("internal error: map_start_to_chunks() "
+				    "was called with non-empty breakpoint_buf "
+				    "or chunkidx_buf");
+		return -1;
+	}
+	n = LENGTH(start);
+	nstart[along] = n;
+	buf_nelt = 0;
+	e = 0;
+	prev_chunk_idx = -1;
+	for (i = 0; i < n; i++) {
+		ret = get_untrusted_start(start, i, &s, along, e, 1);
+		if (ret < 0)
+			return -1;
+		e = s;
+		if (e > d) {
+			set_errmsg_for_selection_beyond_dim(along + 1, i, 1);
+			return -1;
+		}
+		chunk_idx = (s - 1) / chunkd;
+		if (chunk_idx > INT_MAX) {
+			/* If we wanted to support this then we'd need to use
+			   something like a LLongAE for 'chunkidx_buf'. */
+			PRINT_TO_ERRMSG_BUF("selecting array elements from "
+					    "a chunk whose index is > INT_MAX "
+					    "is not supported yet");
+			return -1;
+		}
+		if (chunk_idx > prev_chunk_idx) {
+			IntAE_insert_at(breakpoint_buf, buf_nelt, i + 1);
+			IntAE_insert_at(chunkidx_buf, buf_nelt, chunk_idx);
+			buf_nelt++;
+		} else {
+			breakpoint_buf->elts[buf_nelt - 1]++;
+		}
+		prev_chunk_idx = chunk_idx;
+	}
+	return 0;
+}
+
+/* Assume that 'starts' is a list. This should have been checked by
+   _shallow_check_selection() already so is not checked again.
+
+   'dim', 'chunkdim', 'nstart', 'breakpoint_bufs', and 'chunkidx_bufs'
+   are assumed to have the same length as 'starts'.
+
+   We're storing the chunk indices in a IntAEAE struct which means that we
+   cannot support arrays with more than INT_MAX chunks along any dimension.
+   If we wanted to support such arrays then we'd need to use something like
+   a LLongAEAE instead. (IntAE, IntAEAE, and LLongAE structs are implemented
+   in S4Vectors/src/AEbufs.c but LLongAEAE is not implemented yet.)
+*/
+int _map_starts_to_chunks(SEXP starts,
+		const long long int *dim,
+		const long long int *chunkdim,
+		int *nstart,
+		IntAEAE *breakpoint_bufs, IntAEAE *chunkidx_bufs)
+{
+	int ndim, along, ret;
+	SEXP start;
+
+	ndim = LENGTH(starts);
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		ret = map_start_to_chunks(start, along,
+					  dim[along], chunkdim[along],
+					  nstart,
+					  breakpoint_bufs->elts[along],
+					  chunkidx_bufs->elts[along]);
+		if (ret < 0)
+			return -1;
+	}
+	return 0;
+}
+
+static SEXP as_LIST(const IntAEAE *buf, SEXP starts)
+{
+	int ndim, along;
+	SEXP ans, ans_elt, start;
+
+	ndim = LENGTH(starts);
+	ans = PROTECT(NEW_LIST(ndim));
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		ans_elt = PROTECT(new_INTEGER_from_IntAE(buf->elts[along]));
+		SET_VECTOR_ELT(ans, along, ans_elt);
+		UNPROTECT(1);
+	}
+	UNPROTECT(1);
+	return ans;
+}
+
+/* --- .Call ENTRY POINT ---
+ * Return a list of length 2:
+ *   - The 1st list element is the list of break points.
+ *   - The 2nd list element is the list of chunk indices.
+ * The 2 lists have the same length as 'starts'. Also they have the same
+ * shape (i.e. same lengths()).
+ */
+SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
+{
+	int ndim, along, ret;
+	LLongAE *dim_buf, *chunkdim_buf;
+	long long int d, chunkd;
+	IntAE *nstart_buf;
+	IntAEAE *breakpoint_bufs, *chunkidx_bufs;
+	SEXP ans, ans_elt;
+
+	ndim = _shallow_check_selection(starts, R_NilValue);
+	if (ndim < 0)
+		error(_HDF5Array_errmsg_buf);
+
+	if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
+		error("'dim' must be an integer vector (or NULL)");
+	if (LENGTH(dim) != ndim)
+		error("'starts' and 'dim' must have the same length");
+	if (!(IS_INTEGER(chunkdim) || IS_NUMERIC(chunkdim)))
+		error("'chunkdim' must be an integer vector (or NULL)");
+	if (LENGTH(chunkdim) != ndim)
+		error("'starts' and 'chunkdim' must have the same length");
+
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0; along < ndim; along++) {
+		ret = get_untrusted_elt(dim, along, &d,
+					"dim", -1);
+		if (ret < 0)
+			error(_HDF5Array_errmsg_buf);
+		ret = get_untrusted_elt(chunkdim, along, &chunkd,
+					"chunkdim", -1);
+		if (ret < 0)
+			error(_HDF5Array_errmsg_buf);
+		if (chunkd <= 0)
+			error("'chunkdim' must contain positive values");
+		dim_buf->elts[along] = d;
+		chunkdim_buf->elts[along] = chunkd;
+	}
+
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	breakpoint_bufs = new_IntAEAE(ndim, ndim);
+	chunkidx_bufs = new_IntAEAE(ndim, ndim);
+	ret = _map_starts_to_chunks(starts,
+			dim_buf->elts, chunkdim_buf->elts,
+			nstart_buf->elts,
+			breakpoint_bufs, chunkidx_bufs);
+	if (ret < 0)
+		error(_HDF5Array_errmsg_buf);
+
+	ans = PROTECT(NEW_LIST(2));
+	ans_elt = PROTECT(as_LIST(breakpoint_bufs, starts));
+	SET_VECTOR_ELT(ans, 0, ans_elt);
+	UNPROTECT(1);
+	ans_elt = PROTECT(as_LIST(chunkidx_bufs, starts));
+	SET_VECTOR_ELT(ans, 1, ans_elt);
+	UNPROTECT(1);
+	return ans;
 }
 
 
@@ -374,21 +585,17 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 	return;
 }
 
-static void reduce_selection_along(int along, SEXP starts, SEXP counts,
+static void reduce_selection_along(SEXP start, SEXP count, int along,
 				   const int *count_sum,
 				   const int *nblock,
 				   const long long int *last_block_start,
 				   SEXP reduced_starts, SEXP reduced_counts)
 {
-	SEXP start, count, reduced_start, reduced_count;
 	int n, dup;
+	SEXP reduced_start, reduced_count;
 	SEXPTYPE type;
 
-	start = VECTOR_ELT(starts, along);
-	if (start == R_NilValue)
-		return;
 	n = LENGTH(start);
-	count = counts != R_NilValue ? VECTOR_ELT(counts, along) : R_NilValue;
 	if (nblock[along] == n) {
 		/* Nothing to stitch. */
 		dup = IS_INTEGER(start) || last_block_start[along] > INT_MAX;
@@ -421,7 +628,7 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 		       const long long int *last_block_start)
 {
 	int ndim, along;
-	SEXP ans, reduced_starts, reduced_counts;
+	SEXP ans, reduced_starts, reduced_counts, start, count;
 
 	//clock_t t0 = clock();
 	ndim = LENGTH(starts);
@@ -433,7 +640,12 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 	SET_VECTOR_ELT(ans, 1, reduced_counts);
 	UNPROTECT(1);
 	for (along = 0; along < ndim; along++) {
-		reduce_selection_along(along, starts, counts,
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		count = counts != R_NilValue ? VECTOR_ELT(counts, along) :
+					       R_NilValue;
+		reduce_selection_along(start, count, along,
 				       count_sum,
 				       nblock, last_block_start,
 				       reduced_starts, reduced_counts);
@@ -446,9 +658,11 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 /* --- .Call ENTRY POINT ---
  * Negative values in 'dim' are treated as infinite dimensions.
  * Return a list of length 2 or NULL if the selection could not be reduced.
- * The 1st list element is the list of reduced starts and the 2nd list element
- * the list of reduced 'counts'. The 2 lists have the same shape i.e. same
- * length() and same lengths().
+ * When returning a list of length 2:
+ *   - The 1st list element is the list of reduced starts.
+ *   - The 2nd list element is the list of reduced counts.
+ * The 2 lists have the same length as 'starts'. Also they have the same
+ * shape (i.e. same lengths()).
  */
 SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 {
@@ -462,6 +676,7 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
 		error(_HDF5Array_errmsg_buf);
+
 	if (dim == R_NilValue) {
 		dim_p = NULL;
 	} else {

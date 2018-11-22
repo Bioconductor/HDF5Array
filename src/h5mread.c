@@ -3,7 +3,6 @@
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "HDF5Array.h"
-#include "S4Vectors_interface.h"
 #include "hdf5.h"
 
 #include <zlib.h>
@@ -169,7 +168,7 @@ static int check_selection(const DSetDesc *dset_desc,
 			   int *nstart, int *ans_dim,
 			   int *nblock, long long int *last_block_start)
 {
-	int ndim, along, h5along, ret;
+	int ndim, along, h5along;
 	LLongAE *dim_buf;
 
 	ndim = dset_desc->ndim;
@@ -177,11 +176,32 @@ static int check_selection(const DSetDesc *dset_desc,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
+	return _deep_check_selection(starts, counts, dim_buf->elts,
+				     nstart, ans_dim,
+				     nblock, last_block_start);
+}
 
-	ret = _deep_check_selection(starts, counts, dim_buf->elts,
-				    nstart, ans_dim,
-				    nblock, last_block_start);
-	return ret;
+static int map_starts_to_chunks(const DSetDesc *dset_desc,
+				SEXP starts,
+				int *ans_dim,
+				IntAEAE *breakpoint_bufs,
+				IntAEAE *chunkidx_bufs)
+{
+	int ndim, along, h5along;
+	LLongAE *dim_buf, *chunkdim_buf;
+
+	ndim = dset_desc->ndim;
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		dim_buf->elts[along] =
+			(long long int) dset_desc->h5dim[h5along];
+		chunkdim_buf->elts[along] =
+			(long long int) dset_desc->h5chunkdim[h5along];
+	}
+	return _map_starts_to_chunks(starts, dim_buf->elts, chunkdim_buf->elts,
+				     ans_dim,
+				     breakpoint_bufs, chunkidx_bufs);
 }
 
 static hid_t get_mem_space(int ndim, const int *ans_dim)
@@ -761,11 +781,10 @@ static int direct_read_chunk(const DSetDesc *dset_desc,
 */
 
 static int read_data3(const DSetDesc *dset_desc,
-		      SEXP starts, SEXP counts, int noreduce,
-		      const int *nstart,
+		      SEXP starts,
 		      const int *ans_dim,
-		      const int *nblock,
-		      const long long int *last_block_start,
+		      const IntAEAE *breakpoint_bufs,
+		      const IntAEAE *chunkidx_bufs,
 		      void *out, hid_t mem_space_id, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
@@ -901,6 +920,8 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	int *nstart, *nblock;
 	long long int *last_block_start;
 
+	IntAEAE *breakpoint_bufs, *chunkidx_bufs;
+
 	R_xlen_t ans_len;
 	void *out;
 	hid_t mem_space_id, mem_type_id;
@@ -919,20 +940,29 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
 
-	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+	if (method != 3) {
+		nstart_buf = new_IntAE(ndim, ndim, 0);
+		nblock_buf = new_IntAE(ndim, ndim, 0);
+		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 
-	nstart = nstart_buf->elts;
-	nblock = nblock_buf->elts;
-	last_block_start = last_block_start_buf->elts;
+		nstart = nstart_buf->elts;
+		nblock = nblock_buf->elts;
+		last_block_start = last_block_start_buf->elts;
 
-	/* This call will populate 'nstart', 'ans_dim', 'nblock',
-	   and 'last_block_start'. */
-	ret = check_selection(&dset_desc,
-			      starts, counts,
-			      nstart, INTEGER(ans_dim),
-			      nblock, last_block_start);
+		/* This call will populate 'nstart', 'ans_dim', 'nblock',
+		   and 'last_block_start'. */
+		ret = check_selection(&dset_desc, starts, counts,
+				      nstart, INTEGER(ans_dim),
+				      nblock, last_block_start);
+	} else {
+		breakpoint_bufs = new_IntAEAE(ndim, ndim);
+		chunkidx_bufs = new_IntAEAE(ndim, ndim);
+		/* This call will populate 'ans_dim', 'breakpoint_bufs',
+		   and 'chunkidx_bufs'. */
+		ret = map_starts_to_chunks(&dset_desc, starts,
+				      INTEGER(ans_dim),
+				      breakpoint_bufs, chunkidx_bufs);
+	}
 	if (ret < 0)
 		goto on_error1;
 
@@ -969,13 +999,12 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 				out, mem_space_id, mem_type_id);
 		} else if (method == 3) {
 			ret = read_data3(&dset_desc,
-				starts, counts, noreduce,
-				nstart, INTEGER(ans_dim),
-				nblock, last_block_start,
+				starts, INTEGER(ans_dim),
+				breakpoint_bufs, chunkidx_bufs,
 				out, mem_space_id, mem_type_id);
 		} else if (method != 0) {
-			ret = -1;
 			PRINT_TO_ERRMSG_BUF("'method' must be 0, 1, 2, or 3");
+			ret = -1;
 		}
 		if (ret < 0)
 			goto on_error3;
