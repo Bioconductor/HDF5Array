@@ -444,7 +444,7 @@ static int read_data1(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const int *nblock,
 		      const long long int *last_block_start,
-		      void *out, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ret;
 
@@ -461,9 +461,9 @@ static int read_data1(const DSetDesc *dset_desc,
 	}
 
 	//clock_t t0 = clock();
-	ret = H5Dread(dset_desc->dset_id, mem_type_id,
-		      mem_space_id, dset_desc->space_id,
-		      H5P_DEFAULT, out);
+	ret = H5Dread(dset_desc->dset_id,
+		      mem_type_id, mem_space_id,
+		      dset_desc->space_id, H5P_DEFAULT, out);
 	//printf("time for reading data from selection: %e\n",
 	//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	if (ret < 0)
@@ -481,7 +481,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 		const int *midx, int moved_along,
 		hsize_t *h5offset_in_buf, hsize_t *h5count_buf,
 		hsize_t *h5offset_out_buf,
-		void *out, hid_t mem_space_id, hid_t mem_type_id)
+		void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ndim, along, h5along, i, ret;
 	SEXP start, count;
@@ -525,9 +525,9 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 		return -1;
 	}
 
-	return H5Dread(dset_desc->dset_id, mem_type_id,
-		       mem_space_id, dset_desc->space_id,
-		       H5P_DEFAULT, out);
+	return H5Dread(dset_desc->dset_id,
+		       mem_type_id, mem_space_id,
+		       dset_desc->space_id, H5P_DEFAULT, out);
 }
 
 static int read_data2(const DSetDesc *dset_desc,
@@ -536,7 +536,7 @@ static int read_data2(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const int *nblock,
 		      const long long int *last_block_start,
-		      void *out, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ndim, along, h5along, moved_along, ret;
 	hsize_t *h5offset_in_buf, *h5count_buf, *h5offset_out_buf;
@@ -580,7 +580,7 @@ static int read_data2(const DSetDesc *dset_desc,
 					  midx_buf->elts, moved_along,
 					  h5offset_in_buf, h5count_buf,
 					  h5offset_out_buf,
-					  out, mem_space_id, mem_type_id);
+					  out, mem_type_id, mem_space_id);
 		if (ret < 0)
 			break;
 		moved_along = next_midx(ndim, midx_buf->elts, nstart);
@@ -628,7 +628,7 @@ static void set_offset_and_count_bufs(const DSetDesc *dset_desc,
 static int read_chunk(const DSetDesc *dset_desc,
 		      const hsize_t *h5offset_buf, const hsize_t *h5count_buf,
 		      const hsize_t *h5zeros_buf,
-		      void *chunkout, hid_t mem_space_id, hid_t mem_type_id)
+		      void *chunkout, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ret;
 
@@ -646,9 +646,9 @@ static int read_chunk(const DSetDesc *dset_desc,
 		return -1;
 	}
 
-	return H5Dread(dset_desc->dset_id, mem_type_id,
-		       mem_space_id, dset_desc->space_id,
-		       H5P_DEFAULT, chunkout);
+	return H5Dread(dset_desc->dset_id,
+		       mem_type_id, mem_space_id,
+		       dset_desc->space_id, H5P_DEFAULT, chunkout);
 }
 
 /*
@@ -785,9 +785,10 @@ static int read_data3(const DSetDesc *dset_desc,
 		      const int *ans_dim,
 		      const IntAEAE *breakpoint_bufs,
 		      const IntAEAE *chunkidx_bufs,
-		      void *out, hid_t mem_space_id, hid_t mem_type_id)
+		      void *out, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
+	hid_t mem_space_id;
 	size_t chunk_len, chunk_size;
 	void *chunkout; // *chunkout2, *compressed_chunk_data;
 	hsize_t *h5offset_buf, *h5count_buf, *h5zeros_buf;
@@ -811,7 +812,8 @@ static int read_data3(const DSetDesc *dset_desc,
         } else {
 		chunk_size = chunk_len * sizeof(double);
 	}
-	chunkout = malloc(3 * chunk_size);
+	chunkout = malloc(chunk_size);
+	//chunkout = malloc(3 * chunk_size);
 	if (chunkout == NULL)
 		return -1;
 	//chunkout2 = chunkout + chunk_len;
@@ -836,9 +838,7 @@ static int read_data3(const DSetDesc *dset_desc,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		h5zeros_buf[h5along] = 0;
 		nchunk_buf->elts[along] =
-		    dset_desc->h5dim[h5along] / dset_desc->h5chunkdim[h5along];
-		if (dset_desc->h5dim[h5along] % dset_desc->h5chunkdim[h5along])
-			nchunk_buf->elts[along]++;
+			IntAE_get_nelt(chunkidx_bufs->elts[along]);
 		printf(" %d", nchunk_buf->elts[along]);
 	}
 	printf("\n");
@@ -859,7 +859,7 @@ static int read_data3(const DSetDesc *dset_desc,
 
 		ret = read_chunk(dset_desc,
 				 h5offset_buf, h5count_buf, h5zeros_buf,
-				 chunkout, mem_space_id, mem_type_id);
+				 chunkout, mem_type_id, mem_space_id);
 		if (ret < 0)
 			break;
 /*
@@ -924,7 +924,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	R_xlen_t ans_len;
 	void *out;
-	hid_t mem_space_id, mem_type_id;
+	hid_t mem_type_id, mem_space_id;
 
 	ret = get_ans_type(dset_id, as_int, &ans_type);
 	if (ret < 0)
@@ -955,6 +955,11 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 				      nstart, INTEGER(ans_dim),
 				      nblock, last_block_start);
 	} else {
+		if (counts != R_NilValue) {
+                	PRINT_TO_ERRMSG_BUF("'counts' must be NULL "
+					    "when 'method' is set to 3");
+			goto on_error1;
+		}
 		breakpoint_bufs = new_IntAEAE(ndim, ndim);
 		chunkidx_bufs = new_IntAEAE(ndim, ndim);
 		/* This call will populate 'ans_dim', 'breakpoint_bufs',
@@ -980,43 +985,44 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		mem_type_id = H5T_NATIVE_DOUBLE;
 	}
 
-	mem_space_id = get_mem_space(dset_desc.ndim, INTEGER(ans_dim));
-	if (mem_space_id < 0)
-		goto on_error2;
-
 	if (ans_len != 0) {
-		if (method == 1) {
-			ret = read_data1(&dset_desc,
-				starts, counts, noreduce,
-				nstart, INTEGER(ans_dim),
-				nblock, last_block_start,
-				out, mem_space_id, mem_type_id);
-		} else if (method == 2) {
-			ret = read_data2(&dset_desc,
-				starts, counts, noreduce,
-				nstart, INTEGER(ans_dim),
-				nblock, last_block_start,
-				out, mem_space_id, mem_type_id);
-		} else if (method == 3) {
+		if (method != 3) {
+			mem_space_id = get_mem_space(dset_desc.ndim,
+						     INTEGER(ans_dim));
+			if (mem_space_id < 0)
+				goto on_error2;
+			if (method == 1) {
+				ret = read_data1(&dset_desc,
+					starts, counts, noreduce,
+					nstart, INTEGER(ans_dim),
+					nblock, last_block_start,
+					out, mem_type_id, mem_space_id);
+			} else if (method == 2) {
+				ret = read_data2(&dset_desc,
+					starts, counts, noreduce,
+					nstart, INTEGER(ans_dim),
+					nblock, last_block_start,
+					out, mem_type_id, mem_space_id);
+			} else if (method != 0) {
+				PRINT_TO_ERRMSG_BUF("'method' can only be "
+						    "set to 0, 1, 2, or 3");
+				ret = -1;
+			}
+			H5Sclose(mem_space_id);
+		} else {
 			ret = read_data3(&dset_desc,
 				starts, INTEGER(ans_dim),
 				breakpoint_bufs, chunkidx_bufs,
-				out, mem_space_id, mem_type_id);
-		} else if (method != 0) {
-			PRINT_TO_ERRMSG_BUF("'method' must be 0, 1, 2, or 3");
-			ret = -1;
+				out, mem_type_id);
 		}
 		if (ret < 0)
-			goto on_error3;
+			goto on_error2;
 	}
 
-	H5Sclose(mem_space_id);
 	destroy_dset_desc(&dset_desc);
 	UNPROTECT(2);
 	return ans;
 
-    on_error3:
-	H5Sclose(mem_space_id);
     on_error2:
 	UNPROTECT(1);
     on_error1:
