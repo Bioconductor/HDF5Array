@@ -371,9 +371,10 @@ static int map_start_to_chunks(SEXP start, int along,
 		if (chunk_idx > INT_MAX) {
 			/* If we wanted to support this then we'd need to use
 			   something like a LLongAE for 'chunkidx_buf'. */
-			PRINT_TO_ERRMSG_BUF("selecting array elements from "
-					    "a chunk whose index is > INT_MAX "
-					    "is not supported yet");
+			PRINT_TO_ERRMSG_BUF("selecting array elements from a "
+					    "chunk whose index is > INT_MAX "
+					    "is not\n  supported "
+					    "at the moment");
 			return -1;
 		}
 		if (chunk_idx > prev_chunk_idx) {
@@ -482,8 +483,11 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 					"chunkdim", -1);
 		if (ret < 0)
 			error(_HDF5Array_errmsg_buf);
-		if (chunkd <= 0)
-			error("'chunkdim' must contain positive values");
+		if (chunkd < 0)
+			error("'chunkdim' cannot contain negative values");
+		if (chunkd == 0 && d != 0)
+			error("values in 'chunkdim' cannot be 0 unless their "
+			      "corresponding value\n  in 'dim' is also 0");
 		dim_buf->elts[along] = d;
 		chunkdim_buf->elts[along] = chunkd;
 	}
@@ -504,7 +508,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 	UNPROTECT(1);
 	ans_elt = PROTECT(as_LIST(chunkidx_bufs, starts));
 	SET_VECTOR_ELT(ans, 1, ans_elt);
-	UNPROTECT(1);
+	UNPROTECT(2);
 	return ans;
 }
 
