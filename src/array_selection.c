@@ -332,7 +332,7 @@ static int map_start_to_chunks(SEXP start, int along,
 		IntAE *breakpoint_buf, IntAE *chunkidx_buf)
 {
 	int n, i, ret;
-	size_t buf_nelt;
+	size_t nchunk;
 	long long int e, s, chunk_idx, prev_chunk_idx;
 
 	if (start == R_NilValue) {
@@ -355,7 +355,7 @@ static int map_start_to_chunks(SEXP start, int along,
 	}
 	n = LENGTH(start);
 	nstart[along] = n;
-	buf_nelt = 0;
+	nchunk = 0;
 	e = 0;
 	prev_chunk_idx = -1;
 	for (i = 0; i < n; i++) {
@@ -378,11 +378,11 @@ static int map_start_to_chunks(SEXP start, int along,
 			return -1;
 		}
 		if (chunk_idx > prev_chunk_idx) {
-			IntAE_insert_at(breakpoint_buf, buf_nelt, i + 1);
-			IntAE_insert_at(chunkidx_buf, buf_nelt, chunk_idx);
-			buf_nelt++;
+			IntAE_insert_at(breakpoint_buf, nchunk, i + 1);
+			IntAE_insert_at(chunkidx_buf, nchunk, chunk_idx);
+			nchunk++;
 		} else {
-			breakpoint_buf->elts[buf_nelt - 1]++;
+			breakpoint_buf->elts[nchunk - 1]++;
 		}
 		prev_chunk_idx = chunk_idx;
 	}
