@@ -301,7 +301,7 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 	int along, h5along, i, ret;
 	SEXP start, count;
 
-	/* Set 'h5offset_buf' and 'h5count_buf'. */
+	/* Update 'h5offset_buf' and 'h5count_buf'. */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -527,7 +527,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 
 	ndim = dset_desc->ndim;
 
-	/* Set 'h5offset_in_buf', 'h5count_buf', and 'h5offset_out_buf'. */
+	/* Update 'h5offset_in_buf', 'h5count_buf', and 'h5offset_out_buf'. */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -638,7 +638,7 @@ static void set_nchunk_buf(const DSetDesc *dset_desc,
 	int ndim, along, h5along, nchunk;
 
 	ndim = dset_desc->ndim;
-	printf("nchunk_buf:");
+	//printf("nchunk_buf:");
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) != R_NilValue) {
 			nchunk = IntAE_get_nelt(chunkidx_bufs->elts[along]);
@@ -646,14 +646,14 @@ static void set_nchunk_buf(const DSetDesc *dset_desc,
 			nchunk = dset_desc->h5nchunk[h5along];
 		}
 		nchunk_buf->elts[along] = nchunk;
-		printf(" %d/%d", nchunk_buf->elts[along],
-				 dset_desc->h5nchunk[h5along]);
+		//printf(" %d/%d", nchunk_buf->elts[along],
+		//		 dset_desc->h5nchunk[h5along]);
 	}
-	printf("\n");
+	//printf("\n");
 	return;
 }
 
-static void set_chunk_offset_and_dim(const DSetDesc *dset_desc,
+static void update_chunk_offset_and_dim(const DSetDesc *dset_desc,
 			const int *midx, int moved_along,
 			SEXP starts, const IntAEAE *chunkidx_bufs,
 			hsize_t *h5chunkoff_buf, hsize_t *h5chunkdim_buf)
@@ -678,18 +678,18 @@ static void set_chunk_offset_and_dim(const DSetDesc *dset_desc,
 		if (h5chunkdim_buf[h5along] > chunkd)
 			h5chunkdim_buf[h5along] = chunkd;
 	}
-	printf("> h5chunkoff_buf:");
-	for (h5along = ndim - 1; h5along >= 0; h5along--)
-		printf(" %llu", h5chunkoff_buf[h5along]);
-	printf("\n");
-	printf("> h5chunkdim_buf:");
-	for (h5along = ndim - 1; h5along >= 0; h5along--)
-		printf(" %llu", h5chunkdim_buf[h5along]);
-	printf("\n");
+	//printf("# h5chunkoff_buf:");
+	//for (h5along = ndim - 1; h5along >= 0; h5along--)
+	//	printf(" %llu", h5chunkoff_buf[h5along]);
+	//printf("\n");
+	//printf("# h5chunkdim_buf:");
+	//for (h5along = ndim - 1; h5along >= 0; h5along--)
+	//	printf(" %llu", h5chunkdim_buf[h5along]);
+	//printf("\n");
 	return;
 }
 
-static void set_block_offset_and_dim(int ndim,
+static void update_block_offset_and_dim(int ndim,
 			const int *midx, int moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
 			const hsize_t *h5chunkoff, const hsize_t *h5chunkdim,
@@ -712,14 +712,14 @@ static void set_block_offset_and_dim(int ndim,
 		out_blockoff_buf[along] = off;
 		out_blockdim_buf[along] = d;
 	}
-	printf("> out_blockoff_buf:");
-	for (along = 0; along < ndim; along++)
-		printf(" %d", out_blockoff_buf[along]);
-	printf("\n");
-	printf("> out_blockdim_buf:");
-	for (along = 0; along < ndim; along++)
-		printf(" %d", out_blockdim_buf[along]);
-	printf("\n");
+	//printf("# out_blockoff_buf:");
+	//for (along = 0; along < ndim; along++)
+	//	printf(" %d", out_blockoff_buf[along]);
+	//printf("\n");
+	//printf("# out_blockdim_buf:");
+	//for (along = 0; along < ndim; along++)
+	//	printf(" %d", out_blockdim_buf[along]);
+	//printf("\n");
 	return;
 }
 
@@ -888,7 +888,7 @@ static int direct_read_chunk(const DSetDesc *dset_desc,
 
 static void init_offsets(int ndim, SEXP starts,
 			 const hsize_t *h5chunkoff, const hsize_t *h5chunkdim,
-			 const int *out_blockoff, const int *out_dim,
+			 const int *out_blockoff, const int *outdim,
 			 size_t *in_offset, size_t *out_offset)
 {
 	size_t in_off, out_off;
@@ -898,68 +898,123 @@ static void init_offsets(int ndim, SEXP starts,
 	in_off = out_off = 0;
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
 		in_off *= h5chunkdim[h5along];
-		out_off *= out_dim[along];
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
+		out_off *= outdim[along];
 		i = out_blockoff[along];
-		in_off += _get_trusted_elt(start, i) - 1 - h5chunkoff[h5along];
+		start = VECTOR_ELT(starts, along);
+		if (start != R_NilValue)
+			in_off += _get_trusted_elt(start, i) - 1 -
+				  h5chunkoff[h5along];
 		out_off += i;
 	}
-	printf("> in_offset = %lu out_offset = %lu\n", in_off, out_off);
 	*in_offset = in_off;
 	*out_offset = out_off;
+	//printf("# in_offset = %lu out_offset = %lu\n",
+	//       *in_offset, *out_offset);
 	return;
 }
 
-static inline void next_offsets(const int *inner_midx, int inner_moved_along,
-				size_t *in_offset, size_t *out_offset)
+static inline void update_offsets(int ndim,
+			const int *inner_midx, int inner_moved_along,
+			SEXP starts, const int *out_blockoff,
+			const hsize_t *h5chunkdim, const int *outdim,
+			const int *out_blockdim,
+			size_t *in_offset, size_t *out_offset)
 {
+	SEXP start;
+	int i1, i0, along, h5along, di;
+	long long int in_off_inc, out_off_inc;
+
+	start = VECTOR_ELT(starts, inner_moved_along);
+	if (start != R_NilValue) {
+		i1 = out_blockoff[inner_moved_along] +
+		     inner_midx[inner_moved_along];
+		i0 = i1 - 1;
+		in_off_inc = _get_trusted_elt(start, i1) -
+			     _get_trusted_elt(start, i0);
+	} else {
+		in_off_inc = 1;
+	}
+	out_off_inc = 1;
+	if (inner_moved_along >= 1) {
+		along = inner_moved_along - 1;
+		h5along = ndim - inner_moved_along;
+		do {
+			in_off_inc *= h5chunkdim[h5along];
+			out_off_inc *= outdim[along];
+			di = 1 - out_blockdim[along];
+			start = VECTOR_ELT(starts, along);
+			if (start != R_NilValue) {
+				i1 = out_blockoff[along];
+				i0 = i1 - di;
+				in_off_inc += _get_trusted_elt(start, i1) -
+					      _get_trusted_elt(start, i0);
+			} else {
+				in_off_inc += di;
+			}
+			out_off_inc += di;
+			along--;
+			h5along++;
+		} while (along >= 0);
+	}
+	*in_offset += in_off_inc;
+	*out_offset += out_off_inc;
+	//printf("## in_offset = %lu out_offset = %lu\n",
+	//       *in_offset, *out_offset);
 	return;
 }
 
-static void gather_chunk_data(const DSetDesc *dset_desc,
+static void gather_chunk_data(int ndim,
 			      const int *outer_midx, int outer_moved_along,
 			      SEXP starts, const IntAEAE *breakpoint_bufs,
 			      const void *in,
 			      const hsize_t *h5chunkoff,
 			      const hsize_t *h5chunkdim,
-			      void *out, const int *out_dim,
+			      void *out, const int *outdim,
 			      const int *out_blockoff,
 			      const int *out_blockdim,
-			      size_t chunk_elt_size,
-			      int *inner_midx_buf)
+			      int *inner_midx_buf,
+			      hid_t mem_type_id)
 {
-	int ndim, along, inner_moved_along;
+	int along, inner_moved_along;
 	size_t in_offset, out_offset;
 	long long int num_elts;
 
-	ndim = dset_desc->ndim;
-
-	printf("> outer_midx:");
-	for (along = 0; along < ndim; along++)
-		printf(" %d", outer_midx[along]);
-	printf("\n");
+	//printf("# outer_midx:");
+	//for (along = 0; along < ndim; along++)
+	//	printf(" %d", outer_midx[along]);
+	//printf("\n");
 
 	init_offsets(ndim, starts, h5chunkoff, h5chunkdim,
-		     out_blockoff, out_dim,
+		     out_blockoff, outdim,
 		     &in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
-	inner_moved_along = ndim;
-	do {
+	while (1) {
 		num_elts++;
-		printf(">> inner_midx_buf:");
-		for (along = 0; along < ndim; along++)
-			printf(" %d", inner_midx_buf[along]);
-		printf("\n");
-		memcpy(out + out_offset, in + in_offset, chunk_elt_size);
-
+		//printf("## inner_midx_buf:");
+		//for (along = 0; along < ndim; along++)
+		//	printf(" %d", inner_midx_buf[along]);
+		//printf("\n");
+		if (mem_type_id == H5T_NATIVE_INT) {
+			((int *) out)[out_offset] =
+				((int *) in)[in_offset];
+		} else {
+			((double *) out)[out_offset] =
+				((double *) in)[in_offset];
+		}
 		inner_moved_along = next_midx(ndim, inner_midx_buf,
 					      out_blockdim);
-	} while (inner_moved_along < ndim);
-	printf("> nb of selected elements in current chunk = %lld\n", num_elts);
+		if (inner_moved_along == ndim)
+			break;
+		update_offsets(ndim,
+			       inner_midx_buf, inner_moved_along,
+			       starts, out_blockoff,
+			       h5chunkdim, outdim, out_blockdim,
+			       &in_offset, &out_offset);
+	};
+	//printf("# nb of selected elements in current chunk = %lld\n",
+	//       num_elts);
 	return;
 }
 
@@ -989,7 +1044,6 @@ static int read_data3(const DSetDesc *dset_desc,
 	chunk_len = 1;
 	for (along = 0; along < ndim; along++)
 		chunk_len *= dset_desc->h5chunkdim[along];
-	printf("chunk_len = %lu\n", chunk_len);
 
 	if (mem_type_id == H5T_NATIVE_INT) {
 		chunk_elt_size = sizeof(int);
@@ -1031,17 +1085,17 @@ static int read_data3(const DSetDesc *dset_desc,
 	moved_along = ndim;
 	do {
 		num_chunks++;
-		if (num_chunks % 20000 == 0) {
-			printf(".");
-			if (++ndot % 50 == 0)
-				printf(" [%lld chunks processed]\n",
-				       num_chunks);
-			fflush(stdout);
-		}
-		set_chunk_offset_and_dim(dset_desc,
-					 outer_midx_buf->elts, moved_along,
-					 starts, chunkidx_bufs,
-					 h5chunkoff_buf, h5chunkdim_buf);
+		//if (num_chunks % 20000 == 0) {
+		//	printf(".");
+		//	if (++ndot % 50 == 0)
+		//		printf(" [%lld chunks processed]\n",
+		//		       num_chunks);
+		//	fflush(stdout);
+		//}
+		update_chunk_offset_and_dim(dset_desc,
+			outer_midx_buf->elts, moved_along,
+			starts, chunkidx_bufs,
+			h5chunkoff_buf, h5chunkdim_buf);
 
 		ret = read_chunk(dset_desc,
 				 h5chunkoff_buf, h5chunkdim_buf, h5zeros_buf,
@@ -1079,27 +1133,28 @@ static int read_data3(const DSetDesc *dset_desc,
 			break;
 		}
 */
-		set_block_offset_and_dim(ndim,
+		update_block_offset_and_dim(ndim,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			h5chunkoff_buf, h5chunkdim_buf,
 			out_blockoff_buf->elts, out_blockdim_buf->elts);
 
-		gather_chunk_data(dset_desc,
+		gather_chunk_data(ndim,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			chunk_data_buf,
-			h5chunkoff_buf, h5chunkdim_buf,
+			//h5chunkoff_buf, h5chunkdim_buf,
+			h5chunkoff_buf, dset_desc->h5chunkdim,
 			out, ans_dim,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
-			chunk_elt_size,
-			inner_midx_buf->elts);
+			inner_midx_buf->elts,
+			mem_type_id);
+
 		moved_along = next_midx(ndim, outer_midx_buf->elts,
 					nchunk_buf->elts);
 	} while (moved_along < ndim);
-	printf("\n");
-
-	printf("nb of chunks = %lld\n", num_chunks);
+	//printf("\n");
+	//printf("total chunks processed = %lld\n", num_chunks);
 
 	free(h5chunkoff_buf);
 	free(chunk_data_buf);
