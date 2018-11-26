@@ -265,24 +265,43 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
-static inline int next_midx(int ndim, int *midx, const int *max_idx_plus_one)
+static inline int next_midx(int ndim, const int *max_idx_plus_one,
+			    int *midx_buf)
 {
 	int along, i;
 
 	for (along = 0; along < ndim; along++) {
-		i = midx[along] + 1;
+		i = midx_buf[along] + 1;
 		if (i < max_idx_plus_one[along]) {
-			midx[along] = i;
+			midx_buf[along] = i;
 			break;
 		}
-		midx[along] = 0;
+		midx_buf[along] = 0;
 	}
 	return along;
 }
 
+/*
+static inline int next_midx2(int ndim, const hsize_t *max_idx_plus_one,
+			     int *midx_buf)
+{
+	int along, i;
+
+	for (along = 0; along < ndim; along++) {
+		i = midx_buf[along] + 1;
+		if (i < max_idx_plus_one[along]) {
+			midx_buf[along] = i;
+			break;
+		}
+		midx_buf[along] = 0;
+	}
+	return along;
+}
+*/
+
 
 /****************************************************************************
- * read_data1()
+ * read_data_1_2()
  *
  * Some useful links:
  * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
@@ -293,15 +312,32 @@ static inline int next_midx(int ndim, int *midx, const int *max_idx_plus_one)
  *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
  */
 
-static int select_hyperslab(hid_t file_space_id, int ndim,
-			    SEXP starts, SEXP counts,
-			    const int *midx, int moved_along,
-			    hsize_t *h5offset_buf, hsize_t *h5count_buf)
+static void init_h5blockoff_and_h5blockdim_bufs(const DSetDesc *dset_desc,
+			SEXP starts,
+			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf)
 {
-	int along, h5along, i, ret;
+	int ndim, along, h5along;
+
+	ndim = dset_desc->ndim;
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		if (VECTOR_ELT(starts, along) == R_NilValue) {
+			h5blockoff_buf[h5along] = 0;
+			h5blockdim_buf[h5along] = dset_desc->h5dim[h5along];
+		} else {
+			h5blockdim_buf[h5along] = 1;
+		}
+	}
+	return;
+}
+
+static void update_h5blockoff_and_h5blockdim_bufs(int ndim,
+			const int *midx, int moved_along,
+			SEXP starts, SEXP counts,
+			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf)
+{
+	int along, h5along, i;
 	SEXP start, count;
 
-	/* Update 'h5offset_buf' and 'h5count_buf'. */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -310,38 +346,26 @@ static int select_hyperslab(hid_t file_space_id, int ndim,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		h5offset_buf[h5along] = _get_trusted_elt(start, i) - 1;
-		if (counts != R_NilValue) {
-			count = VECTOR_ELT(counts, along);
-			if (count != R_NilValue)
-				h5count_buf[h5along] =
-					_get_trusted_elt(count, i);
-		}
+		h5blockoff_buf[h5along] = _get_trusted_elt(start, i) - 1;
+		if (counts == R_NilValue)
+			continue;
+		count = VECTOR_ELT(counts, along);
+		if (count == R_NilValue)
+			continue;
+		h5blockdim_buf[h5along] = _get_trusted_elt(count, i);
 	}
-
-	/* Add to current selection. */
-	ret = H5Sselect_hyperslab(file_space_id, H5S_SELECT_OR,
-				  h5offset_buf, NULL, h5count_buf, NULL);
-	if (ret < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
-		return -1;
-	}
-	return 0;
+	return;
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
 static long long int select_hyperslabs(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts, const int *nstart)
+			SEXP starts, SEXP counts,
+			const int *nstart,
+			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf,
+			int *midx_buf)
 {
-	int ndim, along, h5along, moved_along, ret;
+	int ret, ndim, moved_along;
 	long long int num_hyperslabs;
-	hsize_t *h5offset_buf, *h5count_buf;  // hyperslab offsets and dims
-	IntAE *midx_buf;
-
-	ndim = dset_desc->ndim;
-	for (along = 0; along < ndim; along++)
-		if (nstart[along] == 0)
-			return 0;  // empty region (no hyperslab)
 
 	ret = H5Sselect_none(dset_desc->space_id);
 	if (ret < 0) {
@@ -349,63 +373,87 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 		return -1;
 	}
 
-	/* Allocate 'h5offset_buf' and 'h5count_buf'. */
-	h5offset_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
-	if (h5offset_buf == NULL) {
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'h5offset_buf' and 'h5count_buf'");
-		return -1;
-	}
-	h5count_buf = h5offset_buf + ndim;
-
-	/* Initialize 'h5offset_buf' and 'h5count_buf'. */
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (VECTOR_ELT(starts, along) == R_NilValue) {
-			h5offset_buf[h5along] = 0;
-			h5count_buf[h5along] = dset_desc->h5dim[h5along];
-		} else {
-			h5count_buf[h5along] = 1;
-		}
-	}
+	ndim = dset_desc->ndim;
 
 	/* Walk on the blocks. */
-	midx_buf = new_IntAE(ndim, ndim, 0);
 	num_hyperslabs = 0;
 	moved_along = ndim;
 	do {
 		num_hyperslabs++;
-		ret = select_hyperslab(dset_desc->space_id, ndim,
-				       starts, counts,
-				       midx_buf->elts, moved_along,
-				       h5offset_buf, h5count_buf);
-		if (ret < 0)
+		update_h5blockoff_and_h5blockdim_bufs(ndim,
+				midx_buf, moved_along,
+				starts, counts,
+				h5blockoff_buf, h5blockdim_buf);
+		/* Add to current selection. */
+		ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_OR,
+				h5blockoff_buf, NULL, h5blockdim_buf, NULL);
+		if (ret < 0) {
+			PRINT_TO_ERRMSG_BUF(
+				"H5Sselect_hyperslab() returned an error");
 			break;
-		moved_along = next_midx(ndim, midx_buf->elts, nstart);
+		}
+		moved_along = next_midx(ndim, nstart, midx_buf);
 	} while (moved_along < ndim);
-
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(nstart)
-	free(h5offset_buf);
+
 	return num_hyperslabs;
+}
+
+/* This is NOT collecting the elements in the right order!
+static hsize_t *add_block_elements(int ndim,
+		const hsize_t *h5blockoff, const hsize_t *h5blockdim,
+		int *inner_midx_buf, hsize_t *coord_p)
+{
+	int h5along, inner_moved_along;
+
+	do {
+		for (h5along = 0; h5along < ndim; h5along++)
+			*(coord_p++) = h5blockoff[h5along] +
+				       inner_midx_buf[h5along];
+		inner_moved_along = next_midx2(ndim, h5blockdim,
+					       inner_midx_buf);
+	} while (inner_moved_along < ndim);
+	return coord_p;
+}
+*/
+
+static inline hsize_t *add_element(int ndim, const int *outer_midx,
+				   SEXP starts, hsize_t *coord_p)
+{
+	int h5along, i;
+	SEXP start;
+	long long int coord;
+
+	for (h5along = ndim - 1; h5along >= 0; h5along--) {
+		i = outer_midx[h5along];
+		start = VECTOR_ELT(starts, h5along);
+		if (start == R_NilValue) {
+			coord = i;
+		} else {
+			coord = _get_trusted_elt(start, i) - 1;
+		}
+		*(coord_p++) = (hsize_t) coord;
+	}
+	return coord_p;
 }
 
 /* Return nb of elements (or -1 on error). */
 static long long int select_elements(const DSetDesc *dset_desc,
-			SEXP starts, const int *ans_dim)
+			SEXP starts, SEXP counts,
+			const int *nstart, const int *ans_dim,
+			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf,
+			int *outer_midx_buf)
 {
-	int ndim, along, moved_along, i, ret;
+	int ndim, along, outer_moved_along, ret;
 	size_t num_elements;
 	hsize_t *coord_buf, *coord_p;
-	IntAE *midx_buf;
-	SEXP start;
-	long long int coord;
+	//IntAE *inner_midx_buf;
 
 	ndim = dset_desc->ndim;
 	num_elements = 1;
 	for (along = 0; along < ndim; along++)
 		num_elements *= ans_dim[along];
 	//printf("nb of elements = %lu\n", num_elements);  // = length(ans)
-	if (num_elements == 0)
-		return 0;  // no elements
 
 	/* Allocate 'coord_buf'. */
 	coord_buf = (hsize_t *) malloc(num_elements * ndim * sizeof(hsize_t));
@@ -415,23 +463,25 @@ static long long int select_elements(const DSetDesc *dset_desc,
 		return -1;
 	}
 
+	//inner_midx_buf = new_IntAE(ndim, ndim, 0);
+
 	/* Walk on the selected elements. */
-	midx_buf = new_IntAE(ndim, ndim, 0);
 	coord_p = coord_buf;
-	moved_along = ndim;
+	outer_moved_along = ndim;
 	do {
-		for (along = ndim - 1; along >= 0; along--) {
-			i = midx_buf->elts[along];
-			start = VECTOR_ELT(starts, along);
-			if (start == R_NilValue) {
-				coord = i;
-			} else {
-				coord = _get_trusted_elt(start, i) - 1;
-			}
-			*(coord_p++) = (hsize_t) coord;
-		}
-		moved_along = next_midx(ndim, midx_buf->elts, ans_dim);
-	} while (moved_along < ndim);
+/*
+		update_h5blockoff_and_h5blockdim_bufs(ndim,
+				outer_midx_buf, outer_moved_along,
+				starts, counts,
+				h5blockoff_buf, h5blockdim_buf);
+		coord_p = add_block_elements(ndim,
+				h5blockoff_buf, h5blockdim_buf,
+				inner_midx_buf->elts,
+				coord_p);
+*/
+		coord_p = add_element(ndim, outer_midx_buf, starts, coord_p);
+		outer_moved_along = next_midx(ndim, nstart, outer_midx_buf);
+	} while (outer_moved_along < ndim);
 
 	ret = H5Sselect_elements(dset_desc->space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
@@ -441,7 +491,7 @@ static long long int select_elements(const DSetDesc *dset_desc,
 	return (long long int) num_elements;
 }
 
-static int set_selection(const DSetDesc *dset_desc,
+static int set_selection(const DSetDesc *dset_desc, int method,
 			 SEXP starts, SEXP counts, int noreduce,
 			 const int *nstart,
 			 const int *ans_dim,
@@ -449,11 +499,31 @@ static int set_selection(const DSetDesc *dset_desc,
 			 const long long int *last_block_start)
 {
 	int ndim;
+	hsize_t *h5blockoff_buf, *h5blockdim_buf;
+	IntAE *midx_buf;
 	SEXP reduced;
 	long long int nselection;
 
+	if (method == 2 && counts != R_NilValue) {
+		PRINT_TO_ERRMSG_BUF("'counts' must be NULL "
+				    "when 'method' is set to 2");
+		return -1;
+	}
+
 	ndim = dset_desc->ndim;
-	if (!noreduce && _selection_can_be_reduced(ndim, nstart, nblock)) {
+
+	/* Allocate 'h5blockoff_buf' and 'h5blockdim_buf'. */
+	h5blockoff_buf = (hsize_t *) malloc(2 * ndim * sizeof(hsize_t));
+	if (h5blockoff_buf == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory for "
+				    "'h5blockoff_buf' and 'h5blockdim_buf'");
+		return -1;
+	}
+	h5blockdim_buf = h5blockoff_buf + ndim;
+
+	if (method != 2 && !noreduce &&
+	    _selection_can_be_reduced(ndim, nstart, nblock))
+	{
 		reduced = PROTECT(_reduce_selection(starts, counts,
 						    ans_dim,
 						    nblock, last_block_start));
@@ -462,10 +532,21 @@ static int set_selection(const DSetDesc *dset_desc,
 		nstart = nblock;
 	}
 
+	init_h5blockoff_and_h5blockdim_bufs(dset_desc, starts,
+			h5blockoff_buf, h5blockdim_buf);
+
+	midx_buf = new_IntAE(ndim, ndim, 0);
+
 	//clock_t t0 = clock();
-	nselection = counts != R_NilValue ?
-		     select_hyperslabs(dset_desc, starts, counts, nstart) :
-		     select_elements(dset_desc, starts, ans_dim);
+	nselection = method != 2 ?
+		     select_hyperslabs(dset_desc, starts, counts,
+				nstart,
+				h5blockoff_buf, h5blockdim_buf,
+				midx_buf->elts) :
+		     select_elements(dset_desc, starts, counts,
+				nstart, ans_dim,
+				h5blockoff_buf, h5blockdim_buf,
+				midx_buf->elts);
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
 	//printf("time for setting selection: %e\n", dt);
 	//printf("nselection: %lld, time per selection unit: %e\n",
@@ -473,21 +554,22 @@ static int set_selection(const DSetDesc *dset_desc,
 
 	if (nstart == nblock)
 		UNPROTECT(1);  // unprotect 'reduced'
-
+	free(h5blockoff_buf);
 	return nselection < 0 ? -1 : 0;
 }
 
-static int read_data1(const DSetDesc *dset_desc,
-		      SEXP starts, SEXP counts, int noreduce,
-		      const int *nstart,
-		      const int *ans_dim,
-		      const int *nblock,
-		      const long long int *last_block_start,
-		      void *out, hid_t mem_type_id, hid_t mem_space_id)
+static int read_data_1_2(const DSetDesc *dset_desc, int method,
+			 SEXP starts, SEXP counts, int noreduce,
+			 const int *nstart,
+			 const int *ans_dim,
+			 const int *nblock,
+			 const long long int *last_block_start,
+			 void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ret;
 
-	ret = set_selection(dset_desc, starts, counts, noreduce,
+	ret = set_selection(dset_desc, method,
+			    starts, counts, noreduce,
 			    nstart, ans_dim,
 			    nblock, last_block_start);
 	if (ret < 0)
@@ -512,7 +594,7 @@ static int read_data1(const DSetDesc *dset_desc,
 
 
 /****************************************************************************
- * read_data2()
+ * read_data_3()
  */
 
 static int read_selection_unit(const DSetDesc *dset_desc,
@@ -569,9 +651,9 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 		       dset_desc->space_id, H5P_DEFAULT, out);
 }
 
-static int read_data2(const DSetDesc *dset_desc,
-		      SEXP starts, SEXP counts, const int *nstart,
-		      void *out, hid_t mem_type_id, hid_t mem_space_id)
+static int read_data_3(const DSetDesc *dset_desc,
+		       SEXP starts, SEXP counts, const int *nstart,
+		       void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ndim, along, h5along, moved_along, ret;
 	hsize_t *h5offset_in_buf, *h5count_buf, *h5offset_out_buf;
@@ -618,7 +700,7 @@ static int read_data2(const DSetDesc *dset_desc,
 					  out, mem_type_id, mem_space_id);
 		if (ret < 0)
 			break;
-		moved_along = next_midx(ndim, midx_buf->elts, nstart);
+		moved_along = next_midx(ndim, nstart, midx_buf->elts);
 	} while (moved_along < ndim);
 
 	//printf("nb of selection units = %lld\n", num_selection_units); // = prod(nstart)
@@ -628,7 +710,7 @@ static int read_data2(const DSetDesc *dset_desc,
 
 
 /****************************************************************************
- * read_data3()
+ * read_data_4()
  */
 
 static void set_nchunk_buf(const DSetDesc *dset_desc,
@@ -653,7 +735,7 @@ static void set_nchunk_buf(const DSetDesc *dset_desc,
 	return;
 }
 
-static void update_chunk_offset_and_dim(const DSetDesc *dset_desc,
+static void update_h5chunkoff_and_h5chunkdim_bufs(const DSetDesc *dset_desc,
 			const int *midx, int moved_along,
 			SEXP starts, const IntAEAE *chunkidx_bufs,
 			hsize_t *h5chunkoff_buf, hsize_t *h5chunkdim_buf)
@@ -689,7 +771,7 @@ static void update_chunk_offset_and_dim(const DSetDesc *dset_desc,
 	return;
 }
 
-static void update_block_offset_and_dim(int ndim,
+static void update_out_blockoff_and_out_blockdim_bufs(int ndim,
 			const int *midx, int moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
 			const hsize_t *h5chunkoff, const hsize_t *h5chunkdim,
@@ -886,7 +968,7 @@ static int direct_read_chunk(const DSetDesc *dset_desc,
 }
 */
 
-static void init_offsets(int ndim, SEXP starts,
+static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 			 const hsize_t *h5chunkoff, const hsize_t *h5chunkdim,
 			 const int *out_blockoff, const int *outdim,
 			 size_t *in_offset, size_t *out_offset)
@@ -913,7 +995,7 @@ static void init_offsets(int ndim, SEXP starts,
 	return;
 }
 
-static inline void update_offsets(int ndim,
+static inline void update_in_offset_and_out_offset(int ndim,
 			const int *inner_midx, int inner_moved_along,
 			SEXP starts, const int *out_blockoff,
 			const hsize_t *h5chunkdim, const int *outdim,
@@ -984,9 +1066,10 @@ static void gather_chunk_data(int ndim,
 	//	printf(" %d", outer_midx[along]);
 	//printf("\n");
 
-	init_offsets(ndim, starts, h5chunkoff, h5chunkdim,
-		     out_blockoff, outdim,
-		     &in_offset, &out_offset);
+	init_in_offset_and_out_offset(ndim, starts,
+			h5chunkoff, h5chunkdim,
+			out_blockoff, outdim,
+			&in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
@@ -1003,27 +1086,27 @@ static void gather_chunk_data(int ndim,
 			((double *) out)[out_offset] =
 				((double *) in)[in_offset];
 		}
-		inner_moved_along = next_midx(ndim, inner_midx_buf,
-					      out_blockdim);
+		inner_moved_along = next_midx(ndim, out_blockdim,
+					      inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		update_offsets(ndim,
-			       inner_midx_buf, inner_moved_along,
-			       starts, out_blockoff,
-			       h5chunkdim, outdim, out_blockdim,
-			       &in_offset, &out_offset);
+		update_in_offset_and_out_offset(ndim,
+				inner_midx_buf, inner_moved_along,
+				starts, out_blockoff,
+				h5chunkdim, outdim, out_blockdim,
+				&in_offset, &out_offset);
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
 	//       num_elts);
 	return;
 }
 
-static int read_data3(const DSetDesc *dset_desc,
-		      SEXP starts,
-		      const int *ans_dim,
-		      const IntAEAE *breakpoint_bufs,
-		      const IntAEAE *chunkidx_bufs,
-		      void *out, hid_t mem_type_id)
+static int read_data_4(const DSetDesc *dset_desc,
+		       SEXP starts,
+		       const int *ans_dim,
+		       const IntAEAE *breakpoint_bufs,
+		       const IntAEAE *chunkidx_bufs,
+		       void *out, hid_t mem_type_id)
 {
 	int ndim, along, h5along, moved_along, ret;
 	hid_t mem_space_id;
@@ -1092,7 +1175,7 @@ static int read_data3(const DSetDesc *dset_desc,
 		//		       num_chunks);
 		//	fflush(stdout);
 		//}
-		update_chunk_offset_and_dim(dset_desc,
+		update_h5chunkoff_and_h5chunkdim_bufs(dset_desc,
 			outer_midx_buf->elts, moved_along,
 			starts, chunkidx_bufs,
 			h5chunkoff_buf, h5chunkdim_buf);
@@ -1133,7 +1216,7 @@ static int read_data3(const DSetDesc *dset_desc,
 			break;
 		}
 */
-		update_block_offset_and_dim(ndim,
+		update_out_blockoff_and_out_blockdim_bufs(ndim,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			h5chunkoff_buf, h5chunkdim_buf,
@@ -1150,8 +1233,8 @@ static int read_data3(const DSetDesc *dset_desc,
 			inner_midx_buf->elts,
 			mem_type_id);
 
-		moved_along = next_midx(ndim, outer_midx_buf->elts,
-					nchunk_buf->elts);
+		moved_along = next_midx(ndim, nchunk_buf->elts,
+					outer_midx_buf->elts);
 	} while (moved_along < ndim);
 	//printf("\n");
 	//printf("total chunks processed = %lld\n", num_chunks);
@@ -1200,7 +1283,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
 
-	if (method != 3) {
+	if (method != 4) {
 		nstart_buf = new_IntAE(ndim, ndim, 0);
 		nblock_buf = new_IntAE(ndim, ndim, 0);
 		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
@@ -1217,7 +1300,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	} else {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL "
-					    "when 'method' is set to 3");
+					    "when 'method' is set to 4");
 			goto on_error1;
 		}
 		breakpoint_bufs = new_IntAEAE(ndim, ndim);
@@ -1246,29 +1329,29 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	}
 
 	if (ans_len != 0) {
-		if (method != 3) {
+		if (method != 4) {
 			mem_space_id = get_mem_space(dset_desc.ndim,
 						     INTEGER(ans_dim));
 			if (mem_space_id < 0)
 				goto on_error2;
-			if (method == 1) {
-				ret = read_data1(&dset_desc,
+			if (method == 1 || method == 2) {
+				ret = read_data_1_2(&dset_desc, method,
 					starts, counts, noreduce,
 					nstart, INTEGER(ans_dim),
 					nblock, last_block_start,
 					out, mem_type_id, mem_space_id);
-			} else if (method == 2) {
-				ret = read_data2(&dset_desc,
+			} else if (method == 3) {
+				ret = read_data_3(&dset_desc,
 					starts, counts, nstart,
 					out, mem_type_id, mem_space_id);
 			} else if (method != 0) {
 				PRINT_TO_ERRMSG_BUF("'method' can only be "
-						    "set to 0, 1, 2, or 3");
+						    "set to 0, 1, 2, 3, or 4");
 				ret = -1;
 			}
 			H5Sclose(mem_space_id);
 		} else {
-			ret = read_data3(&dset_desc,
+			ret = read_data_4(&dset_desc,
 				starts, INTEGER(ans_dim),
 				breakpoint_bufs, chunkidx_bufs,
 				out, mem_type_id);
