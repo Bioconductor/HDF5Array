@@ -38,7 +38,7 @@ int _map_starts_to_chunks(
 	const long long int *chunk_spacings,
 	int *nstart,
 	IntAEAE *breakpoint_bufs,
-	IntAEAE *chunkidx_bufs
+	LLongAEAE *chunkidx_bufs
 );
 
 SEXP C_map_starts_to_chunks(

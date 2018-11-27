@@ -252,7 +252,7 @@ static int map_starts_to_chunks(const DSetDesc *dset_desc,
 				SEXP starts,
 				int *ans_dim,
 				IntAEAE *breakpoint_bufs,
-				IntAEAE *chunkidx_bufs)
+				LLongAEAE *chunkidx_bufs)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf, *chunkdim_buf;
@@ -714,7 +714,7 @@ static int read_data_3(const DSetDesc *dset_desc,
  */
 
 static void set_nchunk_buf(const DSetDesc *dset_desc,
-			   const SEXP starts, const IntAEAE *chunkidx_bufs,
+			   const SEXP starts, const LLongAEAE *chunkidx_bufs,
 			   IntAE *nchunk_buf)
 {
 	int ndim, along, h5along, nchunk;
@@ -723,7 +723,7 @@ static void set_nchunk_buf(const DSetDesc *dset_desc,
 	//printf("nchunk_buf:");
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) != R_NilValue) {
-			nchunk = IntAE_get_nelt(chunkidx_bufs->elts[along]);
+			nchunk = LLongAE_get_nelt(chunkidx_bufs->elts[along]);
 		} else {
 			nchunk = dset_desc->h5nchunk[h5along];
 		}
@@ -737,10 +737,11 @@ static void set_nchunk_buf(const DSetDesc *dset_desc,
 
 static void update_h5chunkoff_and_h5chunkdim_bufs(const DSetDesc *dset_desc,
 			const int *midx, int moved_along,
-			SEXP starts, const IntAEAE *chunkidx_bufs,
+			SEXP starts, const LLongAEAE *chunkidx_bufs,
 			hsize_t *h5chunkoff_buf, hsize_t *h5chunkdim_buf)
 {
-	int ndim, along, h5along, i, chunk_idx;
+	int ndim, along, h5along, i;
+	long long int chunkidx;
 	hsize_t spacing;
 
 	ndim = dset_desc->ndim;
@@ -749,12 +750,12 @@ static void update_h5chunkoff_and_h5chunkdim_bufs(const DSetDesc *dset_desc,
 			break;
 		i = midx[along];
 		if (VECTOR_ELT(starts, along) != R_NilValue) {
-			chunk_idx = chunkidx_bufs->elts[along]->elts[i];
+			chunkidx = chunkidx_bufs->elts[along]->elts[i];
 		} else {
-			chunk_idx = i;
+			chunkidx = i;
 		}
 		spacing = dset_desc->h5chunk_spacings[h5along];
-		h5chunkoff_buf[h5along] = chunk_idx * spacing;
+		h5chunkoff_buf[h5along] = chunkidx * spacing;
 		h5chunkdim_buf[h5along] = dset_desc->h5dim[h5along] -
 					  h5chunkoff_buf[h5along];
 		if (h5chunkdim_buf[h5along] > spacing)
@@ -1086,7 +1087,7 @@ static void gather_chunk_data(int ndim,
 static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
-			 const IntAEAE *chunkidx_bufs,
+			 const LLongAEAE *chunkidx_bufs,
 			 void *out, const int *outdim, hid_t mem_type_id)
 {
 	int ndim, along, moved_along, ret;
@@ -1265,6 +1266,18 @@ static void update_out_h5blockoff_and_out_blockdim_bufs(int ndim,
 	return;
 }
 
+static int select_full_chunk(const DSetDesc *dset_desc,
+			const hsize_t *h5chunkoff, const hsize_t *h5chunkdim)
+{
+	int ret;
+
+	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
+				  h5chunkoff, NULL, h5chunkdim, NULL);
+	if (ret < 0)
+		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
+	return ret;
+}
+
 /* Return nb of selected elements (or -1 on error). */
 static long long int select_elements_from_chunk(const DSetDesc *dset_desc,
 			const hsize_t *out_h5blockoff, const int *out_blockdim,
@@ -1314,21 +1327,12 @@ static long long int select_elements_from_chunk(const DSetDesc *dset_desc,
 	return (long long int) num_elements;
 }
 
-static int read_from_chunk(const DSetDesc *dset_desc,
-			   const hsize_t *out_h5blockoff,
-			   const hsize_t *out_h5blockdim,
-			   const int *out_blockdim,
-			   SEXP starts,
-			   void *out, hid_t mem_type_id, hid_t mem_space_id,
-			   int *inner_midx_buf, hsize_t *coord_buf)
+static int read_selection(const DSetDesc *dset_desc,
+			  const hsize_t *out_h5blockoff,
+			  const hsize_t *out_h5blockdim,
+			  void *out, hid_t mem_type_id, hid_t mem_space_id)
 {
 	int ret;
-
-	ret = select_elements_from_chunk(dset_desc,
-			out_h5blockoff, out_blockdim,
-			starts, inner_midx_buf, coord_buf);
-	if (ret < 0)
-		return -1;
 
 	ret = H5Sselect_hyperslab(mem_space_id, H5S_SELECT_SET,
 				  out_h5blockoff, NULL, out_h5blockdim, NULL);
@@ -1348,14 +1352,14 @@ static int read_from_chunk(const DSetDesc *dset_desc,
 static int read_data_6(const DSetDesc *dset_desc,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
-		       const IntAEAE *chunkidx_bufs,
+		       const LLongAEAE *chunkidx_bufs,
 		       void *out, const int *outdim, hid_t mem_type_id)
 {
 	int ndim, along, moved_along, ret;
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf,
 		*out_h5blockoff_buf, *out_h5blockdim_buf, *coord_buf;
-	size_t chunk_maxlen;
+	size_t h5buf_size, chunk_maxlen;
 	IntAE *nchunk_buf, *outer_midx_buf, *out_blockdim_buf, *inner_midx_buf;
 	long long int num_chunks, ndot;
 
@@ -1376,6 +1380,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 	h5chunkdim_buf = h5chunkoff_buf + ndim;
 	out_h5blockoff_buf = h5chunkdim_buf + ndim;
 	out_h5blockdim_buf = out_h5blockoff_buf + ndim;
+	h5buf_size = ndim * sizeof(hsize_t);
 
 	/* Allocate 'coord_buf'. */
 	chunk_maxlen = 1;
@@ -1398,6 +1403,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 	/* Walk on the chunks. */
 	num_chunks = ndot = 0;
 	moved_along = ndim;
+	clock_t t_select_elements = 0, t_read_selection = 0, t0;
 	do {
 		num_chunks++;
 		//if (num_chunks % 20000 == 0) {
@@ -1419,20 +1425,41 @@ static int read_data_6(const DSetDesc *dset_desc,
 			out_h5blockoff_buf, out_h5blockdim_buf,
 			out_blockdim_buf->elts);
 
-		ret = read_from_chunk(dset_desc,
-			out_h5blockoff_buf, out_h5blockdim_buf,
-			out_blockdim_buf->elts,
-			starts,
-			out, mem_type_id, mem_space_id,
-			inner_midx_buf->elts, coord_buf);
+		t0 = clock();
+		/* Having 'out_h5blockdim_buf' identical to 'h5chunkdim_buf'
+		   means that the entire chunk is being selected so we can
+		   avoid the costly select_elements_from_chunk(). */
+		ret = memcmp(h5chunkdim_buf, out_h5blockdim_buf, h5buf_size);
+		if (ret == 0) {
+			ret = select_full_chunk(dset_desc,
+				h5chunkoff_buf, h5chunkdim_buf);
+		} else {
+			ret = select_elements_from_chunk(dset_desc,
+				out_h5blockoff_buf, out_blockdim_buf->elts,
+				starts, inner_midx_buf->elts, coord_buf);
+		}
 		if (ret < 0)
 			break;
+		t_select_elements += clock() - t0;
+
+		t0 = clock();
+		ret = read_selection(dset_desc,
+			out_h5blockoff_buf, out_h5blockdim_buf,
+			out, mem_type_id, mem_space_id);
+		if (ret < 0)
+			break;
+		t_read_selection += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
 	} while (moved_along < ndim);
 	//printf("\n");
 	//printf("total chunks processed = %lld\n", num_chunks);
+	double dt1 = 1.0 * t_select_elements / CLOCKS_PER_SEC;
+	printf("total time spent selecting elements: %3.6f\n", dt1);
+	double dt2 = 1.0 * t_read_selection / CLOCKS_PER_SEC;
+	printf("total time spent reading elements: %3.6f\n", dt2);
+	printf("total time: %3.6f\n", dt1 + dt2);
 
 	free(coord_buf);
 	free(h5chunkoff_buf);
@@ -1459,7 +1486,8 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	int *nstart, *nblock;
 	long long int *last_block_start;
 
-	IntAEAE *breakpoint_bufs, *chunkidx_bufs;
+	IntAEAE *breakpoint_bufs;
+	LLongAEAE *chunkidx_bufs;
 
 	R_xlen_t ans_len;
 	void *out;
@@ -1500,7 +1528,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 			goto on_error1;
 		}
 		breakpoint_bufs = new_IntAEAE(ndim, ndim);
-		chunkidx_bufs = new_IntAEAE(ndim, ndim);
+		chunkidx_bufs = new_LLongAEAE(ndim, ndim);
 		/* This call will populate 'ans_dim', 'breakpoint_bufs',
 		   and 'chunkidx_bufs'. */
 		ret = map_starts_to_chunks(&dset_desc, starts,

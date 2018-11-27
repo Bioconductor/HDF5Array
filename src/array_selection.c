@@ -329,11 +329,11 @@ int _deep_check_selection(SEXP starts, SEXP counts,
 static int map_start_to_chunks(SEXP start, int along,
 		long long int d, long long int chunkd,
 		int *nstart,
-		IntAE *breakpoint_buf, IntAE *chunkidx_buf)
+		IntAE *breakpoint_buf, LLongAE *chunkidx_buf)
 {
 	int n, i, ret;
 	size_t nchunk;
-	long long int e, s, chunk_idx, prev_chunk_idx;
+	long long int e, s, chunkidx, prev_chunkidx;
 
 	if (start == R_NilValue) {
 		if (d > INT_MAX) {
@@ -346,18 +346,18 @@ static int map_start_to_chunks(SEXP start, int along,
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
 	if (IntAE_get_nelt(breakpoint_buf) != 0 ||
-	    IntAE_get_nelt(chunkidx_buf) != 0) {
+	    LLongAE_get_nelt(chunkidx_buf) != 0) {
 		/* Should never happen! */
 		PRINT_TO_ERRMSG_BUF("internal error: map_start_to_chunks() "
-				    "was called with non-empty breakpoint_buf "
-				    "or chunkidx_buf");
+				    "was called with non-empty breakpoint "
+				    "or chunkidx buffers");
 		return -1;
 	}
 	n = LENGTH(start);
 	nstart[along] = n;
 	nchunk = 0;
 	e = 0;
-	prev_chunk_idx = -1;
+	prev_chunkidx = -1;
 	for (i = 0; i < n; i++) {
 		ret = get_untrusted_start(start, i, &s, along, e, 1);
 		if (ret < 0)
@@ -367,24 +367,15 @@ static int map_start_to_chunks(SEXP start, int along,
 			set_errmsg_for_selection_beyond_dim(along + 1, i, 1);
 			return -1;
 		}
-		chunk_idx = (s - 1) / chunkd;
-		if (chunk_idx > INT_MAX) {
-			/* If we wanted to support this then we'd need to use
-			   something like a LLongAE for 'chunkidx_buf'. */
-			PRINT_TO_ERRMSG_BUF("selecting array elements from a "
-					    "chunk whose index is > INT_MAX "
-					    "is not\n  supported "
-					    "at the moment");
-			return -1;
-		}
-		if (chunk_idx > prev_chunk_idx) {
+		chunkidx = (s - 1) / chunkd;
+		if (chunkidx > prev_chunkidx) {
 			IntAE_insert_at(breakpoint_buf, nchunk, i + 1);
-			IntAE_insert_at(chunkidx_buf, nchunk, chunk_idx);
+			LLongAE_insert_at(chunkidx_buf, nchunk, chunkidx);
 			nchunk++;
 		} else {
 			breakpoint_buf->elts[nchunk - 1]++;
 		}
-		prev_chunk_idx = chunk_idx;
+		prev_chunkidx = chunkidx;
 	}
 	return 0;
 }
@@ -394,18 +385,12 @@ static int map_start_to_chunks(SEXP start, int along,
 
    'dim', 'chunk_spacings', 'nstart', 'breakpoint_bufs', and 'chunkidx_bufs'
    are assumed to have the same length as 'starts'.
-
-   We're storing the chunk indices in a IntAEAE struct which means that we
-   cannot support arrays with more than INT_MAX chunks along any dimension.
-   If we wanted to support such arrays then we'd need to use something like
-   a LLongAEAE instead. (IntAE, IntAEAE, and LLongAE structs are implemented
-   in S4Vectors/src/AEbufs.c but LLongAEAE is not implemented yet.)
 */
 int _map_starts_to_chunks(SEXP starts,
 		const long long int *dim,
 		const long long int *chunk_spacings,
 		int *nstart,
-		IntAEAE *breakpoint_bufs, IntAEAE *chunkidx_bufs)
+		IntAEAE *breakpoint_bufs, LLongAEAE *chunkidx_bufs)
 {
 	int ndim, along, ret;
 	SEXP start;
@@ -424,7 +409,7 @@ int _map_starts_to_chunks(SEXP starts,
 	return 0;
 }
 
-static SEXP as_LIST(const IntAEAE *buf, SEXP starts)
+static SEXP to_integer_LIST(const IntAEAE *aeae, SEXP starts)
 {
 	int ndim, along;
 	SEXP ans, ans_elt, start;
@@ -435,7 +420,32 @@ static SEXP as_LIST(const IntAEAE *buf, SEXP starts)
 		start = VECTOR_ELT(starts, along);
 		if (start == R_NilValue)
 			continue;
-		ans_elt = PROTECT(new_INTEGER_from_IntAE(buf->elts[along]));
+		ans_elt = PROTECT(new_INTEGER_from_IntAE(aeae->elts[along]));
+		SET_VECTOR_ELT(ans, along, ans_elt);
+		UNPROTECT(1);
+	}
+	UNPROTECT(1);
+	return ans;
+}
+
+static SEXP to_numeric_LIST(const LLongAEAE *aeae, SEXP starts)
+{
+	int ndim, along;
+	SEXP ans, ans_elt, start;
+	const LLongAE *ae;
+	R_xlen_t ans_elt_len, i;
+
+	ndim = LENGTH(starts);
+	ans = PROTECT(NEW_LIST(ndim));
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		ae = aeae->elts[along];
+		ans_elt_len = LLongAE_get_nelt(ae);
+		ans_elt = PROTECT(NEW_NUMERIC(ans_elt_len));
+		for (i = 0; i < ans_elt_len; i++)
+			REAL(ans_elt)[i] = (double) ae->elts[i];
 		SET_VECTOR_ELT(ans, along, ans_elt);
 		UNPROTECT(1);
 	}
@@ -456,7 +466,8 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
 	LLongAE *dim_buf, *chunk_spacings_buf;
 	long long int d, chunkd;
 	IntAE *nstart_buf;
-	IntAEAE *breakpoint_bufs, *chunkidx_bufs;
+	IntAEAE *breakpoint_bufs;
+	LLongAEAE *chunkidx_bufs;
 	SEXP ans, ans_elt;
 
 	ndim = _shallow_check_selection(starts, R_NilValue);
@@ -497,7 +508,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
 
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
-	chunkidx_bufs = new_IntAEAE(ndim, ndim);
+	chunkidx_bufs = new_LLongAEAE(ndim, ndim);
 	ret = _map_starts_to_chunks(starts,
 			dim_buf->elts, chunk_spacings_buf->elts,
 			nstart_buf->elts,
@@ -506,10 +517,10 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
 		error(_HDF5Array_errmsg_buf);
 
 	ans = PROTECT(NEW_LIST(2));
-	ans_elt = PROTECT(as_LIST(breakpoint_bufs, starts));
+	ans_elt = PROTECT(to_integer_LIST(breakpoint_bufs, starts));
 	SET_VECTOR_ELT(ans, 0, ans_elt);
 	UNPROTECT(1);
-	ans_elt = PROTECT(as_LIST(chunkidx_bufs, starts));
+	ans_elt = PROTECT(to_numeric_LIST(chunkidx_bufs, starts));
 	SET_VECTOR_ELT(ans, 1, ans_elt);
 	UNPROTECT(2);
 	return ans;

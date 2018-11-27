@@ -44,32 +44,34 @@ test_map_starts_to_chunks <- function()
     ## 1 dimension
 
     current <- map_starts_to_chunks(list(13:22), 85, 1)
-    target <- list(list(1:10), list(12:21))
+    target <- list(list(1:10), list(as.double(12:21)))
     checkIdentical(target, current)
 
     current <- map_starts_to_chunks(list(13:22), 85, 10)
-    target <- list(list(c(8L, 10L)), list(c(1L, 2L)))
+    target <- list(list(c(8L, 10L)), list(c(1, 2)))
     checkIdentical(target, current)
 
     current <- map_starts_to_chunks(list(c(1:15, 49:51)), 85, 10)
-    target <- list(list(c(10L, 15L, 17L, 18L)), list(c(0L, 1L, 4L, 5L)))
+    target <- list(list(c(10L, 15L, 17L, 18L)), list(c(0, 1, 4, 5)))
     checkIdentical(target, current)
 
     current <- map_starts_to_chunks(list(2*(10:35)), 85, 10)
-    target <- list(list(1L + 5L*(0:5)), list(1:6))
+    target <- list(list(1L + 5L*(0:5)), list(as.double(1:6)))
     checkIdentical(target, current)
 
     current <- map_starts_to_chunks(list(c(6e9, 6e9 + 1)), 9e9, 3)
-    target <- list(list(1:2), list(1999999999:2000000000))
+    target <- list(list(1:2), list(c(1999999999, 2000000000)))
     checkIdentical(target, current)
 
-    checkException(map_starts_to_chunks(list(8e9), 9e9, 3))
+    current <- map_starts_to_chunks(list(8e9), 9e9, 3)
+    target <- list(list(1L), list(2666666666))
+    checkIdentical(target, current)
 
     ## more dimensions
 
     current <- map_starts_to_chunks(list(NULL, 13:22, NULL),
                                     c(0, 85, 999), c(0, 10, 1))
-    target <- list(list(NULL, c(8L, 10L), NULL), list(NULL, c(1L, 2L), NULL))
+    target <- list(list(NULL, c(8L, 10L), NULL), list(NULL, c(1, 2), NULL))
     checkIdentical(target, current)
 
     ## edge cases
@@ -89,7 +91,7 @@ test_map_starts_to_chunks <- function()
     checkIdentical(target, current)
 
     current <- map_starts_to_chunks(list(integer(0)), 0, 1)
-    target <- list(list(integer(0)), list(integer(0)))
+    target <- list(list(integer(0)), list(numeric(0)))
     checkIdentical(target, current)
 }
 
