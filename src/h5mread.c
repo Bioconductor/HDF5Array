@@ -1040,14 +1040,9 @@ static void gather_chunk_data(int ndim,
 			int *inner_midx_buf,
 			hid_t mem_type_id)
 {
-	int along, inner_moved_along;
+	int inner_moved_along;
 	size_t in_offset, out_offset;
 	long long int num_elts;
-
-	//printf("# outer_midx:");
-	//for (along = 0; along < ndim; along++)
-	//	printf(" %d", outer_midx[along]);
-	//printf("\n");
 
 	init_in_offset_and_out_offset(ndim, starts,
 			outdim, out_blockoff,
@@ -1058,10 +1053,6 @@ static void gather_chunk_data(int ndim,
 	num_elts = 0;
 	while (1) {
 		num_elts++;
-		//printf("## inner_midx_buf:");
-		//for (along = 0; along < ndim; along++)
-		//	printf(" %d", inner_midx_buf[along]);
-		//printf("\n");
 		if (mem_type_id == H5T_NATIVE_INT) {
 			((int *) out)[out_offset] =
 				((int *) in)[in_offset];
@@ -1227,6 +1218,22 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
  * read_data_6()
  */
 
+/*
+static hsize_t *alloc_coord_buf(int ndim, const hsize_t *h5chunk_spacings)
+{
+	size_t max_inner_block_per_chunk;
+	int along;
+
+	max_inner_block_per_chunk = 1;
+	for (along = 0; along < ndim; along++)
+		max_inner_block_per_chunk *= (h5chunk_spacings[along] + 1) / 2;
+	//printf("max_inner_block_per_chunk = %lu\n",
+	//	 max_inner_block_per_chunk);
+	return alloc_hsize_t_buf(max_inner_block_per_chunk * ndim,
+				 "'coord_buf'");
+}
+*/
+
 static void update_out_h5blockoff_and_out_h5blockdim_bufs(int ndim,
 			const int *midx, int moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
@@ -1252,14 +1259,6 @@ static void update_out_h5blockoff_and_out_h5blockdim_bufs(int ndim,
 		out_h5blockoff_buf[h5along] = off;
 		out_h5blockdim_buf[h5along] = d;
 	}
-	//printf("# out_h5blockoff_buf:");
-	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//	printf(" %llu", out_h5blockoff_buf[h5along]);
-	//printf("\n");
-	//printf("# out_h5blockdim_buf:");
-	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//	printf(" %llu", out_h5blockdim_buf[h5along]);
-	//printf("\n");
 	return;
 }
 
@@ -1350,22 +1349,11 @@ static void update_in_h5blockoff_and_in_h5blockdim_bufs(
 	return;
 }
 
-static int select_full_chunk(const DSetDesc *dset_desc,
-			const hsize_t *h5chunkoff, const hsize_t *h5chunkdim)
-{
-	int ret;
-
-	ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_SET,
-				  h5chunkoff, NULL, h5chunkdim, NULL);
-	if (ret < 0)
-		PRINT_TO_ERRMSG_BUF("H5Sselect_hyperslab() returned an error");
-	return ret;
-}
-
 /* Return nb of selected elements (or -1 on error). */
 static long long int select_elements_from_chunk(const DSetDesc *dset_desc,
+			SEXP starts,
 			const hsize_t *out_h5blockoff, const int *out_blockdim,
-			SEXP starts, int *inner_midx_buf, hsize_t *coord_buf)
+			int *inner_midx_buf, hsize_t *coord_buf)
 {
 	int ret, ndim, inner_moved_along, along, h5along, i;
 	size_t num_elements;
@@ -1411,7 +1399,8 @@ static long long int select_elements_from_chunk(const DSetDesc *dset_desc,
 	return (long long int) num_elements;
 }
 
-static long long int select_elements_from_chunk2(const DSetDesc *dset_desc,
+/* Return nb of hyperslabs (or -1 on error). */
+static long long int select_hyperslabs_from_chunk(const DSetDesc *dset_desc,
 			SEXP starts, const int *out_blockoff,
 			const hsize_t *h5chunkoff,
 			const hsize_t *h5chunkdim,
@@ -1446,15 +1435,6 @@ static long long int select_elements_from_chunk2(const DSetDesc *dset_desc,
 				inner_midx_buf, inner_moved_along,
 				inner_breakpoint_bufs,
 				in_h5blockoff_buf, in_h5blockdim_buf);
-		//printf("## in_h5blockoff: ");
-		//for (int h5along = ndim - 1; h5along >= 0; h5along--)
-		//	printf(" %llu", in_h5blockoff_buf[h5along]);
-		//printf("\n");
-		//printf("## in_h5blockdim: ");
-		//for (int h5along = ndim - 1; h5along >= 0; h5along--)
-		//	printf(" %llu", in_h5blockdim_buf[h5along]);
-		//printf("\n");
-		/* Add to current selection. */
 		ret = H5Sselect_hyperslab(dset_desc->space_id, H5S_SELECT_OR,
 				in_h5blockoff_buf, NULL,
 				in_h5blockdim_buf, NULL);
@@ -1499,12 +1479,12 @@ static int read_data_6(const DSetDesc *dset_desc,
 		       const LLongAEAE *chunkidx_bufs,
 		       void *out, const int *outdim, hid_t mem_type_id)
 {
-	int ndim, along, moved_along, ret;
+	int ndim, moved_along, ret;
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf,
 		*out_h5blockoff_buf, *out_h5blockdim_buf,
-		*in_h5blockoff_buf, *in_h5blockdim_buf; // *coord_buf;
-	//size_t h5buf_size, chunk_maxlen;
+		*in_h5blockoff_buf, *in_h5blockdim_buf;
+		//*coord_buf;
 	IntAE *nchunk_buf, *outer_midx_buf,
 	      *out_blockoff_buf, *out_blockdim_buf,
 	      *inner_nblock_buf, *inner_midx_buf;
@@ -1532,13 +1512,9 @@ static int read_data_6(const DSetDesc *dset_desc,
 	out_h5blockdim_buf = out_h5blockoff_buf + ndim;
 	in_h5blockoff_buf = out_h5blockdim_buf + ndim;
 	in_h5blockdim_buf = in_h5blockoff_buf + ndim;
-	//h5buf_size = ndim * sizeof(hsize_t);
 
 	/* Allocate 'coord_buf'. */
-	//chunk_maxlen = 1;
-	//for (along = 0; along < ndim; along++)
-	//	chunk_maxlen *= dset_desc->h5chunk_spacings[along];
-	//coord_buf = alloc_hsize_t_buf(chunk_maxlen * ndim, "'coord_buf'");
+	//coord_buf = alloc_coord_buf(ndim, dset_desc->h5chunk_spacings);
 	//if (coord_buf == NULL) {
 	//	free(h5chunkoff_buf);
 	//	H5Sclose(mem_space_id);
@@ -1591,24 +1567,28 @@ static int read_data_6(const DSetDesc *dset_desc,
 			inner_breakpoint_bufs, inner_nblock_buf->elts);
 
 		t0 = clock();
-		/* Having 'out_h5blockdim_buf' identical to 'h5chunkdim_buf'
-		   means that the entire chunk is being selected so we can
-		   avoid the costly select_elements_from_chunk(). */
-		//ret = memcmp(h5chunkdim_buf, out_h5blockdim_buf, h5buf_size);
+		/* Having 'inner_nblock_buf->elts' identical to
+		   'out_blockdim_buf->elts' means that all the inner blocks
+		   are single elements so we use select_elements_from_chunk()
+		   which is faster than select_hyperslabs_from_chunk() in that
+		   case. NO IT'S NOT FASTER! */
+		//ret = memcmp(inner_nblock_buf->elts, out_blockdim_buf->elts,
+		//	     ndim * sizeof(int));
+		//printf("# chunk %lld: %s\n", num_chunks,
+		//       ret == 0 ? "select_elements" : "select_hyperslabs");
 		//if (ret == 0) {
-		//	ret = select_full_chunk(dset_desc,
-		//		h5chunkoff_buf, h5chunkdim_buf);
-		//} else {
 		//	ret = select_elements_from_chunk(dset_desc,
-		//	out_h5blockoff_buf, out_blockdim_buf->elts,
-		//	starts, inner_midx_buf->elts, coord_buf);
-		//}
-		ret = select_elements_from_chunk2(dset_desc,
+		//		starts,
+		//		out_h5blockoff_buf, out_blockdim_buf->elts,
+		//		inner_midx_buf->elts, coord_buf);
+		//} else {
+			ret = select_hyperslabs_from_chunk(dset_desc,
 				starts, out_blockoff_buf->elts,
 				h5chunkoff_buf, h5chunkdim_buf,
 				inner_breakpoint_bufs, inner_nblock_buf->elts,
 				inner_midx_buf->elts,
 				in_h5blockoff_buf, in_h5blockdim_buf);
+		//}
 		if (ret < 0)
 			break;
 		t_select_elements += clock() - t0;
