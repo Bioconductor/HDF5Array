@@ -11,13 +11,13 @@
 #include <string.h>  /* for memcmp */
 #include <limits.h>  /* for INT_MAX */
 
-//#include <time.h>
+#include <time.h>
 
 
 typedef struct {
 	hid_t dset_id, space_id, plist_id;
 	int ndim;
-	hsize_t *h5dim, *h5chunkdim;
+	hsize_t *h5dim, *h5chunk_spacings;
 	int *h5nchunk;
 } DSetDesc;
 
@@ -95,7 +95,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 {
 	hid_t space_id, plist_id;
 	int dset_ndim, *h5nchunk, h5along;
-	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
+	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
 
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
@@ -128,14 +128,14 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 		return -1;
 	}
 
-	/* Allocate 'h5dim', 'h5chunkdim', and 'h5nchunk'. */
-	h5dim = alloc_hsize_t_buf(2 * ndim, "'h5dim' and 'h5chunkdim'");
+	/* Allocate 'h5dim', 'h5chunk_spacings', and 'h5nchunk'. */
+	h5dim = alloc_hsize_t_buf(2 * ndim, "'h5dim' and 'h5chunk_spacings'");
 	if (h5dim == NULL) {
 		H5Pclose(plist_id);
 		H5Sclose(space_id);
 		return -1;
 	}
-	h5chunkdim = h5dim + ndim;
+	h5chunk_spacings = h5dim + ndim;
 	h5nchunk = (int *) malloc(ndim * sizeof(int));
 	if (h5nchunk == NULL) {
 		free(h5dim);
@@ -157,8 +157,8 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 		return -1;
 	}
 
-	/* Set 'h5chunkdim'. */
-	if (H5Pget_chunk(plist_id, ndim, h5chunkdim) != ndim) {
+	/* Set 'h5chunk_spacings'. */
+	if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
 		free(h5nchunk);
 		free(h5dim);
 		H5Pclose(plist_id);
@@ -175,9 +175,9 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 			h5nchunk[h5along] = 0;
 			continue;
 		}
-		chunkd = h5chunkdim[h5along];
-		nchunk = d / chunkd;
-		if (d % chunkd != 0)
+		spacing = h5chunk_spacings[h5along];
+		nchunk = d / spacing;
+		if (d % spacing != 0)
 			nchunk++;
 		if (nchunk > INT_MAX) {
 			free(h5nchunk);
@@ -197,7 +197,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 	dset_desc->plist_id = plist_id;
 	dset_desc->ndim = ndim;
 	dset_desc->h5dim = h5dim;
-	dset_desc->h5chunkdim = h5chunkdim;
+	dset_desc->h5chunk_spacings = h5chunk_spacings;
 	dset_desc->h5nchunk = h5nchunk;
 	return 0;
 }
@@ -244,7 +244,7 @@ static int map_starts_to_chunks(const DSetDesc *dset_desc,
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
 		chunkdim_buf->elts[along] =
-			(long long int) dset_desc->h5chunkdim[h5along];
+			(long long int) dset_desc->h5chunk_spacings[h5along];
 	}
 	return _map_starts_to_chunks(starts, dim_buf->elts, chunkdim_buf->elts,
 				     ans_dim,
@@ -737,7 +737,7 @@ static void update_h5chunkoff_and_h5chunkdim_bufs(const DSetDesc *dset_desc,
 			hsize_t *h5chunkoff_buf, hsize_t *h5chunkdim_buf)
 {
 	int ndim, along, h5along, i, chunk_idx;
-	hsize_t chunkd;
+	hsize_t spacing;
 
 	ndim = dset_desc->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
@@ -749,12 +749,12 @@ static void update_h5chunkoff_and_h5chunkdim_bufs(const DSetDesc *dset_desc,
 		} else {
 			chunk_idx = i;
 		}
-		chunkd = dset_desc->h5chunkdim[h5along];
-		h5chunkoff_buf[h5along] = chunk_idx * chunkd;
+		spacing = dset_desc->h5chunk_spacings[h5along];
+		h5chunkoff_buf[h5along] = chunk_idx * spacing;
 		h5chunkdim_buf[h5along] = dset_desc->h5dim[h5along] -
 					  h5chunkoff_buf[h5along];
-		if (h5chunkdim_buf[h5along] > chunkd)
-			h5chunkdim_buf[h5along] = chunkd;
+		if (h5chunkdim_buf[h5along] > spacing)
+			h5chunkdim_buf[h5along] = spacing;
 	}
 	//printf("# h5chunkoff_buf:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
@@ -804,7 +804,7 @@ static void update_out_blockoff_and_out_blockdim_bufs(int ndim,
 /* It takes about 218s on my laptop to load all the chunks from the EH1040
  * dataset (big 10x Genomics brain dataset in dense format, chunks of 100x100,
  * wrapped in the TENxBrainData package). That's 60 microseconds per chunk! */
-static int read_chunk(const DSetDesc *dset_desc,
+static int load_chunk(const DSetDesc *dset_desc,
 		      const hsize_t *h5chunkoff_buf,
 		      const hsize_t *h5chunkdim_buf,
 		      const hsize_t *h5zeros_buf,
@@ -900,7 +900,7 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
  */
 #define COMPRESSION_OVERHEAD 8	// empirical (increase if necessary)
 
-static int direct_read_chunk(const DSetDesc *dset_desc,
+static int direct_load_chunk(const DSetDesc *dset_desc,
 			     const hsize_t *h5chunkoff_buf,
 			     const hsize_t *h5chunkdim_buf,
 			     void *chunk_data_out, size_t chunk_maxsize,
@@ -940,7 +940,8 @@ static int direct_read_chunk(const DSetDesc *dset_desc,
 
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 			const int *outdim, const int *out_blockoff,
-			const hsize_t *h5chunkoff, const hsize_t *h5chunkdim,
+			const hsize_t *h5chunkoff,
+			const hsize_t *h5chunk_spacings,
 			size_t *in_offset, size_t *out_offset)
 {
 	size_t in_off, out_off;
@@ -949,7 +950,7 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 
 	in_off = out_off = 0;
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
-		in_off *= h5chunkdim[h5along];
+		in_off *= h5chunk_spacings[h5along];
 		out_off *= outdim[along];
 		i = out_blockoff[along];
 		start = VECTOR_ELT(starts, along);
@@ -969,7 +970,8 @@ static inline void update_in_offset_and_out_offset(int ndim,
 			const int *inner_midx, int inner_moved_along,
 			SEXP starts,
 			const int *outdim, const int *out_blockoff,
-			const int *out_blockdim, const hsize_t *h5chunkdim,
+			const int *out_blockdim,
+			const hsize_t *h5chunk_spacings,
 			size_t *in_offset, size_t *out_offset)
 {
 	SEXP start;
@@ -991,7 +993,7 @@ static inline void update_in_offset_and_out_offset(int ndim,
 		along = inner_moved_along - 1;
 		h5along = ndim - inner_moved_along;
 		do {
-			in_off_inc *= h5chunkdim[h5along];
+			in_off_inc *= h5chunk_spacings[h5along];
 			out_off_inc *= outdim[along];
 			di = 1 - out_blockdim[along];
 			start = VECTOR_ELT(starts, along);
@@ -1020,7 +1022,7 @@ static void gather_chunk_data(int ndim,
 			      SEXP starts, const IntAEAE *breakpoint_bufs,
 			      const void *in,
 			      const hsize_t *h5chunkoff,
-			      const hsize_t *h5chunkdim,
+			      const hsize_t *h5chunk_spacings,
 			      void *out, const int *outdim,
 			      const int *out_blockoff,
 			      const int *out_blockdim,
@@ -1038,7 +1040,7 @@ static void gather_chunk_data(int ndim,
 
 	init_in_offset_and_out_offset(ndim, starts,
 			outdim, out_blockoff,
-			h5chunkoff, h5chunkdim,
+			h5chunkoff, h5chunk_spacings,
 			&in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
@@ -1064,7 +1066,7 @@ static void gather_chunk_data(int ndim,
 				inner_midx_buf, inner_moved_along,
 				starts,
 				outdim, out_blockoff,
-				out_blockdim, h5chunkdim,
+				out_blockdim, h5chunk_spacings,
 				&in_offset, &out_offset);
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
@@ -1089,7 +1091,8 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	long long int num_chunks, ndot;
 
 	ndim = dset_desc->ndim;
-	mem_space_id = H5Screate_simple(ndim, dset_desc->h5chunkdim, NULL);
+	mem_space_id = H5Screate_simple(ndim, dset_desc->h5chunk_spacings,
+					NULL);
 	if (mem_space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
 		return -1;
@@ -1102,7 +1105,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	}
 	chunk_maxsize = chunk_eltsize;
 	for (along = 0; along < ndim; along++)
-		chunk_maxsize *= dset_desc->h5chunkdim[along];
+		chunk_maxsize *= dset_desc->h5chunk_spacings[along];
 	if (method != 5) {
 		chunk_data_buf = malloc(chunk_maxsize);
 	} else {
@@ -1136,6 +1139,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	/* Walk on the chunks. */
 	num_chunks = ndot = 0;
 	moved_along = ndim;
+	clock_t t_load_chunk = 0, t_gather_chunk_data = 0, t0;
 	do {
 		num_chunks++;
 		//if (num_chunks % 20000 == 0) {
@@ -1150,21 +1154,24 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			starts, chunkidx_bufs,
 			h5chunkoff_buf, h5chunkdim_buf);
 
+		t0 = clock();
 		if (method != 5) {
-			ret = read_chunk(dset_desc,
+			ret = load_chunk(dset_desc,
 					 h5chunkoff_buf, h5chunkdim_buf,
 					 h5zeros_buf,
 					 chunk_data_buf,
 					 mem_type_id, mem_space_id);
 		} else {
-			ret = direct_read_chunk(dset_desc,
+			ret = direct_load_chunk(dset_desc,
 					h5chunkoff_buf, h5chunkdim_buf,
 					chunk_data_buf, chunk_maxsize,
 					compressed_chunk_data_buf);
 		}
 		if (ret < 0)
 			break;
+		t_load_chunk += clock() - t0;
 
+		t0 = clock();
 		update_out_blockoff_and_out_blockdim_bufs(ndim,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
@@ -1175,18 +1182,23 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			chunk_data_buf,
-			//h5chunkoff_buf, h5chunkdim_buf,
-			h5chunkoff_buf, dset_desc->h5chunkdim,
+			h5chunkoff_buf, dset_desc->h5chunk_spacings,
 			out, ans_dim,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
 			inner_midx_buf->elts,
 			mem_type_id);
+		t_gather_chunk_data += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
 	} while (moved_along < ndim);
 	//printf("\n");
 	//printf("total chunks processed = %lld\n", num_chunks);
+	double dt1 = 1.0 * t_load_chunk / CLOCKS_PER_SEC;
+	printf("total time spent loading chunks: %3.6f\n", dt1);
+	double dt2 = 1.0 * t_gather_chunk_data / CLOCKS_PER_SEC;
+	printf("total time spent gathering the chunk data: %3.6f\n", dt2);
+	printf("total time: %3.6f\n", dt1 + dt2);
 
 	free(h5chunkoff_buf);
 	free(chunk_data_buf);

@@ -35,7 +35,7 @@ int _deep_check_selection(
 int _map_starts_to_chunks(
 	SEXP starts,
 	const long long int *dim,
-	const long long int *chunkdim,
+	const long long int *chunk_spacings,
 	int *nstart,
 	IntAEAE *breakpoint_bufs,
 	IntAEAE *chunkidx_bufs
@@ -44,7 +44,7 @@ int _map_starts_to_chunks(
 SEXP C_map_starts_to_chunks(
 	SEXP starts,
 	SEXP dim,
-	SEXP chunkdim
+	SEXP chunk_spacings
 );
 
 int _selection_can_be_reduced(

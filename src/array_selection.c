@@ -392,7 +392,7 @@ static int map_start_to_chunks(SEXP start, int along,
 /* Assume that 'starts' is a list. This should have been checked by
    _shallow_check_selection() already so is not checked again.
 
-   'dim', 'chunkdim', 'nstart', 'breakpoint_bufs', and 'chunkidx_bufs'
+   'dim', 'chunk_spacings', 'nstart', 'breakpoint_bufs', and 'chunkidx_bufs'
    are assumed to have the same length as 'starts'.
 
    We're storing the chunk indices in a IntAEAE struct which means that we
@@ -403,7 +403,7 @@ static int map_start_to_chunks(SEXP start, int along,
 */
 int _map_starts_to_chunks(SEXP starts,
 		const long long int *dim,
-		const long long int *chunkdim,
+		const long long int *chunk_spacings,
 		int *nstart,
 		IntAEAE *breakpoint_bufs, IntAEAE *chunkidx_bufs)
 {
@@ -414,7 +414,7 @@ int _map_starts_to_chunks(SEXP starts,
 	for (along = 0; along < ndim; along++) {
 		start = VECTOR_ELT(starts, along);
 		ret = map_start_to_chunks(start, along,
-					  dim[along], chunkdim[along],
+					  dim[along], chunk_spacings[along],
 					  nstart,
 					  breakpoint_bufs->elts[along],
 					  chunkidx_bufs->elts[along]);
@@ -450,10 +450,10 @@ static SEXP as_LIST(const IntAEAE *buf, SEXP starts)
  * The 2 lists have the same length as 'starts'. Also they have the same
  * shape (i.e. same lengths()).
  */
-SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
+SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
 {
 	int ndim, along, ret;
-	LLongAE *dim_buf, *chunkdim_buf;
+	LLongAE *dim_buf, *chunk_spacings_buf;
 	long long int d, chunkd;
 	IntAE *nstart_buf;
 	IntAEAE *breakpoint_bufs, *chunkidx_bufs;
@@ -467,36 +467,39 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 		error("'dim' must be an integer vector (or NULL)");
 	if (LENGTH(dim) != ndim)
 		error("'starts' and 'dim' must have the same length");
-	if (!(IS_INTEGER(chunkdim) || IS_NUMERIC(chunkdim)))
-		error("'chunkdim' must be an integer vector (or NULL)");
-	if (LENGTH(chunkdim) != ndim)
-		error("'starts' and 'chunkdim' must have the same length");
+	if (!(IS_INTEGER(chunk_spacings) || IS_NUMERIC(chunk_spacings)))
+		error("'chunk_spacings' must be an integer vector (or NULL)");
+	if (LENGTH(chunk_spacings) != ndim)
+		error("'starts' and 'chunk_spacings' must "
+		      "have the same length");
 
 	dim_buf = new_LLongAE(ndim, ndim, 0);
-	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
+	chunk_spacings_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0; along < ndim; along++) {
 		ret = get_untrusted_elt(dim, along, &d,
 					"dim", -1);
 		if (ret < 0)
 			error(_HDF5Array_errmsg_buf);
-		ret = get_untrusted_elt(chunkdim, along, &chunkd,
-					"chunkdim", -1);
+		ret = get_untrusted_elt(chunk_spacings, along, &chunkd,
+					"chunk_spacings", -1);
 		if (ret < 0)
 			error(_HDF5Array_errmsg_buf);
 		if (chunkd < 0)
-			error("'chunkdim' cannot contain negative values");
+			error("'chunk_spacings' cannot "
+			      "contain negative values");
 		if (chunkd == 0 && d != 0)
-			error("values in 'chunkdim' cannot be 0 unless their "
-			      "corresponding value\n  in 'dim' is also 0");
+			error("values in 'chunk_spacings' cannot be 0 unless "
+			      "their corresponding value\n  in 'dim' is "
+			      "also 0");
 		dim_buf->elts[along] = d;
-		chunkdim_buf->elts[along] = chunkd;
+		chunk_spacings_buf->elts[along] = chunkd;
 	}
 
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
 	chunkidx_bufs = new_IntAEAE(ndim, ndim);
 	ret = _map_starts_to_chunks(starts,
-			dim_buf->elts, chunkdim_buf->elts,
+			dim_buf->elts, chunk_spacings_buf->elts,
 			nstart_buf->elts,
 			breakpoint_bufs, chunkidx_bufs);
 	if (ret < 0)

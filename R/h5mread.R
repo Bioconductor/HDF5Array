@@ -20,9 +20,10 @@ reduce_selection <- function(starts, counts=NULL, dim=NULL)
 }
 
 ### NOT exported!
-map_starts_to_chunks <- function(starts, dim, chunkdim)
+map_starts_to_chunks <- function(starts, dim, chunk_spacings)
 {
-    .Call("C_map_starts_to_chunks", starts, dim, chunkdim, PACKAGE="HDF5Array")
+    .Call("C_map_starts_to_chunks", starts, dim, chunk_spacings,
+	  PACKAGE="HDF5Array")
 }
 
 ### The selection must be strictly ascending along each dimension.
