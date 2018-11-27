@@ -31,10 +31,10 @@ map_starts_to_chunks <- function(starts, dim, chunk_spacings)
 ### Set 'noreduce' to TRUE to skip the reduction step.
 ### Set 'as.integer' to TRUE to force returning the result as an integer array.
 h5mread <- function(filepath, name, starts, counts=NULL, noreduce=FALSE,
-                    method=1L, as.integer=FALSE)
+                    as.integer=FALSE, method=0L)
 {
     .Call("C_h5mread", filepath, name, starts, counts, noreduce,
-                       method, as.integer,
+                       as.integer, method,
                        PACKAGE="HDF5Array")
 }
 

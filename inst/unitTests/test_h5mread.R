@@ -97,10 +97,10 @@ test_map_starts_to_chunks <- function()
 
 test_h5mread <- function()
 {
-    do_tests <- function(m, filepath, name, as.integer=FALSE) {
+    do_tests <- function(m, filepath, name, as.integer=FALSE, method=0L) {
         read <- function(starts, counts=NULL)
             h5mread(filepath, name, starts=starts, counts=counts,
-                    as.integer=as.integer)
+                    as.integer=as.integer, method=method)
 
         current <- read(list(NULL, NULL))
         checkIdentical(m, current)
@@ -116,6 +116,9 @@ test_h5mread <- function()
 
         current <- read(list(integer(0), integer(0)))
         checkIdentical(m[integer(0), integer(0), drop=FALSE], current)
+
+        if (method > 1L)
+            return()
 
         starts <- list(integer(0), 4L)
         counts <- list(integer(0), 2L)
@@ -138,14 +141,20 @@ test_h5mread <- function()
     m0 <- matrix(1:60, ncol=6)
     M0 <- as(m0, "HDF5Array")
     do_tests(m0, M0@seed@filepath, M0@seed@name)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, method=1L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, method=6L)
 
     ## with an array of doubles
 
     m1 <- matrix(10 * runif(60), ncol=6)
     M1 <- as(m1, "HDF5Array")
     do_tests(m1, M1@seed@filepath, M1@seed@name)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, method=1L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, method=6L)
 
     storage.mode(m1) <- "integer"
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=1L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=6L)
 }
 

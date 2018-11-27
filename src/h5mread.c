@@ -11,7 +11,7 @@
 #include <string.h>  /* for memcmp */
 #include <limits.h>  /* for INT_MAX */
 
-#include <time.h>
+//#include <time.h>
 
 
 typedef struct {
@@ -367,10 +367,10 @@ static void update_h5blockoff_and_h5blockdim_bufs(int ndim,
 static long long int select_hyperslabs(const DSetDesc *dset_desc,
 			SEXP starts, SEXP counts,
 			const int *nstart,
-			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf,
 			int *midx_buf)
 {
 	int ret, ndim, moved_along;
+	hsize_t *h5blockoff_buf, *h5blockdim_buf;
 	long long int num_hyperslabs;
 
 	ret = H5Sselect_none(dset_desc->space_id);
@@ -380,6 +380,16 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 	}
 
 	ndim = dset_desc->ndim;
+
+	/* Allocate 'h5blockoff_buf' and 'h5blockdim_buf'. */
+	h5blockoff_buf = alloc_hsize_t_buf(2 * ndim, "'h5blockoff_buf' and "
+						     "'h5blockdim_buf'");
+	if (h5blockoff_buf == NULL)
+		return -1;
+	h5blockdim_buf = h5blockoff_buf + ndim;
+
+	init_h5blockoff_and_h5blockdim_bufs(dset_desc, starts,
+			h5blockoff_buf, h5blockdim_buf);
 
 	/* Walk on the blocks. */
 	num_hyperslabs = 0;
@@ -396,32 +406,15 @@ static long long int select_hyperslabs(const DSetDesc *dset_desc,
 		if (ret < 0) {
 			PRINT_TO_ERRMSG_BUF(
 				"H5Sselect_hyperslab() returned an error");
-			return -1;
+			break;
 		}
 		moved_along = next_midx(ndim, nstart, midx_buf);
 	} while (moved_along < ndim);
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(nstart)
 
-	return num_hyperslabs;
+	free(h5blockoff_buf);
+	return ret < 0 ? -1 : num_hyperslabs;
 }
-
-/* This is NOT collecting the elements in the right order!
-static hsize_t *add_block_elements(int ndim,
-		const hsize_t *h5blockoff, const hsize_t *h5blockdim,
-		int *inner_midx_buf, hsize_t *coord_p)
-{
-	int h5along, inner_moved_along;
-
-	do {
-		for (h5along = 0; h5along < ndim; h5along++)
-			*(coord_p++) = h5blockoff[h5along] +
-				       inner_midx_buf[h5along];
-		inner_moved_along = next_midx2(ndim, h5blockdim,
-					       inner_midx_buf);
-	} while (inner_moved_along < ndim);
-	return coord_p;
-}
-*/
 
 static inline hsize_t *add_element(int ndim, const int *outer_midx,
 				   SEXP starts, hsize_t *coord_p)
@@ -445,15 +438,12 @@ static inline hsize_t *add_element(int ndim, const int *outer_midx,
 
 /* Return nb of selected elements (or -1 on error). */
 static long long int select_elements(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts,
-			const int *nstart, const int *ans_dim,
-			hsize_t *h5blockoff_buf, hsize_t *h5blockdim_buf,
-			int *outer_midx_buf)
+			SEXP starts, const int *nstart, const int *ans_dim,
+			int *midx_buf)
 {
 	int ndim, along, outer_moved_along, ret;
 	size_t num_elements;
 	hsize_t *coord_buf, *coord_p;
-	//IntAE *inner_midx_buf;
 
 	ndim = dset_desc->ndim;
 	num_elements = 1;
@@ -466,24 +456,12 @@ static long long int select_elements(const DSetDesc *dset_desc,
 	if (coord_buf == NULL)
 		return -1;
 
-	//inner_midx_buf = new_IntAE(ndim, ndim, 0);
-
 	/* Walk on the selected elements. */
 	coord_p = coord_buf;
 	outer_moved_along = ndim;
 	do {
-/*
-		update_h5blockoff_and_h5blockdim_bufs(ndim,
-				outer_midx_buf, outer_moved_along,
-				starts, counts,
-				h5blockoff_buf, h5blockdim_buf);
-		coord_p = add_block_elements(ndim,
-				h5blockoff_buf, h5blockdim_buf,
-				inner_midx_buf->elts,
-				coord_p);
-*/
-		coord_p = add_element(ndim, outer_midx_buf, starts, coord_p);
-		outer_moved_along = next_midx(ndim, nstart, outer_midx_buf);
+		coord_p = add_element(ndim, midx_buf, starts, coord_p);
+		outer_moved_along = next_midx(ndim, nstart, midx_buf);
 	} while (outer_moved_along < ndim);
 
 	ret = H5Sselect_elements(dset_desc->space_id, H5S_SELECT_APPEND,
@@ -502,60 +480,43 @@ static int set_selection(const DSetDesc *dset_desc, int method,
 			 const long long int *last_block_start)
 {
 	int ndim;
-	hsize_t *h5blockoff_buf, *h5blockdim_buf;
 	IntAE *midx_buf;
 	SEXP reduced;
 	long long int nselection;
 
-	if (method == 2 && counts != R_NilValue) {
-		PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
-				    "'method' is set to 2");
-		return -1;
-	}
-
 	ndim = dset_desc->ndim;
-
-	/* Allocate 'h5blockoff_buf' and 'h5blockdim_buf'. */
-	h5blockoff_buf = alloc_hsize_t_buf(2 * ndim, "'h5blockoff_buf' and "
-						     "'h5blockdim_buf'");
-	if (h5blockoff_buf == NULL)
-		return -1;
-	h5blockdim_buf = h5blockoff_buf + ndim;
-
-	if (method != 2 && !noreduce &&
-	    _selection_can_be_reduced(ndim, nstart, nblock))
-	{
-		reduced = PROTECT(_reduce_selection(starts, counts,
-						    ans_dim,
-						    nblock, last_block_start));
-		starts = VECTOR_ELT(reduced, 0);
-		counts = VECTOR_ELT(reduced, 1);
-		nstart = nblock;
-	}
-
-	init_h5blockoff_and_h5blockdim_bufs(dset_desc, starts,
-			h5blockoff_buf, h5blockdim_buf);
-
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
 	//clock_t t0 = clock();
-	nselection = method != 2 ?
-		     select_hyperslabs(dset_desc, starts, counts,
-				nstart,
-				h5blockoff_buf, h5blockdim_buf,
-				midx_buf->elts) :
-		     select_elements(dset_desc, starts, counts,
-				nstart, ans_dim,
-				h5blockoff_buf, h5blockdim_buf,
-				midx_buf->elts);
+	if (method == 2) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
+					    "'method' is set to 2");
+			return -1;
+		}
+		nselection = select_elements(dset_desc, starts,
+					     nstart, ans_dim, midx_buf->elts);
+	} else {
+		if (!noreduce &&
+		    _selection_can_be_reduced(ndim, nstart, nblock))
+		{
+			reduced = PROTECT(_reduce_selection(starts, counts,
+							    ans_dim,
+							    nblock,
+							    last_block_start));
+			starts = VECTOR_ELT(reduced, 0);
+			counts = VECTOR_ELT(reduced, 1);
+			nstart = nblock;
+		}
+		nselection = select_hyperslabs(dset_desc, starts, counts,
+					       nstart, midx_buf->elts);
+		if (nstart == nblock)
+			UNPROTECT(1);  // unprotect 'reduced'
+	}
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
 	//printf("time for setting selection: %e\n", dt);
 	//printf("nselection: %lld, time per selection unit: %e\n",
 	//	nselection, dt / nselection);
-
-	if (nstart == nblock)
-		UNPROTECT(1);  // unprotect 'reduced'
-	free(h5blockoff_buf);
 	return nselection < 0 ? -1 : 0;
 }
 
@@ -1086,7 +1047,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf, *h5zeros_buf;
 	size_t chunk_eltsize, chunk_maxsize;
-	void *chunk_data_buf, *compressed_chunk_data_buf;
+	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	IntAE *nchunk_buf, *outer_midx_buf,
 	      *out_blockoff_buf, *out_blockdim_buf, *inner_midx_buf;
 	long long int num_chunks, ndot;
@@ -1146,7 +1107,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	/* Walk on the chunks. */
 	num_chunks = ndot = 0;
 	moved_along = ndim;
-	clock_t t_load_chunk = 0, t_gather_chunk_data = 0, t0;
+	//clock_t t_load_chunk = 0, t_gather_chunk_data = 0, t0;
 	do {
 		num_chunks++;
 		//if (num_chunks % 20000 == 0) {
@@ -1161,7 +1122,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			starts, chunkidx_bufs,
 			h5chunkoff_buf, h5chunkdim_buf);
 
-		t0 = clock();
+		//t0 = clock();
 		if (method != 5) {
 			ret = load_chunk(dset_desc,
 					 h5chunkoff_buf, h5chunkdim_buf,
@@ -1176,9 +1137,9 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 		}
 		if (ret < 0)
 			break;
-		t_load_chunk += clock() - t0;
+		//t_load_chunk += clock() - t0;
 
-		t0 = clock();
+		//t0 = clock();
 		update_out_blockoff_and_out_blockdim_bufs(ndim,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
@@ -1194,18 +1155,18 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
 			inner_midx_buf->elts,
 			mem_type_id);
-		t_gather_chunk_data += clock() - t0;
+		//t_gather_chunk_data += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
 	} while (moved_along < ndim);
 	//printf("\n");
 	//printf("total chunks processed = %lld\n", num_chunks);
-	double dt1 = 1.0 * t_load_chunk / CLOCKS_PER_SEC;
-	printf("total time spent loading chunks: %3.6f\n", dt1);
-	double dt2 = 1.0 * t_gather_chunk_data / CLOCKS_PER_SEC;
-	printf("total time spent gathering the chunk data: %3.6f\n", dt2);
-	printf("total time: %3.6f\n", dt1 + dt2);
+	//double dt1 = 1.0 * t_load_chunk / CLOCKS_PER_SEC;
+	//printf("total time spent loading chunks: %3.6f\n", dt1);
+	//double dt2 = 1.0 * t_gather_chunk_data / CLOCKS_PER_SEC;
+	//printf("total time spent gathering the chunk data: %3.6f\n", dt2);
+	//printf("total time: %3.6f\n", dt1 + dt2);
 
 	free(chunk_data_buf);
 	free(h5chunkoff_buf);
@@ -1534,7 +1495,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 	/* Walk on the chunks. */
 	num_chunks = ndot = 0;
 	moved_along = ndim;
-	clock_t t_select_elements = 0, t_read_selection = 0, t0;
+	//clock_t t_select_elements = 0, t_read_selection = 0, t0;
 	do {
 		num_chunks++;
 		//if (num_chunks % 20000 == 0) {
@@ -1566,7 +1527,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
 			inner_breakpoint_bufs, inner_nblock_buf->elts);
 
-		t0 = clock();
+		//t0 = clock();
 		/* Having 'inner_nblock_buf->elts' identical to
 		   'out_blockdim_buf->elts' means that all the inner blocks
 		   are single elements so we use select_elements_from_chunk()
@@ -1591,26 +1552,26 @@ static int read_data_6(const DSetDesc *dset_desc,
 		//}
 		if (ret < 0)
 			break;
-		t_select_elements += clock() - t0;
+		//t_select_elements += clock() - t0;
 
-		t0 = clock();
+		//t0 = clock();
 		ret = read_selection(dset_desc,
 				out_h5blockoff_buf, out_h5blockdim_buf,
 				out, mem_type_id, mem_space_id);
 		if (ret < 0)
 			break;
-		t_read_selection += clock() - t0;
+		//t_read_selection += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
 	} while (moved_along < ndim);
 	//printf("\n");
 	//printf("total chunks processed = %lld\n", num_chunks);
-	double dt1 = 1.0 * t_select_elements / CLOCKS_PER_SEC;
-	printf("total time spent selecting elements: %3.6f\n", dt1);
-	double dt2 = 1.0 * t_read_selection / CLOCKS_PER_SEC;
-	printf("total time spent reading elements: %3.6f\n", dt2);
-	printf("total time: %3.6f\n", dt1 + dt2);
+	//double dt1 = 1.0 * t_select_elements / CLOCKS_PER_SEC;
+	//printf("total time spent selecting elements: %3.6f\n", dt1);
+	//double dt2 = 1.0 * t_read_selection / CLOCKS_PER_SEC;
+	//printf("total time spent reading elements: %3.6f\n", dt2);
+	//printf("total time: %3.6f\n", dt1 + dt2);
 
 	//free(coord_buf);
 	free(h5chunkoff_buf);
@@ -1624,81 +1585,45 @@ static int read_data_6(const DSetDesc *dset_desc,
  */
 
 /* Return R__NilValue on error. */
-static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
-		    int method, int as_int)
+static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
+			  SEXP starts, SEXP counts, int noreduce,
+			  int method, SEXPTYPE ans_type, int *ans_dim)
 {
-	int ret, ndim, along;
-	SEXPTYPE ans_type;
-	DSetDesc dset_desc;
-	SEXP ans_dim, ans;
+	int ndim, ret, along;
+	SEXP ans;
 
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	int *nstart, *nblock;
 	long long int *last_block_start;
 
-	IntAEAE *breakpoint_bufs;
-	LLongAEAE *chunkidx_bufs;
-
 	R_xlen_t ans_len;
 	void *out;
 	hid_t mem_type_id, mem_space_id;
 
-	ret = get_ans_type(dset_id, as_int, &ans_type);
+	ndim = dset_desc->ndim;
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	nblock_buf = new_IntAE(ndim, ndim, 0);
+	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+
+	nstart = nstart_buf->elts;
+	nblock = nblock_buf->elts;
+	last_block_start = last_block_start_buf->elts;
+
+	/* This call will populate 'nstart', 'ans_dim', 'nblock',
+	   and 'last_block_start'. */
+	ret = check_selection(dset_desc, starts, counts,
+			      nstart, ans_dim,
+			      nblock, last_block_start);
 	if (ret < 0)
 		return R_NilValue;
-
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0)
-		return R_NilValue;
-
-	ret = get_dset_desc(dset_id, ndim, &dset_desc);
-	if (ret < 0)
-		return R_NilValue;
-
-	ans_dim = PROTECT(NEW_INTEGER(ndim));
-
-	if (method <= 3) {
-		nstart_buf = new_IntAE(ndim, ndim, 0);
-		nblock_buf = new_IntAE(ndim, ndim, 0);
-		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-
-		nstart = nstart_buf->elts;
-		nblock = nblock_buf->elts;
-		last_block_start = last_block_start_buf->elts;
-
-		/* This call will populate 'nstart', 'ans_dim', 'nblock',
-		   and 'last_block_start'. */
-		ret = check_selection(&dset_desc, starts, counts,
-				      nstart, INTEGER(ans_dim),
-				      nblock, last_block_start);
-	} else if (method <= 6) {
-		if (counts != R_NilValue) {
-			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
-					    "'method' is 4, 5, or 6");
-			goto on_error1;
-		}
-		breakpoint_bufs = new_IntAEAE(ndim, ndim);
-		chunkidx_bufs = new_LLongAEAE(ndim, ndim);
-		/* This call will populate 'ans_dim', 'breakpoint_bufs',
-		   and 'chunkidx_bufs'. */
-		ret = map_starts_to_chunks(&dset_desc, starts,
-				      INTEGER(ans_dim),
-				      breakpoint_bufs, chunkidx_bufs);
-	} else {
-		PRINT_TO_ERRMSG_BUF("'method' must be <= 6");
-		goto on_error1;
-	}
-	if (ret < 0)
-		goto on_error1;
 
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
-		ans_len *= INTEGER(ans_dim)[along];
+		ans_len *= ans_dim[along];
 	ans = PROTECT(allocVector(ans_type, ans_len));
-	SET_DIM(ans, ans_dim);
 
-	if (ans_len != 0 && method != 0) {
+	if (ans_len != 0) {
 		if (ans_type == INTSXP) {
 			out = INTEGER(ans);
 			mem_type_id = H5T_NATIVE_INT;
@@ -1706,57 +1631,150 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 			out = REAL(ans);
 			mem_type_id = H5T_NATIVE_DOUBLE;
 		}
-		if (method <= 3) {
-			/* methods 1, 2, and 3 */
-			mem_space_id = get_mem_space(ndim, INTEGER(ans_dim));
-			if (mem_space_id < 0)
-				goto on_error2;
-			if (method <= 2) {
-				ret = read_data_1_2(&dset_desc, method,
-					starts, counts, noreduce,
-					nstart, INTEGER(ans_dim),
-					nblock, last_block_start,
-					out, mem_type_id, mem_space_id);
-			} else {
-				ret = read_data_3(&dset_desc,
-					starts, counts, nstart,
-					out, mem_type_id, mem_space_id);
-			}
-			H5Sclose(mem_space_id);
-		} else if (method <= 5) {
-			/* methods 4 and 5 */
-			ret = read_data_4_5(&dset_desc, method,
-				starts, breakpoint_bufs, chunkidx_bufs,
-				out, INTEGER(ans_dim), mem_type_id);
+		mem_space_id = get_mem_space(ndim, ans_dim);
+		if (mem_space_id < 0)
+			goto on_error;
+		if (method <= 2) {
+			ret = read_data_1_2(dset_desc, method,
+				starts, counts, noreduce,
+				nstart, ans_dim,
+				nblock, last_block_start,
+				out, mem_type_id, mem_space_id);
 		} else {
-			/* method 6 */
-			ret = read_data_6(&dset_desc,
-				starts, breakpoint_bufs, chunkidx_bufs,
-				out, INTEGER(ans_dim), mem_type_id);
+			ret = read_data_3(dset_desc,
+				starts, counts, nstart,
+				out, mem_type_id, mem_space_id);
 		}
-		if (ret < 0)
-			goto on_error2;
+		H5Sclose(mem_space_id);
 	}
+	if (ret < 0)
+		goto on_error;
 
-	destroy_dset_desc(&dset_desc);
-	UNPROTECT(2);
+	UNPROTECT(1);
 	return ans;
 
-    on_error2:
+    on_error:
 	UNPROTECT(1);
-    on_error1:
+	return R_NilValue;
+}
+
+/* Return R__NilValue on error. */
+static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
+			  SEXP starts, SEXP counts,
+			  int method, SEXPTYPE ans_type, int *ans_dim)
+{
+	int ndim, ret, along;
+	SEXP ans;
+
+	IntAEAE *breakpoint_bufs;
+	LLongAEAE *chunkidx_bufs;
+
+	R_xlen_t ans_len;
+	void *out;
+	hid_t mem_type_id;
+
+	ndim = dset_desc->ndim;
+	breakpoint_bufs = new_IntAEAE(ndim, ndim);
+	chunkidx_bufs = new_LLongAEAE(ndim, ndim);
+
+	/* This call will populate 'ans_dim', 'breakpoint_bufs',
+	   and 'chunkidx_bufs'. */
+	ret = map_starts_to_chunks(dset_desc, starts,
+				   ans_dim, breakpoint_bufs, chunkidx_bufs);
+	if (ret < 0)
+		return R_NilValue;
+
+	ans_len = 1;
+	for (along = 0; along < ndim; along++)
+		ans_len *= ans_dim[along];
+	ans = PROTECT(allocVector(ans_type, ans_len));
+
+	if (ans_len != 0) {
+		if (ans_type == INTSXP) {
+			out = INTEGER(ans);
+			mem_type_id = H5T_NATIVE_INT;
+		} else {
+			out = REAL(ans);
+			mem_type_id = H5T_NATIVE_DOUBLE;
+		}
+		if (method <= 5) {
+			/* methods 4 and 5 */
+			ret = read_data_4_5(dset_desc, method,
+				starts, breakpoint_bufs, chunkidx_bufs,
+				out, ans_dim, mem_type_id);
+		} else {
+			/* method 6 */
+			ret = read_data_6(dset_desc,
+				starts, breakpoint_bufs, chunkidx_bufs,
+				out, ans_dim, mem_type_id);
+		}
+		if (ret < 0)
+			goto on_error;
+	}
+
+	UNPROTECT(1);
+	return ans;
+
+    on_error:
+	UNPROTECT(1);
+	return R_NilValue;
+}
+
+/* Return R__NilValue on error. */
+static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
+		    int as_int, int method)
+{
+	int ndim;
+	SEXPTYPE ans_type;
+	DSetDesc dset_desc;
+	SEXP ans_dim, ans;
+
+	ndim = _shallow_check_selection(starts, counts);
+	if (ndim < 0)
+		return R_NilValue;
+
+	if (get_ans_type(dset_id, as_int, &ans_type) < 0)
+		return R_NilValue;
+
+	if (get_dset_desc(dset_id, ndim, &dset_desc) < 0)
+		return R_NilValue;
+
+	ans_dim = PROTECT(NEW_INTEGER(ndim));
+	ans = R_NilValue;
+
+	if (method == 0)
+		method = counts == R_NilValue ? 6 : 1;
+	if (method <= 3) {
+		ans = h5mread_1_2_3(&dset_desc, starts, counts, noreduce,
+				    method, ans_type, INTEGER(ans_dim));
+	} else if (method <= 6) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
+					    "'method' is 4, 5, or 6");
+		} else {
+			ans = h5mread_4_5_6(&dset_desc, starts, counts,
+					    method, ans_type, INTEGER(ans_dim));
+		}
+	} else {
+		PRINT_TO_ERRMSG_BUF("'method' must be <= 6");
+	}
+	if (ans != R_NilValue) {
+		PROTECT(ans);
+		SET_DIM(ans, ans_dim);
+		UNPROTECT(1);
+	}
 	UNPROTECT(1);
 	destroy_dset_desc(&dset_desc);
-	return R_NilValue;
+	return ans;
 }
 
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5mread(SEXP filepath, SEXP name,
 	       SEXP starts, SEXP counts, SEXP noreduce,
-	       SEXP method, SEXP as_integer)
+	       SEXP as_integer, SEXP method)
 {
 	SEXP filepath0, name0, ans;
-	int noreduce0, method0, as_int;
+	int noreduce0, as_int, method0;
 	hid_t file_id, dset_id;
 
 	/* Check 'filepath'. */
@@ -1778,17 +1796,17 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'noreduce' must be TRUE or FALSE");
 	noreduce0 = LOGICAL(noreduce)[0];
 
+	/* Check 'as_integer'. */
+	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
+		error("'as_integer' must be TRUE or FALSE");
+	as_int = LOGICAL(as_integer)[0];
+
 	/* Check 'method'. */
 	if (!(IS_INTEGER(method) && LENGTH(method) == 1))
 		error("'method' must be a single integer");
 	method0 = INTEGER(method)[0];
 	if (method0 < 0)
 		error("'method' must be >= 0");
-
-	/* Check 'as_integer'. */
-	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
-		error("'as_integer' must be TRUE or FALSE");
-	as_int = LOGICAL(as_integer)[0];
 
 	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
 	if (file_id < 0)
@@ -1800,7 +1818,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		      CHAR(name0), CHAR(filepath0));
 	}
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
-			      method0, as_int));
+			      as_int, method0));
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ans == R_NilValue) {
