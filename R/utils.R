@@ -99,13 +99,27 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
 ### A thin wrapper around rhdf5::h5read()
 ###
 
+#h5read2 <- function(filepath, name, index=NULL)
+#{
+#    if (!is.null(index))
+#        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
+#    ## h5read() emits an annoying warning when it loads integer values that
+#    ## cannot be represented in R (and thus are converted to NAs).
+#    suppressWarnings(h5read(filepath, name, index=index))
+#}
+
+### Make it a wrapper to h5mread() instead. EXPERIMENTAL!
 h5read2 <- function(filepath, name, index=NULL)
 {
-    if (!is.null(index))
+    if (is.null(index)) {
+        ## Needed for now until h5mread() accepts 'starts=NULL'.
+        ## TODO: Make h5mread() support 'starts=NULL'.
+        ndim <- length(h5dim(filepath, name, as.integer=FALSE))
+        index <- vector("list", ndim)
+    } else {
         index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
-    ## h5read() emits an annoying warning when it loads integer values that
-    ## cannot be represented in R (and thus are converted to NAs).
-    suppressWarnings(h5read(filepath, name, index=index))
+    }
+    h5mread(filepath, name, starts=index)
 }
 
 
