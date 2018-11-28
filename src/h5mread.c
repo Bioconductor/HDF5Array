@@ -15,10 +15,17 @@
 
 
 typedef struct {
+	/* Fields filled by get_dset_desc(). */
 	hid_t dset_id, space_id, plist_id;
 	int ndim;
 	hsize_t *h5dim, *h5chunk_spacings;
 	int *h5nchunk;
+	/* Fields describing the type of data (they will be filled by
+	   set_more_dset_desc_fields(). */
+	H5T_class_t class;
+	size_t size;
+	hid_t mem_type_id;  /* the memory type we'll use to load the data */
+	SEXPTYPE ans_type;
 } DSetDesc;
 
 
@@ -26,18 +33,17 @@ typedef struct {
  * Low-level helpers
  */
 
-static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
+/* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
+   support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
+static int set_more_dset_desc_fields(DSetDesc *dset_desc, int as_int)
 {
 	hid_t type_id;
 	H5T_class_t class;
 	size_t size;
 	const char *classname;
 
-	if (as_int) {
-		*ans_type = INTSXP;
-		return 0;
-	}
-	type_id = H5Dget_type(dset_id);
+	/* Get class and size of datatype. */
+	type_id = H5Dget_type(dset_desc->dset_id);
 	if (type_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		return -1;
@@ -53,18 +59,28 @@ static int get_ans_type(hid_t dset_id, int as_int, SEXPTYPE *ans_type)
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
 		return -1;
 	}
+	dset_desc->class = class;
+	dset_desc->size = size;
 
-	if (class == H5T_INTEGER) {
-		*ans_type = size <= sizeof(int) ? INTSXP : REALSXP;
-		return 0;
-	}
-	if (class == H5T_FLOAT) {
-		*ans_type = REALSXP;
-		return 0;
-	}
 	switch (class) {
+		case H5T_INTEGER:
+		    dset_desc->mem_type_id = H5T_NATIVE_INT;
+		    dset_desc->ans_type = (as_int || size <= sizeof(int)) ?
+					  INTSXP : REALSXP;
+		    return 0;
+		case H5T_FLOAT:
+		    dset_desc->mem_type_id = H5T_NATIVE_DOUBLE;
+		    dset_desc->ans_type = as_int ? INTSXP : REALSXP;
+		    return 0;
+		case H5T_STRING:
+		    if (as_int)
+			warning("'as.integer' is ignored when "
+				"dataset class is H5T_STRING");
+		    dset_desc->mem_type_id = H5T_NATIVE_CHAR;
+		    dset_desc->ans_type = STRSXP;
+		    PRINT_TO_ERRMSG_BUF("H5T_STRING type not supported yet!");
+		    return -1;
 		case H5T_TIME: classname = "H5T_TIME"; break;
-		case H5T_STRING: classname = "H5T_STRING"; break;
 		case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
 		case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
 		case H5T_COMPOUND: classname = "H5T_COMPOUND"; break;
@@ -91,18 +107,29 @@ static hsize_t *alloc_hsize_t_buf(size_t buflength, const char *what)
 	return buf;
 }
 
-static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
+static void destroy_dset_desc(DSetDesc *dset_desc)
+{
+	free(dset_desc->h5nchunk);
+	free(dset_desc->h5dim);
+	H5Pclose(dset_desc->plist_id);
+	H5Sclose(dset_desc->space_id);
+}
+
+static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
+			 DSetDesc *dset_desc)
 {
 	hid_t space_id, plist_id;
 	int dset_ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
 
+	/* Get dataspace. */
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
 		return -1;
 	}
 
+	/* Ckeck number of dimensions. */
 	dset_ndim = H5Sget_simple_extent_ndims(space_id);
 	if (dset_ndim < 0) {
 		H5Sclose(space_id);
@@ -121,6 +148,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 		return -1;
 	}
 
+	/* Get creation property list. */
 	plist_id = H5Dget_create_plist(dset_id);
 	if (plist_id < 0) {
 		H5Sclose(space_id);
@@ -148,24 +176,16 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 
 	/* Set 'h5dim'. */
 	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
-		free(h5nchunk);
-		free(h5dim);
-		H5Pclose(plist_id);
-		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
-		return -1;
+		goto on_error;
 	}
 
 	/* Set 'h5chunk_spacings'. */
 	if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
-		free(h5nchunk);
-		free(h5dim);
-		H5Pclose(plist_id);
-		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
 				    "an unexpected value");
-		return -1;
+		goto on_error;
 	}
 
 	/* Set 'h5nchunk'. */
@@ -180,14 +200,10 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 		if (d % spacing != 0)
 			nchunk++;
 		if (nchunk > INT_MAX) {
-			free(h5nchunk);
-			free(h5dim);
-			H5Pclose(plist_id);
-			H5Sclose(space_id);
 			PRINT_TO_ERRMSG_BUF("datasets with more than "
 				"INT_MAX chunks along any dimension\n  "
 				"are not supported at the moment");
-			return -1;
+			goto on_error;
 		}
 		h5nchunk[h5along] = nchunk;
 	}
@@ -199,15 +215,14 @@ static int get_dset_desc(hid_t dset_id, int ndim, DSetDesc *dset_desc)
 	dset_desc->h5dim = h5dim;
 	dset_desc->h5chunk_spacings = h5chunk_spacings;
 	dset_desc->h5nchunk = h5nchunk;
-	return 0;
-}
 
-static void destroy_dset_desc(DSetDesc *dset_desc)
-{
-	free(dset_desc->h5nchunk);
-	free(dset_desc->h5dim);
-	H5Pclose(dset_desc->plist_id);
-	H5Sclose(dset_desc->space_id);
+	if (set_more_dset_desc_fields(dset_desc, as_int) < 0)
+		goto on_error;
+	return 0;
+
+    on_error:
+	destroy_dset_desc(dset_desc);
+	return -1;
 }
 
 static hid_t get_mem_space(int ndim, const int *ans_dim)
@@ -526,7 +541,7 @@ static int read_data_1_2(const DSetDesc *dset_desc, int method,
 			 const int *ans_dim,
 			 const int *nblock,
 			 const long long int *last_block_start,
-			 void *out, hid_t mem_type_id, hid_t mem_space_id)
+			 void *out, hid_t mem_space_id)
 {
 	int ret;
 
@@ -545,7 +560,7 @@ static int read_data_1_2(const DSetDesc *dset_desc, int method,
 
 	//clock_t t0 = clock();
 	ret = H5Dread(dset_desc->dset_id,
-		      mem_type_id, mem_space_id,
+		      dset_desc->mem_type_id, mem_space_id,
 		      dset_desc->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
@@ -564,7 +579,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 		const int *midx, int moved_along,
 		hsize_t *h5offset_in_buf, hsize_t *h5count_buf,
 		hsize_t *h5offset_out_buf,
-		void *out, hid_t mem_type_id, hid_t mem_space_id)
+		void *out, hid_t mem_space_id)
 {
 	int ndim, along, h5along, i, ret;
 	SEXP start, count;
@@ -609,7 +624,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 	}
 
 	ret = H5Dread(dset_desc->dset_id,
-		      mem_type_id, mem_space_id,
+		      dset_desc->mem_type_id, mem_space_id,
 		      dset_desc->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
@@ -618,7 +633,7 @@ static int read_selection_unit(const DSetDesc *dset_desc,
 
 static int read_data_3(const DSetDesc *dset_desc,
 		       SEXP starts, SEXP counts, const int *nstart,
-		       void *out, hid_t mem_type_id, hid_t mem_space_id)
+		       void *out, hid_t mem_space_id)
 {
 	int ndim, along, h5along, moved_along, ret;
 	hsize_t *h5offset_in_buf, *h5count_buf, *h5offset_out_buf;
@@ -658,7 +673,7 @@ static int read_data_3(const DSetDesc *dset_desc,
 					  midx_buf->elts, moved_along,
 					  h5offset_in_buf, h5count_buf,
 					  h5offset_out_buf,
-					  out, mem_type_id, mem_space_id);
+					  out, mem_space_id);
 		if (ret < 0)
 			break;
 		moved_along = next_midx(ndim, nstart, midx_buf->elts);
@@ -775,8 +790,7 @@ static int load_chunk(const DSetDesc *dset_desc,
 		      const hsize_t *h5chunkoff_buf,
 		      const hsize_t *h5chunkdim_buf,
 		      const hsize_t *h5zeros_buf,
-		      void *chunk_data_out,
-		      hid_t mem_type_id, hid_t mem_space_id)
+		      void *chunk_data_out, hid_t mem_space_id)
 {
 	int ret;
 
@@ -795,7 +809,7 @@ static int load_chunk(const DSetDesc *dset_desc,
 	}
 
 	ret = H5Dread(dset_desc->dset_id,
-		      mem_type_id, mem_space_id,
+		      dset_desc->mem_type_id, mem_space_id,
 		      dset_desc->space_id, H5P_DEFAULT, chunk_data_out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
@@ -1041,7 +1055,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
 			 const LLongAEAE *chunkidx_bufs,
-			 void *out, const int *outdim, hid_t mem_type_id)
+			 void *out, const int *outdim)
 {
 	int ndim, along, moved_along, ret;
 	hid_t mem_space_id;
@@ -1072,7 +1086,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	for (along = 0; along < ndim; along++)
 		h5zeros_buf[along] = 0;
 
-	if (mem_type_id == H5T_NATIVE_INT) {
+	if (dset_desc->mem_type_id == H5T_NATIVE_INT) {
 		chunk_eltsize = sizeof(int);
 	} else {
 		chunk_eltsize = sizeof(double);
@@ -1127,8 +1141,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			ret = load_chunk(dset_desc,
 					 h5chunkoff_buf, h5chunkdim_buf,
 					 h5zeros_buf,
-					 chunk_data_buf,
-					 mem_type_id, mem_space_id);
+					 chunk_data_buf, mem_space_id);
 		} else {
 			ret = direct_load_chunk(dset_desc,
 					h5chunkoff_buf, h5chunkdim_buf,
@@ -1154,7 +1167,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			out, outdim,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
 			inner_midx_buf->elts,
-			mem_type_id);
+			dset_desc->mem_type_id);
 		//t_gather_chunk_data += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
@@ -1415,7 +1428,7 @@ static long long int select_hyperslabs_from_chunk(const DSetDesc *dset_desc,
 static int read_selection(const DSetDesc *dset_desc,
 			  const hsize_t *out_h5blockoff,
 			  const hsize_t *out_h5blockdim,
-			  void *out, hid_t mem_type_id, hid_t mem_space_id)
+			  void *out, hid_t mem_space_id)
 {
 	int ret;
 
@@ -1427,7 +1440,7 @@ static int read_selection(const DSetDesc *dset_desc,
 	}
 
 	ret = H5Dread(dset_desc->dset_id,
-		      mem_type_id, mem_space_id,
+		      dset_desc->mem_type_id, mem_space_id,
 		      dset_desc->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
@@ -1438,7 +1451,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
 		       const LLongAEAE *chunkidx_bufs,
-		       void *out, const int *outdim, hid_t mem_type_id)
+		       void *out, const int *outdim)
 {
 	int ndim, moved_along, ret;
 	hid_t mem_space_id;
@@ -1557,7 +1570,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 		//t0 = clock();
 		ret = read_selection(dset_desc,
 				out_h5blockoff_buf, out_h5blockdim_buf,
-				out, mem_type_id, mem_space_id);
+				out, mem_space_id);
 		if (ret < 0)
 			break;
 		//t_read_selection += clock() - t0;
@@ -1587,7 +1600,7 @@ static int read_data_6(const DSetDesc *dset_desc,
 /* Return R__NilValue on error. */
 static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 			  SEXP starts, SEXP counts, int noreduce,
-			  int method, SEXPTYPE ans_type, int *ans_dim)
+			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
 	SEXP ans;
@@ -1599,7 +1612,7 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 
 	R_xlen_t ans_len;
 	void *out;
-	hid_t mem_type_id, mem_space_id;
+	hid_t mem_space_id;
 
 	ndim = dset_desc->ndim;
 	nstart_buf = new_IntAE(ndim, ndim, 0);
@@ -1621,15 +1634,13 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(ans_type, ans_len));
+	ans = PROTECT(allocVector(dset_desc->ans_type, ans_len));
 
 	if (ans_len != 0) {
-		if (ans_type == INTSXP) {
+		if (dset_desc->ans_type == INTSXP) {
 			out = INTEGER(ans);
-			mem_type_id = H5T_NATIVE_INT;
 		} else {
 			out = REAL(ans);
-			mem_type_id = H5T_NATIVE_DOUBLE;
 		}
 		mem_space_id = get_mem_space(ndim, ans_dim);
 		if (mem_space_id < 0)
@@ -1639,11 +1650,11 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 				starts, counts, noreduce,
 				nstart, ans_dim,
 				nblock, last_block_start,
-				out, mem_type_id, mem_space_id);
+				out, mem_space_id);
 		} else {
 			ret = read_data_3(dset_desc,
 				starts, counts, nstart,
-				out, mem_type_id, mem_space_id);
+				out, mem_space_id);
 		}
 		H5Sclose(mem_space_id);
 	}
@@ -1661,7 +1672,7 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 /* Return R__NilValue on error. */
 static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
 			  SEXP starts, SEXP counts,
-			  int method, SEXPTYPE ans_type, int *ans_dim)
+			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
 	SEXP ans;
@@ -1671,7 +1682,6 @@ static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
 
 	R_xlen_t ans_len;
 	void *out;
-	hid_t mem_type_id;
 
 	ndim = dset_desc->ndim;
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
@@ -1687,26 +1697,24 @@ static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(ans_type, ans_len));
+	ans = PROTECT(allocVector(dset_desc->ans_type, ans_len));
 
 	if (ans_len != 0) {
-		if (ans_type == INTSXP) {
+		if (dset_desc->ans_type == INTSXP) {
 			out = INTEGER(ans);
-			mem_type_id = H5T_NATIVE_INT;
 		} else {
 			out = REAL(ans);
-			mem_type_id = H5T_NATIVE_DOUBLE;
 		}
 		if (method <= 5) {
 			/* methods 4 and 5 */
 			ret = read_data_4_5(dset_desc, method,
 				starts, breakpoint_bufs, chunkidx_bufs,
-				out, ans_dim, mem_type_id);
+				out, ans_dim);
 		} else {
 			/* method 6 */
 			ret = read_data_6(dset_desc,
 				starts, breakpoint_bufs, chunkidx_bufs,
-				out, ans_dim, mem_type_id);
+				out, ans_dim);
 		}
 		if (ret < 0)
 			goto on_error;
@@ -1725,7 +1733,6 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int, int method)
 {
 	int ndim;
-	SEXPTYPE ans_type;
 	DSetDesc dset_desc;
 	SEXP ans_dim, ans;
 
@@ -1733,10 +1740,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ndim < 0)
 		return R_NilValue;
 
-	if (get_ans_type(dset_id, as_int, &ans_type) < 0)
-		return R_NilValue;
-
-	if (get_dset_desc(dset_id, ndim, &dset_desc) < 0)
+	if (get_dset_desc(dset_id, ndim, as_int, &dset_desc) < 0)
 		return R_NilValue;
 
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
@@ -1746,14 +1750,14 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		method = counts == R_NilValue ? 6 : 1;
 	if (method <= 3) {
 		ans = h5mread_1_2_3(&dset_desc, starts, counts, noreduce,
-				    method, ans_type, INTEGER(ans_dim));
+				    method, INTEGER(ans_dim));
 	} else if (method <= 6) {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "'method' is 4, 5, or 6");
 		} else {
 			ans = h5mread_4_5_6(&dset_desc, starts, counts,
-					    method, ans_type, INTEGER(ans_dim));
+					    method, INTEGER(ans_dim));
 		}
 	} else {
 		PRINT_TO_ERRMSG_BUF("'method' must be <= 6");
