@@ -103,9 +103,9 @@ static hsize_t *alloc_hsize_t_buf(size_t buflength, const char *what)
 
 static void destroy_dset_desc(DSetDesc *dset_desc)
 {
-	H5Tclose(dset_desc->dtype_id);
 	free(dset_desc->h5nchunk);
 	free(dset_desc->h5dim);
+	H5Tclose(dset_desc->dtype_id);
 	H5Pclose(dset_desc->plist_id);
 	H5Sclose(dset_desc->space_id);
 }
@@ -158,9 +158,20 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	}
 	dset_desc->plist_id = plist_id;
 
+	/* Set 'dtype_id'. */
+	dtype_id = H5Dget_type(dset_id);
+	if (dtype_id < 0) {
+		H5Pclose(plist_id);
+		H5Sclose(space_id);
+		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
+		return -1;
+	}
+	dset_desc->dtype_id = dtype_id;
+
 	/* Allocate 'h5dim', 'h5chunk_spacings', and 'h5nchunk'. */
 	h5dim = alloc_hsize_t_buf(2 * ndim, "'h5dim' and 'h5chunk_spacings'");
 	if (h5dim == NULL) {
+		H5Tclose(dtype_id);
 		H5Pclose(plist_id);
 		H5Sclose(space_id);
 		return -1;
@@ -169,27 +180,13 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	h5nchunk = (int *) malloc(ndim * sizeof(int));
 	if (h5nchunk == NULL) {
 		free(h5dim);
+		H5Tclose(dtype_id);
 		H5Pclose(plist_id);
 		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 				    "for 'h5nchunk'");
 		return -1;
 	}
-	dset_desc->h5dim = h5dim;
-	dset_desc->h5chunk_spacings = h5chunk_spacings;
-	dset_desc->h5nchunk = h5nchunk;
-
-	/* Set 'dtype_id'. */
-	dtype_id = H5Dget_type(dset_id);
-	if (dtype_id < 0) {
-		free(h5nchunk);
-		free(h5dim);
-		H5Pclose(plist_id);
-		H5Sclose(space_id);
-		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
-		return -1;
-	}
-	dset_desc->dtype_id = dtype_id;
 
 	/* Set 'h5dim'. */
 	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
@@ -197,6 +194,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 				    "an unexpected value");
 		goto on_error;
 	}
+	dset_desc->h5dim = h5dim;
 
 	/* Set 'h5chunk_spacings'. */
 	if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
@@ -204,6 +202,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 				    "an unexpected value");
 		goto on_error;
 	}
+	dset_desc->h5chunk_spacings = h5chunk_spacings;
 
 	/* Set 'h5nchunk'. */
 	for (h5along = 0; h5along < ndim; h5along++) {
@@ -224,6 +223,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 		}
 		h5nchunk[h5along] = nchunk;
 	}
+	dset_desc->h5nchunk = h5nchunk;
 
 	/* Set 'class'. */
 	class = H5Tget_class(dtype_id);
@@ -244,13 +244,12 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	/* Set 'ans_type'. */
 	if (get_ans_type_from_class(class, as_int, size, &ans_type) < 0)
 		goto on_error;
-	dset_desc->ans_type = ans_type;
-
 	if (ans_type == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
 		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
 				    "is not supported at the moment");
 		goto on_error;
 	}
+	dset_desc->ans_type = ans_type;
 
 	/* Set 'ans_elt_size'. */
 	ans_elt_size = get_ans_elt_size_from_ans_type(ans_type, size);
@@ -352,24 +351,6 @@ static inline int next_midx(int ndim, const int *max_idx_plus_one,
 	}
 	return along;
 }
-
-/*
-static inline int next_midx2(int ndim, const hsize_t *max_idx_plus_one,
-			     int *midx_buf)
-{
-	int along, i;
-
-	for (along = 0; along < ndim; along++) {
-		i = midx_buf[along] + 1;
-		if (i < max_idx_plus_one[along]) {
-			midx_buf[along] = i;
-			break;
-		}
-		midx_buf[along] = 0;
-	}
-	return along;
-}
-*/
 
 
 /****************************************************************************
@@ -970,6 +951,8 @@ static int direct_load_chunk(const DSetDesc *dset_desc,
 		return -1;
 	}
 
+	//printf("filters = %u\n", filters);
+
 	//FIXME: This will error if chunk data is not compressed!
 	//TODO: Decompress only if chunk data is compressed. There should be
 	// a bit in the returned 'filters' that indicates this.
@@ -1070,7 +1053,7 @@ static void gather_chunk_data(const DSetDesc *dset_desc,
 			hid_t mem_type_id)
 {
 	int ndim, inner_moved_along;
-	size_t in_offset, out_offset;
+	size_t in_offset, out_offset, s_len;
 	long long int num_elts;
 	const char *s;
 	SEXP ans_elt;
@@ -1087,7 +1070,10 @@ static void gather_chunk_data(const DSetDesc *dset_desc,
 		num_elts++;
 		if (dset_desc->ans_type == STRSXP) {
 			s = (char *) in + in_offset * dset_desc->size;
-			ans_elt = PROTECT(mkChar(s));
+			for (s_len = 0; s_len < dset_desc->size; s_len++)
+				if (s[s_len] == 0)
+					break;
+			ans_elt = PROTECT(mkCharLen(s, s_len));
 			SET_STRING_ELT(ans, out_offset, ans_elt);
 			UNPROTECT(1);
 		} else {
@@ -1116,6 +1102,24 @@ static void gather_chunk_data(const DSetDesc *dset_desc,
 	return;
 }
 
+/*
+  WARNING: method 5 is not working properly on some datasets:
+      library(HDF5Array)
+      library(ExperimentHub)
+      hub <- ExperimentHub()
+      fname0 <- hub[["EH1039"]]
+      h5mread(fname0, "mm10/barcodes", list(1), method=4L)
+      # [1] "AAACCTGAGATAGGAG-1"
+      h5mread(fname0, "mm10/barcodes", list(1), method=5L)
+      # [1] "AAAAAAAAAAAAAAAAAAAA"
+  Looks like the chunk data has been shuffled (transposed in that case)
+  before being written to disk in order to improve compression.
+  TODO: Investigate this further. I suspect we need to check whether a
+  "Data shuffling filter" (H5Z_FILTER_SHUFFLE) was used at creation time.
+  Check H5Pget_filter() for how to know whether this filter was used or not.
+  There should be a way to retrieve information about how the data was
+  shuffled.
+ */
 static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
@@ -1150,9 +1154,10 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	for (along = 0; along < ndim; along++)
 		h5zeros_buf[along] = 0;
 
-	if (method != 5) {
+	if (method == 4) {
 		chunk_data_buf = malloc(dset_desc->chunk_data_buf_size);
 	} else {
+		warning("method 5 is still experimental, use at your own risk");
 		chunk_data_buf = malloc(2 * dset_desc->chunk_data_buf_size +
 					COMPRESSION_OVERHEAD);
 	}
@@ -1163,7 +1168,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 				    "for 'chunk_data_buf'");
 		return -1;
 	}
-	if (method == 5)
+	if (method != 4)
 		compressed_chunk_data_buf = chunk_data_buf +
 					    dset_desc->chunk_data_buf_size;
 
@@ -1194,7 +1199,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			h5chunkoff_buf, h5chunkdim_buf);
 
 		//t0 = clock();
-		if (method != 5) {
+		if (method == 4) {
 			ret = load_chunk(dset_desc,
 					 h5chunkoff_buf, h5chunkdim_buf,
 					 h5zeros_buf,
@@ -1810,7 +1815,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 			goto on_error;
 		}
 		if (method == 0) {
-			method = 5;
+			method = 4;
 		} else if (method != 4 && method != 5) {
 			PRINT_TO_ERRMSG_BUF("reading string data is only "
 					    "supported by methods 4 and 5");
