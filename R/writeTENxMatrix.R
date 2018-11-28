@@ -136,8 +136,11 @@ setMethod("type", "TENxRealizationSink", function(x) x@type)
 TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, group=NULL, level=NULL)
 {
-    if (!(is.integer(dim) && length(dim) == 2L))
-        stop(wmsg("'dim' must be an integer vector of length 2"))
+    if (!is.integer(dim))
+        stop(wmsg("'dim' must be an integer vector"))
+    if (length(dim) != 2L)
+        stop(wmsg("TENxMatrix backend only supports ",
+                  "realization of matrix-like objects"))
     if (S4Vectors:::anyMissingOrOutside(dim, 0L))
         stop(wmsg("'dim' cannot contain NAs or negative values"))
     if (is.null(dimnames)) {
