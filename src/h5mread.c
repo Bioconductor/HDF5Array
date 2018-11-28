@@ -15,13 +15,10 @@
 
 
 typedef struct {
-	/* Fields filled by get_dset_desc(). */
 	hid_t dset_id, space_id, plist_id;
 	int ndim;
 	hsize_t *h5dim, *h5chunk_spacings;
 	int *h5nchunk;
-	/* Fields describing the type of data (they will be filled by
-	   set_more_dset_desc_fields(). */
 	hid_t dtype_id;
 	H5T_class_t class;
 	size_t size;
@@ -37,63 +34,60 @@ typedef struct {
 
 /* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
-static int set_more_dset_desc_fields(DSetDesc *dset_desc, int as_int)
+static int get_ans_type_from_class(H5T_class_t class, int as_int, size_t size,
+				   SEXPTYPE *ans_type)
 {
-	hid_t dtype_id;
-	H5T_class_t class;
-	size_t size;
 	const char *classname;
 
-	/* Get class and size of datatype. */
-	dtype_id = H5Dget_type(dset_desc->dset_id);
-	if (dtype_id < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
-		return -1;
-	}
-	dset_desc->dtype_id = dtype_id;
-
-	class = H5Tget_class(dtype_id);
-	if (class == H5T_NO_CLASS) {
-		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
-		return -1;
-	}
-	dset_desc->class = class;
-
-	size = H5Tget_size(dtype_id);
-	if (size == 0) {
-		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
-		return -1;
-	}
-	dset_desc->size = size;
-
 	switch (class) {
-		case H5T_INTEGER:
-		    dset_desc->ans_type = (as_int || size <= sizeof(int)) ?
-					  INTSXP : REALSXP;
-		    return 0;
-		case H5T_FLOAT:
-		    dset_desc->ans_type = as_int ? INTSXP : REALSXP;
-		    return 0;
-		case H5T_STRING:
-		    if (as_int)
+	    case H5T_INTEGER:
+		*ans_type = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
+		return 0;
+	    case H5T_FLOAT:
+		*ans_type = as_int ? INTSXP : REALSXP;
+		return 0;
+	    case H5T_STRING:
+		if (as_int)
 			warning("'as.integer' is ignored when "
 				"dataset class is H5T_STRING");
-		    dset_desc->ans_type = STRSXP;
-		    return 0;
-		case H5T_TIME: classname = "H5T_TIME"; break;
-		case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
-		case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
-		case H5T_COMPOUND: classname = "H5T_COMPOUND"; break;
-		case H5T_REFERENCE: classname = "H5T_REFERENCE"; break;
-		case H5T_ENUM: classname = "H5T_ENUM"; break;
-		case H5T_VLEN: classname = "H5T_VLEN"; break;
-		case H5T_ARRAY: classname = "H5T_ARRAY"; break;
-		default:
-		    PRINT_TO_ERRMSG_BUF("unknown dataset class identifier: %d",
-					class);
-		    return -1;
+		*ans_type = STRSXP;
+		return 0;
+	    case H5T_TIME: classname = "H5T_TIME"; break;
+	    case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
+	    case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
+	    case H5T_COMPOUND: classname = "H5T_COMPOUND"; break;
+	    case H5T_REFERENCE: classname = "H5T_REFERENCE"; break;
+	    case H5T_ENUM: classname = "H5T_ENUM"; break;
+	    case H5T_VLEN: classname = "H5T_VLEN"; break;
+	    case H5T_ARRAY: classname = "H5T_ARRAY"; break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unknown dataset class identifier: %d",
+				    class);
+	    return -1;
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s", classname);
+	return -1;
+}
+
+static size_t get_ans_elt_size_from_ans_type(SEXPTYPE ans_type, size_t size)
+{
+	switch (ans_type) {
+	    case INTSXP:  return sizeof(int);
+	    case REALSXP: return sizeof(double);
+	    case STRSXP:  return size;
+	}
+	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(ans_type)));
+	return 0;
+}
+
+static hid_t get_mem_type_id_from_ans_type(SEXPTYPE ans_type, hid_t dtype_id)
+{
+	switch (ans_type) {
+	    case INTSXP:  return H5T_NATIVE_INT;
+	    case REALSXP: return H5T_NATIVE_DOUBLE;
+	    case STRSXP:  return dtype_id;
+	}
+	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(ans_type)));
 	return -1;
 }
 
@@ -119,20 +113,24 @@ static void destroy_dset_desc(DSetDesc *dset_desc)
 static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 			 DSetDesc *dset_desc)
 {
-	hid_t space_id, plist_id;
+	hid_t space_id, plist_id, dtype_id, mem_type_id;
 	int dset_ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
-	size_t ans_elt_size, chunk_data_buf_size;
-	hid_t mem_type_id;
+	H5T_class_t class;
+	size_t size, ans_elt_size, chunk_data_buf_size;
+	SEXPTYPE ans_type;
 
-	/* Get dataspace. */
+	dset_desc->dset_id = dset_id;
+
+	/* Set 'space_id'. */
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
 		return -1;
 	}
+	dset_desc->space_id = space_id;
 
-	/* Ckeck number of dimensions. */
+	/* Set 'ndim'. */
 	dset_ndim = H5Sget_simple_extent_ndims(space_id);
 	if (dset_ndim < 0) {
 		H5Sclose(space_id);
@@ -140,7 +138,6 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 			"H5Sget_simple_extent_ndims() returned an error");
 		return -1;
 	}
-
 	if (ndim != dset_ndim) {
 		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF(
@@ -150,14 +147,16 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 			dset_ndim, ndim, ndim > 1 ? "s" : "");
 		return -1;
 	}
+	dset_desc->ndim = ndim;
 
-	/* Get creation property list. */
+	/* Set 'plist_id'. */
 	plist_id = H5Dget_create_plist(dset_id);
 	if (plist_id < 0) {
 		H5Sclose(space_id);
 		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
 		return -1;
 	}
+	dset_desc->plist_id = plist_id;
 
 	/* Allocate 'h5dim', 'h5chunk_spacings', and 'h5nchunk'. */
 	h5dim = alloc_hsize_t_buf(2 * ndim, "'h5dim' and 'h5chunk_spacings'");
@@ -176,6 +175,21 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 				    "for 'h5nchunk'");
 		return -1;
 	}
+	dset_desc->h5dim = h5dim;
+	dset_desc->h5chunk_spacings = h5chunk_spacings;
+	dset_desc->h5nchunk = h5nchunk;
+
+	/* Set 'dtype_id'. */
+	dtype_id = H5Dget_type(dset_id);
+	if (dtype_id < 0) {
+		free(h5nchunk);
+		free(h5dim);
+		H5Pclose(plist_id);
+		H5Sclose(space_id);
+		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
+		return -1;
+	}
+	dset_desc->dtype_id = dtype_id;
 
 	/* Set 'h5dim'. */
 	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
@@ -211,42 +225,43 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 		h5nchunk[h5along] = nchunk;
 	}
 
-	dset_desc->dset_id = dset_id;
-	dset_desc->space_id = space_id;
-	dset_desc->plist_id = plist_id;
-	dset_desc->ndim = ndim;
-	dset_desc->h5dim = h5dim;
-	dset_desc->h5chunk_spacings = h5chunk_spacings;
-	dset_desc->h5nchunk = h5nchunk;
-
-	if (set_more_dset_desc_fields(dset_desc, as_int) < 0)
-		goto on_error;
-
-	switch (dset_desc->ans_type) {
-	    case INTSXP:
-		ans_elt_size = sizeof(int);
-		mem_type_id = H5T_NATIVE_INT;
-	    break;
-	    case REALSXP:
-		ans_elt_size = sizeof(double);
-		mem_type_id = H5T_NATIVE_DOUBLE;
-	    break;
-	    case STRSXP:
-		ans_elt_size = dset_desc->size;
-		mem_type_id = dset_desc->dtype_id;
-	    break;
-	    default:
-		PRINT_TO_ERRMSG_BUF("%s type not supported",
-				    CHAR(type2str(dset_desc->ans_type)));
+	/* Set 'class'. */
+	class = H5Tget_class(dtype_id);
+	if (class == H5T_NO_CLASS) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		goto on_error;
 	}
+	dset_desc->class = class;
 
-	chunk_data_buf_size = ans_elt_size;
-	for (h5along = 0; h5along < dset_desc->ndim; h5along++)
-		chunk_data_buf_size *= dset_desc->h5chunk_spacings[h5along];
+	/* Set 'size'. */
+	size = H5Tget_size(dtype_id);
+	if (size == 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
+		goto on_error;
+	}
+	dset_desc->size = size;
 
+	/* Set 'ans_type'. */
+	if (get_ans_type_from_class(class, as_int, size, &ans_type) < 0)
+		goto on_error;
+	dset_desc->ans_type = ans_type;
+
+	/* Set 'ans_elt_size'. */
+	ans_elt_size = get_ans_elt_size_from_ans_type(ans_type, size);
+	if (ans_elt_size == 0)
+		goto on_error;
 	dset_desc->ans_elt_size = ans_elt_size;
+
+	/* Set 'chunk_data_buf_size'. */
+	chunk_data_buf_size = ans_elt_size;
+	for (h5along = 0; h5along < ndim; h5along++)
+		chunk_data_buf_size *= h5chunk_spacings[h5along];
 	dset_desc->chunk_data_buf_size = chunk_data_buf_size;
+
+	/* Set 'mem_type_id'. */
+	mem_type_id = get_mem_type_id_from_ans_type(ans_type, dtype_id);
+	if (mem_type_id < 0)
+		goto on_error;
 	dset_desc->mem_type_id = mem_type_id;
 	return 0;
 
