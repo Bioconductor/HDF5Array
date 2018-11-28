@@ -24,8 +24,8 @@ typedef struct {
 	   set_more_dset_desc_fields(). */
 	H5T_class_t class;
 	size_t size;
-	hid_t mem_type_id;  /* the memory type we'll use to load the data */
 	SEXPTYPE ans_type;
+	hid_t mem_type_id;  /* the memory type we'll use to load the data */
 } DSetDesc;
 
 
@@ -64,19 +64,16 @@ static int set_more_dset_desc_fields(DSetDesc *dset_desc, int as_int)
 
 	switch (class) {
 		case H5T_INTEGER:
-		    dset_desc->mem_type_id = H5T_NATIVE_INT;
 		    dset_desc->ans_type = (as_int || size <= sizeof(int)) ?
 					  INTSXP : REALSXP;
 		    return 0;
 		case H5T_FLOAT:
-		    dset_desc->mem_type_id = H5T_NATIVE_DOUBLE;
 		    dset_desc->ans_type = as_int ? INTSXP : REALSXP;
 		    return 0;
 		case H5T_STRING:
 		    if (as_int)
 			warning("'as.integer' is ignored when "
 				"dataset class is H5T_STRING");
-		    dset_desc->mem_type_id = H5T_NATIVE_CHAR;
 		    dset_desc->ans_type = STRSXP;
 		    PRINT_TO_ERRMSG_BUF("H5T_STRING type not supported yet!");
 		    return -1;
@@ -218,6 +215,16 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 
 	if (set_more_dset_desc_fields(dset_desc, as_int) < 0)
 		goto on_error;
+
+	switch (dset_desc->ans_type) {
+	    case INTSXP:  dset_desc->mem_type_id = H5T_NATIVE_INT;    break;
+	    case REALSXP: dset_desc->mem_type_id = H5T_NATIVE_DOUBLE; break;
+	    case STRSXP:  dset_desc->mem_type_id = H5T_NATIVE_CHAR;   break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("%s type not supported",
+				    CHAR(type2str(dset_desc->ans_type)));
+		goto on_error;
+	}
 	return 0;
 
     on_error:
@@ -1259,16 +1266,16 @@ static void update_inner_breakpoints(int ndim, int moved_along,
 			continue;
 		}
 		off = out_blockoff[along];
-		s0 = _get_trusted_elt(start, off);
+		s1 = _get_trusted_elt(start, off);
 		nblock = 0;
 		for (i = 1; i < d; i++) {
+			s0 = s1;
 			s1 = _get_trusted_elt(start, off + i);
 			if (s1 != s0 + 1)
 				IntAE_insert_at(inner_breakpoint_buf,
 						nblock++, i);
-			s0 = s1;
 		}
-		IntAE_insert_at(inner_breakpoint_buf, nblock++, i);
+		IntAE_insert_at(inner_breakpoint_buf, nblock++, d);
 		inner_nblock_buf[along] = nblock;
 	}
 	return;

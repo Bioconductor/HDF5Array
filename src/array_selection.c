@@ -343,8 +343,10 @@ static int map_start_to_chunks(SEXP start, int along,
 		nstart[along] = d;
 		return 0;
 	}
+
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
+
 	if (IntAE_get_nelt(breakpoint_buf) != 0 ||
 	    LLongAE_get_nelt(chunkidx_buf) != 0) {
 		/* Should never happen! */
@@ -353,30 +355,44 @@ static int map_start_to_chunks(SEXP start, int along,
 				    "or chunkidx buffers");
 		return -1;
 	}
+
 	n = LENGTH(start);
 	nstart[along] = n;
+
+	if (n == 0)
+		return 0;
+
+	/* Get 's' and 'chunkidx' for 1st 'start' element. */
+	ret = get_untrusted_start(start, 0, &s, along, 0, 1);
+	if (ret < 0)
+		return -1;
+	if (s > d) {
+		set_errmsg_for_selection_beyond_dim(along + 1, 0, 1);
+		return -1;
+	}
+	chunkidx = (s - 1) / chunkd;
+
+	/* Walk on the remaining 'start' elements. */
 	nchunk = 0;
-	e = 0;
-	prev_chunkidx = -1;
-	for (i = 0; i < n; i++) {
+	for (i = 1; i < n; i++) {
+		e = s;
 		ret = get_untrusted_start(start, i, &s, along, e, 1);
 		if (ret < 0)
 			return -1;
-		e = s;
-		if (e > d) {
+		if (s > d) {
 			set_errmsg_for_selection_beyond_dim(along + 1, i, 1);
 			return -1;
 		}
+		prev_chunkidx = chunkidx;
 		chunkidx = (s - 1) / chunkd;
 		if (chunkidx > prev_chunkidx) {
-			IntAE_insert_at(breakpoint_buf, nchunk, i + 1);
-			LLongAE_insert_at(chunkidx_buf, nchunk, chunkidx);
+			IntAE_insert_at(breakpoint_buf, nchunk, i);
+			LLongAE_insert_at(chunkidx_buf, nchunk, prev_chunkidx);
 			nchunk++;
-		} else {
-			breakpoint_buf->elts[nchunk - 1]++;
 		}
-		prev_chunkidx = chunkidx;
 	}
+	IntAE_insert_at(breakpoint_buf, nchunk, n);
+	LLongAE_insert_at(chunkidx_buf, nchunk, chunkidx);
 	return 0;
 }
 
