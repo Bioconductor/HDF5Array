@@ -1,5 +1,5 @@
 /****************************************************************************
- *       Experimenting with alternate rhdf5::h5read() implementations       *
+ *            Exploring alternate rhdf5::h5read() implementations           *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "HDF5Array.h"
