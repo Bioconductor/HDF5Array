@@ -247,7 +247,7 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	dset_desc->ans_type = ans_type;
 
 	if (ans_type == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
-		PRINT_TO_ERRMSG_BUF("variable-length string data "
+		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
 				    "is not supported at the moment");
 		goto on_error;
 	}
@@ -1787,7 +1787,12 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 {
 	int ndim;
 	DSetDesc dset_desc;
-	SEXP ans_dim, ans;
+	SEXP ans, ans_dim;
+
+	if (method < 0 || method > 6) {
+		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 6");
+		return R_NilValue;
+	}
 
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
@@ -1796,31 +1801,46 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (get_dset_desc(dset_id, ndim, as_int, &dset_desc) < 0)
 		return R_NilValue;
 
-	ans_dim = PROTECT(NEW_INTEGER(ndim));
 	ans = R_NilValue;
 
-	if (method == 0)
+	if (dset_desc.ans_type == STRSXP) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
+					    "reading string data");
+			goto on_error;
+		}
+		if (method == 0) {
+			method = 5;
+		} else if (method != 4 && method != 5) {
+			PRINT_TO_ERRMSG_BUF("reading string data is only "
+					    "supported by methods 4 and 5");
+			goto on_error;
+		}
+	} else if (method == 0) {
 		method = counts == R_NilValue ? 6 : 1;
+	}
+
+	ans_dim = PROTECT(NEW_INTEGER(ndim));
+
 	if (method <= 3) {
 		ans = h5mread_1_2_3(&dset_desc, starts, counts, noreduce,
 				    method, INTEGER(ans_dim));
-	} else if (method <= 6) {
-		if (counts != R_NilValue) {
-			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
-					    "'method' is 4, 5, or 6");
-		} else {
-			ans = h5mread_4_5_6(&dset_desc, starts, counts,
-					    method, INTEGER(ans_dim));
-		}
+	} else if (counts != R_NilValue) {
+		PRINT_TO_ERRMSG_BUF("'counts' must be NULL for "
+				    "methods 4, 5, and 6");
 	} else {
-		PRINT_TO_ERRMSG_BUF("'method' must be <= 6");
+		ans = h5mread_4_5_6(&dset_desc, starts, counts,
+				    method, INTEGER(ans_dim));
 	}
 	if (ans != R_NilValue) {
 		PROTECT(ans);
 		SET_DIM(ans, ans_dim);
 		UNPROTECT(1);
 	}
+
 	UNPROTECT(1);
+
+    on_error:
 	destroy_dset_desc(&dset_desc);
 	return ans;
 }
@@ -1862,8 +1882,6 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	if (!(IS_INTEGER(method) && LENGTH(method) == 1))
 		error("'method' must be a single integer");
 	method0 = INTEGER(method)[0];
-	if (method0 < 0)
-		error("'method' must be >= 0");
 
 	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
 	if (file_id < 0)
