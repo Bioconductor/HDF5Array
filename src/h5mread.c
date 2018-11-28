@@ -246,6 +246,12 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 		goto on_error;
 	dset_desc->ans_type = ans_type;
 
+	if (ans_type == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
+		PRINT_TO_ERRMSG_BUF("variable-length string data "
+				    "is not supported at the moment");
+		goto on_error;
+	}
+
 	/* Set 'ans_elt_size'. */
 	ans_elt_size = get_ans_elt_size_from_ans_type(ans_type, size);
 	if (ans_elt_size == 0)
@@ -1052,38 +1058,46 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
-static void gather_chunk_data(int ndim,
+static void gather_chunk_data(const DSetDesc *dset_desc,
 			const int *outer_midx, int outer_moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
 			const void *in,
 			const hsize_t *h5chunkoff,
-			const hsize_t *h5chunk_spacings,
-			void *out, const int *outdim,
+			SEXP ans, const int *outdim,
 			const int *out_blockoff,
 			const int *out_blockdim,
 			int *inner_midx_buf,
 			hid_t mem_type_id)
 {
-	int inner_moved_along;
+	int ndim, inner_moved_along;
 	size_t in_offset, out_offset;
 	long long int num_elts;
+	const char *s;
+	SEXP ans_elt;
 
+	ndim = dset_desc->ndim;
 	init_in_offset_and_out_offset(ndim, starts,
 			outdim, out_blockoff,
-			h5chunkoff, h5chunk_spacings,
+			h5chunkoff, dset_desc->h5chunk_spacings,
 			&in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
 	while (1) {
 		num_elts++;
-
-		if (mem_type_id == H5T_NATIVE_INT) {
-			((int *) out)[out_offset] =
-				((int *) in)[in_offset];
+		if (dset_desc->ans_type == STRSXP) {
+			s = (char *) in + in_offset * dset_desc->size;
+			ans_elt = PROTECT(mkChar(s));
+			SET_STRING_ELT(ans, out_offset, ans_elt);
+			UNPROTECT(1);
 		} else {
-			((double *) out)[out_offset] =
-				((double *) in)[in_offset];
+			if (dset_desc->ans_type == INTSXP) {
+				INTEGER(ans)[out_offset] =
+					((int *) in)[in_offset];
+			} else {
+				REAL(ans)[out_offset] =
+					((double *) in)[in_offset];
+			}
 		}
 
 		inner_moved_along = next_midx(ndim, out_blockdim,
@@ -1094,7 +1108,7 @@ static void gather_chunk_data(int ndim,
 				inner_midx_buf, inner_moved_along,
 				starts,
 				outdim, out_blockoff,
-				out_blockdim, h5chunk_spacings,
+				out_blockdim, dset_desc->h5chunk_spacings,
 				&in_offset, &out_offset);
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
@@ -1109,19 +1123,14 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 const int *outdim, SEXP ans)
 {
 	int ndim, along, moved_along, ret;
-	void *out, *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	hid_t mem_space_id;
+	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf, *h5zeros_buf;
 	IntAE *nchunk_buf, *outer_midx_buf,
 	      *out_blockoff_buf, *out_blockdim_buf, *inner_midx_buf;
 	long long int num_chunks, ndot;
 
 	ndim = dset_desc->ndim;
-	if (dset_desc->ans_type == INTSXP) {
-		out = INTEGER(ans);
-	} else {
-		out = REAL(ans);
-	}
 	mem_space_id = H5Screate_simple(ndim, dset_desc->h5chunk_spacings,
 					NULL);
 	if (mem_space_id < 0) {
@@ -1207,12 +1216,12 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			h5chunkoff_buf, h5chunkdim_buf,
 			out_blockoff_buf->elts, out_blockdim_buf->elts);
 
-		gather_chunk_data(ndim,
+		gather_chunk_data(dset_desc,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			chunk_data_buf,
-			h5chunkoff_buf, dset_desc->h5chunk_spacings,
-			out, outdim,
+			h5chunkoff_buf,
+			ans, outdim,
 			out_blockoff_buf->elts, out_blockdim_buf->elts,
 			inner_midx_buf->elts,
 			dset_desc->mem_type_id);
@@ -1495,63 +1504,14 @@ static int read_selection(const DSetDesc *dset_desc,
 	return ret;
 }
 
-static void gather_chunk_char_data(const DSetDesc *dset_desc,
-			const int *outer_midx, int outer_moved_along,
-			SEXP starts, const IntAEAE *breakpoint_bufs,
-			const void *in,
-			const hsize_t *h5chunkoff,
-			SEXP ans, const int *outdim,
-			const int *out_blockoff,
-			const int *out_blockdim,
-			int *inner_midx_buf,
-			hid_t mem_type_id)
-{
-	int ndim, inner_moved_along;
-	size_t in_offset, out_offset;
-	long long int num_elts;
-	const char *s;
-	SEXP ans_elt;
-
-	ndim = dset_desc->ndim;
-	init_in_offset_and_out_offset(ndim, starts,
-			outdim, out_blockoff,
-			h5chunkoff, dset_desc->h5chunk_spacings,
-			&in_offset, &out_offset);
-
-	/* Walk on the selected elements in current chunk. */
-	num_elts = 0;
-	while (1) {
-		num_elts++;
-
-		s = (char *) in + in_offset * dset_desc->size;
-		ans_elt = PROTECT(mkCharLen(s, dset_desc->size));
-		SET_STRING_ELT(ans, out_offset, ans_elt);
-		UNPROTECT(1);
-
-		inner_moved_along = next_midx(ndim, out_blockdim,
-					      inner_midx_buf);
-		if (inner_moved_along == ndim)
-			break;
-		update_in_offset_and_out_offset(ndim,
-				inner_midx_buf, inner_moved_along,
-				starts,
-				outdim, out_blockoff,
-				out_blockdim, dset_desc->h5chunk_spacings,
-				&in_offset, &out_offset);
-	};
-	//printf("# nb of selected elements in current chunk = %lld\n",
-	//       num_elts);
-	return;
-}
-
 static int read_data_6(const DSetDesc *dset_desc,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
 		       const LLongAEAE *chunkidx_bufs,
 		       const int *outdim, SEXP ans)
 {
+	void *out;
 	int ndim, moved_along, ret;
-	void *out = NULL, *chunk_data_buf = NULL;
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf,
 		*out_h5blockoff_buf, *out_h5blockdim_buf,
@@ -1563,38 +1523,24 @@ static int read_data_6(const DSetDesc *dset_desc,
 	IntAEAE *inner_breakpoint_bufs;
 	long long int num_chunks, ndot;
 
-	ndim = dset_desc->ndim;
-	if (dset_desc->ans_type == STRSXP) {
-		chunk_data_buf = malloc(dset_desc->chunk_data_buf_size);
-		if (chunk_data_buf == NULL)
-			return -1;
-		mem_space_id = H5Screate_simple(ndim,
-						dset_desc->h5chunk_spacings,
-						NULL);
+	if (dset_desc->ans_type == INTSXP) {
+		out = INTEGER(ans);
 	} else {
-		if (dset_desc->ans_type == INTSXP) {
-			out = INTEGER(ans);
-		} else {
-			out = REAL(ans);
-		}
-		mem_space_id = get_mem_space(ndim, outdim);
+		out = REAL(ans);
 	}
-	if (mem_space_id < 0) {
-		if (chunk_data_buf != NULL)
-			free(chunk_data_buf);
+	ndim = dset_desc->ndim;
+	mem_space_id = get_mem_space(ndim, outdim);
+	if (mem_space_id < 0)
 		return -1;
-	}
 
 	/* Allocate 'h5chunkoff_buf', 'h5chunkdim_buf',
 	   'out_h5blockoff_buf', 'out_h5blockdim_buf',
 	   'in_h5blockoff_buf', and 'in_h5blockdim_buf'. */
 	h5chunkoff_buf = alloc_hsize_t_buf(6 * ndim,
-			"'h5chunkoff_buf', 'h5chunkdim_buf', "
-			"'out_h5blockoff_buf', 'out_h5blockdim_buf', "
-			"'in_h5blockoff_buf', and 'in_h5blockdim_buf'");
+				"'h5chunkoff_buf', 'h5chunkdim_buf', "
+				"'out_h5blockoff_buf', 'out_h5blockdim_buf', "
+				"'in_h5blockoff_buf', and 'in_h5blockdim_buf'");
 	if (h5chunkoff_buf == NULL) {
-		if (chunk_data_buf != NULL)
-			free(chunk_data_buf);
 		H5Sclose(mem_space_id);
 		return -1;
 	}
@@ -1684,32 +1630,13 @@ static int read_data_6(const DSetDesc *dset_desc,
 			break;
 		//t_select_elements += clock() - t0;
 
-		if (dset_desc->ans_type == STRSXP) {
-			printf("read_selection ok1\n");
-			ret = read_selection(dset_desc,
-				out_h5blockoff_buf, out_h5blockdim_buf,
-				chunk_data_buf, mem_space_id);
-			if (ret < 0)
-				break;
-			printf("read_selection ok2\n");
-			gather_chunk_char_data(dset_desc,
-				outer_midx_buf->elts, moved_along,
-				starts, breakpoint_bufs,
-				chunk_data_buf,
-				h5chunkoff_buf,
-				ans, outdim,
-				out_blockoff_buf->elts, out_blockdim_buf->elts,
-				inner_midx_buf->elts,
-				dset_desc->mem_type_id);
-		} else {
-			//t0 = clock();
-			ret = read_selection(dset_desc,
-				out_h5blockoff_buf, out_h5blockdim_buf,
-				out, mem_space_id);
-			if (ret < 0)
-				break;
-			//t_read_selection += clock() - t0;
-		}
+		//t0 = clock();
+		ret = read_selection(dset_desc,
+			out_h5blockoff_buf, out_h5blockdim_buf,
+			out, mem_space_id);
+		if (ret < 0)
+			break;
+		//t_read_selection += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
@@ -1725,8 +1652,6 @@ static int read_data_6(const DSetDesc *dset_desc,
 	//free(coord_buf);
 	free(h5chunkoff_buf);
 	H5Sclose(mem_space_id);
-	if (chunk_data_buf != NULL)
-		free(chunk_data_buf);
 	return ret;
 }
 
