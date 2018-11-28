@@ -22,9 +22,11 @@ typedef struct {
 	int *h5nchunk;
 	/* Fields describing the type of data (they will be filled by
 	   set_more_dset_desc_fields(). */
+	hid_t dtype_id;
 	H5T_class_t class;
 	size_t size;
 	SEXPTYPE ans_type;
+	size_t ans_elt_size, chunk_data_buf_size;
 	hid_t mem_type_id;  /* the memory type we'll use to load the data */
 } DSetDesc;
 
@@ -37,29 +39,31 @@ typedef struct {
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
 static int set_more_dset_desc_fields(DSetDesc *dset_desc, int as_int)
 {
-	hid_t type_id;
+	hid_t dtype_id;
 	H5T_class_t class;
 	size_t size;
 	const char *classname;
 
 	/* Get class and size of datatype. */
-	type_id = H5Dget_type(dset_desc->dset_id);
-	if (type_id < 0) {
+	dtype_id = H5Dget_type(dset_desc->dset_id);
+	if (dtype_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		return -1;
 	}
-	class = H5Tget_class(type_id);
-	size = H5Tget_size(type_id);
-	H5Tclose(type_id);
+	dset_desc->dtype_id = dtype_id;
+
+	class = H5Tget_class(dtype_id);
 	if (class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		return -1;
 	}
+	dset_desc->class = class;
+
+	size = H5Tget_size(dtype_id);
 	if (size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
 		return -1;
 	}
-	dset_desc->class = class;
 	dset_desc->size = size;
 
 	switch (class) {
@@ -75,8 +79,7 @@ static int set_more_dset_desc_fields(DSetDesc *dset_desc, int as_int)
 			warning("'as.integer' is ignored when "
 				"dataset class is H5T_STRING");
 		    dset_desc->ans_type = STRSXP;
-		    PRINT_TO_ERRMSG_BUF("H5T_STRING type not supported yet!");
-		    return -1;
+		    return 0;
 		case H5T_TIME: classname = "H5T_TIME"; break;
 		case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
 		case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
@@ -106,6 +109,7 @@ static hsize_t *alloc_hsize_t_buf(size_t buflength, const char *what)
 
 static void destroy_dset_desc(DSetDesc *dset_desc)
 {
+	H5Tclose(dset_desc->dtype_id);
 	free(dset_desc->h5nchunk);
 	free(dset_desc->h5dim);
 	H5Pclose(dset_desc->plist_id);
@@ -118,6 +122,8 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	hid_t space_id, plist_id;
 	int dset_ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
+	size_t ans_elt_size, chunk_data_buf_size;
+	hid_t mem_type_id;
 
 	/* Get dataspace. */
 	space_id = H5Dget_space(dset_id);
@@ -217,14 +223,31 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 		goto on_error;
 
 	switch (dset_desc->ans_type) {
-	    case INTSXP:  dset_desc->mem_type_id = H5T_NATIVE_INT;    break;
-	    case REALSXP: dset_desc->mem_type_id = H5T_NATIVE_DOUBLE; break;
-	    case STRSXP:  dset_desc->mem_type_id = H5T_NATIVE_CHAR;   break;
+	    case INTSXP:
+		ans_elt_size = sizeof(int);
+		mem_type_id = H5T_NATIVE_INT;
+	    break;
+	    case REALSXP:
+		ans_elt_size = sizeof(double);
+		mem_type_id = H5T_NATIVE_DOUBLE;
+	    break;
+	    case STRSXP:
+		ans_elt_size = dset_desc->size;
+		mem_type_id = dset_desc->dtype_id;
+	    break;
 	    default:
 		PRINT_TO_ERRMSG_BUF("%s type not supported",
 				    CHAR(type2str(dset_desc->ans_type)));
 		goto on_error;
 	}
+
+	chunk_data_buf_size = ans_elt_size;
+	for (h5along = 0; h5along < dset_desc->ndim; h5along++)
+		chunk_data_buf_size *= dset_desc->h5chunk_spacings[h5along];
+
+	dset_desc->ans_elt_size = ans_elt_size;
+	dset_desc->chunk_data_buf_size = chunk_data_buf_size;
+	dset_desc->mem_type_id = mem_type_id;
 	return 0;
 
     on_error:
@@ -894,7 +917,7 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
 static int direct_load_chunk(const DSetDesc *dset_desc,
 			     const hsize_t *h5chunkoff_buf,
 			     const hsize_t *h5chunkdim_buf,
-			     void *chunk_data_out, size_t chunk_maxsize,
+			     void *chunk_data_out,
 			     void *compressed_chunk_data_buf)
 {
 	int ret;
@@ -908,11 +931,14 @@ static int direct_load_chunk(const DSetDesc *dset_desc,
 				    "returned an error");
 		return -1;
 	}
-	if (chunk_storage_size > chunk_maxsize + COMPRESSION_OVERHEAD) {
+	if (chunk_storage_size > dset_desc->chunk_data_buf_size +
+				 COMPRESSION_OVERHEAD)
+	{
 		PRINT_TO_ERRMSG_BUF("chunk storage size (%llu) bigger "
 				    "than expected (%lu + %d)",
 				    chunk_storage_size,
-				    chunk_maxsize, COMPRESSION_OVERHEAD);
+				    dset_desc->chunk_data_buf_size,
+				    COMPRESSION_OVERHEAD);
 		return -1;
 	}
 	ret = H5Dread_chunk(dset_desc->dset_id, H5P_DEFAULT,
@@ -928,7 +954,8 @@ static int direct_load_chunk(const DSetDesc *dset_desc,
 	// a bit in the returned 'filters' that indicates this.
 	return uncompress_chunk_data(compressed_chunk_data_buf,
 				     chunk_storage_size,
-				     chunk_data_out, chunk_maxsize);
+				     chunk_data_out,
+				     dset_desc->chunk_data_buf_size);
 }
 
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
@@ -1035,6 +1062,7 @@ static void gather_chunk_data(int ndim,
 	num_elts = 0;
 	while (1) {
 		num_elts++;
+
 		if (mem_type_id == H5T_NATIVE_INT) {
 			((int *) out)[out_offset] =
 				((int *) in)[in_offset];
@@ -1042,6 +1070,7 @@ static void gather_chunk_data(int ndim,
 			((double *) out)[out_offset] =
 				((double *) in)[in_offset];
 		}
+
 		inner_moved_along = next_midx(ndim, out_blockdim,
 					      inner_midx_buf);
 		if (inner_moved_along == ndim)
@@ -1062,18 +1091,22 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
 			 const LLongAEAE *chunkidx_bufs,
-			 void *out, const int *outdim)
+			 const int *outdim, SEXP ans)
 {
 	int ndim, along, moved_along, ret;
+	void *out, *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf, *h5zeros_buf;
-	size_t chunk_eltsize, chunk_maxsize;
-	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	IntAE *nchunk_buf, *outer_midx_buf,
 	      *out_blockoff_buf, *out_blockdim_buf, *inner_midx_buf;
 	long long int num_chunks, ndot;
 
 	ndim = dset_desc->ndim;
+	if (dset_desc->ans_type == INTSXP) {
+		out = INTEGER(ans);
+	} else {
+		out = REAL(ans);
+	}
 	mem_space_id = H5Screate_simple(ndim, dset_desc->h5chunk_spacings,
 					NULL);
 	if (mem_space_id < 0) {
@@ -1093,18 +1126,10 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 	for (along = 0; along < ndim; along++)
 		h5zeros_buf[along] = 0;
 
-	if (dset_desc->mem_type_id == H5T_NATIVE_INT) {
-		chunk_eltsize = sizeof(int);
-	} else {
-		chunk_eltsize = sizeof(double);
-	}
-	chunk_maxsize = chunk_eltsize;
-	for (along = 0; along < ndim; along++)
-		chunk_maxsize *= dset_desc->h5chunk_spacings[along];
 	if (method != 5) {
-		chunk_data_buf = malloc(chunk_maxsize);
+		chunk_data_buf = malloc(dset_desc->chunk_data_buf_size);
 	} else {
-		chunk_data_buf = malloc(2 * chunk_maxsize +
+		chunk_data_buf = malloc(2 * dset_desc->chunk_data_buf_size +
 					COMPRESSION_OVERHEAD);
 	}
 	if (chunk_data_buf == NULL) {
@@ -1115,7 +1140,8 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 		return -1;
 	}
 	if (method == 5)
-		compressed_chunk_data_buf = chunk_data_buf + chunk_maxsize;
+		compressed_chunk_data_buf = chunk_data_buf +
+					    dset_desc->chunk_data_buf_size;
 
 	/* Prepare buffers. */
 	nchunk_buf = new_IntAE(ndim, ndim, 0);
@@ -1152,7 +1178,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 		} else {
 			ret = direct_load_chunk(dset_desc,
 					h5chunkoff_buf, h5chunkdim_buf,
-					chunk_data_buf, chunk_maxsize,
+					chunk_data_buf,
 					compressed_chunk_data_buf);
 		}
 		if (ret < 0)
@@ -1454,13 +1480,63 @@ static int read_selection(const DSetDesc *dset_desc,
 	return ret;
 }
 
+static void gather_chunk_char_data(const DSetDesc *dset_desc,
+			const int *outer_midx, int outer_moved_along,
+			SEXP starts, const IntAEAE *breakpoint_bufs,
+			const void *in,
+			const hsize_t *h5chunkoff,
+			SEXP ans, const int *outdim,
+			const int *out_blockoff,
+			const int *out_blockdim,
+			int *inner_midx_buf,
+			hid_t mem_type_id)
+{
+	int ndim, inner_moved_along;
+	size_t in_offset, out_offset;
+	long long int num_elts;
+	const char *s;
+	SEXP ans_elt;
+
+	ndim = dset_desc->ndim;
+	init_in_offset_and_out_offset(ndim, starts,
+			outdim, out_blockoff,
+			h5chunkoff, dset_desc->h5chunk_spacings,
+			&in_offset, &out_offset);
+
+	/* Walk on the selected elements in current chunk. */
+	num_elts = 0;
+	while (1) {
+		num_elts++;
+
+		s = (char *) in + in_offset * dset_desc->size;
+		ans_elt = PROTECT(mkCharLen(s, dset_desc->size));
+		SET_STRING_ELT(ans, out_offset, ans_elt);
+		UNPROTECT(1);
+
+		inner_moved_along = next_midx(ndim, out_blockdim,
+					      inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		update_in_offset_and_out_offset(ndim,
+				inner_midx_buf, inner_moved_along,
+				starts,
+				outdim, out_blockoff,
+				out_blockdim, dset_desc->h5chunk_spacings,
+				&in_offset, &out_offset);
+	};
+	//printf("# nb of selected elements in current chunk = %lld\n",
+	//       num_elts);
+	return;
+}
+
 static int read_data_6(const DSetDesc *dset_desc,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
 		       const LLongAEAE *chunkidx_bufs,
-		       void *out, const int *outdim)
+		       const int *outdim, SEXP ans)
 {
 	int ndim, moved_along, ret;
+	void *out = NULL, *chunk_data_buf = NULL;
 	hid_t mem_space_id;
 	hsize_t *h5chunkoff_buf, *h5chunkdim_buf,
 		*out_h5blockoff_buf, *out_h5blockdim_buf,
@@ -1473,9 +1549,26 @@ static int read_data_6(const DSetDesc *dset_desc,
 	long long int num_chunks, ndot;
 
 	ndim = dset_desc->ndim;
-	mem_space_id = get_mem_space(ndim, outdim);
-	if (mem_space_id < 0)
+	if (dset_desc->ans_type == STRSXP) {
+		chunk_data_buf = malloc(dset_desc->chunk_data_buf_size);
+		if (chunk_data_buf == NULL)
+			return -1;
+		mem_space_id = H5Screate_simple(ndim,
+						dset_desc->h5chunk_spacings,
+						NULL);
+	} else {
+		if (dset_desc->ans_type == INTSXP) {
+			out = INTEGER(ans);
+		} else {
+			out = REAL(ans);
+		}
+		mem_space_id = get_mem_space(ndim, outdim);
+	}
+	if (mem_space_id < 0) {
+		if (chunk_data_buf != NULL)
+			free(chunk_data_buf);
 		return -1;
+	}
 
 	/* Allocate 'h5chunkoff_buf', 'h5chunkdim_buf',
 	   'out_h5blockoff_buf', 'out_h5blockdim_buf',
@@ -1485,6 +1578,8 @@ static int read_data_6(const DSetDesc *dset_desc,
 			"'out_h5blockoff_buf', 'out_h5blockdim_buf', "
 			"'in_h5blockoff_buf', and 'in_h5blockdim_buf'");
 	if (h5chunkoff_buf == NULL) {
+		if (chunk_data_buf != NULL)
+			free(chunk_data_buf);
 		H5Sclose(mem_space_id);
 		return -1;
 	}
@@ -1574,13 +1669,32 @@ static int read_data_6(const DSetDesc *dset_desc,
 			break;
 		//t_select_elements += clock() - t0;
 
-		//t0 = clock();
-		ret = read_selection(dset_desc,
+		if (dset_desc->ans_type == STRSXP) {
+			printf("read_selection ok1\n");
+			ret = read_selection(dset_desc,
+				out_h5blockoff_buf, out_h5blockdim_buf,
+				chunk_data_buf, mem_space_id);
+			if (ret < 0)
+				break;
+			printf("read_selection ok2\n");
+			gather_chunk_char_data(dset_desc,
+				outer_midx_buf->elts, moved_along,
+				starts, breakpoint_bufs,
+				chunk_data_buf,
+				h5chunkoff_buf,
+				ans, outdim,
+				out_blockoff_buf->elts, out_blockdim_buf->elts,
+				inner_midx_buf->elts,
+				dset_desc->mem_type_id);
+		} else {
+			//t0 = clock();
+			ret = read_selection(dset_desc,
 				out_h5blockoff_buf, out_h5blockdim_buf,
 				out, mem_space_id);
-		if (ret < 0)
-			break;
-		//t_read_selection += clock() - t0;
+			if (ret < 0)
+				break;
+			//t_read_selection += clock() - t0;
+		}
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
 					outer_midx_buf->elts);
@@ -1596,6 +1710,8 @@ static int read_data_6(const DSetDesc *dset_desc,
 	//free(coord_buf);
 	free(h5chunkoff_buf);
 	H5Sclose(mem_space_id);
+	if (chunk_data_buf != NULL)
+		free(chunk_data_buf);
 	return ret;
 }
 
@@ -1610,14 +1726,12 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
-	SEXP ans;
-
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	int *nstart, *nblock;
 	long long int *last_block_start;
-
 	R_xlen_t ans_len;
+	SEXP ans;
 	void *out;
 	hid_t mem_space_id;
 
@@ -1682,13 +1796,10 @@ static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
 			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
-	SEXP ans;
-
 	IntAEAE *breakpoint_bufs;
 	LLongAEAE *chunkidx_bufs;
-
 	R_xlen_t ans_len;
-	void *out;
+	SEXP ans;
 
 	ndim = dset_desc->ndim;
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
@@ -1707,21 +1818,16 @@ static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
 	ans = PROTECT(allocVector(dset_desc->ans_type, ans_len));
 
 	if (ans_len != 0) {
-		if (dset_desc->ans_type == INTSXP) {
-			out = INTEGER(ans);
-		} else {
-			out = REAL(ans);
-		}
 		if (method <= 5) {
 			/* methods 4 and 5 */
 			ret = read_data_4_5(dset_desc, method,
 				starts, breakpoint_bufs, chunkidx_bufs,
-				out, ans_dim);
+				ans_dim, ans);
 		} else {
 			/* method 6 */
 			ret = read_data_6(dset_desc,
 				starts, breakpoint_bufs, chunkidx_bufs,
-				out, ans_dim);
+				ans_dim, ans);
 		}
 		if (ret < 0)
 			goto on_error;
