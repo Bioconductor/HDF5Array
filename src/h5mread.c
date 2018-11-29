@@ -304,8 +304,9 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
-static int check_selection_against_dset(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts, int *count_sum_buf)
+static long long int check_selection_against_dset(
+			const DSetDesc *dset_desc,
+			SEXP starts, SEXP counts, int *selection_dim_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -316,11 +317,12 @@ static int check_selection_against_dset(const DSetDesc *dset_desc,
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
 	return _check_selection(starts, counts, dim_buf->elts,
-				count_sum_buf);
+				selection_dim_buf);
 }
 
-static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts, int *count_sum_buf,
+static long long int check_ordered_selection_against_dset(
+			const DSetDesc *dset_desc,
+			SEXP starts, SEXP counts, int *selection_dim_buf,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
@@ -333,7 +335,7 @@ static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
 	return _check_ordered_selection(starts, counts, dim_buf->elts,
-					count_sum_buf,
+					selection_dim_buf,
 					nstart_buf, nblock_buf,
 					last_block_start_buf);
 }
@@ -1732,22 +1734,21 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 			  SEXP starts, SEXP counts, int noreduce,
 			  int method, int *ans_dim)
 {
-	int ndim, ret, along;
+	int ndim, ret;
+	long long ans_len;
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
-	R_xlen_t ans_len;
 	SEXP ans, reduced;
 	void *out;
 	hid_t mem_space_id;
 	int nprotect = 0;
 
 	ndim = dset_desc->ndim;
-
 	if (noreduce || method == 2) {
 		/* This call will populate 'ans_dim'. */
-		ret = check_selection_against_dset(dset_desc,
+		ans_len = check_selection_against_dset(dset_desc,
 					starts, counts, ans_dim);
-		if (ret < 0)
+		if (ans_len < 0)
 			return R_NilValue;
 	} else {
 		nstart_buf = new_IntAE(ndim, ndim, 0);
@@ -1755,11 +1756,11 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 		/* This call will populate 'ans_dim', 'nblock_buf',
 		   and 'last_block_start_buf'. */
-		ret = check_ordered_selection_against_dset(dset_desc,
+		ans_len = check_ordered_selection_against_dset(dset_desc,
 					starts, counts, ans_dim,
 					nstart_buf->elts, nblock_buf->elts,
 					last_block_start_buf->elts);
-		if (ret < 0)
+		if (ans_len < 0)
 			return R_NilValue;
 		if (_selection_can_be_reduced(ndim, nstart_buf->elts,
 						    nblock_buf->elts)) {
@@ -1773,10 +1774,7 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 		}
 	}
 
-	ans_len = 1;
-	for (along = 0; along < ndim; along++)
-		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(dset_desc->ans_type, ans_len));
+	ans = PROTECT(allocVector(dset_desc->ans_type, (R_xlen_t) ans_len));
 	nprotect++;
 
 	if (ans_len != 0) {
@@ -1798,9 +1796,9 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 				out, mem_space_id);
 		}
 		H5Sclose(mem_space_id);
+		if (ret < 0)
+			goto on_error;
 	}
-	if (ret < 0)
-		goto on_error;
 
 	UNPROTECT(nprotect);
 	return ans;

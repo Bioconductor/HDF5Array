@@ -22,11 +22,11 @@ int _shallow_check_selection(
 	SEXP counts
 );
 
-int _check_selection(
+long long int _check_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *count_sum_buf
+	int *selection_dim_buf
 );
 
 SEXP C_check_selection(
@@ -35,11 +35,11 @@ SEXP C_check_selection(
 	SEXP dim
 );
 
-int _check_ordered_selection(
+long long int _check_ordered_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *count_sum_buf,
+	int *selection_dim_buf,
 	int *nstart_buf,
 	int *nblock_buf,
 	long long int *last_block_start_buf
@@ -68,7 +68,7 @@ int _selection_can_be_reduced(
 
 SEXP _reduce_selection(
 	SEXP starts, SEXP counts,
-	const int *count_sum,
+	const int *selection_dim,
 	const int *nblock,
 	const long long int *last_block_start
 );

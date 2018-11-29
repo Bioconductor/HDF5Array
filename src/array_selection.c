@@ -146,11 +146,10 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 }
 
 static int check_selection_along(SEXP start, SEXP count, int along,
-				 long long int d,
-				 int *count_sum_buf)
+				 long long int d)
 {
+	long long int selection_dim, s, c, e;
 	int n, i, ret;
-	long long int s, c, cs, e;
 
 	if (start == R_NilValue) {
 		if (count != R_NilValue) {
@@ -165,12 +164,14 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 				set_error_for_selection_too_large(along + 1);
 				return -1;
 			}
-			count_sum_buf[along] = d;
+			selection_dim = d;
 		} else {
-			/* The "count sum" is undefined in that case
-			   so we don't set it. */
+			/* The dimension of the selection along the current
+			   dimension is undefined in that case.
+			   We **arbitrary** set it to INT_MAX. */
+			selection_dim = INT_MAX;
 		}
-		return 0;
+		return (int) selection_dim;
 	}
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
@@ -202,12 +203,10 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 			return -1;
 		}
 	}
-	if (count == R_NilValue) {
-		count_sum_buf[along] = n;
-		return 0;
-	}
+	if (count == R_NilValue)
+		return n;
 	/* Walk on the 'count' (and 'start') elements. */
-	cs = 0;
+	selection_dim = 0;
 	for (i = 0; i < n; i++) {
 		ret = get_untrusted_elt(count, i, &c, "counts", along);
 		if (ret < 0)
@@ -220,20 +219,19 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 			return -1;
 		}
 		s = _get_trusted_elt(start, i);
-		e = s + c - 1;	// could overflow! (FIXME)
+		e = s + c - 1;      // could overflow! (FIXME)
 		if (d >= 0 && e > d) {
 			set_errmsg_for_selection_beyond_dim(
 				along + 1, i, 0);
 			return -1;
 		}
-		cs += c;	// could overflow! (FIXME)
-		if (cs > INT_MAX) {
+		selection_dim += c; // could overflow! (FIXME)
+		if (selection_dim > INT_MAX) {
 			set_error_for_selection_too_large(along + 1);
 			return -1;
 		}
 	}
-	count_sum_buf[along] = cs;
-	return 0;
+	return (int) selection_dim;
 }
 
 /* Assume that 'starts' is a list and that 'counts' is NULL or a list
@@ -242,26 +240,30 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 
    'dim' is assumed to be NULL or to have the same length as 'starts'.
 
-   'count_sum_buf' is assumed to have the same length as 'starts'.
+   'selection_dim_buf' is assumed to have the same length as 'starts'.
 */
-int _check_selection(SEXP starts, SEXP counts,
-		     const long long int *dim, int *count_sum_buf)
+long long int _check_selection(SEXP starts, SEXP counts,
+		     const long long int *dim, int *selection_dim_buf)
 {
-	int ndim, along, ret;
+	long long int selection_len;
+	int ndim, along, selection_dim;
 	SEXP start, count;
 
+	selection_len = 1;
 	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
 		start = VECTOR_ELT(starts, along);
 		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
 					     : R_NilValue;
-		ret = check_selection_along(start, count, along,
-					    dim != NULL ? dim[along] : -1,
-					    count_sum_buf);
-		if (ret < 0)
+		selection_dim = check_selection_along(
+					start, count, along,
+					dim != NULL ? dim[along] : -1);
+		if (selection_dim < 0)
 			return -1;
+		selection_dim_buf[along] = selection_dim;
+		selection_len *= selection_dim;
 	}
-	return 0;
+	return selection_len;
 }
 
 /* --- .Call ENTRY POINT --- */
@@ -269,8 +271,8 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 {
 	int ndim, along, ret;
 	LLongAE *dim_buf;
-	IntAE *count_sum_buf;
-	long long int *dim_p, d;
+	IntAE *selection_dim_buf;
+	long long int *dim_p, d, selection_len;
 
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
@@ -293,10 +295,11 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 		}
 	}
 
-	count_sum_buf = new_IntAE(ndim, ndim, 0);
+	selection_dim_buf = new_IntAE(ndim, ndim, 0);
 
-	ret = _check_selection(starts, counts, dim_p, count_sum_buf->elts);
-	if (ret < 0)
+	selection_len = _check_selection(starts, counts, dim_p,
+					 selection_dim_buf->elts);
+	if (selection_len < 0)
 		error(_HDF5Array_errmsg_buf);
 	return R_NilValue;
 }
@@ -342,10 +345,12 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 }
 
 static int check_ordered_selection_along_NULL_start(SEXP count, int along,
-			long long int d, int *count_sum_buf,
+			long long int d,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
+	int selection_dim;
+
 	if (count != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF(
 			"if 'starts[[%d]]' is NULL then 'counts' "
@@ -358,30 +363,32 @@ static int check_ordered_selection_along_NULL_start(SEXP count, int along,
 			set_error_for_selection_too_large(along + 1);
 			return -1;
 		}
-		count_sum_buf[along] = d;
+		selection_dim = d;
 		nstart_buf[along] = d;
 		nblock_buf[along] = d != 0;
 		last_block_start_buf[along] = 1;
 	} else {
-		/* The "count sum" is undefined in that case
-		   so we don't set it. */
+		/* The dimension of the selection along the current
+		   dimension is undefined in that case.
+		   We **arbitrary** set it to INT_MAX. */
+		selection_dim = INT_MAX;
 		nstart_buf[along] = nblock_buf[along] = 1;
 		last_block_start_buf[along] = 1;
 	}
-	return 0;
+	return selection_dim;
 }
 
 static int check_ordered_selection_along(SEXP start, SEXP count, int along,
-			long long int d, int *count_sum_buf,
+			long long int d,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
+	long long int selection_dim, e, s, c;
 	int n, i, ret;
-	long long int e, s, cs, c;
 
 	if (start == R_NilValue)
 		return check_ordered_selection_along_NULL_start(count, along,
-				d, count_sum_buf,
+				d,
 				nstart_buf, nblock_buf, last_block_start_buf);
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
@@ -417,10 +424,10 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 				return -1;
 			}
 		}
-		count_sum_buf[along] = n;
+		selection_dim = n;
 	} else {
 		/* Walk on the 'start' and 'count' elements. */
-		cs = 0;
+		selection_dim = 0;
 		for (i = 0; i < n; i++) {
 			ret = get_untrusted_elt(count, i, &c, "counts", along);
 			if (ret < 0)
@@ -439,21 +446,20 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 				nblock_buf[along]++;
 				last_block_start_buf[along] = s;
 			}
-			e = s + c - 1;	// could overflow! (FIXME)
+			e = s + c - 1;      // could overflow! (FIXME)
 			if (d >= 0 && e > d) {
 				set_errmsg_for_selection_beyond_dim(
 					along + 1, i, 0);
 				return -1;
 			}
-			cs += c;	// could overflow! (FIXME)
-			if (cs > INT_MAX) {
+			selection_dim += c; // could overflow! (FIXME)
+			if (selection_dim > INT_MAX) {
 				set_error_for_selection_too_large(along + 1);
 				return -1;
 			}
 		}
-		count_sum_buf[along] = cs;
 	}
-	return 0;
+	return (int) selection_dim;
 }
 
 /* Assume that 'starts' is a list and that 'counts' is NULL or a list
@@ -462,31 +468,35 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 
    'dim' is assumed to be NULL or to have the same length as 'starts'.
 
-   'count_sum_buf', 'nstart_buf', 'nblock_buf', and 'last_block_start_buf'
+   'selection_dim_buf', 'nstart_buf', 'nblock_buf', and 'last_block_start_buf'
    are assumed to have the same length as 'starts'.
 */
-int _check_ordered_selection(SEXP starts, SEXP counts,
-			const long long int *dim, int *count_sum_buf,
+long long int _check_ordered_selection(SEXP starts, SEXP counts,
+			const long long int *dim, int *selection_dim_buf,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
-	int ndim, along, ret;
+	long long int selection_len;
+	int ndim, along, selection_dim;
 	SEXP start, count;
 
+	selection_len = 1;
 	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
 		start = VECTOR_ELT(starts, along);
 		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
 					     : R_NilValue;
-		ret = check_ordered_selection_along(start, count, along,
+		selection_dim = check_ordered_selection_along(
+					start, count, along,
 					dim != NULL ? dim[along] : -1,
-					count_sum_buf,
 					nstart_buf, nblock_buf,
 					last_block_start_buf);
-		if (ret < 0)
+		if (selection_dim < 0)
 			return -1;
+		selection_dim_buf[along] = selection_dim;
+		selection_len *= selection_dim;
 	}
-	return 0;
+	return selection_len;
 }
 
 
@@ -790,7 +800,7 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 }
 
 static void reduce_selection_along(SEXP start, SEXP count, int along,
-				   const int *count_sum,
+				   const int *selection_dim,
 				   const int *nblock,
 				   const long long int *last_block_start,
 				   SEXP reduced_starts, SEXP reduced_counts)
@@ -806,7 +816,7 @@ static void reduce_selection_along(SEXP start, SEXP count, int along,
 		reduced_start = PROTECT(dup_or_coerce_to_INTSXP(start, dup));
 		SET_VECTOR_ELT(reduced_starts, along, reduced_start);
 		UNPROTECT(1);
-		if (count_sum[along] == n)
+		if (selection_dim[along] == n)
 			return;
 		dup = IS_INTEGER(count);
 		reduced_count = PROTECT(dup_or_coerce_to_INTSXP(count, dup));
@@ -827,7 +837,7 @@ static void reduce_selection_along(SEXP start, SEXP count, int along,
 }
 
 SEXP _reduce_selection(SEXP starts, SEXP counts,
-		       const int *count_sum,
+		       const int *selection_dim,
 		       const int *nblock,
 		       const long long int *last_block_start)
 {
@@ -850,7 +860,7 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 		count = counts != R_NilValue ? VECTOR_ELT(counts, along) :
 					       R_NilValue;
 		reduce_selection_along(start, count, along,
-				       count_sum,
+				       selection_dim,
 				       nblock, last_block_start,
 				       reduced_starts, reduced_counts);
 	}
@@ -872,9 +882,9 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 {
 	int ndim, along, ret;
 	LLongAE *dim_buf;
-	IntAE *count_sum_buf, *nstart_buf, *nblock_buf;
+	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
-	long long int *dim_p, d;
+	long long int selection_len, *dim_p, d;
 
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
@@ -897,19 +907,19 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 		}
 	}
 
-	count_sum_buf = new_IntAE(ndim, ndim, 0);
+	selection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 
 	/* 1st pass */
 	//clock_t t0 = clock();
-	ret = _check_ordered_selection(starts, counts, dim_p,
-				count_sum_buf->elts,
+	selection_len = _check_ordered_selection(starts, counts, dim_p,
+				selection_dim_buf->elts,
 				nstart_buf->elts, nblock_buf->elts,
 				last_block_start_buf->elts);
 	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	if (ret < 0)
+	if (selection_len < 0)
 		error(_HDF5Array_errmsg_buf);
 
 	if (!_selection_can_be_reduced(ndim,
@@ -918,7 +928,7 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 
 	/* 2nd pass */
 	return _reduce_selection(starts, counts,
-				 count_sum_buf->elts, nblock_buf->elts,
+				 selection_dim_buf->elts, nblock_buf->elts,
 				 last_block_start_buf->elts);
 }
 
