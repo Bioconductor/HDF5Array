@@ -1,7 +1,16 @@
 /****************************************************************************
  *            Exploring alternate rhdf5::h5read() implementations           *
  *                            Author: H. Pag\`es                            *
- ****************************************************************************/
+ ****************************************************************************
+ *
+ * Some useful links:
+ * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
+ *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
+ * - Documentation of H5Dread():
+ *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
+ * - An H5Dread() example:
+ *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
+ */
 #include "HDF5Array.h"
 #include "hdf5.h"
 
@@ -372,13 +381,12 @@ static inline int next_midx(int ndim, const int *max_idx_plus_one,
 /****************************************************************************
  * read_data_1_2()
  *
- * Some useful links:
- * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
- * - Documentation of H5Dread():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
- * - An H5Dread() example:
- *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
+ * A single call to H5Dread().
+ *
+ * More precisely:
+ *   - First walk over the blocks described by 'starts' and 'counts' and
+ *     add each block to the selection.
+ *   - Then make a single call to H5Dread().
  */
 
 static void init_h5blockoff_and_h5blockdim_bufs(const DSetDesc *dset_desc,
@@ -598,6 +606,30 @@ static int read_data_1_2(const DSetDesc *dset_desc, int method,
 
 /****************************************************************************
  * read_data_3()
+ *
+ * One call to H5Dread() per block in the selection.
+ *
+ * More precisely, walk over the blocks described by 'starts' and 'counts'
+ * and make one call to H5Dread() per block.
+ *
+ * WARNING: Currently broken!
+
+    library(HDF5Array)
+    m0 <- matrix(1:60, ncol=6)
+    M0 <- writeHDF5Array(m0, chunkdim=c(4, 5))
+    h5mread(M0@seed@filepath, M0@seed@name, list(NULL, c(2:3, 5)), method=3L)
+         [,1] [,2]      [,3]
+    [1,]   11   41 209047208
+    [2,]   12   42         0
+    [3,]   13   43 209046632
+    [4,]   14   44         0
+    [5,]   15   45 209046568
+    [6,]   16   46         0
+    [7,]   17   47 209046440
+    [8,]   18   48         0
+    [9,]   19   49 209046312
+   [10,]   20   50         0
+
  */
 
 static int read_selection_unit(const DSetDesc *dset_desc,
@@ -713,6 +745,14 @@ static int read_data_3(const DSetDesc *dset_desc,
 
 /****************************************************************************
  * read_data_4_5()
+ *
+ * One call to H5Dread() per chunk touched by the selection.
+ *
+ * More precisely, walk over the chunks touched by 'starts'. For each chunk:
+ *   - Make one call to H5Dread() to load the **entire** chunk data to an
+ *     intermediate buffer.
+ *   - Copy the selected data from the intermediate buffer to the output
+ *     array.
  */
 
 static void set_nchunk_buf(const DSetDesc *dset_desc,
@@ -1246,6 +1286,13 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 
 /****************************************************************************
  * read_data_6()
+ *
+ * One call to H5Dread() per chunk touched by the selection. No intermediate
+ * buffer.
+ *
+ * More precisely, walk over the chunks touched by 'starts'. For each chunk
+ * make one call to H5Dread() to load the selected data **directly** to the
+ * output array.
  */
 
 /*
