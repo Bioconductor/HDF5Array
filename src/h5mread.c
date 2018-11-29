@@ -305,7 +305,7 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 }
 
 static int check_selection_against_dset(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts, int *ans_dim)
+			SEXP starts, SEXP counts, int *count_sum_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -315,13 +315,14 @@ static int check_selection_against_dset(const DSetDesc *dset_desc,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
-	return _check_selection(starts, counts, dim_buf->elts, ans_dim);
+	return _check_selection(starts, counts, dim_buf->elts,
+				count_sum_buf);
 }
 
 static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
-			SEXP starts, SEXP counts, int *ans_dim,
-			int *nstart, int *nblock,
-			long long int *last_block_start)
+			SEXP starts, SEXP counts, int *count_sum_buf,
+			int *nstart_buf, int *nblock_buf,
+			long long int *last_block_start_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -331,13 +332,15 @@ static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
-	return _check_ordered_selection(starts, counts, dim_buf->elts, ans_dim,
-					nstart, nblock, last_block_start);
+	return _check_ordered_selection(starts, counts, dim_buf->elts,
+					count_sum_buf,
+					nstart_buf, nblock_buf,
+					last_block_start_buf);
 }
 
 static int map_starts_to_chunks(const DSetDesc *dset_desc,
 				SEXP starts,
-				int *ans_dim,
+				int *nstart_buf,
 				IntAEAE *breakpoint_bufs,
 				LLongAEAE *chunkidx_bufs)
 {
@@ -354,7 +357,7 @@ static int map_starts_to_chunks(const DSetDesc *dset_desc,
 			(long long int) dset_desc->h5chunk_spacings[h5along];
 	}
 	return _map_starts_to_chunks(starts, dim_buf->elts, chunkdim_buf->elts,
-				     ans_dim,
+				     nstart_buf,
 				     breakpoint_bufs, chunkidx_bufs);
 }
 
@@ -1732,8 +1735,6 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 	int ndim, ret, along;
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
-	int *nstart, *nblock;
-	long long int *last_block_start;
 	R_xlen_t ans_len;
 	SEXP ans, reduced;
 	void *out;
@@ -1752,21 +1753,20 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 		nstart_buf = new_IntAE(ndim, ndim, 0);
 		nblock_buf = new_IntAE(ndim, ndim, 0);
 		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-		nstart = nstart_buf->elts;
-		nblock = nblock_buf->elts;
-		last_block_start = last_block_start_buf->elts;
-		/* This call will populate 'ans_dim', 'nblock',
-		   and 'last_block_start'. */
+		/* This call will populate 'ans_dim', 'nblock_buf',
+		   and 'last_block_start_buf'. */
 		ret = check_ordered_selection_against_dset(dset_desc,
 					starts, counts, ans_dim,
-					nstart, nblock, last_block_start);
+					nstart_buf->elts, nblock_buf->elts,
+					last_block_start_buf->elts);
 		if (ret < 0)
 			return R_NilValue;
-		if (_selection_can_be_reduced(ndim, nstart, nblock)) {
-			reduced = PROTECT(_reduce_selection(starts, counts,
-							    ans_dim,
-							    nblock,
-							    last_block_start));
+		if (_selection_can_be_reduced(ndim, nstart_buf->elts,
+						    nblock_buf->elts)) {
+			reduced = PROTECT(_reduce_selection(
+						starts, counts, ans_dim,
+						nblock_buf->elts,
+						last_block_start_buf->elts));
 			nprotect++;
 			starts = VECTOR_ELT(reduced, 0);
 			counts = VECTOR_ELT(reduced, 1);

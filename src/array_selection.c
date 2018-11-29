@@ -146,7 +146,8 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 }
 
 static int check_selection_along(SEXP start, SEXP count, int along,
-				 long long int d, int *count_sum)
+				 long long int d,
+				 int *count_sum_buf)
 {
 	int n, i, ret;
 	long long int s, c, cs, e;
@@ -164,9 +165,10 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 				set_error_for_selection_too_large(along + 1);
 				return -1;
 			}
-			count_sum[along] = d;
+			count_sum_buf[along] = d;
 		} else {
-			/* 'count_sum' is undefined in that case. */
+			/* The "count sum" is undefined in that case
+			   so we don't set it. */
 		}
 		return 0;
 	}
@@ -201,7 +203,7 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 		}
 	}
 	if (count == R_NilValue) {
-		count_sum[along] = n;
+		count_sum_buf[along] = n;
 		return 0;
 	}
 	/* Walk on the 'count' (and 'start') elements. */
@@ -230,7 +232,7 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 			return -1;
 		}
 	}
-	count_sum[along] = cs;
+	count_sum_buf[along] = cs;
 	return 0;
 }
 
@@ -240,10 +242,10 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 
    'dim' is assumed to be NULL or to have the same length as 'starts'.
 
-   'count_sum' is assumed to have the same length as 'starts'.
+   'count_sum_buf' is assumed to have the same length as 'starts'.
 */
 int _check_selection(SEXP starts, SEXP counts,
-		     const long long int *dim, int *count_sum)
+		     const long long int *dim, int *count_sum_buf)
 {
 	int ndim, along, ret;
 	SEXP start, count;
@@ -255,7 +257,7 @@ int _check_selection(SEXP starts, SEXP counts,
 					     : R_NilValue;
 		ret = check_selection_along(start, count, along,
 					    dim != NULL ? dim[along] : -1,
-					    count_sum);
+					    count_sum_buf);
 		if (ret < 0)
 			return -1;
 	}
@@ -268,7 +270,6 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 	int ndim, along, ret;
 	LLongAE *dim_buf;
 	IntAE *count_sum_buf;
-	int *count_sum;
 	long long int *dim_p, d;
 
 	ndim = _shallow_check_selection(starts, counts);
@@ -293,9 +294,8 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 	}
 
 	count_sum_buf = new_IntAE(ndim, ndim, 0);
-	count_sum = count_sum_buf->elts;
 
-	ret = _check_selection(starts, counts, dim_p, count_sum);
+	ret = _check_selection(starts, counts, dim_p, count_sum_buf->elts);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
 	return R_NilValue;
@@ -342,9 +342,9 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 }
 
 static int check_ordered_selection_along_NULL_start(SEXP count, int along,
-			long long int d, int *count_sum,
-			int *nstart, int *nblock,
-			long long int *last_block_start)
+			long long int d, int *count_sum_buf,
+			int *nstart_buf, int *nblock_buf,
+			long long int *last_block_start_buf)
 {
 	if (count != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF(
@@ -358,30 +358,31 @@ static int check_ordered_selection_along_NULL_start(SEXP count, int along,
 			set_error_for_selection_too_large(along + 1);
 			return -1;
 		}
-		count_sum[along] = d;
-		nstart[along] = d;
-		nblock[along] = d != 0;
-		last_block_start[along] = 1;
+		count_sum_buf[along] = d;
+		nstart_buf[along] = d;
+		nblock_buf[along] = d != 0;
+		last_block_start_buf[along] = 1;
 	} else {
-		/* 'count_sum' is undefined in that case. */
-		nstart[along] = nblock[along] = 1;
-		last_block_start[along] = 1;
+		/* The "count sum" is undefined in that case
+		   so we don't set it. */
+		nstart_buf[along] = nblock_buf[along] = 1;
+		last_block_start_buf[along] = 1;
 	}
 	return 0;
 }
 
 static int check_ordered_selection_along(SEXP start, SEXP count, int along,
-			long long int d, int *count_sum,
-			int *nstart, int *nblock,
-			long long int *last_block_start)
+			long long int d, int *count_sum_buf,
+			int *nstart_buf, int *nblock_buf,
+			long long int *last_block_start_buf)
 {
 	int n, i, ret;
 	long long int e, s, cs, c;
 
 	if (start == R_NilValue)
 		return check_ordered_selection_along_NULL_start(count, along,
-				d, count_sum,
-				nstart, nblock, last_block_start);
+				d, count_sum_buf,
+				nstart_buf, nblock_buf, last_block_start_buf);
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
 	n = LENGTH(start);
@@ -396,8 +397,8 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			return -1;
 		}
 	}
-	nstart[along] = n;
-	nblock[along] = 0;
+	nstart_buf[along] = n;
+	nblock_buf[along] = 0;
 	e = -1;
 	if (count == R_NilValue) {
 		/* Walk on the 'start' elements. */
@@ -406,8 +407,8 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			if (ret < 0)
 				return -1;
 			if (s != e + 1) {
-				nblock[along]++;
-				last_block_start[along] = s;
+				nblock_buf[along]++;
+				last_block_start_buf[along] = s;
 			}
 			e = s;
 			if (d >= 0 && e > d) {
@@ -416,7 +417,7 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 				return -1;
 			}
 		}
-		count_sum[along] = n;
+		count_sum_buf[along] = n;
 	} else {
 		/* Walk on the 'start' and 'count' elements. */
 		cs = 0;
@@ -435,8 +436,8 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			if (ret < 0)
 				return -1;
 			if (s != e + 1) {
-				nblock[along]++;
-				last_block_start[along] = s;
+				nblock_buf[along]++;
+				last_block_start_buf[along] = s;
 			}
 			e = s + c - 1;	// could overflow! (FIXME)
 			if (d >= 0 && e > d) {
@@ -450,7 +451,7 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 				return -1;
 			}
 		}
-		count_sum[along] = cs;
+		count_sum_buf[along] = cs;
 	}
 	return 0;
 }
@@ -461,13 +462,13 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 
    'dim' is assumed to be NULL or to have the same length as 'starts'.
 
-   'count_sum', 'nstart', 'nblock', and 'last_block_start' are assumed
-   to have the same length as 'starts'.
+   'count_sum_buf', 'nstart_buf', 'nblock_buf', and 'last_block_start_buf'
+   are assumed to have the same length as 'starts'.
 */
 int _check_ordered_selection(SEXP starts, SEXP counts,
-			const long long int *dim, int *count_sum,
-			int *nstart, int *nblock,
-			long long int *last_block_start)
+			const long long int *dim, int *count_sum_buf,
+			int *nstart_buf, int *nblock_buf,
+			long long int *last_block_start_buf)
 {
 	int ndim, along, ret;
 	SEXP start, count;
@@ -479,8 +480,9 @@ int _check_ordered_selection(SEXP starts, SEXP counts,
 					     : R_NilValue;
 		ret = check_ordered_selection_along(start, count, along,
 					dim != NULL ? dim[along] : -1,
-					count_sum,
-					nstart, nblock, last_block_start);
+					count_sum_buf,
+					nstart_buf, nblock_buf,
+					last_block_start_buf);
 		if (ret < 0)
 			return -1;
 	}
@@ -494,7 +496,7 @@ int _check_ordered_selection(SEXP starts, SEXP counts,
 
 static int map_start_to_chunks(SEXP start, int along,
 		long long int d, long long int chunkd,
-		int *nstart,
+		int *nstart_buf,
 		IntAE *breakpoint_buf, LLongAE *chunkidx_buf)
 {
 	int n, i, ret;
@@ -506,7 +508,7 @@ static int map_start_to_chunks(SEXP start, int along,
 			set_error_for_selection_too_large(along + 1);
 			return -1;
 		}
-		nstart[along] = d;
+		nstart_buf[along] = d;
 		return 0;
 	}
 
@@ -523,7 +525,7 @@ static int map_start_to_chunks(SEXP start, int along,
 	}
 
 	n = LENGTH(start);
-	nstart[along] = n;
+	nstart_buf[along] = n;
 
 	if (n == 0)
 		return 0;
@@ -565,13 +567,13 @@ static int map_start_to_chunks(SEXP start, int along,
 /* Assume that 'starts' is a list. This should have been checked by
    _shallow_check_selection() already so is not checked again.
 
-   'dim', 'chunk_spacings', 'nstart', 'breakpoint_bufs', and 'chunkidx_bufs'
-   are assumed to have the same length as 'starts'.
+   'dim', 'chunk_spacings', 'nstart_buf', 'breakpoint_bufs', and
+   'chunkidx_bufs' are assumed to have the same length as 'starts'.
 */
 int _map_starts_to_chunks(SEXP starts,
 		const long long int *dim,
 		const long long int *chunk_spacings,
-		int *nstart,
+		int *nstart_buf,
 		IntAEAE *breakpoint_bufs, LLongAEAE *chunkidx_bufs)
 {
 	int ndim, along, ret;
@@ -582,7 +584,7 @@ int _map_starts_to_chunks(SEXP starts,
 		start = VECTOR_ELT(starts, along);
 		ret = map_start_to_chunks(start, along,
 					  dim[along], chunk_spacings[along],
-					  nstart,
+					  nstart_buf,
 					  breakpoint_bufs->elts[along],
 					  chunkidx_bufs->elts[along]);
 		if (ret < 0)
@@ -872,8 +874,7 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 	LLongAE *dim_buf;
 	IntAE *count_sum_buf, *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
-	int *count_sum, *nstart, *nblock;
-	long long int *dim_p, d, *last_block_start;
+	long long int *dim_p, d;
 
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
@@ -901,24 +902,23 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 
-	count_sum = count_sum_buf->elts;
-	nstart = nstart_buf->elts;
-	nblock = nblock_buf->elts;
-	last_block_start = last_block_start_buf->elts;
-
 	/* 1st pass */
 	//clock_t t0 = clock();
-	ret = _check_ordered_selection(starts, counts, dim_p, count_sum,
-				nstart, nblock, last_block_start);
+	ret = _check_ordered_selection(starts, counts, dim_p,
+				count_sum_buf->elts,
+				nstart_buf->elts, nblock_buf->elts,
+				last_block_start_buf->elts);
 	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
 
-	if (!_selection_can_be_reduced(ndim, nstart, nblock))
+	if (!_selection_can_be_reduced(ndim,
+				       nstart_buf->elts, nblock_buf->elts))
 		return R_NilValue;
 
 	/* 2nd pass */
 	return _reduce_selection(starts, counts,
-				 count_sum, nblock, last_block_start);
+				 count_sum_buf->elts, nblock_buf->elts,
+				 last_block_start_buf->elts);
 }
 

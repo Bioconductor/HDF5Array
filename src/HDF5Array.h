@@ -26,7 +26,7 @@ int _check_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *count_sum
+	int *count_sum_buf
 );
 
 SEXP C_check_selection(
@@ -39,17 +39,17 @@ int _check_ordered_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *count_sum,
-	int *nstart,
-	int *nblock,
-	long long int *last_block_start
+	int *count_sum_buf,
+	int *nstart_buf,
+	int *nblock_buf,
+	long long int *last_block_start_buf
 );
 
 int _map_starts_to_chunks(
 	SEXP starts,
 	const long long int *dim,
 	const long long int *chunk_spacings,
-	int *nstart,
+	int *nstart_buf,
 	IntAEAE *breakpoint_bufs,
 	LLongAEAE *chunkidx_bufs
 );
