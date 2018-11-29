@@ -295,10 +295,10 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
-static int check_selection(const DSetDesc *dset_desc,
-			   SEXP starts, SEXP counts,
-			   int *nstart, int *ans_dim,
-			   int *nblock, long long int *last_block_start)
+static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
+			SEXP starts, SEXP counts,
+			int *nstart, int *ans_dim,
+			int *nblock, long long int *last_block_start)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -308,9 +308,9 @@ static int check_selection(const DSetDesc *dset_desc,
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_desc->h5dim[h5along];
-	return _deep_check_selection(starts, counts, dim_buf->elts,
-				     nstart, ans_dim,
-				     nblock, last_block_start);
+	return _check_ordered_selection(starts, counts, dim_buf->elts,
+					nstart, ans_dim,
+					nblock, last_block_start);
 }
 
 static int map_starts_to_chunks(const DSetDesc *dset_desc,
@@ -1691,9 +1691,9 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 
 	/* This call will populate 'nstart', 'ans_dim', 'nblock',
 	   and 'last_block_start'. */
-	ret = check_selection(dset_desc, starts, counts,
-			      nstart, ans_dim,
-			      nblock, last_block_start);
+	ret = check_ordered_selection_against_dset(dset_desc, starts, counts,
+					nstart, ans_dim,
+					nblock, last_block_start);
 	if (ret < 0)
 		return R_NilValue;
 

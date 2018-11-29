@@ -5,6 +5,11 @@
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
+check_selection <- function(starts, counts=NULL, dim=NULL)
+{
+    .Call("C_check_selection", starts, counts, dim, PACKAGE="HDF5Array")
+}
+
 ### The selection must be strictly ascending along each dimension.
 ### If 'dim' is provided, it must also be within the extend of each dimension.
 ### Return NULL if the selection could not be reduced.

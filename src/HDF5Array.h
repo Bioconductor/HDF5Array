@@ -22,7 +22,20 @@ int _shallow_check_selection(
 	SEXP counts
 );
 
-int _deep_check_selection(
+int _check_selection(
+	SEXP starts,
+	SEXP counts,
+	const long long int *dim,
+	int *count_sum
+);
+
+SEXP C_check_selection(
+	SEXP starts,
+	SEXP counts,
+	SEXP dim
+);
+
+int _check_ordered_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,

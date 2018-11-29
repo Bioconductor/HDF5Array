@@ -117,28 +117,13 @@ int _shallow_check_selection(SEXP starts, SEXP counts)
 
 
 /****************************************************************************
- * Deep check the array selection
+ * Deep check of an array selection
  */
 
 static void set_error_for_selection_too_large(int along1)
 {
 	PRINT_TO_ERRMSG_BUF("too many elements (>= 2^31) selected "
 			    "along dimension %d of array", along1);
-	return;
-}
-
-static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
-							    int starts_only)
-{
-	const char *msg = "selection must be strictly ascending "
-			  "along each dimension, but\n  you have:";
-	if (starts_only)
-		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] <= starts[[%d]][%d]",
-				    msg, along1, i + 1, along1, i);
-	else
-		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] < starts[[%d]][%d] + "
-				    "counts[[%d]][%d]",
-				    msg, along1, i + 1, along1, i, along1, i);
 	return;
 }
 
@@ -157,6 +142,178 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 			"%s starts[[%d]][%d] + counts[[%d]][%d] - 1 "
 			"> dimension %d in array",
 			msg, along1, i + 1, along1, i + 1, along1);
+	return;
+}
+
+static int check_selection_along(SEXP start, SEXP count, int along,
+				 long long int d, int *count_sum)
+{
+	int n, i, ret;
+	long long int s, c, cs, e;
+
+	if (start == R_NilValue) {
+		if (count != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF(
+				"if 'starts[[%d]]' is NULL then 'counts' "
+				"or 'counts[[%d]]' must also be NULL",
+				along + 1, along + 1);
+			return -1;
+		}
+		if (d >= 0) {
+			if (d > INT_MAX) {
+				set_error_for_selection_too_large(along + 1);
+				return -1;
+			}
+			count_sum[along] = d;
+		}
+		return 0;
+	}
+	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
+		return -1;
+	n = LENGTH(start);
+	if (count != R_NilValue) {
+		if (check_INTEGER_or_NUMERIC(count, "counts", along) < 0)
+			return -1;
+		if (LENGTH(count) != n) {
+			PRINT_TO_ERRMSG_BUF(
+				"'starts[[%d]]' and 'counts[[%d]]' "
+				"must have the same length",
+				along + 1, along + 1);
+			return -1;
+		}
+	}
+	/* Walk on the 'start' elements. */
+	for (i = 0; i < n; i++) {
+		ret = get_untrusted_elt(start, i, &s, "starts", along);
+		if (ret < 0)
+			return -1;
+		if (s <= 0) {
+			PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
+					    along + 1, i + 1);
+			return -1;
+		}
+		if (d >= 0 && s > d) {
+			set_errmsg_for_selection_beyond_dim(
+				along + 1, i, 1);
+			return -1;
+		}
+	}
+	if (count == R_NilValue) {
+		count_sum[along] = n;
+		return 0;
+	}
+	/* Walk on the 'count' elements. */
+	cs = 0;
+	for (i = 0; i < n; i++) {
+		ret = get_untrusted_elt(count, i, &c, "counts", along);
+		if (ret < 0)
+			return -1;
+		if (c < 0) {
+			PRINT_TO_ERRMSG_BUF("counts[[%d]][%d] is < 0",
+					    along + 1, i + 1);
+			return -1;
+		}
+		s = _get_trusted_elt(start, i);
+		e = s + c - 1;	// could overflow! (FIXME)
+		if (d >= 0 && e > d) {
+			set_errmsg_for_selection_beyond_dim(
+				along + 1, i, 0);
+			return -1;
+		}
+		cs += c;	// could overflow! (FIXME)
+		if (cs > INT_MAX) {
+			set_error_for_selection_too_large(along + 1);
+			return -1;
+		}
+	}
+	count_sum[along] = cs;
+	return 0;
+}
+
+/* Assume that 'starts' is a list and that 'counts' is NULL or a list
+   of the same length as 'starts'. This should have been checked
+   by _shallow_check_selection() already so is not checked again.
+
+   'dim' is assumed to be NULL or to have the same length as 'starts'.
+
+   'count_sum' is assumed to have the same length as 'starts'.
+*/
+int _check_selection(SEXP starts, SEXP counts,
+		     const long long int *dim, int *count_sum)
+{
+	int ndim, along, ret;
+	SEXP start, count;
+
+	ndim = LENGTH(starts);
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
+					     : R_NilValue;
+		ret = check_selection_along(start, count, along,
+					    dim != NULL ? dim[along] : -1,
+					    count_sum);
+		if (ret < 0)
+			return -1;
+	}
+	return 0;
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
+{
+	int ndim, along, ret;
+	LLongAE *dim_buf;
+	IntAE *count_sum_buf;
+	int *count_sum;
+	long long int *dim_p, d;
+
+	ndim = _shallow_check_selection(starts, counts);
+	if (ndim < 0)
+		error(_HDF5Array_errmsg_buf);
+
+	if (dim == R_NilValue) {
+		dim_p = NULL;
+	} else {
+		if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
+			error("'dim' must be an integer vector (or NULL)");
+		if (LENGTH(dim) != ndim)
+			error("'starts' and 'dim' must have the same length");
+		dim_buf = new_LLongAE(ndim, ndim, 0);
+		dim_p = dim_buf->elts;
+		for (along = 0; along < ndim; along++) {
+			ret = get_untrusted_elt(dim, along, &d, "dim", -1);
+			if (ret < 0)
+				error(_HDF5Array_errmsg_buf);
+			dim_p[along] = d;
+		}
+	}
+
+	count_sum_buf = new_IntAE(ndim, ndim, 0);
+	count_sum = count_sum_buf->elts;
+
+	ret = _check_selection(starts, counts, dim_p, count_sum);
+	if (ret < 0)
+		error(_HDF5Array_errmsg_buf);
+	return R_NilValue;
+}
+
+
+/****************************************************************************
+ * Deep check of an ordered array selection (in preparation for reduction)
+ */
+
+static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
+							    int starts_only)
+{
+	const char *msg = "selection must be strictly ascending "
+			  "along each dimension, but\n  you have:";
+	if (starts_only)
+		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] <= starts[[%d]][%d]",
+				    msg, along1, i + 1, along1, i);
+	else
+		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] < starts[[%d]][%d] + "
+				    "counts[[%d]][%d]",
+				    msg, along1, i + 1, along1, i, along1, i);
 	return;
 }
 
@@ -179,7 +336,7 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 	return -1;
 }
 
-static int check_selection_along_NULL_start(SEXP count, int along,
+static int check_ordered_selection_along_NULL_start(SEXP count, int along,
 			long long int d,
 			int *nstart, int *count_sum,
 			int *nblock, long long int *last_block_start)
@@ -207,7 +364,7 @@ static int check_selection_along_NULL_start(SEXP count, int along,
 	return 0;
 }
 
-static int check_selection_along(SEXP start, SEXP count, int along,
+static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			long long int d,
 			int *nstart, int *count_sum,
 			int *nblock, long long int *last_block_start)
@@ -216,7 +373,7 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 	long long int e, s, cs, c;
 
 	if (start == R_NilValue)
-		return check_selection_along_NULL_start(count, along,
+		return check_ordered_selection_along_NULL_start(count, along,
 				d,
 				nstart, count_sum,
 				nblock, last_block_start);
@@ -298,10 +455,10 @@ static int check_selection_along(SEXP start, SEXP count, int along,
    'nstart', 'count_sum', 'nblock', and 'last_block_start' are assumed
    to have the same length as 'starts'.
 */
-int _deep_check_selection(SEXP starts, SEXP counts,
-			  const long long int *dim,
-			  int *nstart, int *count_sum,
-			  int *nblock, long long int *last_block_start)
+int _check_ordered_selection(SEXP starts, SEXP counts,
+			const long long int *dim,
+			int *nstart, int *count_sum,
+			int *nblock, long long int *last_block_start)
 {
 	int ndim, along, ret;
 	SEXP start, count;
@@ -311,10 +468,10 @@ int _deep_check_selection(SEXP starts, SEXP counts,
 		start = VECTOR_ELT(starts, along);
 		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
 					     : R_NilValue;
-		ret = check_selection_along(start, count, along,
-					    dim != NULL ? dim[along] : -1,
-					    nstart, count_sum,
-					    nblock, last_block_start);
+		ret = check_ordered_selection_along(start, count, along,
+					dim != NULL ? dim[along] : -1,
+					nstart, count_sum,
+					nblock, last_block_start);
 		if (ret < 0)
 			return -1;
 	}
@@ -740,9 +897,9 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 
 	/* 1st pass */
 	//clock_t t0 = clock();
-	ret = _deep_check_selection(starts, counts, dim_p,
-				    nstart, count_sum,
-				    nblock, last_block_start);
+	ret = _check_ordered_selection(starts, counts, dim_p,
+				 nstart, count_sum,
+				 nblock, last_block_start);
 	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
