@@ -146,7 +146,8 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 }
 
 static int check_selection_along(SEXP start, SEXP count, int along,
-				 long long int d, int *count_sum)
+				 long long int d,
+				 int *nstart, int *count_sum)
 {
 	int n, i, ret;
 	long long int s, c, cs, e;
@@ -164,7 +165,10 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 				set_error_for_selection_too_large(along + 1);
 				return -1;
 			}
-			count_sum[along] = d;
+			nstart[along] = count_sum[along] = d;
+		} else {
+			/* 'count_sum' is undefined in that case. */
+			nstart[along] = 1;
 		}
 		return 0;
 	}
@@ -182,6 +186,7 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 			return -1;
 		}
 	}
+	nstart[along] = n;
 	/* Walk on the 'start' elements. */
 	for (i = 0; i < n; i++) {
 		ret = get_untrusted_elt(start, i, &s, "starts", along);
@@ -202,12 +207,14 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 		count_sum[along] = n;
 		return 0;
 	}
-	/* Walk on the 'count' elements. */
+	/* Walk on the 'count' (and 'start') elements. */
 	cs = 0;
 	for (i = 0; i < n; i++) {
 		ret = get_untrusted_elt(count, i, &c, "counts", along);
 		if (ret < 0)
 			return -1;
+		if (c == 0)
+			continue;
 		if (c < 0) {
 			PRINT_TO_ERRMSG_BUF("counts[[%d]][%d] is < 0",
 					    along + 1, i + 1);
@@ -236,10 +243,11 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 
    'dim' is assumed to be NULL or to have the same length as 'starts'.
 
-   'count_sum' is assumed to have the same length as 'starts'.
+   'nstart' and 'count_sum' are assumed to have the same length as 'starts'.
 */
 int _check_selection(SEXP starts, SEXP counts,
-		     const long long int *dim, int *count_sum)
+		     const long long int *dim,
+		     int *nstart, int *count_sum)
 {
 	int ndim, along, ret;
 	SEXP start, count;
@@ -251,7 +259,7 @@ int _check_selection(SEXP starts, SEXP counts,
 					     : R_NilValue;
 		ret = check_selection_along(start, count, along,
 					    dim != NULL ? dim[along] : -1,
-					    count_sum);
+					    nstart, count_sum);
 		if (ret < 0)
 			return -1;
 	}
@@ -263,8 +271,8 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 {
 	int ndim, along, ret;
 	LLongAE *dim_buf;
-	IntAE *count_sum_buf;
-	int *count_sum;
+	IntAE *nstart_buf, *count_sum_buf;
+	int *nstart, *count_sum;
 	long long int *dim_p, d;
 
 	ndim = _shallow_check_selection(starts, counts);
@@ -288,10 +296,12 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 		}
 	}
 
+	nstart_buf = new_IntAE(ndim, ndim, 0);
 	count_sum_buf = new_IntAE(ndim, ndim, 0);
+	nstart = nstart_buf->elts;
 	count_sum = count_sum_buf->elts;
 
-	ret = _check_selection(starts, counts, dim_p, count_sum);
+	ret = _check_selection(starts, counts, dim_p, nstart, count_sum);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
 	return R_NilValue;
@@ -324,16 +334,17 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 {
 	if (get_untrusted_elt(start, i, s, "starts", along) < 0)
 		return -1;
-	if (*s > e)
-		return 0;
-	if (e == 0) {
+	if (*s <= 0) {
 		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
 				    along + 1, i + 1);
-	} else {
+		return -1;
+	}
+	if (*s <= e) {
 		set_errmsg_for_non_strictly_ascending_selection(
 			along + 1, i, starts_only);
+		return -1;
 	}
-	return -1;
+	return 0;
 }
 
 static int check_ordered_selection_along_NULL_start(SEXP count, int along,
@@ -393,13 +404,14 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 	}
 	nstart[along] = n;
 	nblock[along] = 0;
-	e = 0;
+	e = -1;
 	if (count == R_NilValue) {
+		/* Walk on the 'start' elements. */
 		for (i = 0; i < n; i++) {
 			ret = get_untrusted_start(start, i, &s, along, e, 1);
 			if (ret < 0)
 				return -1;
-			if (i == 0 || s != e + 1) {
+			if (s != e + 1) {
 				nblock[along]++;
 				last_block_start[along] = s;
 			}
@@ -412,22 +424,25 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 		}
 		count_sum[along] = n;
 	} else {
+		/* Walk on the 'start' and 'count' elements. */
 		cs = 0;
 		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along, e, 0);
-			if (ret < 0)
-				return -1;
-			if (i == 0 || s != e + 1) {
-				nblock[along]++;
-				last_block_start[along] = s;
-			}
 			ret = get_untrusted_elt(count, i, &c, "counts", along);
 			if (ret < 0)
 				return -1;
-			if (c <= 0) {
-				PRINT_TO_ERRMSG_BUF("counts[[%d]][%d] is <= 0",
+			if (c < 0) {
+				PRINT_TO_ERRMSG_BUF("counts[[%d]][%d] is < 0",
 						    along + 1, i + 1);
 				return -1;
+			}
+			if (c == 0)
+				continue;
+			ret = get_untrusted_start(start, i, &s, along, e, 0);
+			if (ret < 0)
+				return -1;
+			if (s != e + 1) {
+				nblock[along]++;
+				last_block_start[along] = s;
 			}
 			e = s + c - 1;	// could overflow! (FIXME)
 			if (d >= 0 && e > d) {
@@ -745,12 +760,12 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 	long long int e, s, c;
 
 	n = LENGTH(start_in);
-	e = 0;
+	e = -1;
 	j = -1;
 	if (count_in == R_NilValue) {
 		for (i = 0; i < n; i++) {
 			s = _get_trusted_elt(start_in, i);
-			if (i == 0 || s != e + 1) {
+			if (s != e + 1) {
 				j++;
 				set_trusted_elt(start_out, j, s);
 				count_out[j] = 1;
@@ -761,9 +776,11 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 		}
 	} else {
 		for (i = 0; i < n; i++) {
-			s = _get_trusted_elt(start_in, i);
 			c = _get_trusted_elt(count_in, i);
-			if (i == 0 || s != e + 1) {
+			if (c == 0)
+				continue;
+			s = _get_trusted_elt(start_in, i);
+			if (s != e + 1) {
 				j++;
 				set_trusted_elt(start_out, j, s);
 				count_out[j] = c;

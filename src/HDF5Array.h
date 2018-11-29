@@ -26,6 +26,7 @@ int _check_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
+	int *nstart,
 	int *count_sum
 );
 

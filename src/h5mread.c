@@ -295,6 +295,22 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
+static int check_selection_against_dset(const DSetDesc *dset_desc,
+			SEXP starts, SEXP counts,
+			int *nstart, int *ans_dim)
+{
+	int ndim, along, h5along;
+	LLongAE *dim_buf;
+
+	ndim = dset_desc->ndim;
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
+		dim_buf->elts[along] =
+			(long long int) dset_desc->h5dim[h5along];
+	return _check_selection(starts, counts, dim_buf->elts,
+				nstart, ans_dim);
+}
+
 static int check_ordered_selection_against_dset(const DSetDesc *dset_desc,
 			SEXP starts, SEXP counts,
 			int *nstart, int *ans_dim,
@@ -520,15 +536,11 @@ static long long int select_elements(const DSetDesc *dset_desc,
 }
 
 static int set_selection(const DSetDesc *dset_desc, int method,
-			 SEXP starts, SEXP counts, int noreduce,
-			 const int *nstart,
-			 const int *ans_dim,
-			 const int *nblock,
-			 const long long int *last_block_start)
+			 SEXP starts, SEXP counts,
+			 const int *nstart, const int *ans_dim)
 {
 	int ndim;
 	IntAE *midx_buf;
-	SEXP reduced;
 	long long int nselection;
 
 	ndim = dset_desc->ndim;
@@ -544,21 +556,8 @@ static int set_selection(const DSetDesc *dset_desc, int method,
 		nselection = select_elements(dset_desc, starts,
 					     nstart, ans_dim, midx_buf->elts);
 	} else {
-		if (!noreduce &&
-		    _selection_can_be_reduced(ndim, nstart, nblock))
-		{
-			reduced = PROTECT(_reduce_selection(starts, counts,
-							    ans_dim,
-							    nblock,
-							    last_block_start));
-			starts = VECTOR_ELT(reduced, 0);
-			counts = VECTOR_ELT(reduced, 1);
-			nstart = nblock;
-		}
 		nselection = select_hyperslabs(dset_desc, starts, counts,
 					       nstart, midx_buf->elts);
-		if (nstart == nblock)
-			UNPROTECT(1);  // unprotect 'reduced'
 	}
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
 	//printf("time for setting selection: %e\n", dt);
@@ -568,19 +567,14 @@ static int set_selection(const DSetDesc *dset_desc, int method,
 }
 
 static int read_data_1_2(const DSetDesc *dset_desc, int method,
-			 SEXP starts, SEXP counts, int noreduce,
-			 const int *nstart,
-			 const int *ans_dim,
-			 const int *nblock,
-			 const long long int *last_block_start,
+			 SEXP starts, SEXP counts,
+			 const int *nstart, const int *ans_dim,
 			 void *out, hid_t mem_space_id)
 {
 	int ret;
 
 	ret = set_selection(dset_desc, method,
-			    starts, counts, noreduce,
-			    nstart, ans_dim,
-			    nblock, last_block_start);
+			    starts, counts, nstart, ans_dim);
 	if (ret < 0)
 		return -1;
 
@@ -1676,31 +1670,52 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 	int *nstart, *nblock;
 	long long int *last_block_start;
 	R_xlen_t ans_len;
-	SEXP ans;
+	SEXP ans, reduced;
 	void *out;
 	hid_t mem_space_id;
+	int nprotect = 0;
 
 	ndim = dset_desc->ndim;
 	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-
 	nstart = nstart_buf->elts;
-	nblock = nblock_buf->elts;
-	last_block_start = last_block_start_buf->elts;
 
-	/* This call will populate 'nstart', 'ans_dim', 'nblock',
-	   and 'last_block_start'. */
-	ret = check_ordered_selection_against_dset(dset_desc, starts, counts,
+	if (noreduce || method == 2) {
+		/* This call will populate 'nstart' and 'ans_dim'. */
+		ret = check_selection_against_dset(dset_desc,
+					starts, counts,
+					nstart, ans_dim);
+		if (ret < 0)
+			return R_NilValue;
+	} else {
+		nblock_buf = new_IntAE(ndim, ndim, 0);
+		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+		nblock = nblock_buf->elts;
+		last_block_start = last_block_start_buf->elts;
+		/* This call will populate 'nstart', 'ans_dim', 'nblock',
+		   and 'last_block_start'. */
+		ret = check_ordered_selection_against_dset(dset_desc,
+					starts, counts,
 					nstart, ans_dim,
 					nblock, last_block_start);
-	if (ret < 0)
-		return R_NilValue;
+		if (ret < 0)
+			return R_NilValue;
+		if (_selection_can_be_reduced(ndim, nstart, nblock)) {
+			reduced = PROTECT(_reduce_selection(starts, counts,
+							    ans_dim,
+							    nblock,
+							    last_block_start));
+			nprotect++;
+			starts = VECTOR_ELT(reduced, 0);
+			counts = VECTOR_ELT(reduced, 1);
+			nstart = nblock;
+		}
+	}
 
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
 	ans = PROTECT(allocVector(dset_desc->ans_type, ans_len));
+	nprotect++;
 
 	if (ans_len != 0) {
 		if (dset_desc->ans_type == INTSXP) {
@@ -1713,9 +1728,7 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 			goto on_error;
 		if (method <= 2) {
 			ret = read_data_1_2(dset_desc, method,
-				starts, counts, noreduce,
-				nstart, ans_dim,
-				nblock, last_block_start,
+				starts, counts, nstart, ans_dim,
 				out, mem_space_id);
 		} else {
 			ret = read_data_3(dset_desc,
@@ -1727,11 +1740,11 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 	if (ret < 0)
 		goto on_error;
 
-	UNPROTECT(1);
+	UNPROTECT(nprotect);
 	return ans;
 
     on_error:
-	UNPROTECT(1);
+	UNPROTECT(nprotect);
 	return R_NilValue;
 }
 

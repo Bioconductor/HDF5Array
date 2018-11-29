@@ -4,7 +4,7 @@ test_reduce_selection <- function()
 
     starts <- list(NULL, c(2, 6))
 
-    checkIdentical(NULL, reduce_selection(starts))
+    checkIdentical(NULL, reduce_selection(starts))  # no reduction
 
     current <- reduce_selection(starts, dim=5:6)
     checkIdentical(list(NULL, c(2L, 6L)), current[[1L]])
@@ -22,11 +22,29 @@ test_reduce_selection <- function()
 
     starts <- list(NULL, c(2, 6))
     counts <- list(NULL, NULL)
-    checkIdentical(NULL, reduce_selection(starts, counts))
+    checkIdentical(NULL, reduce_selection(starts, counts))  # no reduction
 
     starts <- list(NULL, c(2, 6))
     counts <- list(NULL, c(3, 4))
-    checkIdentical(NULL, reduce_selection(starts, counts))
+    checkIdentical(NULL, reduce_selection(starts, counts))  # no reduction
+
+    starts <- list(NULL, 5)
+    counts <- list(NULL, 0)
+    current <- reduce_selection(starts, counts)
+    checkIdentical(list(NULL, integer(0)), current[[1L]])
+    checkIdentical(list(NULL, integer(0)), current[[2L]])
+
+    starts <- list(NULL, c(6, 9))
+    counts <- list(NULL, c(2, 0))
+    current <- reduce_selection(starts, counts)
+    checkIdentical(list(NULL, 6L), current[[1L]])
+    checkIdentical(list(NULL, 2L), current[[2L]])
+
+    starts <- list(NULL, c(2, 5, 5, 6, 11, 11))
+    counts <- list(NULL, c(3, 0, 1, 4,  0,  5))
+    current <- reduce_selection(starts, counts)
+    checkIdentical(list(NULL, c(2L, 11L)), current[[1L]])
+    checkIdentical(list(NULL, c(8L,  5L)), current[[2L]])
 
     starts <- list(NULL, c(2, 6, 10), c(5:10, 15, 3e9 + 1:10), c(99, 2e9))
     counts <- list(NULL, c(3, 4, 1), NULL, c(6e8, 5e8))
