@@ -1,6 +1,7 @@
 \name{h5mread}
 
 \alias{h5mread}
+\alias{reduce_selection}
 
 \title{An alternative to \code{rhdf5::h5read}}
 

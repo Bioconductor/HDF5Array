@@ -6,7 +6,7 @@
 #define PRINT_TO_ERRMSG_BUF(...) \
 	snprintf(_HDF5Array_errmsg_buf, ERRMSG_BUF_LENGTH, __VA_ARGS__)
 
-inline long long int _get_trusted_elt(SEXP x, int i)
+static inline long long int _get_trusted_elt(SEXP x, int i)
 {
 	return IS_INTEGER(x) ? (long long int) INTEGER(x)[i] :
 			       (long long int) REAL(x)[i];
