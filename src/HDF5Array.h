@@ -26,7 +26,6 @@ int _check_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *nstart,
 	int *count_sum
 );
 
@@ -40,8 +39,8 @@ int _check_ordered_selection(
 	SEXP starts,
 	SEXP counts,
 	const long long int *dim,
-	int *nstart,
 	int *count_sum,
+	int *nstart,
 	int *nblock,
 	long long int *last_block_start
 );
