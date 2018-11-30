@@ -128,11 +128,11 @@ static void set_error_for_selection_too_large(int along1)
 }
 
 static void set_errmsg_for_selection_beyond_dim(int along1, int i,
-						int starts_only)
+						int no_counts)
 {
 	const char *msg = "selection must be within extent of "
 			  "array, but you\n  have:";
-	if (starts_only)
+	if (no_counts)
 		PRINT_TO_ERRMSG_BUF(
 			"%s starts[[%d]][%d] "
 			"> dimension %d in array",
@@ -143,6 +143,40 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 			"> dimension %d in array",
 			msg, along1, i + 1, along1, i + 1, along1);
 	return;
+}
+
+static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
+							    int no_counts)
+{
+	const char *msg = "selection must be strictly ascending "
+			  "along each dimension, but\n  you have:";
+	if (no_counts)
+		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] <= starts[[%d]][%d]",
+				    msg, along1, i + 1, along1, i);
+	else
+		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] < starts[[%d]][%d] + "
+				    "counts[[%d]][%d]",
+				    msg, along1, i + 1, along1, i, along1, i);
+	return;
+}
+
+static inline int get_untrusted_start(SEXP start, int i, long long int *s,
+				      long long int min_start,
+				      int along, int no_counts)
+{
+	if (get_untrusted_elt(start, i, s, "starts", along) < 0)
+		return -1;
+	if (*s <= 0) {
+		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
+				    along + 1, i + 1);
+		return -1;
+	}
+	if (*s < min_start) {
+		set_errmsg_for_non_strictly_ascending_selection(
+			along + 1, i, no_counts);
+		return -1;
+	}
+	return 0;
 }
 
 static int check_selection_along(SEXP start, SEXP count, int along,
@@ -189,14 +223,11 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 	}
 	/* Walk on the 'start' elements. */
 	for (i = 0; i < n; i++) {
-		ret = get_untrusted_elt(start, i, &s, "starts", along);
+		/* Because we've set the 4th argument ('min_start') to 0,
+		   the last argument ('no_counts') will be ignored. */
+		ret = get_untrusted_start(start, i, &s, 0, along, 0);
 		if (ret < 0)
 			return -1;
-		if (s <= 0) {
-			PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
-					    along + 1, i + 1);
-			return -1;
-		}
 		if (d >= 0 && s > d) {
 			set_errmsg_for_selection_beyond_dim(
 				along + 1, i, 1);
@@ -309,41 +340,6 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
  * Deep check of an ordered array selection (in preparation for reduction)
  */
 
-static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
-							    int starts_only)
-{
-	const char *msg = "selection must be strictly ascending "
-			  "along each dimension, but\n  you have:";
-	if (starts_only)
-		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] <= starts[[%d]][%d]",
-				    msg, along1, i + 1, along1, i);
-	else
-		PRINT_TO_ERRMSG_BUF("%s starts[[%d]][%d] < starts[[%d]][%d] + "
-				    "counts[[%d]][%d]",
-				    msg, along1, i + 1, along1, i, along1, i);
-	return;
-}
-
-static inline int get_untrusted_start(SEXP start, int i, long long int *s,
-				      int along,
-				      long long int e,
-				      int starts_only)
-{
-	if (get_untrusted_elt(start, i, s, "starts", along) < 0)
-		return -1;
-	if (*s <= 0) {
-		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
-				    along + 1, i + 1);
-		return -1;
-	}
-	if (*s <= e) {
-		set_errmsg_for_non_strictly_ascending_selection(
-			along + 1, i, starts_only);
-		return -1;
-	}
-	return 0;
-}
-
 static int check_ordered_selection_along_NULL_start(SEXP count, int along,
 			long long int d,
 			int *nstart_buf, int *nblock_buf,
@@ -383,7 +379,7 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
-	long long int selection_dim, e, s, c;
+	long long int selection_dim, min_start, s, c;
 	int n, i, ret;
 
 	if (start == R_NilValue)
@@ -406,19 +402,20 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 	}
 	nstart_buf[along] = n;
 	nblock_buf[along] = 0;
-	e = -1;
+	min_start = 1;
 	if (count == R_NilValue) {
 		/* Walk on the 'start' elements. */
 		for (i = 0; i < n; i++) {
-			ret = get_untrusted_start(start, i, &s, along, e, 1);
+			ret = get_untrusted_start(start, i, &s, min_start,
+						  along, 1);
 			if (ret < 0)
 				return -1;
-			if (s != e + 1) {
+			if (s != min_start) {
 				nblock_buf[along]++;
 				last_block_start_buf[along] = s;
 			}
-			e = s;
-			if (d >= 0 && e > d) {
+			min_start = s + 1;
+			if (d >= 0 && s > d) {
 				set_errmsg_for_selection_beyond_dim(
 					along + 1, i, 1);
 				return -1;
@@ -439,15 +436,16 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 			}
 			if (c == 0)
 				continue;
-			ret = get_untrusted_start(start, i, &s, along, e, 0);
+			ret = get_untrusted_start(start, i, &s, min_start,
+						  along, 0);
 			if (ret < 0)
 				return -1;
-			if (s != e + 1) {
+			if (s != min_start) {
 				nblock_buf[along]++;
 				last_block_start_buf[along] = s;
 			}
-			e = s + c - 1;      // could overflow! (FIXME)
-			if (d >= 0 && e > d) {
+			min_start = s + c;  // could overflow! (FIXME)
+			if (d >= 0 && min_start - 1 > d) {
 				set_errmsg_for_selection_beyond_dim(
 					along + 1, i, 0);
 				return -1;
@@ -511,7 +509,7 @@ static int map_start_to_chunks(SEXP start, int along,
 {
 	int n, i, ret;
 	size_t nchunk;
-	long long int e, s, chunkidx, prev_chunkidx;
+	long long int min_start, s, chunkidx, prev_chunkidx;
 
 	if (start == R_NilValue) {
 		if (d > INT_MAX) {
@@ -541,7 +539,7 @@ static int map_start_to_chunks(SEXP start, int along,
 		return 0;
 
 	/* Get 's' and 'chunkidx' for 1st 'start' element. */
-	ret = get_untrusted_start(start, 0, &s, along, 0, 1);
+	ret = get_untrusted_start(start, 0, &s, 1, along, 1);
 	if (ret < 0)
 		return -1;
 	if (s > d) {
@@ -553,8 +551,8 @@ static int map_start_to_chunks(SEXP start, int along,
 	/* Walk on the remaining 'start' elements. */
 	nchunk = 0;
 	for (i = 1; i < n; i++) {
-		e = s;
-		ret = get_untrusted_start(start, i, &s, along, e, 1);
+		min_start = s;
+		ret = get_untrusted_start(start, i, &s, min_start, along, 1);
 		if (ret < 0)
 			return -1;
 		if (s > d) {
@@ -763,22 +761,22 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 			     SEXP start_out, int *count_out)
 {
 	int n, i, j;
-	long long int e, s, c;
+	long long int min_start, s, c;
 
 	n = LENGTH(start_in);
-	e = -1;
+	min_start = 0;
 	j = -1;
 	if (count_in == R_NilValue) {
 		for (i = 0; i < n; i++) {
 			s = _get_trusted_elt(start_in, i);
-			if (s != e + 1) {
+			if (s != min_start) {
 				j++;
 				set_trusted_elt(start_out, j, s);
 				count_out[j] = 1;
 			} else {
 				count_out[j]++;
 			}
-			e = s;
+			min_start = s;
 		}
 	} else {
 		for (i = 0; i < n; i++) {
@@ -786,14 +784,14 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 			if (c == 0)
 				continue;
 			s = _get_trusted_elt(start_in, i);
-			if (s != e + 1) {
+			if (s != min_start) {
 				j++;
 				set_trusted_elt(start_out, j, s);
 				count_out[j] = c;
 			} else {
 				count_out[j] += c;
 			}
-			e = s + c - 1;
+			min_start = s + c;
 		}
 	}
 	return;
