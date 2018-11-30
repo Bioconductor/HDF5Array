@@ -23,25 +23,30 @@ hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
 	return buf;
 }
 
+
+/****************************************************************************
+ * _get_DSet() / _close_DSet()
+ */
+
 /* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
-static int get_ans_type_from_class(H5T_class_t class, int as_int, size_t size,
-				   SEXPTYPE *ans_type)
+static int map_H5class_to_Rtype(H5T_class_t class, int as_int, size_t size,
+				SEXPTYPE *Rtype)
 {
 	const char *classname;
 
 	switch (class) {
 	    case H5T_INTEGER:
-		*ans_type = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
+		*Rtype = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
 		return 0;
 	    case H5T_FLOAT:
-		*ans_type = as_int ? INTSXP : REALSXP;
+		*Rtype = as_int ? INTSXP : REALSXP;
 		return 0;
 	    case H5T_STRING:
 		if (as_int)
 			warning("'as.integer' is ignored when "
 				"dataset class is H5T_STRING");
-		*ans_type = STRSXP;
+		*Rtype = STRSXP;
 		return 0;
 	    case H5T_TIME: classname = "H5T_TIME"; break;
 	    case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
@@ -60,25 +65,25 @@ static int get_ans_type_from_class(H5T_class_t class, int as_int, size_t size,
 	return -1;
 }
 
-static size_t get_ans_elt_size_from_ans_type(SEXPTYPE ans_type, size_t size)
+static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t size)
 {
-	switch (ans_type) {
+	switch (Rtype) {
 	    case INTSXP:  return sizeof(int);
 	    case REALSXP: return sizeof(double);
 	    case STRSXP:  return size;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(ans_type)));
+	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return 0;
 }
 
-static hid_t get_mem_type_id_from_ans_type(SEXPTYPE ans_type, hid_t dtype_id)
+static hid_t get_mem_type_id_from_Rtype(SEXPTYPE Rtype, hid_t dtype_id)
 {
-	switch (ans_type) {
+	switch (Rtype) {
 	    case INTSXP:  return H5T_NATIVE_INT;
 	    case REALSXP: return H5T_NATIVE_DOUBLE;
 	    case STRSXP:  return dtype_id;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(ans_type)));
+	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return -1;
 }
 
@@ -97,15 +102,14 @@ void _close_DSet(DSet *dset)
 	H5Dclose(dset->dset_id);
 }
 
-int _get_DSet(hid_t dset_id, int ndim, int as_int, int ans_type_only,
-	      DSet *dset)
+int _get_DSet(hid_t dset_id, int ndim, int as_int, int Rtype_only, DSet *dset)
 {
 	hid_t space_id, plist_id, dtype_id, mem_type_id;
 	int dset_ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
 	H5T_class_t class;
 	size_t size, ans_elt_size, chunk_data_buf_size;
-	SEXPTYPE ans_type;
+	SEXPTYPE Rtype;
 
 	dset->dset_id = dset_id;
 	dset->dtype_id = -1;
@@ -140,20 +144,20 @@ int _get_DSet(hid_t dset_id, int ndim, int as_int, int ans_type_only,
 	}
 	dset->size = size;
 
-	/* Set 'ans_type'. */
-	if (get_ans_type_from_class(class, as_int, size, &ans_type) < 0) {
+	/* Set 'Rtype'. */
+	if (map_H5class_to_Rtype(class, as_int, size, &Rtype) < 0) {
 		H5Tclose(dtype_id);
 		return -1;
 	}
-	if (ans_type == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
+	if (Rtype == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
 		H5Tclose(dtype_id);
 		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
 				    "is not supported at the moment");
 		return -1;
 	}
-	dset->ans_type = ans_type;
+	dset->Rtype = Rtype;
 
-	if (ans_type_only) {
+	if (Rtype_only) {
 		H5Tclose(dtype_id);
 		return 0;
 	}
@@ -257,7 +261,7 @@ int _get_DSet(hid_t dset_id, int ndim, int as_int, int ans_type_only,
 	dset->h5nchunk = h5nchunk;
 
 	/* Set 'ans_elt_size'. */
-	ans_elt_size = get_ans_elt_size_from_ans_type(ans_type, size);
+	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, size);
 	if (ans_elt_size == 0)
 		goto on_error;
 	dset->ans_elt_size = ans_elt_size;
@@ -269,7 +273,7 @@ int _get_DSet(hid_t dset_id, int ndim, int as_int, int ans_type_only,
 	dset->chunk_data_buf_size = chunk_data_buf_size;
 
 	/* Set 'mem_type_id'. */
-	mem_type_id = get_mem_type_id_from_ans_type(ans_type, dtype_id);
+	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);
 	if (mem_type_id < 0)
 		goto on_error;
 	dset->mem_type_id = mem_type_id;
@@ -278,5 +282,65 @@ int _get_DSet(hid_t dset_id, int ndim, int as_int, int ans_type_only,
     on_error:
 	_close_DSet(dset);
 	return -1;
+}
+
+
+/****************************************************************************
+ * Convenience wrappers to H5Fopen() and H5Dopen() with argument checking
+ */
+
+hid_t _get_file_id(SEXP filepath)
+{
+	SEXP filepath0;
+	hid_t file_id;
+
+	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
+		error("'filepath' must be a single string");
+	filepath0 = STRING_ELT(filepath, 0);
+	if (filepath0 == NA_STRING)
+		error("'filepath' cannot be NA");
+	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
+	if (file_id < 0)
+		error("failed to open file '%s'", CHAR(filepath0));
+	return file_id;
+}
+
+hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
+{
+	SEXP name0;
+	hid_t dset_id;
+
+	if (!(IS_CHARACTER(name) && LENGTH(name) == 1))
+		error("'name' must be a single string");
+	name0 = STRING_ELT(name, 0);
+	if (name0 == NA_STRING)
+		error("'name' cannot be NA");
+	dset_id = H5Dopen(file_id, CHAR(name0), H5P_DEFAULT);
+	if (dset_id < 0) {
+		H5Fclose(file_id);
+		error("failed to open dataset '%s' from file '%s'",
+		      CHAR(name0), CHAR(STRING_ELT(filepath, 0)));
+	}
+	return dset_id;
+}
+
+
+/****************************************************************************
+ * C_get_h5mread_returned_type
+ *
+ * The R type returned by h5mread() is determined by arguments 'filepath',
+ * 'name', and 'as_integer'.
+ */
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
+{
+	hid_t file_id, dset_id;
+
+	file_id = _get_file_id(filepath);
+	dset_id = _get_dset_id(file_id, name, filepath);
+	H5Dclose(dset_id);
+	H5Fclose(file_id);
+	return R_NilValue;
 }
 

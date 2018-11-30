@@ -18,7 +18,7 @@ typedef struct {
 	hid_t dtype_id;
 	H5T_class_t class;
 	size_t size;
-	SEXPTYPE ans_type;
+	SEXPTYPE Rtype;
 	size_t ans_elt_size, chunk_data_buf_size;
 	hid_t mem_type_id; // the memory type we'll use to load the data
 } DSet;
@@ -117,8 +117,22 @@ int _get_DSet(
 	hid_t dset_id,
 	int ndim,
 	int as_int,
-	int ans_type_only,
+	int Rtype_only,
 	DSet *dset
+);
+
+hid_t _get_file_id(SEXP filepath);
+
+hid_t _get_dset_id(
+	hid_t file_id,
+	SEXP name,
+	SEXP filepath
+);
+
+SEXP C_get_h5mread_returned_type(
+	SEXP filepath,
+	SEXP name,
+	SEXP as_integer
 );
 
 

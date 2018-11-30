@@ -1,5 +1,6 @@
 \name{h5mread}
 
+\alias{get_h5mread_returned_type}
 \alias{h5mread}
 
 \title{An alternative to \code{rhdf5::h5read}}

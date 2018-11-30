@@ -873,7 +873,7 @@ static void gather_chunk_data(const DSet *dset,
 	num_elts = 0;
 	while (1) {
 		num_elts++;
-		if (dset->ans_type == STRSXP) {
+		if (dset->Rtype == STRSXP) {
 			s = (char *) in + in_offset * dset->size;
 			for (s_len = 0; s_len < dset->size; s_len++)
 				if (s[s_len] == 0)
@@ -882,7 +882,7 @@ static void gather_chunk_data(const DSet *dset,
 			SET_STRING_ELT(ans, out_offset, ans_elt);
 			UNPROTECT(1);
 		} else {
-			if (dset->ans_type == INTSXP) {
+			if (dset->Rtype == INTSXP) {
 				INTEGER(ans)[out_offset] =
 					((int *) in)[in_offset];
 			} else {
@@ -1300,7 +1300,7 @@ static int read_data_6(const DSet *dset,
 	IntAEAE *inner_breakpoint_bufs;
 	long long int num_chunks, ndot;
 
-	if (dset->ans_type == INTSXP) {
+	if (dset->Rtype == INTSXP) {
 		out = INTEGER(ans);
 	} else {
 		out = REAL(ans);
@@ -1471,11 +1471,11 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 		}
 	}
 
-	ans = PROTECT(allocVector(dset->ans_type, (R_xlen_t) ans_len));
+	ans = PROTECT(allocVector(dset->Rtype, (R_xlen_t) ans_len));
 	nprotect++;
 
 	if (ans_len != 0) {
-		if (dset->ans_type == INTSXP) {
+		if (dset->Rtype == INTSXP) {
 			out = INTEGER(ans);
 		} else {
 			out = REAL(ans);
@@ -1529,7 +1529,7 @@ static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(dset->ans_type, ans_len));
+	ans = PROTECT(allocVector(dset->Rtype, ans_len));
 
 	if (ans_len != 0) {
 		if (method <= 5) {
@@ -1581,7 +1581,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	ans = R_NilValue;
 
-	if (dset.ans_type == STRSXP) {
+	if (dset.Rtype == STRSXP) {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "reading string data");
@@ -1628,23 +1628,9 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	       SEXP starts, SEXP counts, SEXP noreduce,
 	       SEXP as_integer, SEXP method)
 {
-	SEXP filepath0, name0, ans;
 	int noreduce0, as_int, method0;
 	hid_t file_id, dset_id;
-
-	/* Check 'filepath'. */
-	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
-		error("'filepath' must be a single string");
-	filepath0 = STRING_ELT(filepath, 0);
-	if (filepath0 == NA_STRING)
-		error("'filepath' cannot be NA");
-
-	/* Check 'name'. */
-	if (!(IS_CHARACTER(name) && LENGTH(name) == 1))
-		error("'name' must be a single string");
-	name0 = STRING_ELT(name, 0);
-	if (name0 == NA_STRING)
-		error("'name' cannot be NA");
+	SEXP ans;
 
 	/* Check 'noreduce'. */
 	if (!(IS_LOGICAL(noreduce) && LENGTH(noreduce) == 1))
@@ -1661,15 +1647,9 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'method' must be a single integer");
 	method0 = INTEGER(method)[0];
 
-	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
-	if (file_id < 0)
-		error("failed to open file %s", CHAR(filepath0));
-	dset_id = H5Dopen(file_id, CHAR(name0), H5P_DEFAULT);
-	if (dset_id < 0) {
-		H5Fclose(file_id);
-		error("failed to open dataset %s from file %s",
-		      CHAR(name0), CHAR(filepath0));
-	}
+	file_id = _get_file_id(filepath);
+	dset_id = _get_dset_id(file_id, name, filepath);
+
 	/* h5mread() will do H5Dclose(dset_id). */
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
 			      as_int, method0));

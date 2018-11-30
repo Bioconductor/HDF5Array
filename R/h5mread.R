@@ -39,6 +39,14 @@ map_starts_to_chunks <- function(starts, dim, chunk_spacings)
           PACKAGE="HDF5Array")
 }
 
+## The R type returned by h5mread() is determined by arguments 'filepath',
+## 'name', and 'as_integer'.
+get_h5mread_returned_type <- function(filepath, name, as.integer=FALSE)
+{
+    .Call("C_get_h5mread_returned_type", filepath, name, as.integer,
+          PACKAGE="HDF5Array")
+}
+
 ### The selection must be strictly ascending along each dimension.
 ### By default the supplied selection is checked and reduced (if it can be).
 ### Set 'noreduce' to TRUE to skip the reduction step.

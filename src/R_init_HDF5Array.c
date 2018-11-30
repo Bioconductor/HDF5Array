@@ -11,6 +11,9 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_reduce_selection, 3),
 	CALLMETHOD_DEF(C_map_starts_to_chunks, 3),
 
+/* DSet.c */
+	CALLMETHOD_DEF(C_get_h5mread_returned_type, 3),
+
 /* h5mread.c */
 	CALLMETHOD_DEF(C_h5mread, 7),
 
