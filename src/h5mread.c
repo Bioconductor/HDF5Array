@@ -1782,8 +1782,7 @@ static SEXP h5mread_1_2_3(const DSetDesc *dset_desc,
 }
 
 /* Return R__NilValue on error. */
-static SEXP h5mread_4_5_6(const DSetDesc *dset_desc,
-			  SEXP starts, SEXP counts,
+static SEXP h5mread_4_5_6(const DSetDesc *dset_desc, SEXP starts,
 			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
@@ -1880,7 +1879,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		PRINT_TO_ERRMSG_BUF("'counts' must be NULL for "
 				    "methods 4, 5, and 6");
 	} else {
-		ans = h5mread_4_5_6(&dset_desc, starts, counts,
+		ans = h5mread_4_5_6(&dset_desc, starts,
 				    method, INTEGER(ans_dim));
 	}
 	if (ans != R_NilValue) {

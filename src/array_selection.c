@@ -92,9 +92,9 @@ static inline int get_untrusted_elt(SEXP x, int i, long long int *val,
 static inline void set_trusted_elt(SEXP x, int i, long long int val)
 {
 	if (IS_INTEGER(x))
-		INTEGER(x)[i] = val;
+		INTEGER(x)[i] = (int) val;
 	else
-		REAL(x)[i] = val;
+		REAL(x)[i] = (double) val;
 	return;
 }
 
@@ -205,8 +205,8 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 {
 	if (get_untrusted_elt(start, i, s, "starts", along) < 0)
 		return -1;
-	if (*s <= 0) {
-		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is <= 0",
+	if (*s < 1) {
+		PRINT_TO_ERRMSG_BUF("starts[[%d]][%d] is < 1",
 				    along + 1, i + 1);
 		return -1;
 	}
@@ -407,7 +407,7 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 		return -1;
 	nstart_buf[along] = n;
 	nblock_buf[along] = 0;
-	min_start = 1;
+	min_start = 0;
 	if (count == R_NilValue) {
 		/* Walk on the 'start' elements. */
 		for (i = 0; i < n; i++) {
@@ -588,7 +588,7 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 			} else {
 				count_out[j]++;
 			}
-			min_start = s;
+			min_start = s + 1;
 		}
 	} else {
 		for (i = 0; i < n; i++) {
@@ -652,17 +652,12 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 		       const long long int *last_block_start)
 {
 	int ndim, along;
-	SEXP ans, reduced_starts, reduced_counts, start, count;
+	SEXP reduced_starts, reduced_counts, start, count, ans;
 
 	//clock_t t0 = clock();
 	ndim = LENGTH(starts);
-	ans = PROTECT(NEW_LIST(2));
 	reduced_starts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 0, reduced_starts);
-	UNPROTECT(1);
 	reduced_counts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 1, reduced_counts);
-	UNPROTECT(1);
 	for (along = 0; along < ndim; along++) {
 		start = VECTOR_ELT(starts, along);
 		if (start == R_NilValue)
@@ -674,7 +669,10 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
 				       nblock, last_block_start,
 				       reduced_starts, reduced_counts);
 	}
-	UNPROTECT(1);
+	ans = PROTECT(NEW_LIST(2));
+	SET_VECTOR_ELT(ans, 0, reduced_starts);
+	SET_VECTOR_ELT(ans, 1, reduced_counts);
+	UNPROTECT(3);
 	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
 	return ans;
 }
@@ -777,7 +775,7 @@ static int map_start_to_chunks(SEXP start, int along,
 	/* Walk on the remaining 'start' elements. */
 	nchunk = 0;
 	for (i = 1; i < n; i++) {
-		min_start = s;
+		min_start = s + 1;
 		ret = get_untrusted_start(start, i, &s, min_start, along, 1);
 		if (ret < 0)
 			return -1;

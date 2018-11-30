@@ -56,16 +56,21 @@ test_reduce_selection <- function()
 
     ## specifying 'starts' only (no 'counts')
 
+    current <- reduce_selection(list(c(2:5, 7:10)))
+    checkIdentical(list(c(2L, 7L)), current[[1L]])
+    checkIdentical(list(c(4L, 4L)), current[[2L]])
+
+    current <- reduce_selection(list(7:10, c(1:2, 5)))
+    checkIdentical(list(7L, c(1L, 5L)), current[[1L]])
+    checkIdentical(list(4L, c(2L, 1L)), current[[2L]])
+
     starts <- list(NULL, c(2, 6))
-
     checkIdentical(NULL, reduce_selection(starts))  # no reduction
-
     current <- reduce_selection(starts, dim=5:6)
     checkIdentical(list(NULL, c(2L, 6L)), current[[1L]])
     checkIdentical(list(NULL, NULL), current[[2L]])
 
     starts <- list(NULL, c(4, 6:7), c(2, 5), integer(0), numeric(0))
-
     current <- reduce_selection(starts)
     checkIdentical(list(NULL, c(4L, 6L), c(2L, 5L), integer(0), integer(0)),
                    current[[1L]])
@@ -169,13 +174,20 @@ test_map_starts_to_chunks <- function()
 
 test_h5mread <- function()
 {
-    do_tests <- function(m, filepath, name, as.integer=FALSE, method=0L) {
+    do_tests <- function(m, filepath, name, noreduce=FALSE,
+                            as.integer=FALSE, method=0L)
+    {
         read <- function(starts, counts=NULL)
             h5mread(filepath, name, starts=starts, counts=counts,
-                    as.integer=as.integer, method=method)
+                    noreduce=noreduce, as.integer=as.integer, method=method)
 
         current <- read(list(NULL, NULL))
         checkIdentical(m, current)
+
+        current <- read(list(integer(0), integer(0)))
+        checkIdentical(m[integer(0), integer(0), drop=FALSE], current)
+
+        ## With indices strictly sorted
 
         current <- read(list(c(2:5, 7:10), NULL))
         checkIdentical(m[c(2:5, 7:10), , drop=FALSE], current)
@@ -186,10 +198,16 @@ test_h5mread <- function()
         current <- read(list(7:10, c(1:2, 5)))
         checkIdentical(m[7:10, c(1:2, 5), drop=FALSE], current)
 
-        current <- read(list(integer(0), integer(0)))
-        checkIdentical(m[integer(0), integer(0), drop=FALSE], current)
+        ## With indices in any order and with duplicates
 
-        if (method > 1L)
+        current <- read(list(c(2:6, 6:3, 1, 1, 1, 9:8), NULL))
+        checkIdentical(m[c(2:6, 6:3, 1, 1, 1, 9:8), , drop=FALSE], current)
+
+        current <- read(list(c(2:6, 6:3, 1, 1, 1, 9:8), c(6:5, 5)))
+        checkIdentical(m[c(2:6, 6:3, 1, 1, 1, 9:8), c(6:5, 5), drop=FALSE], current)
+
+        ## Only methods 1 and 3 support 'counts'.
+        if (!(method %in% c(1, 3)))
             return()
 
         starts <- list(integer(0), 4L)
@@ -208,25 +226,41 @@ test_h5mread <- function()
         checkIdentical(m[2:8, 4:5, drop=FALSE], current)
     }
 
-    ## with an array of integers
+    ## with an integer matrix
 
     m0 <- matrix(1:60, ncol=6)
     M0 <- as(m0, "HDF5Array")
-    do_tests(m0, M0@seed@filepath, M0@seed@name)
     do_tests(m0, M0@seed@filepath, M0@seed@name, method=1L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, noreduce=TRUE, method=1L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, method=2L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, method=3L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, noreduce=TRUE, method=3L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name, method=4L)
     do_tests(m0, M0@seed@filepath, M0@seed@name, method=6L)
+    do_tests(m0, M0@seed@filepath, M0@seed@name)
 
-    ## with an array of doubles
+    ## with a numeric matrix
 
     m1 <- matrix(10 * runif(60), ncol=6)
     M1 <- as(m1, "HDF5Array")
-    do_tests(m1, M1@seed@filepath, M1@seed@name)
     do_tests(m1, M1@seed@filepath, M1@seed@name, method=1L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, noreduce=TRUE, method=1L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, method=2L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, method=3L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, noreduce=TRUE, method=3L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name, method=4L)
     do_tests(m1, M1@seed@filepath, M1@seed@name, method=6L)
+    do_tests(m1, M1@seed@filepath, M1@seed@name)
 
     storage.mode(m1) <- "integer"
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE)
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=1L)
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=6L)
+
+    ## with a character matrix
+
+    m2 <- matrix(as.character(1:60), ncol=6)
+    M2 <- as(m2, "HDF5Array")
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=4L)
 }
 
