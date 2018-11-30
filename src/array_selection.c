@@ -253,8 +253,8 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 		return -1;
 	/* Walk on the 'start' elements. */
 	for (i = 0; i < n; i++) {
-		/* Because we've set the 4th argument ('min_start') to 0,
-		   the last argument ('no_counts') will be ignored. */
+		/* Last arg ('no_counts') is ignored when 4th arg ('min_start')
+		   is set to 0. */
 		ret = get_untrusted_start(start, i, &s, 0, along, 0);
 		if (ret < 0)
 			return -1;

@@ -1575,8 +1575,8 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		return R_NilValue;
 	}
 
-	/* _get_DSet() will do H5Dclose(dset_id) in case of error. */
-	if (_get_DSet(dset_id, ndim, as_int, 0, &dset) < 0)
+	/* _get_DSet() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSet(dset_id, as_int, 0, ndim, &dset) < 0)
 		return R_NilValue;
 
 	ans = R_NilValue;
