@@ -126,6 +126,9 @@ extractNonzeroDataByCol(x, j)
     \item \code{\link{writeTENxMatrix}} for writing a matrix-like object
           as an HDF5-based sparse matrix.
 
+    \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
+          \pkg{TENxBrainData} package).
+
     \item \code{\link[parallel]{detectCores}} from the \pkg{parallel}
           package.
 

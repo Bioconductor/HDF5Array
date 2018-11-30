@@ -88,6 +88,9 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
   \itemize{
     \item \link{TENxMatrix} objects.
 
+    \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
+          \pkg{TENxBrainData} package).
+
     \item \link{HDF5-dump-management} to control the location and
           physical properties of automatically created HDF5 datasets.
 
