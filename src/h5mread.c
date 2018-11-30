@@ -46,13 +46,19 @@ typedef struct {
  * Low-level helpers
  */
 
-static hsize_t *alloc_hsize_t_buf(size_t buflength, const char *what)
+static hsize_t *alloc_hsize_t_buf(size_t buflength, int zeroes,
+				  const char *what)
 {
 	hsize_t *buf;
+	int i;
 
 	buf = (hsize_t *) malloc(buflength * sizeof(hsize_t));
 	if (buf == NULL)
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory for %s", what);
+	if (zeroes) {
+		for (i = 0; i < buflength; i++)
+			buf[i] = 0;
+	}
 	return buf;
 }
 
@@ -67,7 +73,7 @@ static int alloc_Viewport(Viewport *vp, int ndim, int mode)
 	vp->off = NULL;
 	if (mode != 1) {
 		/* Allocate memory for the 'h5off' and 'h5dim' fields. */
-		vp->h5off = alloc_hsize_t_buf(2 * ndim, "Viewport fields");
+		vp->h5off = alloc_hsize_t_buf(2 * ndim, 0, "Viewport fields");
 		if (vp->h5off == NULL)
 			return -1;
 		vp->h5dim = vp->h5off + ndim;
@@ -250,7 +256,8 @@ static int get_dset_desc(hid_t dset_id, int ndim, int as_int,
 	dset_desc->dtype_id = dtype_id;
 
 	/* Allocate 'h5dim', 'h5chunk_spacings', and 'h5nchunk'. */
-	h5dim = alloc_hsize_t_buf(2 * ndim, "'h5dim' and 'h5chunk_spacings'");
+	h5dim = alloc_hsize_t_buf(2 * ndim, 0,
+				  "'h5dim' and 'h5chunk_spacings'");
 	if (h5dim == NULL) {
 		H5Tclose(dtype_id);
 		H5Pclose(plist_id);
@@ -363,7 +370,7 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	hid_t mem_space_id;
 
 	/* Allocate and set 'h5dim'. */
-	h5dim = alloc_hsize_t_buf(ndim, "'h5dim'");
+	h5dim = alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		return -1;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
@@ -484,19 +491,20 @@ static size_t set_nblock_buf(int ndim, SEXP starts,
 }
 
 static void init_srcvp_buf(const DSetDesc *dset_desc,
-			    SEXP starts, Viewport *srcvp_buf)
+			   SEXP starts, Viewport *srcvp_buf)
 {
 	int ndim, along, h5along;
+	hsize_t d;
 
 	ndim = dset_desc->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
 			srcvp_buf->h5off[h5along] = 0;
-			srcvp_buf->h5dim[h5along] =
-				dset_desc->h5dim[h5along];
+			d = dset_desc->h5dim[h5along];
 		} else {
-			srcvp_buf->h5dim[h5along] = 1;
+			d = 1;
 		}
+		srcvp_buf->h5dim[h5along] = d;
 	}
 	return;
 }
@@ -604,7 +612,7 @@ static long long int select_elements(const DSetDesc *dset_desc,
 	num_elements = set_nblock_buf(ndim, starts, 1, ans_dim, nblock_buf);
 
 	/* Allocate 'coord_buf'. */
-	coord_buf = alloc_hsize_t_buf(num_elements * ndim, "'coord_buf'");
+	coord_buf = alloc_hsize_t_buf(num_elements * ndim, 0, "'coord_buf'");
 	if (coord_buf == NULL)
 		return -1;
 
@@ -694,24 +702,6 @@ static int read_data_1_2(const DSetDesc *dset_desc, int method,
  * More precisely, walk over the blocks described by 'starts' and 'counts'
  * and make one call to H5Dread() per block.
  *
- * WARNING: Currently broken!
-
-    library(HDF5Array)
-    m0 <- matrix(1:60, ncol=6)
-    M0 <- writeHDF5Array(m0, chunkdim=c(4, 5))
-    h5mread(M0@seed@filepath, M0@seed@name, list(NULL, c(2:3, 5)), method=3L)
-         [,1] [,2]      [,3]
-    [1,]   11   41 209047208
-    [2,]   12   42         0
-    [3,]   13   43 209046632
-    [4,]   14   44         0
-    [5,]   15   45 209046568
-    [6,]   16   46         0
-    [7,]   17   47 209046440
-    [8,]   18   48         0
-    [9,]   19   49 209046312
-   [10,]   20   50         0
-
  */
 
 static int read_hyperslab(const DSetDesc *dset_desc,
@@ -721,11 +711,11 @@ static int read_hyperslab(const DSetDesc *dset_desc,
 		void *out, hid_t mem_space_id)
 {
 	int ndim, along, h5along, i, ret;
-	SEXP start, count;
+	SEXP start;
 
 	ndim = dset_desc->ndim;
 
-	/* Update 'srcvp_buf' and 'destvp_buf'. */
+	/* Update 'destvp_buf' and 'srcvp_buf' IN THAT ORDER! */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -734,20 +724,13 @@ static int read_hyperslab(const DSetDesc *dset_desc,
 			continue;
 		h5along = ndim - 1 - along;
 		i = midx[along];
-		srcvp_buf->h5off[h5along] = _get_trusted_elt(start, i) - 1;
-		if (counts != R_NilValue) {
-			count = VECTOR_ELT(counts, along);
-			if (count != R_NilValue)
-				srcvp_buf->h5dim[h5along] =
-					destvp_buf->h5dim[h5along] =
-						_get_trusted_elt(count, i);
-		}
-		if (along < moved_along) {
+		if (i == 0) {
 			destvp_buf->h5off[h5along] = 0;
 		} else {
 			destvp_buf->h5off[h5along] += srcvp_buf->h5dim[h5along];
 		}
 	}
+	update_srcvp_buf(ndim, midx, moved_along, starts, counts, srcvp_buf);
 
 	ret = set_hyperslab(dset_desc->space_id, srcvp_buf);
 	if (ret < 0)
@@ -767,9 +750,8 @@ static int read_data_3(const DSetDesc *dset_desc,
 		       SEXP starts, SEXP counts, const int *ans_dim,
 		       void *out, hid_t mem_space_id)
 {
-	int ndim, along, h5along, moved_along, ret;
+	int ndim, moved_along, ret;
 	Viewport srcvp_buf, destvp_buf;
-	hsize_t d;
 	IntAE *nblock_buf, *midx_buf;
 	long long int num_hyperslabs;
 
@@ -782,22 +764,15 @@ static int read_data_3(const DSetDesc *dset_desc,
 	/* Allocate 'srcvp_buf' and 'destvp_buf'. */
 	if (alloc_Viewport(&srcvp_buf, ndim, 0) < 0)
 		return -1;
-	if (alloc_Viewport(&destvp_buf, ndim, 0) < 0) {
+	destvp_buf.h5off = alloc_hsize_t_buf(ndim, 1, "'destvp_buf.h5off'");
+	destvp_buf.h5dim = srcvp_buf.h5dim;
+	if (destvp_buf.h5off == NULL) {
 		free_Viewport(&srcvp_buf);
 		return -1;
 	}
 
-	/* Initialize 'srcvp_buf' and 'destvp_buf'. */
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (VECTOR_ELT(starts, along) == R_NilValue) {
-			srcvp_buf.h5off[h5along] =
-				destvp_buf.h5off[h5along] = 0;
-			d = dset_desc->h5dim[h5along];
-		} else {
-			d = 1;
-		}
-		srcvp_buf.h5dim[h5along] = destvp_buf.h5dim[h5along] = d;
-	}
+	/* Initialize 'srcvp_buf' (this also initializes 'destvp_buf.h5dim'). */
+	init_srcvp_buf(dset_desc, starts, &srcvp_buf);
 
 	/* Walk on the hyperslabs. */
 	num_hyperslabs = 0;
@@ -815,8 +790,8 @@ static int read_data_3(const DSetDesc *dset_desc,
 	} while (moved_along < ndim);
 
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs);
+	free(destvp_buf.h5off);
 	free_Viewport(&srcvp_buf);
-	free_Viewport(&destvp_buf);
 	return ret;
 }
 
@@ -1232,7 +1207,7 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 			 const LLongAEAE *chunkidx_bufs,
 			 const int *outdim, SEXP ans)
 {
-	int ndim, along, moved_along, ret;
+	int ndim, moved_along, ret;
 	hid_t mem_space_id;
 	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	Viewport chunkvp_buf, middlevp_buf, destvp_buf;
@@ -1252,15 +1227,13 @@ static int read_data_4_5(const DSetDesc *dset_desc, int method,
 		H5Sclose(mem_space_id);
 		return -1;
 	}
-	middlevp_buf.h5off = alloc_hsize_t_buf(ndim, "'middlevp_buf.h5off'");
+	middlevp_buf.h5off = alloc_hsize_t_buf(ndim, 1, "'middlevp_buf.h5off'");
+	middlevp_buf.h5dim = chunkvp_buf.h5dim;
 	if (middlevp_buf.h5off == NULL) {
 		free_Viewport(&chunkvp_buf);
 		H5Sclose(mem_space_id);
 		return -1;
 	}
-	for (along = 0; along < ndim; along++)
-		middlevp_buf.h5off[along] = 0;
-	middlevp_buf.h5dim = chunkvp_buf.h5dim;
 	if (alloc_Viewport(&destvp_buf, ndim, 1) < 0) {
 		free(middlevp_buf.h5off);
 		free_Viewport(&chunkvp_buf);
@@ -1427,21 +1400,21 @@ static void update_inner_breakpoints(int ndim, int moved_along,
 	return;
 }
 
-static void init_srcvp_buf_for_current_chunk(
-			int ndim, SEXP starts, const Viewport *chunkvp,
+static void init_srcvp_buf_for_current_chunk(int ndim,
+			SEXP starts, const Viewport *chunkvp,
 			Viewport *srcvp_buf)
 {
 	int along, h5along;
+	hsize_t d;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
-			srcvp_buf->h5off[h5along] =
-				chunkvp->h5off[h5along];
-			srcvp_buf->h5dim[h5along] =
-				chunkvp->h5dim[h5along];
+			srcvp_buf->h5off[h5along] = chunkvp->h5off[h5along];
+			d = chunkvp->h5dim[h5along];
 		} else {
-			srcvp_buf->h5dim[h5along] = 1;
+			d = 1;
 		}
+		srcvp_buf->h5dim[h5along] = d;
 	}
 	return;
 }
