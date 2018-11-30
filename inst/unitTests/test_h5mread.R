@@ -1,5 +1,59 @@
+test_check_selection <- function()
+{
+    check_selection <- HDF5Array:::check_selection
+
+    ## specifying 'starts' only (no 'counts')
+
+    checkIdentical(integer(0), check_selection(list()))
+    checkIdentical(integer(0), check_selection(list(), dim=integer(0)))
+    checkIdentical(15L, check_selection(list(NULL), dim=15))
+    checkIdentical(5L, check_selection(list(c(6, 5, 2, 2, 10)), dim=15))
+    checkIdentical(30L, check_selection(list(c(15:1, 1:15)), dim=15))
+    checkIdentical(5L, check_selection(list(c(6, 5, 2, 2, 10)), dim=3e9))
+    checkIdentical(1L, check_selection(list(1e18)))
+    checkIdentical(1L, check_selection(list(1e18), dim=1e18))
+
+    checkException(check_selection(list(), dim=15))
+    checkException(check_selection(list(NULL), dim=3e9))
+    checkException(check_selection(list(0)))
+    checkException(check_selection(list(NA)))
+    checkException(check_selection(list(NA_integer_)))
+    checkException(check_selection(list(NA_real_)))
+    checkException(check_selection(list(NaN)))
+    checkException(check_selection(list(Inf)))
+    checkException(check_selection(list(-Inf)))
+    checkException(check_selection(list(1e19)))
+    checkException(check_selection(list(18), NULL, 15))
+
+    ## specifying 'starts' and 'counts'
+
+    checkIdentical(integer(0), check_selection(list(), list()))
+    checkIdentical(15L, check_selection(list(NULL), list(NULL), dim=15))
+    checkIdentical(5L, check_selection(list(c(6, 5, 2, 2, 10)),
+                                       list(NULL), dim=15))
+    checkIdentical(5L, check_selection(list(c(14, 5, 8)),
+                                       list(c( 2, 0, 3)), dim=15))
+
+    checkException(check_selection(list(NULL), list()))
+    checkException(check_selection(list(), list(NULL)))
+    checkException(check_selection(list(NULL), list(3)))
+    checkException(check_selection(list(6), list(-1)))
+    checkException(check_selection(list(11), list(6), dim=15))
+    checkException(check_selection(list(1), list(3e9)))
+    checkException(check_selection(list(c(3, 5, 2)), list(1e9, 1e9, 1e9)))
+}
+
+test_check_ordered_selection <- function()
+{
+    check_ordered_selection <- HDF5Array:::check_ordered_selection
+
+    # TODO!
+}
+
 test_reduce_selection <- function()
 {
+    reduce_selection <- HDF5Array:::reduce_selection
+
     ## specifying 'starts' only (no 'counts')
 
     starts <- list(NULL, c(2, 6))

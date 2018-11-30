@@ -27,6 +27,21 @@ static int check_INTEGER_or_NUMERIC(SEXP x, const char *what, int along)
 	return 0;
 }
 
+static int shallow_check_count(SEXP count, int n, int along)
+{
+	if (count == R_NilValue)
+		return 0;
+	if (check_INTEGER_or_NUMERIC(count, "counts", along) < 0)
+		return -1;
+	if (LENGTH(count) != n) {
+		PRINT_TO_ERRMSG_BUF("'starts[[%d]]' and 'counts[[%d]]' "
+				    "must have the same length",
+				    along + 1, along + 1);
+		return -1;
+	}
+	return 0;
+}
+
 #define	NOT_A_FINITE_NUMBER(x) \
 	(R_IsNA(x) || R_IsNaN(x) || (x) == R_PosInf || (x) == R_NegInf)
 
@@ -83,9 +98,33 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 	return;
 }
 
+/* Called at the very beginning of the various .Call entry points where
+   it's used and before any resource is allocated so it's ok to error()
+   immediately in case of error. */
+static const long long int *check_dim(SEXP dim, int ndim)
+{
+	long long int *dim_p, d;
+	int along, ret;
+
+	if (dim == R_NilValue)
+		return NULL;
+	if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
+		error("'dim' must be an integer vector (or NULL)");
+	if (LENGTH(dim) != ndim)
+		error("'starts' and 'dim' must have the same length");
+	dim_p = new_LLongAE(ndim, ndim, 0)->elts;
+	for (along = 0; along < ndim; along++) {
+		ret = get_untrusted_elt(dim, along, &d, "dim", -1);
+		if (ret < 0)
+			error(_HDF5Array_errmsg_buf);
+		dim_p[along] = d;
+	}
+	return dim_p;
+}
+
 
 /****************************************************************************
- * Shallow check the array selection
+ * Shallow check of an array selection
  */
 
 /* Only check that 'starts' is a list and that 'counts' is NULL or a list
@@ -210,17 +249,8 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
 	n = LENGTH(start);
-	if (count != R_NilValue) {
-		if (check_INTEGER_or_NUMERIC(count, "counts", along) < 0)
-			return -1;
-		if (LENGTH(count) != n) {
-			PRINT_TO_ERRMSG_BUF(
-				"'starts[[%d]]' and 'counts[[%d]]' "
-				"must have the same length",
-				along + 1, along + 1);
-			return -1;
-		}
-	}
+	if (shallow_check_count(count, n, along) < 0)
+		return -1;
 	/* Walk on the 'start' elements. */
 	for (i = 0; i < n; i++) {
 		/* Because we've set the 4th argument ('min_start') to 0,
@@ -297,42 +327,26 @@ long long int _check_selection(SEXP starts, SEXP counts,
 	return selection_len;
 }
 
-/* --- .Call ENTRY POINT --- */
+/* --- .Call ENTRY POINT ---
+ * Return the dimensions of the selection.
+ */
 SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
 {
-	int ndim, along, ret;
-	LLongAE *dim_buf;
+	int ndim;
+	const long long int *dim_p;
 	IntAE *selection_dim_buf;
-	long long int *dim_p, d, selection_len;
+	long long int selection_len;
 
 	ndim = _shallow_check_selection(starts, counts);
 	if (ndim < 0)
 		error(_HDF5Array_errmsg_buf);
-
-	if (dim == R_NilValue) {
-		dim_p = NULL;
-	} else {
-		if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
-			error("'dim' must be an integer vector (or NULL)");
-		if (LENGTH(dim) != ndim)
-			error("'starts' and 'dim' must have the same length");
-		dim_buf = new_LLongAE(ndim, ndim, 0);
-		dim_p = dim_buf->elts;
-		for (along = 0; along < ndim; along++) {
-			ret = get_untrusted_elt(dim, along, &d, "dim", -1);
-			if (ret < 0)
-				error(_HDF5Array_errmsg_buf);
-			dim_p[along] = d;
-		}
-	}
-
+	dim_p = check_dim(dim, ndim);
 	selection_dim_buf = new_IntAE(ndim, ndim, 0);
-
 	selection_len = _check_selection(starts, counts, dim_p,
 					 selection_dim_buf->elts);
 	if (selection_len < 0)
 		error(_HDF5Array_errmsg_buf);
-	return R_NilValue;
+	return new_INTEGER_from_IntAE(selection_dim_buf);
 }
 
 
@@ -389,17 +403,8 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
 	n = LENGTH(start);
-	if (count != R_NilValue) {
-		if (check_INTEGER_or_NUMERIC(count, "counts", along) < 0)
-			return -1;
-		if (LENGTH(count) != n) {
-			PRINT_TO_ERRMSG_BUF(
-				"'starts[[%d]]' and 'counts[[%d]]' "
-				"must have the same length",
-				along + 1, along + 1);
-			return -1;
-		}
-	}
+	if (shallow_check_count(count, n, along) < 0)
+		return -1;
 	nstart_buf[along] = n;
 	nblock_buf[along] = 0;
 	min_start = 1;
@@ -495,6 +500,227 @@ long long int _check_ordered_selection(SEXP starts, SEXP counts,
 		selection_len *= selection_dim;
 	}
 	return selection_len;
+}
+
+/* --- .Call ENTRY POINT ---
+ * Return the dimensions of the selection.
+ */
+SEXP C_check_ordered_selection(SEXP starts, SEXP counts, SEXP dim)
+{
+	int ndim;
+	const long long int *dim_p;
+	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
+	LLongAE *last_block_start_buf;
+	long long int selection_len;
+
+	ndim = _shallow_check_selection(starts, counts);
+	if (ndim < 0)
+		error(_HDF5Array_errmsg_buf);
+	dim_p = check_dim(dim, ndim);
+	selection_dim_buf = new_IntAE(ndim, ndim, 0);
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	nblock_buf = new_IntAE(ndim, ndim, 0);
+	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+	selection_len = _check_ordered_selection(starts, counts, dim_p,
+				selection_dim_buf->elts,
+				nstart_buf->elts, nblock_buf->elts,
+				last_block_start_buf->elts);
+	if (selection_len < 0)
+		error(_HDF5Array_errmsg_buf);
+	return new_INTEGER_from_IntAE(selection_dim_buf);
+}
+
+
+/****************************************************************************
+ * Reduce the array selection
+ */
+
+int _selection_can_be_reduced(int ndim, const int *nstart, const int *nblock)
+{
+	int along;
+
+	for (along = 0; along < ndim; along++) {
+		/* nblock[along] should always be <= nstart[along] */
+		if (nblock[along] < nstart[along])
+			return 1;
+	}
+	return 0;
+}
+
+static SEXP dup_or_coerce_to_INTSXP(SEXP x, int dup)
+{
+	int x_len, i;
+	SEXP ans;
+
+	if (dup)
+		return duplicate(x);
+	x_len = LENGTH(x);
+	ans = PROTECT(NEW_INTEGER(x_len));
+	for (i = 0; i < x_len; i++)
+		INTEGER(ans)[i] = (int) REAL(x)[i];
+	UNPROTECT(1);
+	return ans;
+}
+
+/*
+ * Note that this does something similar to what coercion from integer (or
+ * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
+ * in IRanges). However we cannot re-use this here because we want to be able
+ * to handle start values that are >= 2^31 which this coercion doesn't support
+ * at the moment.
+ */
+static void stitch_selection(SEXP start_in, SEXP count_in,
+			     SEXP start_out, int *count_out)
+{
+	int n, i, j;
+	long long int min_start, s, c;
+
+	n = LENGTH(start_in);
+	min_start = 0;
+	j = -1;
+	if (count_in == R_NilValue) {
+		for (i = 0; i < n; i++) {
+			s = _get_trusted_elt(start_in, i);
+			if (s != min_start) {
+				j++;
+				set_trusted_elt(start_out, j, s);
+				count_out[j] = 1;
+			} else {
+				count_out[j]++;
+			}
+			min_start = s;
+		}
+	} else {
+		for (i = 0; i < n; i++) {
+			c = _get_trusted_elt(count_in, i);
+			if (c == 0)
+				continue;
+			s = _get_trusted_elt(start_in, i);
+			if (s != min_start) {
+				j++;
+				set_trusted_elt(start_out, j, s);
+				count_out[j] = c;
+			} else {
+				count_out[j] += c;
+			}
+			min_start = s + c;
+		}
+	}
+	return;
+}
+
+static void reduce_selection_along(SEXP start, SEXP count, int along,
+				   const int *selection_dim,
+				   const int *nblock,
+				   const long long int *last_block_start,
+				   SEXP reduced_starts, SEXP reduced_counts)
+{
+	int n, dup;
+	SEXP reduced_start, reduced_count;
+	SEXPTYPE type;
+
+	n = LENGTH(start);
+	if (nblock[along] == n) {
+		/* Nothing to stitch. */
+		dup = IS_INTEGER(start) || last_block_start[along] > INT_MAX;
+		reduced_start = PROTECT(dup_or_coerce_to_INTSXP(start, dup));
+		SET_VECTOR_ELT(reduced_starts, along, reduced_start);
+		UNPROTECT(1);
+		if (selection_dim[along] == n)
+			return;
+		dup = IS_INTEGER(count);
+		reduced_count = PROTECT(dup_or_coerce_to_INTSXP(count, dup));
+		SET_VECTOR_ELT(reduced_counts, along, reduced_count);
+		UNPROTECT(1);
+		return;
+	}
+	/* Stitch. */
+	type = last_block_start[along] <= INT_MAX ? INTSXP : REALSXP;
+	reduced_start = PROTECT(allocVector(type, nblock[along]));
+	SET_VECTOR_ELT(reduced_starts, along, reduced_start);
+	UNPROTECT(1);
+	reduced_count = PROTECT(NEW_INTEGER(nblock[along]));
+	SET_VECTOR_ELT(reduced_counts, along, reduced_count);
+	UNPROTECT(1);
+	stitch_selection(start, count, reduced_start, INTEGER(reduced_count));
+	return;
+}
+
+SEXP _reduce_selection(SEXP starts, SEXP counts,
+		       const int *selection_dim,
+		       const int *nblock,
+		       const long long int *last_block_start)
+{
+	int ndim, along;
+	SEXP ans, reduced_starts, reduced_counts, start, count;
+
+	//clock_t t0 = clock();
+	ndim = LENGTH(starts);
+	ans = PROTECT(NEW_LIST(2));
+	reduced_starts = PROTECT(NEW_LIST(ndim));
+	SET_VECTOR_ELT(ans, 0, reduced_starts);
+	UNPROTECT(1);
+	reduced_counts = PROTECT(NEW_LIST(ndim));
+	SET_VECTOR_ELT(ans, 1, reduced_counts);
+	UNPROTECT(1);
+	for (along = 0; along < ndim; along++) {
+		start = VECTOR_ELT(starts, along);
+		if (start == R_NilValue)
+			continue;
+		count = counts != R_NilValue ? VECTOR_ELT(counts, along) :
+					       R_NilValue;
+		reduce_selection_along(start, count, along,
+				       selection_dim,
+				       nblock, last_block_start,
+				       reduced_starts, reduced_counts);
+	}
+	UNPROTECT(1);
+	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
+	return ans;
+}
+
+/* --- .Call ENTRY POINT ---
+ * Negative values in 'dim' are treated as infinite dimensions.
+ * Return a list of length 2 or NULL if the selection could not be reduced.
+ * When returning a list of length 2:
+ *   - The 1st list element is the list of reduced starts.
+ *   - The 2nd list element is the list of reduced counts.
+ * The 2 lists have the same length as 'starts'. Also they have the same
+ * shape (i.e. same lengths()).
+ */
+SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
+{
+	int ndim;
+	const long long int *dim_p;
+	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
+	LLongAE *last_block_start_buf;
+	long long int selection_len;
+
+	ndim = _shallow_check_selection(starts, counts);
+	if (ndim < 0)
+		error(_HDF5Array_errmsg_buf);
+	dim_p = check_dim(dim, ndim);
+	selection_dim_buf = new_IntAE(ndim, ndim, 0);
+	nstart_buf = new_IntAE(ndim, ndim, 0);
+	nblock_buf = new_IntAE(ndim, ndim, 0);
+	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+
+	/* 1st pass */
+	selection_len = _check_ordered_selection(starts, counts, dim_p,
+				selection_dim_buf->elts,
+				nstart_buf->elts, nblock_buf->elts,
+				last_block_start_buf->elts);
+	if (selection_len < 0)
+		error(_HDF5Array_errmsg_buf);
+	if (!_selection_can_be_reduced(ndim,
+				       nstart_buf->elts,
+				       nblock_buf->elts))
+		return R_NilValue;
+
+	/* 2nd pass */
+	return _reduce_selection(starts, counts,
+				 selection_dim_buf->elts, nblock_buf->elts,
+				 last_block_start_buf->elts);
 }
 
 
@@ -719,214 +945,4 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
 }
 
 
-/****************************************************************************
- * Reduce the array selection
- */
-
-int _selection_can_be_reduced(int ndim, const int *nstart, const int *nblock)
-{
-	int along;
-
-	for (along = 0; along < ndim; along++) {
-		/* nblock[along] should always be <= nstart[along] */
-		if (nblock[along] < nstart[along])
-			return 1;
-	}
-	return 0;
-}
-
-static SEXP dup_or_coerce_to_INTSXP(SEXP x, int dup)
-{
-	int x_len, i;
-	SEXP ans;
-
-	if (dup)
-		return duplicate(x);
-	x_len = LENGTH(x);
-	ans = PROTECT(NEW_INTEGER(x_len));
-	for (i = 0; i < x_len; i++)
-		INTEGER(ans)[i] = (int) REAL(x)[i];
-	UNPROTECT(1);
-	return ans;
-}
-
-/*
- * Note that this does something similar to what coercion from integer (or
- * numeric) to IRanges does (see .Call entry point "IRanges_from_integer"
- * in IRanges). However we cannot re-use this here because we want to be able
- * to handle start values that are >= 2^31 which this coercion doesn't support
- * at the moment.
- */
-static void stitch_selection(SEXP start_in, SEXP count_in,
-			     SEXP start_out, int *count_out)
-{
-	int n, i, j;
-	long long int min_start, s, c;
-
-	n = LENGTH(start_in);
-	min_start = 0;
-	j = -1;
-	if (count_in == R_NilValue) {
-		for (i = 0; i < n; i++) {
-			s = _get_trusted_elt(start_in, i);
-			if (s != min_start) {
-				j++;
-				set_trusted_elt(start_out, j, s);
-				count_out[j] = 1;
-			} else {
-				count_out[j]++;
-			}
-			min_start = s;
-		}
-	} else {
-		for (i = 0; i < n; i++) {
-			c = _get_trusted_elt(count_in, i);
-			if (c == 0)
-				continue;
-			s = _get_trusted_elt(start_in, i);
-			if (s != min_start) {
-				j++;
-				set_trusted_elt(start_out, j, s);
-				count_out[j] = c;
-			} else {
-				count_out[j] += c;
-			}
-			min_start = s + c;
-		}
-	}
-	return;
-}
-
-static void reduce_selection_along(SEXP start, SEXP count, int along,
-				   const int *selection_dim,
-				   const int *nblock,
-				   const long long int *last_block_start,
-				   SEXP reduced_starts, SEXP reduced_counts)
-{
-	int n, dup;
-	SEXP reduced_start, reduced_count;
-	SEXPTYPE type;
-
-	n = LENGTH(start);
-	if (nblock[along] == n) {
-		/* Nothing to stitch. */
-		dup = IS_INTEGER(start) || last_block_start[along] > INT_MAX;
-		reduced_start = PROTECT(dup_or_coerce_to_INTSXP(start, dup));
-		SET_VECTOR_ELT(reduced_starts, along, reduced_start);
-		UNPROTECT(1);
-		if (selection_dim[along] == n)
-			return;
-		dup = IS_INTEGER(count);
-		reduced_count = PROTECT(dup_or_coerce_to_INTSXP(count, dup));
-		SET_VECTOR_ELT(reduced_counts, along, reduced_count);
-		UNPROTECT(1);
-		return;
-	}
-	/* Stitch. */
-	type = last_block_start[along] <= INT_MAX ? INTSXP : REALSXP;
-	reduced_start = PROTECT(allocVector(type, nblock[along]));
-	SET_VECTOR_ELT(reduced_starts, along, reduced_start);
-	UNPROTECT(1);
-	reduced_count = PROTECT(NEW_INTEGER(nblock[along]));
-	SET_VECTOR_ELT(reduced_counts, along, reduced_count);
-	UNPROTECT(1);
-	stitch_selection(start, count, reduced_start, INTEGER(reduced_count));
-	return;
-}
-
-SEXP _reduce_selection(SEXP starts, SEXP counts,
-		       const int *selection_dim,
-		       const int *nblock,
-		       const long long int *last_block_start)
-{
-	int ndim, along;
-	SEXP ans, reduced_starts, reduced_counts, start, count;
-
-	//clock_t t0 = clock();
-	ndim = LENGTH(starts);
-	ans = PROTECT(NEW_LIST(2));
-	reduced_starts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 0, reduced_starts);
-	UNPROTECT(1);
-	reduced_counts = PROTECT(NEW_LIST(ndim));
-	SET_VECTOR_ELT(ans, 1, reduced_counts);
-	UNPROTECT(1);
-	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		count = counts != R_NilValue ? VECTOR_ELT(counts, along) :
-					       R_NilValue;
-		reduce_selection_along(start, count, along,
-				       selection_dim,
-				       nblock, last_block_start,
-				       reduced_starts, reduced_counts);
-	}
-	UNPROTECT(1);
-	//printf("time 2nd pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	return ans;
-}
-
-/* --- .Call ENTRY POINT ---
- * Negative values in 'dim' are treated as infinite dimensions.
- * Return a list of length 2 or NULL if the selection could not be reduced.
- * When returning a list of length 2:
- *   - The 1st list element is the list of reduced starts.
- *   - The 2nd list element is the list of reduced counts.
- * The 2 lists have the same length as 'starts'. Also they have the same
- * shape (i.e. same lengths()).
- */
-SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
-{
-	int ndim, along, ret;
-	LLongAE *dim_buf;
-	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
-	long long int selection_len, *dim_p, d;
-
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0)
-		error(_HDF5Array_errmsg_buf);
-
-	if (dim == R_NilValue) {
-		dim_p = NULL;
-	} else {
-		if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
-			error("'dim' must be an integer vector (or NULL)");
-		if (LENGTH(dim) != ndim)
-			error("'starts' and 'dim' must have the same length");
-		dim_buf = new_LLongAE(ndim, ndim, 0);
-		dim_p = dim_buf->elts;
-		for (along = 0; along < ndim; along++) {
-			ret = get_untrusted_elt(dim, along, &d, "dim", -1);
-			if (ret < 0)
-				error(_HDF5Array_errmsg_buf);
-			dim_p[along] = d;
-		}
-	}
-
-	selection_dim_buf = new_IntAE(ndim, ndim, 0);
-	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-
-	/* 1st pass */
-	//clock_t t0 = clock();
-	selection_len = _check_ordered_selection(starts, counts, dim_p,
-				selection_dim_buf->elts,
-				nstart_buf->elts, nblock_buf->elts,
-				last_block_start_buf->elts);
-	//printf("time 1st pass: %e\n", (1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	if (selection_len < 0)
-		error(_HDF5Array_errmsg_buf);
-
-	if (!_selection_can_be_reduced(ndim,
-				       nstart_buf->elts, nblock_buf->elts))
-		return R_NilValue;
-
-	/* 2nd pass */
-	return _reduce_selection(starts, counts,
-				 selection_dim_buf->elts, nblock_buf->elts,
-				 last_block_start_buf->elts);
-}
 

@@ -7,6 +7,7 @@ static const R_CallMethodDef callMethods[] = {
 
 /* array_selection.c */
 	CALLMETHOD_DEF(C_check_selection, 3),
+	CALLMETHOD_DEF(C_check_ordered_selection, 3),
 	CALLMETHOD_DEF(C_reduce_selection, 3),
 	CALLMETHOD_DEF(C_map_starts_to_chunks, 3),
 

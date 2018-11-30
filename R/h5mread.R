@@ -5,9 +5,16 @@
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
+### NOT exported!
 check_selection <- function(starts, counts=NULL, dim=NULL)
 {
     .Call("C_check_selection", starts, counts, dim, PACKAGE="HDF5Array")
+}
+
+### NOT exported!
+check_ordered_selection <- function(starts, counts=NULL, dim=NULL)
+{
+    .Call("C_check_ordered_selection", starts, counts, dim, PACKAGE="HDF5Array")
 }
 
 ### The selection must be strictly ascending along each dimension.
@@ -19,6 +26,7 @@ check_selection <- function(starts, counts=NULL, dim=NULL)
 ###         starts <- reduced[[1L]]
 ###         counts <- counts[[1L]]
 ###     }
+### NOT exported!
 reduce_selection <- function(starts, counts=NULL, dim=NULL)
 {
     .Call("C_reduce_selection", starts, counts, dim, PACKAGE="HDF5Array")

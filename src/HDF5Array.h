@@ -45,19 +45,10 @@ long long int _check_ordered_selection(
 	long long int *last_block_start_buf
 );
 
-int _map_starts_to_chunks(
+SEXP C_check_ordered_selection(
 	SEXP starts,
-	const long long int *dim,
-	const long long int *chunk_spacings,
-	int *nstart_buf,
-	IntAEAE *breakpoint_bufs,
-	LLongAEAE *chunkidx_bufs
-);
-
-SEXP C_map_starts_to_chunks(
-	SEXP starts,
-	SEXP dim,
-	SEXP chunk_spacings
+	SEXP counts,
+	SEXP dim
 );
 
 int _selection_can_be_reduced(
@@ -77,6 +68,21 @@ SEXP C_reduce_selection(
 	SEXP starts,
 	SEXP counts,
 	SEXP dim
+);
+
+int _map_starts_to_chunks(
+	SEXP starts,
+	const long long int *dim,
+	const long long int *chunk_spacings,
+	int *nstart_buf,
+	IntAEAE *breakpoint_bufs,
+	LLongAEAE *chunkidx_bufs
+);
+
+SEXP C_map_starts_to_chunks(
+	SEXP starts,
+	SEXP dim,
+	SEXP chunk_spacings
 );
 
 
