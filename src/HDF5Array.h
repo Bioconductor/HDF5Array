@@ -1,10 +1,27 @@
 #include <Rdefines.h>
 #include "S4Vectors_interface.h"
 
+#include "hdf5.h"
+
 #define ERRMSG_BUF_LENGTH 256
 
 #define PRINT_TO_ERRMSG_BUF(...) \
 	snprintf(_HDF5Array_errmsg_buf, ERRMSG_BUF_LENGTH, __VA_ARGS__)
+
+/* A data structure for representing an HDF5 dataset (tailored based on the
+   needs of C_h5mread()). */
+typedef struct {
+	hid_t dset_id, space_id, plist_id;
+	int ndim;
+	hsize_t *h5dim, *h5chunk_spacings;
+	int *h5nchunk;
+	hid_t dtype_id;
+	H5T_class_t class;
+	size_t size;
+	SEXPTYPE ans_type;
+	size_t ans_elt_size, chunk_data_buf_size;
+	hid_t mem_type_id; // the memory type we'll use to load the data
+} DSet;
 
 static inline long long int _get_trusted_elt(SEXP x, int i)
 {
@@ -83,6 +100,25 @@ SEXP C_map_starts_to_chunks(
 	SEXP starts,
 	SEXP dim,
 	SEXP chunk_spacings
+);
+
+
+/* DSet.c */
+
+hsize_t *_alloc_hsize_t_buf(
+	size_t buflength,
+	int zeroes,
+	const char *what
+);
+
+void _close_DSet(DSet *dset);
+
+int _get_DSet(
+	hid_t dset_id,
+	int ndim,
+	int as_int,
+	int ans_type_only,
+	DSet *dset
 );
 
 
