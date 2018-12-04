@@ -99,7 +99,7 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 }
 
 /* Called at the very beginning of the various .Call entry points where
-   it's used and before any resource is allocated so it's ok to error()
+   it's used (and before any resource is allocated) so it's ok to error()
    immediately in case of error. */
 static const long long int *check_dim(SEXP dim, int ndim)
 {

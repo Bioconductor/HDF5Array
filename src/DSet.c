@@ -5,6 +5,7 @@
 #include "HDF5Array.h"
 
 #include <stdlib.h>  /* for malloc, free */
+#include <string.h>  /* for strcmp */
 #include <limits.h>  /* for INT_MAX */
 
 
@@ -28,14 +29,109 @@ hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
  * _get_DSet() / _close_DSet()
  */
 
+static char *get_storage_mode_attr(hid_t dset_id)
+{
+	hid_t attr_id, attr_type_id;
+	H5T_class_t attr_H5class;
+	hsize_t attr_size;
+	char *storage_mode_attr;
+	herr_t ret;
+
+	attr_id = H5Aopen(dset_id, "storage.mode", H5P_DEFAULT);
+	if (attr_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aopen() returned an error");
+		return NULL;
+	}
+	attr_type_id = H5Aget_type(attr_id);
+	if (attr_type_id < 0) {
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Aget_type() returned 0");
+		return NULL;
+	}
+	attr_H5class = H5Tget_class(attr_type_id);
+	if (attr_H5class == H5T_NO_CLASS) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
+		return NULL;
+	}
+	if (attr_H5class != H5T_STRING) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("attribute \"storage.mode\" is "
+				    "not of expected type H5T_STRING");
+		return NULL;
+	}
+	attr_size = H5Aget_storage_size(attr_id);
+	if (attr_size == 0) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
+		return NULL;
+	}
+	//printf("attr_size = %llu\n", attr_size);
+	storage_mode_attr = (char *) malloc((size_t) attr_size);
+	if (storage_mode_attr == NULL) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'storage_mode_attr'");
+		return NULL;
+	}
+	ret = H5Aread(attr_id, attr_type_id, storage_mode_attr);
+	H5Tclose(attr_type_id);
+	H5Aclose(attr_id);
+	if (ret < 0) {
+		free(storage_mode_attr);
+		PRINT_TO_ERRMSG_BUF("H5Aread() returned an error");
+		return NULL;
+	}
+	//printf("storage_mode_attr: %s\n", storage_mode_attr);
+	return storage_mode_attr;
+}
+
+static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
+				     SEXPTYPE *Rtype)
+{
+	if (strcmp(storage_mode, "logical") == 0) {
+		*Rtype = as_int ? INTSXP : LGLSXP;
+		return 0;
+	}
+	if (strcmp(storage_mode, "integer") == 0) {
+		if (as_int)
+			warning("'as.integer' is ignored when the dataset to "
+				"read has a \"storage.mode\" attribute set "
+				"to \"integer\"");
+		*Rtype = INTSXP;
+		return 0;
+	}
+	if (strcmp(storage_mode, "double") == 0 ||
+	    strcmp(storage_mode, "numeric") == 0) {
+		*Rtype = as_int ? INTSXP : REALSXP;
+		return 0;
+	}
+	if (strcmp(storage_mode, "character") == 0) {
+		if (as_int)
+			warning("'as.integer' is ignored when the dataset to "
+				"read has a \"storage.mode\" attribute set "
+				"to \"character\"");
+		*Rtype = STRSXP;
+		return 0;
+	}
+	PRINT_TO_ERRMSG_BUF("the dataset to read has a \"storage.mode\" "
+			    "attribute set to unsupported value: \"%s\"",
+			    storage_mode);
+	return -1;
+}
+
 /* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
-static int map_H5class_to_Rtype(H5T_class_t class, int as_int, size_t size,
+static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
 				SEXPTYPE *Rtype)
 {
 	const char *classname;
 
-	switch (class) {
+	switch (H5class) {
 	    case H5T_INTEGER:
 		*Rtype = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
 		return 0;
@@ -58,7 +154,7 @@ static int map_H5class_to_Rtype(H5T_class_t class, int as_int, size_t size,
 	    case H5T_ARRAY: classname = "H5T_ARRAY"; break;
 	    default:
 		PRINT_TO_ERRMSG_BUF("unknown dataset class identifier: %d",
-				    class);
+				    H5class);
 	    return -1;
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s", classname);
@@ -68,6 +164,7 @@ static int map_H5class_to_Rtype(H5T_class_t class, int as_int, size_t size,
 static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t size)
 {
 	switch (Rtype) {
+	    case LGLSXP:
 	    case INTSXP:  return sizeof(int);
 	    case REALSXP: return sizeof(double);
 	    case STRSXP:  return size;
@@ -79,6 +176,7 @@ static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t size)
 static hid_t get_mem_type_id_from_Rtype(SEXPTYPE Rtype, hid_t dtype_id)
 {
 	switch (Rtype) {
+	    case LGLSXP:
 	    case INTSXP:  return H5T_NATIVE_INT;
 	    case REALSXP: return H5T_NATIVE_DOUBLE;
 	    case STRSXP:  return dtype_id;
@@ -99,27 +197,45 @@ void _close_DSet(DSet *dset)
 		H5Sclose(dset->space_id);
 	if (dset->dtype_id != -1)
 		H5Tclose(dset->dtype_id);
+	if (dset->storage_mode_attr != NULL)
+		free(dset->storage_mode_attr);
 	H5Dclose(dset->dset_id);
 }
 
 int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	      DSet *dset)
 {
+	char *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
-	H5T_class_t class;
+	H5T_class_t H5class;
 	size_t size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int dset_ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
+	htri_t ret;
 
 	dset->dset_id = dset_id;
 
 	/* Initialize the fields that _close_DSet() will look at. */
+	dset->storage_mode_attr = NULL;
 	dset->dtype_id = -1;
 	dset->space_id = -1;
 	dset->plist_id = -1;
 	dset->h5dim = NULL;
 	dset->h5nchunk = NULL;
+
+	/* Set 'storage_mode_attr'. */
+	ret = H5Aexists(dset_id, "storage.mode");
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
+		goto on_error;
+	}
+	if (ret > 0) {
+		storage_mode_attr = get_storage_mode_attr(dset_id);
+		if (storage_mode_attr == NULL)
+			goto on_error;
+		dset->storage_mode_attr = storage_mode_attr;
+	}
 
 	/* Set 'dtype_id'. */
 	dtype_id = H5Dget_type(dset_id);
@@ -129,13 +245,13 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset->dtype_id = dtype_id;
 
-	/* Set 'class'. */
-	class = H5Tget_class(dtype_id);
-	if (class == H5T_NO_CLASS) {
+	/* Set 'H5class'. */
+	H5class = H5Tget_class(dtype_id);
+	if (H5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		goto on_error;
 	}
-	dset->class = class;
+	dset->H5class = H5class;
 
 	/* Set 'size'. */
 	size = H5Tget_size(dtype_id);
@@ -146,8 +262,14 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset->size = size;
 
 	/* Set 'Rtype'. */
-	if (map_H5class_to_Rtype(class, as_int, size, &Rtype) < 0)
-		goto on_error;
+	if (dset->storage_mode_attr != NULL) {
+		if (map_storage_mode_to_Rtype(storage_mode_attr, as_int,
+					      &Rtype) < 0)
+			goto on_error;
+	} else {
+		if (map_H5class_to_Rtype(H5class, as_int, size, &Rtype) < 0)
+			goto on_error;
+	}
 	if (Rtype == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
 		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
 				    "is not supported at the moment");
@@ -269,7 +391,11 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 
 
 /****************************************************************************
- * Convenience wrappers to H5Fopen() and H5Dopen() with argument checking
+ * Convenience wrappers to H5Fopen() and H5Dopen(), with argument checking
+ *
+ * These are called at the very beginning of the various .Call entry points
+ * where they are used (and before any resource is allocated) so it's ok to
+ * error() immediately in case of error.
  */
 
 hid_t _get_file_id(SEXP filepath)
@@ -309,7 +435,7 @@ hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
 
 
 /****************************************************************************
- * C_get_h5mread_returned_type
+ * C_get_h5mread_returned_type()
  *
  * The R type returned by h5mread() is determined by arguments 'filepath',
  * 'name', and 'as_integer'.

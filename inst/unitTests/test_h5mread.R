@@ -172,7 +172,7 @@ test_map_starts_to_chunks <- function()
     checkIdentical(target, current)
 }
 
-test_h5mread <- function()
+test_h5mread_2D <- function()
 {
     do_tests <- function(m, filepath, name, noreduce=FALSE,
                             as.integer=FALSE, method=0L)
@@ -239,9 +239,9 @@ test_h5mread <- function()
     do_tests(m0, M0@seed@filepath, M0@seed@name, method=6L)
     do_tests(m0, M0@seed@filepath, M0@seed@name)
 
-    ## with a numeric matrix
+    ## with a logical matrix
 
-    m1 <- matrix(10 * runif(60), ncol=6)
+    m1 <- m0 %% 3L == 0L
     M1 <- as(m1, "HDF5Array")
     do_tests(m1, M1@seed@filepath, M1@seed@name, method=1L)
     do_tests(m1, M1@seed@filepath, M1@seed@name, noreduce=TRUE, method=1L)
@@ -257,10 +257,33 @@ test_h5mread <- function()
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=1L)
     do_tests(m1, M1@seed@filepath, M1@seed@name, as.integer=TRUE, method=6L)
 
+    ## with a numeric matrix
+
+    m2 <- matrix(10 * runif(60), ncol=6)
+    M2 <- as(m2, "HDF5Array")
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=1L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, noreduce=TRUE, method=1L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=2L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=3L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, noreduce=TRUE, method=3L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=4L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, method=6L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name)
+
+    storage.mode(m2) <- "integer"
+    do_tests(m2, M2@seed@filepath, M2@seed@name, as.integer=TRUE)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, as.integer=TRUE, method=1L)
+    do_tests(m2, M2@seed@filepath, M2@seed@name, as.integer=TRUE, method=6L)
+
     ## with a character matrix
 
-    m2 <- matrix(as.character(1:60), ncol=6)
-    M2 <- as(m2, "HDF5Array")
-    do_tests(m2, M2@seed@filepath, M2@seed@name, method=4L)
+    m3 <- matrix(as.character(1:60), ncol=6)
+    M3 <- as(m3, "HDF5Array")
+    do_tests(m3, M3@seed@filepath, M3@seed@name, method=4L)
+}
+
+test_h5mread_3D <- function()
+{
+    # TODO!
 }
 

@@ -847,7 +847,7 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
-static void gather_chunk_data(const DSet *dset,
+static int gather_chunk_data(const DSet *dset,
 			const int *outer_midx, int outer_moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
 			const void *in,
@@ -873,7 +873,17 @@ static void gather_chunk_data(const DSet *dset,
 	num_elts = 0;
 	while (1) {
 		num_elts++;
-		if (dset->Rtype == STRSXP) {
+		switch (dset->Rtype) {
+		    case LGLSXP:
+			LOGICAL(ans)[out_offset] = ((int *) in)[in_offset];
+		    break;
+		    case INTSXP:
+			INTEGER(ans)[out_offset] = ((int *) in)[in_offset];
+		    break;
+		    case REALSXP:
+			REAL(ans)[out_offset] = ((double *) in)[in_offset];
+		    break;
+		    case STRSXP:
 			s = (char *) in + in_offset * dset->size;
 			for (s_len = 0; s_len < dset->size; s_len++)
 				if (s[s_len] == 0)
@@ -881,16 +891,12 @@ static void gather_chunk_data(const DSet *dset,
 			ans_elt = PROTECT(mkCharLen(s, s_len));
 			SET_STRING_ELT(ans, out_offset, ans_elt);
 			UNPROTECT(1);
-		} else {
-			if (dset->Rtype == INTSXP) {
-				INTEGER(ans)[out_offset] =
-					((int *) in)[in_offset];
-			} else {
-				REAL(ans)[out_offset] =
-					((double *) in)[in_offset];
-			}
+		    break;
+		    default:
+			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
+					    CHAR(type2str(dset->Rtype)));
+			return -1;
 		}
-
 		inner_moved_along = next_midx(ndim, destvp->dim,
 					      inner_midx_buf);
 		if (inner_moved_along == ndim)
@@ -904,7 +910,7 @@ static void gather_chunk_data(const DSet *dset,
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
 	//       num_elts);
-	return;
+	return 0;
 }
 
 /*
@@ -1030,7 +1036,7 @@ static int read_data_4_5(const DSet *dset, int method,
 			starts, breakpoint_bufs,
 			&chunkvp_buf, &destvp_buf);
 
-		gather_chunk_data(dset,
+		ret = gather_chunk_data(dset,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			chunk_data_buf,
@@ -1038,6 +1044,8 @@ static int read_data_4_5(const DSet *dset, int method,
 			ans, outdim, &destvp_buf,
 			inner_midx_buf->elts,
 			dset->mem_type_id);
+		if (ret < 0)
+			break;
 		//t_gather_chunk_data += clock() - t0;
 
 		moved_along = next_midx(ndim, nchunk_buf->elts,
@@ -1300,10 +1308,14 @@ static int read_data_6(const DSet *dset,
 	IntAEAE *inner_breakpoint_bufs;
 	long long int num_chunks, ndot;
 
-	if (dset->Rtype == INTSXP) {
-		out = INTEGER(ans);
-	} else {
-		out = REAL(ans);
+	switch (dset->Rtype) {
+	    case LGLSXP:  out = LOGICAL(ans); break;
+	    case INTSXP:  out = INTEGER(ans); break;
+	    case REALSXP: out = REAL(ans);    break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
+				    CHAR(type2str(dset->Rtype)));
+		return -1;
 	}
 	ndim = dset->ndim;
 	mem_space_id = get_mem_space(ndim, outdim);
@@ -1475,10 +1487,14 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 	nprotect++;
 
 	if (ans_len != 0) {
-		if (dset->Rtype == INTSXP) {
-			out = INTEGER(ans);
-		} else {
-			out = REAL(ans);
+		switch (dset->Rtype) {
+		    case LGLSXP:  out = LOGICAL(ans); break;
+		    case INTSXP:  out = INTEGER(ans); break;
+		    case REALSXP: out = REAL(ans);    break;
+		    default:
+			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
+					    CHAR(type2str(dset->Rtype)));
+			goto on_error;
 		}
 		mem_space_id = get_mem_space(ndim, ans_dim);
 		if (mem_space_id < 0)

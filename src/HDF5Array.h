@@ -12,7 +12,8 @@
    needs of C_h5mread()). */
 typedef struct {
 	hid_t dset_id, dtype_id, space_id, plist_id, mem_type_id;
-	H5T_class_t class;
+	char *storage_mode_attr;
+	H5T_class_t H5class;
 	size_t size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk;
