@@ -14,7 +14,7 @@ Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
-	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOnocology
+	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.9.0), rhdf5 (>= 2.25.6)
 Imports: utils, tools, BiocGenerics (>= 0.25.1), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib
