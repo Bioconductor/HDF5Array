@@ -9,12 +9,12 @@ Description: Implements the HDF5Array and TENxMatrix classes, 2 convenient
 	DelayedArray extensions, they support all operations supported by
 	DelayedArray objects. These operations can be either delayed or
 	block-processed.
-Version: 1.11.5
+Version: 1.11.6
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
-biocViews: Infrastructure, DataRepresentation, DataImport,
-	SingleCell, Sequencing, RNASeq, Annotation, Coverage, GenomeAnnotation
+biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
+	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOnocology
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.9.0), rhdf5 (>= 2.25.6)
 Imports: utils, tools, BiocGenerics (>= 0.25.1), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib
