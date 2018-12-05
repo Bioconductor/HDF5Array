@@ -1074,9 +1074,11 @@ static int read_data_4_5(const DSet *dset, int method,
  * One call to H5Dread() per chunk touched by the selection. No intermediate
  * buffer.
  *
- * More precisely, walk over the chunks touched by 'starts'. For each chunk
- * make one call to H5Dread() to load the selected data **directly** to the
- * output array.
+ * More precisely, walk over the chunks touched by 'starts'. For each chunk:
+ *   - Select the hyperslabs obtained by intersecting the selection with
+ *     the current chunk.
+ *   - Call H5Dread(). This loads the selected data **directly** to the
+ *     output array.
  */
 
 /*
@@ -1233,7 +1235,7 @@ static long long int select_elements_from_chunk(const DSet *dset,
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
-static long long int select_hyperslabs_from_chunk(const DSet *dset,
+static long long int select_intersection_of_blocks_with_chunk(const DSet *dset,
 			SEXP starts,
 			const Viewport *destvp, const Viewport *chunkvp,
 			const IntAEAE *inner_breakpoint_bufs,
@@ -1254,7 +1256,7 @@ static long long int select_hyperslabs_from_chunk(const DSet *dset,
 
 	init_inner_srcvp_buf(ndim, starts, chunkvp, inner_srcvp_buf);
 
-	/* Walk on the inner blocks. */
+	/* Walk on the block intersections with the currrent chunk. */
 	num_hyperslabs = 0;
 	inner_moved_along = ndim;
 	do {
@@ -1388,8 +1390,9 @@ static int read_data_6(const DSet *dset,
 		/* Having 'inner_nblock_buf->elts' identical to
 		   'destvp_buf.dim' means that all the inner blocks
 		   are single elements so we use select_elements_from_chunk()
-		   which could be faster than select_hyperslabs_from_chunk()
-		   in that case. NO IT'S NOT FASTER! */
+		   which could be faster than
+		   select_intersection_of_blocks_with_chunk() in that case.
+		   NO IT'S NOT FASTER! */
 		//ret = memcmp(inner_nblock_buf->elts, destvp_buf.dim,
 		//	     ndim * sizeof(int));
 		//printf("# chunk %lld: %s\n", num_chunks,
@@ -1399,7 +1402,7 @@ static int read_data_6(const DSet *dset,
 		//		starts, &destvp_buf,
 		//		inner_midx_buf->elts, coord_buf);
 		//} else {
-			ret = select_hyperslabs_from_chunk(dset,
+			ret = select_intersection_of_blocks_with_chunk(dset,
 				starts, &destvp_buf, &chunkvp_buf,
 				inner_breakpoint_bufs, inner_nblock_buf->elts,
 				inner_midx_buf->elts, &inner_srcvp_buf);
