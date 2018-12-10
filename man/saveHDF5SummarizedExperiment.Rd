@@ -31,7 +31,7 @@ loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
     \code{replace} is set to \code{TRUE}, then it's replaced with an
     empty directory.
   }
-  \item(prefix){
+  \item{prefix}{
     An optional prefix to add to the names of the files created
     inside \code{dir}. Allows saving more than one object in the same
     directory.
