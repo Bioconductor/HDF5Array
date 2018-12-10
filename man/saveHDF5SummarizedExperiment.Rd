@@ -12,9 +12,9 @@
 }
 
 \usage{
-saveHDF5SummarizedExperiment(x, dir="my_h5_se", replace=FALSE,
+saveHDF5SummarizedExperiment(x, dir="my_h5_se", prefix="", replace=FALSE,
                              chunkdim=NULL, level=NULL, verbose=FALSE)
-loadHDF5SummarizedExperiment(dir="my_h5_se")
+loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
 }
 
 \arguments{
@@ -25,12 +25,21 @@ loadHDF5SummarizedExperiment(dir="my_h5_se")
     The path (as a single string) to the directory where to save the
     HDF5-based \link[SummarizedExperiment]{SummarizedExperiment} object
     or to load it from.
-    When saving, the directory will be created so should not already exist,
-    unless \code{replace} is set to \code{TRUE}.
+
+    When saving, the directory will be created if it doesn't already exist.
+    If the directory already exists and no prefix is specified and
+    \code{replace} is set to \code{TRUE}, then it's replaced with an
+    empty directory.
+  }
+  \item(prefix){
+    An optional prefix to add to the names of the files created
+    inside \code{dir}. Allows saving more than one object in the same
+    directory.
   }
   \item{replace}{
-    If directory \code{dir} already exists, should it be replaced with a
-    new one? The content of the existing directory will be lost!
+    When no prefix is specified, should a pre-existing directory be replaced
+    with a new empty one? The content of the pre-existing directory will
+    be lost!
   }
   \item{chunkdim, level}{
     The dimensions of the chunks and the compression level to use for
