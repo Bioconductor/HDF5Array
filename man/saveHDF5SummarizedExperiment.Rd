@@ -2,6 +2,7 @@
 
 \alias{saveHDF5SummarizedExperiment}
 \alias{loadHDF5SummarizedExperiment}
+\alias{quickResaveHDF5SummarizedExperiment}
 
 \title{Save/load an HDF5-based SummarizedExperiment object}
 
@@ -13,13 +14,20 @@
 
 \usage{
 saveHDF5SummarizedExperiment(x, dir="my_h5_se", prefix="", replace=FALSE,
-                             chunkdim=NULL, level=NULL, verbose=FALSE)
+                                chunkdim=NULL, level=NULL, verbose=FALSE)
+
 loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
+
+quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
 }
 
 \arguments{
   \item{x}{
-    A \link[SummarizedExperiment]{SummarizedExperiment} object.
+    A \link[SummarizedExperiment]{SummarizedExperiment} object or derivative.
+
+    For \code{quickResaveHDF5SummarizedExperiment} the object must have been
+    previously saved with \code{saveHDF5SummarizedExperiment} (and has been
+    possibly modified since then).
   }
   \item{dir}{
     The path (as a single string) to the directory where to save the
@@ -83,6 +91,16 @@ loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
   are \link{HDF5Array} objects pointing to the on-disk HDF5 datasets
   located in \code{dir}. \link{HDF5Array} objects are typically
   light-weight in memory.
+
+  \code{quickResaveHDF5SummarizedExperiment} preserves the HDF5 file and
+  datasets that the assays in \code{x} are already pointing to (and that
+  were created by an earlier call to \code{saveHDF5SummarizedExperiment}).
+  All it does is re-serialize \code{x} on top of the \code{.rds} file
+  that is associated with this HDF5 file (and that was created by an
+  earlier call to \code{saveHDF5SummarizedExperiment} or
+  \code{quickResaveHDF5SummarizedExperiment}). Because the delayed
+  operations possibly carried by the assays in \code{x} are not realized,
+  this is very fast.
 }
 
 \value{
@@ -109,20 +127,26 @@ loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## saveHDF5SummarizedExperiment() / loadHDF5SummarizedExperiment()
+## ---------------------------------------------------------------------
 library(SummarizedExperiment)
-nrows <- 200; ncols <- 6
-counts <- matrix(runif(nrows * ncols, 1, 1e4), nrows)
+
+nrow <- 200
+ncol <- 6
+counts <- matrix(as.integer(runif(nrow * ncol, 1, 1e4)), nrow)
 colData <- DataFrame(Treatment=rep(c("ChIP", "Input"), 3),
                      row.names=LETTERS[1:6])
-se0 <- SummarizedExperiment(assays=SimpleList(counts=counts),
-                            colData=colData)
+se0 <- SummarizedExperiment(assays=list(counts=counts), colData=colData)
 se0
 
 ## Save 'se0' as an HDF5-based SummarizedExperiment object:
-dir <- sub("file", "h5_se0_", tempfile())
+dir <- tempfile("h5_se0_")
 h5_se0 <- saveHDF5SummarizedExperiment(se0, dir)
+list.files(dir)
+
 h5_se0
-assay(h5_se0, withDimnames=FALSE)  # HDF5Matrix object
+assay(h5_se0, withDimnames=FALSE)   # HDF5Matrix object
 
 h5_se0b <- loadHDF5SummarizedExperiment(dir)
 h5_se0b
@@ -130,16 +154,16 @@ assay(h5_se0b, withDimnames=FALSE)  # HDF5Matrix object
 
 ## Sanity checks:
 stopifnot(is(assay(h5_se0, withDimnames=FALSE), "HDF5Matrix"))
-stopifnot(all(DelayedArray(assay(se0)) == assay(h5_se0)))
+stopifnot(identical(assay(se0), as.matrix(assay(h5_se0))))
 stopifnot(is(assay(h5_se0b, withDimnames=FALSE), "HDF5Matrix"))
-stopifnot(all(DelayedArray(assay(se0)) == assay(h5_se0b)))
+stopifnot(identical(assay(se0), as.matrix(assay(h5_se0b))))
 
 ## ---------------------------------------------------------------------
 ## More sanity checks
 ## ---------------------------------------------------------------------
 
 ## Make a copy of directory 'dir':
-somedir <- sub("file", "somedir", tempfile())
+somedir <- tempfile("somedir")
 dir.create(somedir)
 file.copy(dir, somedir, recursive=TRUE)
 dir2 <- list.files(somedir, full.names=TRUE)
@@ -149,5 +173,31 @@ dir2 <- list.files(somedir, full.names=TRUE)
 h5_se0c <- loadHDF5SummarizedExperiment(dir2)
 
 stopifnot(is(assay(h5_se0c, withDimnames=FALSE), "HDF5Matrix"))
-stopifnot(all(DelayedArray(assay(se0)) == assay(h5_se0c)))
+stopifnot(identical(assay(se0), as.matrix(assay(h5_se0c))))
+
+## ---------------------------------------------------------------------
+## Using a prefix
+## ---------------------------------------------------------------------
+
+se1 <- se0[51:100, ]
+saveHDF5SummarizedExperiment(se1, dir, prefix="xx_")
+list.files(dir)
+loadHDF5SummarizedExperiment(dir, prefix="xx_")
+
+## ---------------------------------------------------------------------
+## quickResaveHDF5SummarizedExperiment()
+## ---------------------------------------------------------------------
+
+se2 <- loadHDF5SummarizedExperiment(dir, prefix="xx_")
+se2 <- se2[1:14, ]
+assay1 <- assay(se2, withDimnames=FALSE)
+assays(se2) <- c(assays(se2), list(score=assay1/100))
+rowRanges(se2) <- GRanges("chr1", IRanges(1:14, width=5))
+rownames(se2) <- letters[1:14]
+se2
+
+## This will replace saved 'se1'!
+quickResaveHDF5SummarizedExperiment(se2, verbose=TRUE)
+list.files(dir)
+loadHDF5SummarizedExperiment(dir, prefix="xx_")
 }

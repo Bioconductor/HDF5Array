@@ -129,7 +129,7 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
     if (name == "")
         stop(wmsg("'name' cannot be the empty string"))
     if (!isSingleStringOrNA(type))
-        stop("'type' must be a single string or NA")
+        stop(wmsg("'type' must be a single string or NA"))
     dim <- h5dim(filepath, name)
     if (any(dim == 0L)) {
         if (is.na(type))
@@ -144,10 +144,9 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
         first_val <- .read_h5dataset_first_val(filepath, name, length(dim))
         detected_type <- typeof(first_val)
         if (!(is.na(type) || type == detected_type))
-            warning(wmsg("The type specified via the 'type' argument (",
-                         type, ") doesn't match the type of this HDF5 ",
-                         "dataset (", detected_type, "). Ignoring the ",
-                         "former."))
+            stop(wmsg("the type specified via the 'type' argument (", type,
+                      ") doesn't match the type of this HDF5 dataset (",
+                      detected_type, ")"))
     }
     chunkdim <- h5chunkdim(filepath, name, adjust=TRUE)
     new2("HDF5ArraySeed", filepath=filepath,

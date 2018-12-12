@@ -17,10 +17,98 @@
         stop(.HOWTO_INSTALL_PKG)
 }
 
+.SE_RDS_BASENAME <- "se.rds"
+.ASSAYS_H5_BASENAME <- "assays.h5"
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .write_HDF5SummarizedExperiment() / .read_HDF5SummarizedExperiment
+### .shorten_h5_paths() / .restore_and_ckeck_h5_paths()
 ###
+
+### All the seeds in all the assays are expected to be HDF5ArraySeed objects
+### so are guaranteed to have a 'filepath' slot. Note that shortening the
+### path stored in the HDF5ArraySeed objects actually these objects so we
+### must use direct slot access instead of the path() setter to do this.
+### This is because the latter is intended for the end user so it makes sure
+### that the path replacement is not breaking the object.
+.shorten_h5_paths <- function(assays)
+{
+    nassay <- length(assays)
+    for (i in seq_len(nassay)) {
+        assays[[i]] <- modify_seeds(assays[[i]],
+            function(x) {
+                x@filepath <- basename(x@filepath)
+                x
+            })
+    }
+    assays
+}
+
+.restore_and_ckeck_h5_paths <- function(assays, dir)
+{
+    nassay <- length(assays)
+    for (i in seq_len(nassay)) {
+        assays[[i]] <- modify_seeds(assays[[i]],
+            function(x) {
+                if (!is(x, "HDF5ArraySeed"))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load is not HDF5-based"))
+                ## Check 'x@filepath'.
+                h5_path <- file.path(dir, x@filepath)
+                if (!file.exists(h5_path))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an HDF5 file that ",
+                              "does not exist: ", h5_path))
+                h5_content <- try(h5ls(h5_path), silent=TRUE)
+                if (inherits(h5_content, "try-error"))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an invalid ",
+                              "HDF5 file: ", h5_path))
+                ## Check 'x@name'.
+                h5_dim <- try(h5dim(h5_path, x@name), silent=TRUE)
+                if (inherits(h5_dim, "try-error"))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an HDF5 dataset ",
+                              "('", x@name, "') that does not exist in ",
+                              "HDF5 file: ", h5_path))
+                ## Check dimensions of HDF5 dataset.
+                if (!identical(h5_dim, x@dim))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an HDF5 dataset ",
+                              "('", x@name, "') in HDF5 file '", h5_path, "' ",
+                              "that does not have the expected dimensions"))
+                ## Check chunk dimensions of HDF5 dataset.
+                h5_chunkdim <- h5chunkdim(h5_path, x@name, adjust=TRUE)
+                if (!identical(h5_chunkdim, x@chunkdim))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an HDF5 dataset ",
+                              "('", x@name, "') in HDF5 file '", h5_path, "' ",
+                              "that does not have the expected chunk ",
+                              "dimensions"))
+                ## Restore 'x@filepath'.
+                x@filepath <- file_path_as_absolute(h5_path)
+                x
+            })
+    }
+    assays
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .write_HDF5SummarizedExperiment()
+### .quick_resave_HDF5SummarizedExperiment()
+### .read_HDF5SummarizedExperiment()
+###
+
+.serialize_HDF5SummarizedExperiment <- function(x, rds_path, verbose)
+{
+    x@assays <- .shorten_h5_paths(x@assays)
+    if (verbose)
+        message("Serialize ", class(x), " object to ",
+                ifelse(file.exists(rds_path), "existing ", ""),
+                "RDS file:\n  ", rds_path)
+    saveRDS(x, file=rds_path)
+}
 
 .write_h5_assays <- function(assays, h5_path, chunkdim, level, verbose)
 {
@@ -29,39 +117,28 @@
         a <- assays[[i]]
         h5_name <- sprintf("assay%03d", i)
         if (verbose)
-            message("Start writing assay ", i, "/", nassay, " to '",
-                    h5_path, "':")
+            message("Start writing assay ", i, "/", nassay, " to ",
+                    "HDF5 file:\n  ", h5_path)
         a <- writeHDF5Array(a, h5_path, h5_name, chunkdim, level,
                             verbose=verbose)
         if (verbose)
-            message("Finished writing assay ", i, "/", nassay, " to '",
-                    h5_path, "'.")
-        assays[[i]] <- a
-    }
-    assays
-}
-
-.shorten_h5_paths <- function(assays)
-{
-    nassay <- length(assays)
-    for (i in seq_len(nassay)) {
-        a <- assays[[i]]
-        a@seed@filepath <- basename(a@seed@filepath)
+            message("Finished writing assay ", i, "/", nassay, " to ",
+                    "HDF5 file:\n  ", h5_path, "\n")
         assays[[i]] <- a
     }
     assays
 }
 
 .write_HDF5SummarizedExperiment <- function(x,
-                                            rds_path="se.rds",
-                                            h5_path="assays.h5",
+                                            rds_path=.SE_RDS_BASENAME,
+                                            h5_path=.ASSAYS_H5_BASENAME,
                                             chunkdim=NULL, level=NULL,
                                             verbose=FALSE)
 {
     .load_SummarizedExperiment_package()
 
     if (!is(x, "SummarizedExperiment"))
-        stop("'x' must be a SummarizedExperiment object")
+        stop(wmsg("'x' must be a SummarizedExperiment object"))
 
     if (!isSingleString(rds_path) || rds_path == "")
         stop(wmsg("'rds_path' must be a a non-empty string ",
@@ -74,44 +151,70 @@
                   "where to write the assays of the ", class(x), " object"))
 
     if (!isTRUEorFALSE(verbose))
-        stop("'verbose' must be TRUE or FALSE")
+        stop(wmsg("'verbose' must be TRUE or FALSE"))
 
     x@assays <- .write_h5_assays(x@assays, h5_path, chunkdim, level, verbose)
-    ans <- x
-    x@assays <- .shorten_h5_paths(x@assays)
-    saveRDS(x, file=rds_path)
-    invisible(ans)
+    .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
+    invisible(x)
 }
 
-.ckeck_and_fix_HDF5Array_assay <- function(x, i, dir)
+.stop_if_cannot_quick_resave <- function()
+    stop(wmsg("cannot quick-resave a SummarizedExperiment ",
+              "object that was not previously saved with ",
+              "saveHDF5SummarizedExperiment()"))
+
+.get_h5_path <- function(assays)
+{
+    h5_paths <- lapply(seq_along(assays),
+        function(i) {
+            a <- assays[[i]]
+            ok <- unlist(seedApply(a, is, "HDF5ArraySeed"))
+            if (!all(ok))
+                .stop_if_cannot_quick_resave()
+            h5_path <- unique(unlist(seedApply(a, path)))
+            if (length(h5_path) != 1L)
+                .stop_if_cannot_quick_resave()
+            h5_path
+        })
+    h5_path <- unique(unlist(h5_paths))
+    if (length(h5_path) != 1L)
+        .stop_if_cannot_quick_resave()
+    h5_path
+}
+
+.map_h5_path_to_rds_path <- function(h5_path)
+{
+    dir <- dirname(h5_path)
+    h5_basename <- basename(h5_path)
+    h5_suffix <- substr(h5_basename,
+                        nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME) + 1L,
+                        nchar(h5_basename))
+    if (h5_suffix != .ASSAYS_H5_BASENAME)
+        .stop_if_cannot_quick_resave()
+    prefix <- substr(h5_basename,
+                     1L, nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME))
+    rds_basename <- paste0(prefix, .SE_RDS_BASENAME)
+    file.path(dir, rds_basename)
+}
+
+.quick_resave_HDF5SummarizedExperiment <- function(x, verbose=FALSE)
 {
     .load_SummarizedExperiment_package()
 
-    stopifnot(is(x, "SummarizedExperiment"))
-    a <- assay(x, i, withDimnames=FALSE)
-    if (!is(a, "HDF5Array"))
-        stop(wmsg("all assays in the SummarizedExperiment object ",
-                  "to load are expected to be HDF5Array objects"))
+    if (!is(x, "SummarizedExperiment"))
+        stop(wmsg("'x' must be a SummarizedExperiment object"))
 
-    ## Check 'a@seed@filepath' and 'a@seed@name'.
-    h5_path <- file.path(dir, a@seed@filepath)
-    if (!file.exists(h5_path))
-        stop(wmsg("assay ", i, " in the SummarizedExperiment object to ",
-                  "load points to an HDF5 file that does not exist: ",
-                  h5_path))
-    h5_content <- try(h5ls(h5_path), silent=TRUE)
-    if (inherits(h5_content, "try-error"))
-        stop(wmsg("assay ", i, " in the SummarizedExperiment object to ",
-                  "load points to an invalid HDF5 file: ", h5_path))
-    if (!(a@seed@name %in% h5_content[ , "name"]))
-        stop(wmsg("assay ", i, " in the SummarizedExperiment object to ",
-                  "load points to an HDF5 dataset (", a@seed@name, ") ",
-                  "that does not exist in HDF5 file: ", h5_path))
+    if (!isTRUEorFALSE(verbose))
+        stop(wmsg("'verbose' must be TRUE or FALSE"))
 
-    ## Fix 'a@seed@filepath'.
-    a@seed@filepath <- file_path_as_absolute(h5_path)
-    assay(x, i, withDimnames=FALSE) <- a
-    x
+    h5_path <-  .get_h5_path(x@assays)
+    if (verbose)
+        message("All assay data already in HDF5 file:\n  ", h5_path)
+    rds_path <- .map_h5_path_to_rds_path(h5_path)
+    if (!file.exists(rds_path) || dir.exists(rds_path))
+        .stop_if_cannot_quick_resave()
+    .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
+    invisible(x)
 }
 
 .read_HDF5SummarizedExperiment <- function(filepath)
@@ -123,14 +226,15 @@
         stop(wmsg("the object serialized in \"", filepath, "\" is not ",
                   "a SummarizedExperiment object or derivative"))
     dir <- dirname(filepath)
-    for (i in seq_along(assays(ans)))
-        ans <- .ckeck_and_fix_HDF5Array_assay(ans, i, dir)
+    ans@assays <- .restore_and_ckeck_h5_paths(ans@assays, dir)
     ans
 }
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### saveHDF5SummarizedExperiment() / loadHDF5SummarizedExperiment()
+### saveHDF5SummarizedExperiment()
+### quickResaveHDF5SummarizedExperiment()
+### loadHDF5SummarizedExperiment()
 ###
 
 .create_dir <- function(dir)
@@ -139,7 +243,7 @@
         stop(wmsg("\"", dir, "\" already exists and is a file, ",
                   "not a directory"))
     if (!suppressWarnings(dir.create(dir)))
-        stop("cannot create directory \"", dir, "\"")
+        stop(wmsg("cannot create directory \"", dir, "\""))
 }
 
 .replace_dir <- function(dir, replace)
@@ -149,9 +253,9 @@
                   "Use 'replace=TRUE' to replace it. ",
                   "Its content will be lost!"))
     if (unlink(dir, recursive=TRUE) != 0L)
-        stop("failed to delete directory \"", dir, "\"")
+        stop(wmsg("failed to delete directory \"", dir, "\""))
     if (!suppressWarnings(dir.create(dir)))
-        stop("cannot create directory \"", dir, "\"")
+        stop(wmsg("cannot create directory \"", dir, "\""))
 }
 
 .check_and_delete_files <- function(rds_path, h5_path, replace)
@@ -166,23 +270,23 @@
                   "already exist. Use a different 'prefix' or use ",
                   "'replace=TRUE' if you really want to replace them."))
     if (unlink(rds_path, recursive=TRUE) != 0L)
-        stop("failed to delete file \"", rds_path, "\"")
+        stop(wmsg("failed to delete file \"", rds_path, "\""))
     if (unlink(h5_path, recursive=TRUE) != 0L)
-        stop("failed to delete file \"", h5_path, "\"")
+        stop(wmsg("failed to delete file \"", h5_path, "\""))
 }
 
 ### Save all the assays in HDF5 format, including in-memory assays.
 ### Delayed assays with delayed operations on them are realized while they
 ### are written to disk..
 saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
-                                         replace=FALSE,
-                                         chunkdim=NULL, level=NULL,
-                                         verbose=FALSE)
+                                            replace=FALSE,
+                                            chunkdim=NULL, level=NULL,
+                                            verbose=FALSE)
 {
     .load_SummarizedExperiment_package()
 
     if (!is(x, "SummarizedExperiment"))
-        stop("'x' must be a SummarizedExperiment object")
+        stop(wmsg("'x' must be a SummarizedExperiment object"))
 
     if (!isSingleString(dir))
         stop(wmsg("'dir' must be a single string specifying the path ",
@@ -200,8 +304,8 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
     } else if (prefix == "") {
         .replace_dir(dir, replace)
     }
-    rds_path <- file.path(dir, paste0(prefix, "se.rds"))
-    h5_path <- file.path(dir, paste0(prefix, "assays.h5"))
+    rds_path <- file.path(dir, paste0(prefix, .SE_RDS_BASENAME))
+    h5_path <- file.path(dir, paste0(prefix, .ASSAYS_H5_BASENAME))
     if (prefix != "")
         .check_and_delete_files(rds_path, h5_path, replace)
 
@@ -209,6 +313,21 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
                                        h5_path=h5_path,
                                        chunkdim=chunkdim, level=level,
                                        verbose=verbose)
+}
+
+### 'x' must have been previously saved with saveHDF5SummarizedExperiment()
+### and possibly modified since then.
+### A quick-resave preserves the current HDF5 file and datasets and
+### re-serializes the SummarizedExperiment object without realizing the
+### delayed operations possibly carried by the assays.
+quickResaveHDF5SummarizedExperiment <- function(x, verbose=FALSE)
+{
+    .load_SummarizedExperiment_package()
+
+    if (!is(x, "SummarizedExperiment"))
+        stop(wmsg("'x' must be a SummarizedExperiment object"))
+
+    .quick_resave_HDF5SummarizedExperiment(x, verbose=verbose)
 }
 
 .THE_EXPECTED_STUFF <- c(
@@ -251,7 +370,7 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
         stop(wmsg("directory \"", dir, "\" not found"))
     }
 
-    rds_path <- file.path(dir, paste0(prefix, "se.rds"))
+    rds_path <- file.path(dir, paste0(prefix, .SE_RDS_BASENAME))
     if (!file.exists(rds_path))
         .stop_if_bad_dir(dir, prefix)
 
