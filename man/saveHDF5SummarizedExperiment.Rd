@@ -114,8 +114,9 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
 
 \note{
   The files created by \code{saveHDF5SummarizedExperiment} should not
-  be renamed. The \emph{folder} created by \code{saveHDF5SummarizedExperiment}
-  is relocatable i.e. it can be renamed and/or moved around, but not the files
+  be renamed.
+  The \emph{directory} created by \code{saveHDF5SummarizedExperiment} is
+  relocatable i.e. it can be renamed and/or moved around, but not the files
   in it.
 }
 
