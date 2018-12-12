@@ -93,10 +93,10 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
   light-weight in memory.
 
   \code{quickResaveHDF5SummarizedExperiment} preserves the HDF5 file and
-  datasets that the assays in \code{x} are already pointing to (and that
+  datasets that the assays in \code{x} are already pointing to (and which
   were created by an earlier call to \code{saveHDF5SummarizedExperiment}).
   All it does is re-serialize \code{x} on top of the \code{.rds} file
-  that is associated with this HDF5 file (and that was created by an
+  that is associated with this HDF5 file (and which was created by an
   earlier call to \code{saveHDF5SummarizedExperiment} or
   \code{quickResaveHDF5SummarizedExperiment}). Because the delayed
   operations possibly carried by the assays in \code{x} are not realized,
