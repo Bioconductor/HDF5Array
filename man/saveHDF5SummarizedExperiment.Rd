@@ -1,8 +1,8 @@
 \name{saveHDF5SummarizedExperiment}
 
 \alias{saveHDF5SummarizedExperiment}
-\alias{loadHDF5SummarizedExperiment}
 \alias{quickResaveHDF5SummarizedExperiment}
+\alias{loadHDF5SummarizedExperiment}
 
 \title{Save/load an HDF5-based SummarizedExperiment object}
 
@@ -110,6 +110,13 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
   saved in \code{dir}. It's in fact the same obect as the object that
   would be returned by calling \code{loadHDF5SummarizedExperiment} on
   \code{dir}.
+}
+
+\note{
+  The files created by \code{saveHDF5SummarizedExperiment} should not
+  be renamed. The \emph{folder} created by \code{saveHDF5SummarizedExperiment}
+  is relocatable i.e. it can be renamed and/or moved around, but not the files
+  in it.
 }
 
 \author{Hervé Pagès}

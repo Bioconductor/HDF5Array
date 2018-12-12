@@ -22,16 +22,32 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .shorten_h5_paths() / .restore_and_ckeck_h5_paths()
+### Low-level manipulation of the assays-to-HDF5 links
 ###
 
-### All the seeds in all the assays are expected to be HDF5ArraySeed objects
-### so are guaranteed to have a 'filepath' slot. Note that shortening the
-### path stored in the HDF5ArraySeed objects actually these objects so we
-### must use direct slot access instead of the path() setter to do this.
-### This is because the latter is intended for the end user so it makes sure
-### that the path replacement is not breaking the object.
-.shorten_h5_paths <- function(assays)
+### Return an error if any of the seeds in any of the assays is not an
+### HDF5ArraySeed object.
+.get_unique_assay2h5_links <- function(assays)
+{
+    h5_paths <- lapply(seq_along(assays),
+        function(i) {
+            a <- assays[[i]]
+            ok <- unlist(seedApply(a, is, "HDF5ArraySeed"))
+            if (!all(ok))
+                stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                          "object to load is not HDF5-based"))
+            unique(unlist(seedApply(a, path)))
+        })
+    unique(unlist(h5_paths))
+}
+
+### Assume that all the seeds in all the assays are HDF5ArraySeed objects
+### so have a 'filepath' slot. This is NOT checked!
+### Note that shortening the path stored in the HDF5ArraySeed objects breaks
+### these objects so we must use direct slot access instead of the path()
+### setter to do this. This is because the latter is intended for the end user
+### so it makes sure that the path replacement is not breaking the object.
+.shorten_assay2h5_links <- function(assays)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -44,7 +60,7 @@
     assays
 }
 
-.restore_and_ckeck_h5_paths <- function(assays, dir)
+.restore_and_ckeck_full_assay2h5_links <- function(assays, dir)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -96,13 +112,12 @@
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### .write_HDF5SummarizedExperiment()
-### .quick_resave_HDF5SummarizedExperiment()
 ### .read_HDF5SummarizedExperiment()
 ###
 
 .serialize_HDF5SummarizedExperiment <- function(x, rds_path, verbose)
 {
-    x@assays <- .shorten_h5_paths(x@assays)
+    x@assays <- .shorten_assay2h5_links(x@assays)
     if (verbose)
         message("Serialize ", class(x), " object to ",
                 ifelse(file.exists(rds_path), "existing ", ""),
@@ -158,65 +173,6 @@
     invisible(x)
 }
 
-.stop_if_cannot_quick_resave <- function()
-    stop(wmsg("cannot quick-resave a SummarizedExperiment ",
-              "object that was not previously saved with ",
-              "saveHDF5SummarizedExperiment()"))
-
-.get_h5_path <- function(assays)
-{
-    h5_paths <- lapply(seq_along(assays),
-        function(i) {
-            a <- assays[[i]]
-            ok <- unlist(seedApply(a, is, "HDF5ArraySeed"))
-            if (!all(ok))
-                .stop_if_cannot_quick_resave()
-            h5_path <- unique(unlist(seedApply(a, path)))
-            if (length(h5_path) != 1L)
-                .stop_if_cannot_quick_resave()
-            h5_path
-        })
-    h5_path <- unique(unlist(h5_paths))
-    if (length(h5_path) != 1L)
-        .stop_if_cannot_quick_resave()
-    h5_path
-}
-
-.map_h5_path_to_rds_path <- function(h5_path)
-{
-    dir <- dirname(h5_path)
-    h5_basename <- basename(h5_path)
-    h5_suffix <- substr(h5_basename,
-                        nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME) + 1L,
-                        nchar(h5_basename))
-    if (h5_suffix != .ASSAYS_H5_BASENAME)
-        .stop_if_cannot_quick_resave()
-    prefix <- substr(h5_basename,
-                     1L, nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME))
-    rds_basename <- paste0(prefix, .SE_RDS_BASENAME)
-    file.path(dir, rds_basename)
-}
-
-.quick_resave_HDF5SummarizedExperiment <- function(x, verbose=FALSE)
-{
-    .load_SummarizedExperiment_package()
-
-    if (!is(x, "SummarizedExperiment"))
-        stop(wmsg("'x' must be a SummarizedExperiment object"))
-
-    if (!isTRUEorFALSE(verbose))
-        stop(wmsg("'verbose' must be TRUE or FALSE"))
-
-    h5_path <-  .get_h5_path(x@assays)
-    if (verbose)
-        message("All assay data already in HDF5 file:\n  ", h5_path)
-    rds_path <- .map_h5_path_to_rds_path(h5_path)
-    if (!file.exists(rds_path) || dir.exists(rds_path))
-        .stop_if_cannot_quick_resave()
-    .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
-    invisible(x)
-}
-
 .read_HDF5SummarizedExperiment <- function(filepath)
 {
     .load_SummarizedExperiment_package()
@@ -226,15 +182,13 @@
         stop(wmsg("the object serialized in \"", filepath, "\" is not ",
                   "a SummarizedExperiment object or derivative"))
     dir <- dirname(filepath)
-    ans@assays <- .restore_and_ckeck_h5_paths(ans@assays, dir)
+    ans@assays <- .restore_and_ckeck_full_assay2h5_links(ans@assays, dir)
     ans
 }
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### saveHDF5SummarizedExperiment()
-### quickResaveHDF5SummarizedExperiment()
-### loadHDF5SummarizedExperiment()
+### saveHDF5SummarizedExperiment() / loadHDF5SummarizedExperiment()
 ###
 
 .create_dir <- function(dir)
@@ -315,21 +269,6 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
                                        verbose=verbose)
 }
 
-### 'x' must have been previously saved with saveHDF5SummarizedExperiment()
-### and possibly modified since then.
-### A quick-resave preserves the current HDF5 file and datasets and
-### re-serializes the SummarizedExperiment object without realizing the
-### delayed operations possibly carried by the assays.
-quickResaveHDF5SummarizedExperiment <- function(x, verbose=FALSE)
-{
-    .load_SummarizedExperiment_package()
-
-    if (!is(x, "SummarizedExperiment"))
-        stop(wmsg("'x' must be a SummarizedExperiment object"))
-
-    .quick_resave_HDF5SummarizedExperiment(x, verbose=verbose)
-}
-
 .THE_EXPECTED_STUFF <- c(
     "an HDF5-based SummarizedExperiment object ",
     "previously saved with saveHDF5SummarizedExperiment",
@@ -378,5 +317,57 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
     if (inherits(ans, "try-error"))
         .stop_if_bad_dir(dir, prefix)
     ans
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### quickResaveHDF5SummarizedExperiment()
+###
+
+.stop_if_cannot_quick_resave <- function()
+    stop(wmsg("cannot quick-resave a SummarizedExperiment ",
+              "object that was not previously saved with ",
+              "saveHDF5SummarizedExperiment()"))
+
+.map_h5_path_to_rds_path <- function(h5_path)
+{
+    dir <- dirname(h5_path)
+    h5_basename <- basename(h5_path)
+    h5_suffix <- substr(h5_basename,
+                        nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME) + 1L,
+                        nchar(h5_basename))
+    if (h5_suffix != .ASSAYS_H5_BASENAME)
+        .stop_if_cannot_quick_resave()
+    prefix <- substr(h5_basename,
+                     1L, nchar(h5_basename) - nchar(.ASSAYS_H5_BASENAME))
+    rds_basename <- paste0(prefix, .SE_RDS_BASENAME)
+    file.path(dir, rds_basename)
+}
+
+### 'x' must have been previously saved with saveHDF5SummarizedExperiment()
+### and possibly modified since then.
+### A quick-resave preserves the current HDF5 file and datasets and
+### re-serializes the SummarizedExperiment object without realizing the
+### delayed operations possibly carried by the assays.
+quickResaveHDF5SummarizedExperiment <- function(x, verbose=FALSE)
+{
+    .load_SummarizedExperiment_package()
+
+    if (!is(x, "SummarizedExperiment"))
+        stop(wmsg("'x' must be a SummarizedExperiment object"))
+
+    if (!isTRUEorFALSE(verbose))
+        stop(wmsg("'verbose' must be TRUE or FALSE"))
+
+    h5_path <-  try(.get_unique_assay2h5_links(x@assays), silent=TRUE)
+    if (inherits(h5_path, "try-error") || length(h5_path) != 1L)
+        .stop_if_cannot_quick_resave()
+    if (verbose)
+        message("All assay data already in HDF5 file:\n  ", h5_path)
+    rds_path <- .map_h5_path_to_rds_path(h5_path)
+    if (!file.exists(rds_path) || dir.exists(rds_path))
+        .stop_if_cannot_quick_resave()
+    .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
+    invisible(x)
 }
 
