@@ -16,12 +16,10 @@
 
 % sparsity
 
-\alias{sparsity}
 \alias{sparsity,TENxMatrixSeed-method}
 \alias{is_sparse,TENxMatrixSeed-method}
 \alias{extract_sparse_array,TENxMatrixSeed-method}
 \alias{read_sparse_block,TENxMatrixSeed-method}
-\alias{extractNonzeroDataByCol}
 \alias{extractNonzeroDataByCol,TENxMatrixSeed-method}
 
 \title{TENxMatrixSeed objects}
@@ -38,14 +36,10 @@
 \usage{
 ## Constructor function:
 TENxMatrixSeed(filepath, group="mm10")
-
-## sparsity() and a convenient data extractor:
-sparsity(x)
-extractNonzeroDataByCol(x, j)
 }
 
 \arguments{
-  \item{filepath, group, x, j}{
+  \item{filepath, group}{
     See \code{?\link{TENxMatrix}} for a description of these arguments.
   }
 }

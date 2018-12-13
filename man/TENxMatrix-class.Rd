@@ -9,6 +9,9 @@
 
 % sparsity
 
+\alias{sparsity}
+\alias{extractNonzeroDataByCol}
+
 \alias{sparsity,TENxMatrix-method}
 \alias{read_sparse_block,TENxMatrix-method}
 \alias{extractNonzeroDataByCol,TENxMatrix-method}
