@@ -28,6 +28,7 @@ Collate: h5mread.R
 	dump-management.R
 	writeHDF5Array.R
 	saveHDF5SummarizedExperiment.R
+	TENxMatrixSeed-class.R
 	TENxMatrix-class.R
 	writeTENxMatrix.R
 	zzz.R

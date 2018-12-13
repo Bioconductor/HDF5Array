@@ -1,23 +1,6 @@
 \name{TENxMatrix-class}
 \docType{class}
 
-% TENxMatrixSeed
-
-\alias{class:TENxMatrixSeed}
-\alias{TENxMatrixSeed-class}
-\alias{TENxMatrixSeed}
-
-\alias{path,TENxMatrixSeed-method}
-\alias{path<-,TENxMatrixSeed-method}
-\alias{dim,TENxMatrixSeed-method}
-\alias{dimnames,TENxMatrixSeed-method}
-\alias{extract_array,TENxMatrixSeed-method}
-\alias{chunkdim,TENxMatrixSeed-method}
-
-\alias{show,TENxMatrixSeed-method}
-
-% TENxMatrix
-
 \alias{class:TENxMatrix}
 \alias{TENxMatrix-class}
 \alias{TENxMatrix}
@@ -26,49 +9,28 @@
 
 % sparsity
 
-\alias{sparsity}
-\alias{sparsity,TENxMatrixSeed-method}
 \alias{sparsity,TENxMatrix-method}
-
-\alias{is_sparse,TENxMatrixSeed-method}
-\alias{extract_sparse_array,TENxMatrixSeed-method}
-
-\alias{read_sparse_block,TENxMatrixSeed-method}
 \alias{read_sparse_block,TENxMatrix-method}
-
-\alias{extractNonzeroDataByCol}
-\alias{extractNonzeroDataByCol,TENxMatrixSeed-method}
 \alias{extractNonzeroDataByCol,TENxMatrix-method}
 
-\title{10x Genomics datasets as DelayedArray objects}
+\title{10x Genomics datasets as DelayedMatrix objects}
 
 \description{
   The 1.3 Million Brain Cell Dataset and other datasets published by
   10x Genomics use an HDF5-based sparse matrix representation instead
   of the conventional (i.e. dense) HDF5 representation.
 
-  We provide 2 classes for representing a 10x Genomics dataset as a
-  matrix-like object in R:
-  \itemize{
-    \item TENxMatrix: A high-level class that extends
-          \link[DelayedArray]{DelayedArray}.
-          All the operations available for \link[DelayedArray]{DelayedArray}
-          objects work on TENxMatrix objects.
+  The TENxMatrix class is a \link[DelayedArray]{DelayedMatrix} subclass
+  for representing an HDF5-based sparse matrix like one used by
+  10x Genomics for the 1.3 Million Brain Cell Dataset.
 
-    \item TENxMatrixSeed: A low-level class for pointing to a 10x Genomics
-          dataset.
-          No operation can be performed directly on a TENxMatrixSeed object.
-          It first needs to be wrapped in a \link[DelayedArray]{DelayedArray}
-          object.
-          A TENxMatrix object is just a TENxMatrixSeed object wrapped in
-          a \link[DelayedArray]{DelayedArray} object.
-  }
+  All the operations available for \link[DelayedArray]{DelayedMatrix}
+  objects work on TENxMatrix objects.
 }
 
 \usage{
 ## Constructor functions:
 TENxMatrix(filepath, group="mm10")
-TENxMatrixSeed(filepath, group="mm10")
 
 ## sparsity() and a convenient data extractor:
 sparsity(x)
@@ -84,7 +46,7 @@ extractNonzeroDataByCol(x, j)
     The name of the group in the HDF5 file containing the 10x Genomics data.
   }
   \item{x}{
-    A TENxMatrix or TENxMatrixSeed object.
+    A TENxMatrix (or \link{TENxMatrixSeed}) object.
   }
   \item{j}{
     An integer vector containing valid column indices.
@@ -93,8 +55,6 @@ extractNonzeroDataByCol(x, j)
 
 \value{
   \code{TENxMatrix}: A TENxMatrix object.
-
-  \code{TENxMatrixSeed}: A TENxMatrixSeed object.
 
   \code{sparsity}: The number of zero-valued matrix elements in the
   object divided by its total number of elements (a.k.a. its length).
@@ -120,7 +80,7 @@ extractNonzeroDataByCol(x, j)
     \item \link{HDF5Array} objects for representing conventional (i.e.
           dense) HDF5 datasets as \link[DelayedArray]{DelayedArray} objects.
 
-    \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
+    \item \link[DelayedArray]{DelayedMatrix} objects in the \pkg{DelayedArray}
           package.
 
     \item \code{\link{writeTENxMatrix}} for writing a matrix-like object
@@ -140,10 +100,9 @@ extractNonzeroDataByCol(x, j)
           \code{\link[DelayedArray]{blockApply}} in the
           \pkg{DelayedArray} package.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item The \link{TENxMatrixSeed} helper class.
 
-    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which TENxMatrix
-          and TENxMatrixSeed objects are implemented.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
 
     \item \link[IRanges]{NumericList} and \link[IRanges]{IntegerList}
           objects in the \pkg{IRanges} package.
@@ -152,17 +111,17 @@ extractNonzeroDataByCol(x, j)
 
 \examples{
 ## ---------------------------------------------------------------------
-## THE "1.3 Million Brain Cell Dataset" AS A DelayedArray OBJECT
+## THE "1.3 Million Brain Cell Dataset" AS A DelayedMatrix OBJECT
 ## ---------------------------------------------------------------------
-## The 1.3 Million Brain Cell Dataset from 10x Genomics is available via
-## ExperimentHub:
+## The 1.3 Million Brain Cell Dataset from 10x Genomics is available
+## via ExperimentHub:
 library(ExperimentHub)
 hub <- ExperimentHub()
 query(hub, "TENxBrainData")
 fname <- hub[["EH1039"]]
 
-## The structure of the file can be seen using the h5ls() command from
-## the rhdf5 package:
+## The structure of this HDF5 file can be seen using the h5ls() command
+## from the rhdf5 package:
 library(rhdf5)
 h5ls(fname)
 
@@ -171,9 +130,11 @@ h5ls(fname)
 ## create a TENxMatrix object representing the dataset:
 oneM <- TENxMatrix(fname, "mm10")
 oneM
-sparsity(oneM)
 
-is(oneM, "DelayedArray")  # TRUE
+is(oneM, "DelayedMatrix")  # TRUE
+seed(oneM)
+path(oneM)
+sparsity(oneM)
 
 ## Some examples of delayed operations:
 oneM != 0

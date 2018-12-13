@@ -4,12 +4,13 @@
 ###
 ### Note that we could just wrap an HDF5ArraySeed object in a DelayedArray
 ### object to represent and manipulate an HDF5 dataset as a DelayedArray
-### object, so strictly speaking we don't really need the HDF5Array and
-### HDF5Matrix classes. We define these classes mostly for cosmetic reasons
-### i.e. to hide the DelayedArray and DelayedMatrix classes from the user.
-### So the user will see and manipulate HDF5Array and HDF5Matrix objects
-### instead of DelayedArray and DelayedMatrix objects.
+### object. So, strictly speaking, we don't really need the HDF5Array and
+### HDF5Matrix classes. However, we define these classes mostly for cosmetic
+### reasons, that is, to hide the DelayedArray and DelayedMatrix classes
+### from the user. So the user will see and manipulate HDF5Array and
+### HDF5Matrix objects instead of DelayedArray and DelayedMatrix objects.
 ###
+
 
 setClass("HDF5Array",
     contains="DelayedArray",

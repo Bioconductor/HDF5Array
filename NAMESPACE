@@ -19,7 +19,8 @@ exportClasses(
     HDF5ArraySeed,
     HDF5Array, HDF5Matrix,
     HDF5RealizationSink,
-    TENxMatrixSeed, TENxMatrix,
+    TENxMatrixSeed,
+    TENxMatrix,
     TENxRealizationSink
 )
 
@@ -66,7 +67,8 @@ export(
     HDF5RealizationSink, writeHDF5Array,
     saveHDF5SummarizedExperiment, loadHDF5SummarizedExperiment,
     quickResaveHDF5SummarizedExperiment,
-    TENxMatrixSeed, TENxMatrix,
+    TENxMatrixSeed,
+    TENxMatrix,
     TENxRealizationSink, writeTENxMatrix
 )
 

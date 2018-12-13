@@ -46,7 +46,7 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
     The object to write should typically be sparse, that is, most of its
     elements should be zero.
 
-    If \code{x} is a \link{DelayedArray} object, \code{writeTENxMatrix}
+    If \code{x} is a \link{DelayedMatrix} object, \code{writeTENxMatrix}
     \emph{realizes} it on disk, that is, all the delayed operations carried
     by the object are executed while the object is written to disk.
   }

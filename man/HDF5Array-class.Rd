@@ -19,10 +19,11 @@
 \title{HDF5 datasets as DelayedArray objects}
 
 \description{
-  The HDF5Array class is a \link[DelayedArray]{DelayedArray} subclass for
-  representing a conventional (i.e. dense) HDF5 dataset.
-  All the operations available for \link[DelayedArray]{DelayedArray} objects
-  work on HDF5Array objects.
+  The HDF5Array class is a \link[DelayedArray]{DelayedArray} subclass
+  for representing a conventional (i.e. dense) HDF5 dataset.
+
+  All the operations available for \link[DelayedArray]{DelayedArray}
+  objects work on HDF5Array objects.
 }
 
 \usage{
@@ -63,7 +64,7 @@ HDF5Array(filepath, name, type=NA)
 \seealso{
   \itemize{
     \item \link{TENxMatrix} objects for representing 10x Genomics
-          datasets as \link[DelayedArray]{DelayedArray} objects.
+          datasets as \link[DelayedArray]{DelayedMatrix} objects.
 
     \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
           package.
@@ -83,9 +84,6 @@ HDF5Array(filepath, name, type=NA)
     \item The \link{HDF5ArraySeed} helper class.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
-
-    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which HDF5Array
-          and HDF5ArraySeed objects are implemented.
   }
 }
 

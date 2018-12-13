@@ -15,8 +15,9 @@
 
 \description{
   HDF5ArraySeed is a low-level helper class for representing a pointer
-  to an HDF5 dataset. It is not intended to be used directly. Most
-  end-users should create an manipulate \link{HDF5Array} objects
+  to an HDF5 dataset.
+  HDF5ArraySeed objects are not intended to be used directly. Most
+  end-users should create and manipulate \link{HDF5Array} objects
   instead. See \code{?\link{HDF5Array}} for more information.
 }
 
@@ -44,7 +45,12 @@ HDF5ArraySeed(filepath, name, type=NA)
 }
 
 \seealso{
-  \link{HDF5Array} objects.
+  \itemize{
+    \item \link{HDF5Array} objects.
+
+    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which
+          HDF5ArraySeed objects are implemented.
+  }
 }
 
 \examples{
@@ -56,6 +62,7 @@ library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 x <- HDF5ArraySeed(tally_file, "/ExampleStudy/16/Coverages")
+x
 path(x)
 dim(x)
 chunkdim(x)
