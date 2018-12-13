@@ -23,6 +23,7 @@ Suggests: h5vcData, SummarizedExperiment (>= 1.9.6), GenomicRanges,
 License: Artistic-2.0
 Collate: h5mread.R
 	utils.R
+	HDF5ArraySeed-class.R
 	HDF5Array-class.R
 	dump-management.R
 	writeHDF5Array.R

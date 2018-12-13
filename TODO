@@ -21,10 +21,6 @@ Other things
 - Keep investigating interaction between chunk and block geometries and their
   impact on block processing performance.
 
-- Add 'chunk' slot to HDF5ArraySeed objects and populate it with physical chunk
-  geometry at creation time. Emit a warning if chunk genometry won't lead to
-  good block processing performance.
-
 - Do some benchmarking (with special attention to memory usage).
 
 - Add more unit tests.
