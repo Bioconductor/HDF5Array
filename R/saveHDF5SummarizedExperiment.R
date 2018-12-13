@@ -22,7 +22,7 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Low-level manipulation of the assays-to-HDF5 links
+### Low-level manipulation of the assay-to-HDF5 links
 ###
 
 ### Return an error if any of the seeds in any of the assays is not an
@@ -41,8 +41,9 @@
     unique(unlist(h5_paths))
 }
 
-### Assume that all the seeds in all the assays are HDF5ArraySeed objects
-### so have a 'filepath' slot. This is NOT checked!
+### Assume that all the assays are fully HDF5-based (i.e. that all their
+### seeds are HDF5ArraySeed objects). This means that all the seeds should
+### have a 'filepath' slot. This is NOT checked!
 ### Note that shortening the path stored in the HDF5ArraySeed objects breaks
 ### these objects so we must use direct slot access instead of the path()
 ### setter to do this. This is because the latter is intended for the end user
@@ -60,7 +61,11 @@
     assays
 }
 
-.restore_and_ckeck_full_assay2h5_links <- function(assays, dir)
+### Check that all the assays are fully HDF5-based (i.e. that all their seeds
+### are HDF5ArraySeed objects), and, via validate_HDF5ArraySeed_dataset(),
+### that all the HDF5ArraySeed objects point to HDF5 datasets that are
+### accessible and "as expected".
+.restore_full_assay2h5_links <- function(assays, dir)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -69,40 +74,13 @@
                 if (!is(x, "HDF5ArraySeed"))
                     stop(wmsg("assay ", i, " in the SummarizedExperiment ",
                               "object to load is not HDF5-based"))
-                ## Check 'x@filepath'.
-                h5_path <- file.path(dir, x@filepath)
-                if (!file.exists(h5_path))
+                x@filepath <- file_path_as_absolute(file.path(dir, x@filepath))
+                ## Check that 'x' points to an HDF5 dataset that is accessible
+                ## and "as expected".
+                msg <- validate_HDF5ArraySeed_dataset(x)
+                if (!isTRUE(msg))
                     stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an HDF5 file that ",
-                              "does not exist: ", h5_path))
-                h5_content <- try(h5ls(h5_path), silent=TRUE)
-                if (inherits(h5_content, "try-error"))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an invalid ",
-                              "HDF5 file: ", h5_path))
-                ## Check 'x@name'.
-                h5_dim <- try(h5dim(h5_path, x@name), silent=TRUE)
-                if (inherits(h5_dim, "try-error"))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an HDF5 dataset ",
-                              "('", x@name, "') that does not exist in ",
-                              "HDF5 file: ", h5_path))
-                ## Check dimensions of HDF5 dataset.
-                if (!identical(h5_dim, x@dim))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an HDF5 dataset ",
-                              "('", x@name, "') in HDF5 file '", h5_path, "' ",
-                              "that does not have the expected dimensions"))
-                ## Check chunk dimensions of HDF5 dataset.
-                h5_chunkdim <- h5chunkdim(h5_path, x@name, adjust=TRUE)
-                if (!identical(h5_chunkdim, x@chunkdim))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an HDF5 dataset ",
-                              "('", x@name, "') in HDF5 file '", h5_path, "' ",
-                              "that does not have the expected chunk ",
-                              "dimensions"))
-                ## Restore 'x@filepath'.
-                x@filepath <- file_path_as_absolute(h5_path)
+                              "object to load ", msg))
                 x
             })
     }
@@ -111,8 +89,7 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .write_HDF5SummarizedExperiment()
-### .read_HDF5SummarizedExperiment()
+### .write_HDF5SummarizedExperiment() / .read_HDF5SummarizedExperiment()
 ###
 
 .serialize_HDF5SummarizedExperiment <- function(x, rds_path, verbose)
@@ -173,16 +150,19 @@
     invisible(x)
 }
 
-.read_HDF5SummarizedExperiment <- function(filepath)
+### Does a lot of checking (via .restore_full_assay2h5_links()) on the
+### assays of the SummarizedExperiment object found in 'rds_path' and
+### fails with an informative error message if they don't look as expected.
+.read_HDF5SummarizedExperiment <- function(rds_path)
 {
     .load_SummarizedExperiment_package()
 
-    ans <- updateObject(readRDS(filepath), check=FALSE)
+    ans <- updateObject(readRDS(rds_path), check=FALSE)
     if (!is(ans, "SummarizedExperiment"))
-        stop(wmsg("the object serialized in \"", filepath, "\" is not ",
+        stop(wmsg("the object serialized in \"", rds_path, "\" is not ",
                   "a SummarizedExperiment object or derivative"))
-    dir <- dirname(filepath)
-    ans@assays <- .restore_and_ckeck_full_assay2h5_links(ans@assays, dir)
+    dir <- dirname(rds_path)
+    ans@assays <- .restore_full_assay2h5_links(ans@assays, dir)
     ans
 }
 
@@ -290,8 +270,8 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
     stop(wmsg(msg))
 }
 
-### Does a lot of checking and tries to fail graciously if the content
-### of 'dir' doesn't look as expected.
+### Does a lot of checking (via .read_HDF5SummarizedExperiment()) and fails
+### graciously if the content of 'dir' doesn't look as expected.
 loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
 {
     .load_SummarizedExperiment_package()

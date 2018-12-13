@@ -17,6 +17,76 @@ setClass("HDF5ArraySeed",
     )
 )
 
+### Check that HDF5ArraySeed object 'x' points to an HDF5 dataset that
+### is accessible and "as expected".
+validate_HDF5ArraySeed_dataset <- function(x)
+{
+    ## Check that 'x' points to an HDF5 dataset that is accessible.
+    if (!file.exists(x@filepath))
+        return(paste0("points to an HDF5 file that does not exist: ",
+                      x@filepath))
+    if (dir.exists(x@filepath))
+        return(paste0("points to a directory ('", x@filepath, "') ",
+                      "instead of an HDF5 file"))
+    h5_content <- try(h5ls(x@filepath), silent=TRUE)
+    if (inherits(h5_content, "try-error"))
+        return(paste0("points to an invalid HDF5 file: ", x@filepath))
+    h5_dim <- try(h5dim(x@filepath, x@name), silent=TRUE)
+    if (inherits(h5_dim, "try-error"))
+        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                      "that does not exist in HDF5 file: ", x@filepath))
+
+    ## Check that 'x' points to an HDF5 dataset that has the
+    ## expected dimensions and chunk dimensions.
+    if (!identical(h5_dim, x@dim))
+        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                      "in HDF5 file '", x@filepath, "' ",
+                      "that does not have the expected dimensions"))
+    h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
+    if (!identical(h5_chunkdim, x@chunkdim))
+        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                      "in HDF5 file '", x@filepath, "' ",
+                 "that does not have the expected chunk dimensions"))
+
+    TRUE
+}
+
+.validate_HDF5ArraySeed <- function(x)
+{
+    ## 'filepath' slot.
+    x_filepath <- x@filepath
+    if (!isSingleString(x_filepath))
+        return("'filepath' slot must be a single string")
+
+    ## 'name' slot.
+    x_name <- x@name
+    if (!isSingleString(x_name))
+        return("'name' slot must be a single string")
+
+    ## 'dim' slot.
+    msg <- DelayedArray:::validate_dim_slot(x, "dim")
+    if (!isTRUE(msg))
+        return(msg)
+
+    ## 'chunkdim' slot.
+    x_chunkdim <- x@chunkdim
+    if (!is.null(x_chunkdim)) {
+        msg <- DelayedArray:::validate_dim_slot(x, "chunkdim")
+        if (!isTRUE(msg))
+            return(msg)
+    }
+
+    ## Check that 'x' points to an HDF5 dataset that is accessible
+    ## and "as expected".
+    msg <- validate_HDF5ArraySeed_dataset(x)
+    if (!isTRUE(msg))
+        return(paste0("object ", msg))
+
+    TRUE
+}
+
+setValidity2("HDF5ArraySeed", .validate_HDF5ArraySeed)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### path() getter/setter
