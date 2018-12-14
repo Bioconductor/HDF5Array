@@ -65,7 +65,8 @@
 ### are HDF5ArraySeed objects), and, via validate_HDF5ArraySeed_dataset(),
 ### that all the HDF5ArraySeed objects point to HDF5 datasets that are
 ### accessible and "as expected".
-.restore_full_assay2h5_links <- function(assays, dir)
+### Restore all the file paths to their absolute canonical form.
+.restore_absolute_assay2h5_links <- function(assays, dir)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -74,7 +75,14 @@
                 if (!is(x, "HDF5ArraySeed"))
                     stop(wmsg("assay ", i, " in the SummarizedExperiment ",
                               "object to load is not HDF5-based"))
-                x@filepath <- file_path_as_absolute(file.path(dir, x@filepath))
+                h5_path <- file.path(dir, x@filepath)
+                ## file_path_as_absolute() will fail if the file does
+                ## not exist.
+                if (!file.exists(h5_path))
+                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
+                              "object to load points to an HDF5 file ",
+                              "that does not exist: ", h5_path))
+                x@filepath <- file_path_as_absolute(h5_path)
                 ## Check that 'x' points to an HDF5 dataset that is accessible
                 ## and "as expected".
                 msg <- validate_HDF5ArraySeed_dataset(x)
@@ -150,19 +158,24 @@
     invisible(x)
 }
 
-### Does a lot of checking (via .restore_full_assay2h5_links()) on the
-### assays of the SummarizedExperiment object found in 'rds_path' and
+### Does a lot of checking (via .restore_absolute_assay2h5_links()) on
+### the assays of the SummarizedExperiment object found in 'rds_path' and
 ### fails with an informative error message if they don't look as expected.
 .read_HDF5SummarizedExperiment <- function(rds_path)
 {
     .load_SummarizedExperiment_package()
+
+    if (!file.exists(rds_path))
+        stop(wmsg("file not found: ", rds_path))
+    if (dir.exists(rds_path))
+        stop(wmsg("'", rds_path, "' is a directory, not a file"))
 
     ans <- updateObject(readRDS(rds_path), check=FALSE)
     if (!is(ans, "SummarizedExperiment"))
         stop(wmsg("the object serialized in \"", rds_path, "\" is not ",
                   "a SummarizedExperiment object or derivative"))
     dir <- dirname(rds_path)
-    ans@assays <- .restore_full_assay2h5_links(ans@assays, dir)
+    ans@assays <- .restore_absolute_assay2h5_links(ans@assays, dir)
     ans
 }
 
@@ -290,9 +303,6 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
     }
 
     rds_path <- file.path(dir, paste0(prefix, .SE_RDS_BASENAME))
-    if (!file.exists(rds_path))
-        .stop_if_bad_dir(dir, prefix)
-
     ans <- try(.read_HDF5SummarizedExperiment(rds_path), silent=TRUE)
     if (inherits(ans, "try-error"))
         .stop_if_bad_dir(dir, prefix)
@@ -324,6 +334,20 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
     file.path(dir, rds_basename)
 }
 
+### Check that the assays of the SummarizedExperiment object found
+### in 'rds_path' are HDF5-based and point to 'h5_path'.
+.check_HDF5SummarizedExperiment_h5_file <- function(rds_path, h5_path)
+{
+    se <- try(.read_HDF5SummarizedExperiment(rds_path), silent=TRUE)
+    if (inherits(se, "try-error"))
+        .stop_if_cannot_quick_resave()
+    se_h5_path <-  try(.get_unique_assay2h5_links(se@assays), silent=TRUE)
+    if (inherits(se_h5_path, "try-error") ||
+        length(se_h5_path) != 1L ||
+        se_h5_path != h5_path)
+        .stop_if_cannot_quick_resave()
+}
+
 ### 'x' must have been previously saved with saveHDF5SummarizedExperiment()
 ### and possibly modified since then.
 ### A quick-resave preserves the current HDF5 file and datasets and
@@ -344,9 +368,9 @@ quickResaveHDF5SummarizedExperiment <- function(x, verbose=FALSE)
         .stop_if_cannot_quick_resave()
     if (verbose)
         message("All assay data already in HDF5 file:\n  ", h5_path)
+
     rds_path <- .map_h5_path_to_rds_path(h5_path)
-    if (!file.exists(rds_path) || dir.exists(rds_path))
-        .stop_if_cannot_quick_resave()
+    .check_HDF5SummarizedExperiment_h5_file(rds_path, h5_path)
     .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
     invisible(x)
 }

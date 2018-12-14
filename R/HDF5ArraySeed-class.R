@@ -8,8 +8,12 @@ setClass("HDF5ArraySeed",
     representation(
         filepath="character",       # Absolute path to the HDF5 file so the
                                     # object doesn't break when the user
-                                    # changes the working directory (e.g. with
-                                    # setwd()).
+                                    # changes the working directory (e.g.
+                                    # with setwd()).
+                                    # The path must also be in its canonical
+                                    # form so paths from different objects
+                                    # can be compared (required by
+                                    # quickResaveHDF5SummarizedExperiment()).
         name="character",           # Name of the dataset in the HDF5 file.
         dim="integer",
         first_val="ANY",            # First value in the dataset.
@@ -26,7 +30,7 @@ setClass("HDF5ArraySeed",
 ### is accessible and "as expected".
 validate_HDF5ArraySeed_dataset <- function(x)
 {
-    ## Check that 'x' points to an HDF5 dataset that is accessible.
+    ## Check that 'x' points to an HDF5 file that is accessible.
     if (!file.exists(x@filepath))
         return(paste0("points to an HDF5 file that does not exist: ",
                       x@filepath))
@@ -36,6 +40,11 @@ validate_HDF5ArraySeed_dataset <- function(x)
     h5_content <- try(h5ls(x@filepath), silent=TRUE)
     if (inherits(h5_content, "try-error"))
         return(paste0("points to an invalid HDF5 file: ", x@filepath))
+    if (x@filepath != file_path_as_absolute(x@filepath))
+        return(paste0("uses a non-absolute/non-canonical path ",
+                      "('", x@filepath, "') to point to the HDF5 file"))
+
+    ## Check that 'x' points to an HDF5 dataset that is accessible.
     h5_dim <- try(h5dim(x@filepath, x@name), silent=TRUE)
     if (inherits(h5_dim, "try-error"))
         return(paste0("points to an HDF5 dataset ('", x@name, "') ",
@@ -105,7 +114,7 @@ normarg_path <- function(path, what1, what2)
     if (!isSingleString(path))
         stop(wmsg(what1, " must be a single string specifying the path ",
                   "to the file where the ", what2, " is located"))
-    file_path_as_absolute(path)
+    file_path_as_absolute(path)  # return absolute path in canonical form
 }
 
 ### Will fail if the dataset is empty (i.e. if at least one of its
