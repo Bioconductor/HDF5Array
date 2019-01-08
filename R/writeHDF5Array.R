@@ -191,9 +191,10 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
 
 setAs("ANY", "HDF5Array", .as_HDF5Array)
 
-### Automatic coercion method from DelayedArray to HDF5Array silently returns
-### a broken object (unfortunately these dummy automatic coercion methods don't
-### bother to validate the object they return). So we overwrite it.
+### Automatic coercion methods from DelayedArray to HDF5Array and from
+### DelayedMatrix to HDF5Matrix silently return broken objects (unfortunately
+### these dummy automatic coercion methods don't bother to validate the object
+### they return). So we overwrite them.
 setAs("DelayedArray", "HDF5Array", .as_HDF5Array)
 setAs("DelayedMatrix", "HDF5Matrix", .as_HDF5Array)
 

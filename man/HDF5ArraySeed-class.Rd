@@ -67,5 +67,5 @@ path(x)
 dim(x)
 chunkdim(x)
 }
-\keyword{methods}
 \keyword{classes}
+\keyword{methods}

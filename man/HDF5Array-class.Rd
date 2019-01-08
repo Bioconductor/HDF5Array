@@ -164,5 +164,5 @@ stopifnot(validObject(se))
 assays(se)$pcov
 assays(se)$mcov
 }
-\keyword{methods}
 \keyword{classes}
+\keyword{methods}

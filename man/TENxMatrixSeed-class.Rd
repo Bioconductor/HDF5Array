@@ -93,5 +93,5 @@ path(x)
 dim(x)
 sparsity(x)
 }
-\keyword{methods}
 \keyword{classes}
+\keyword{methods}

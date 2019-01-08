@@ -231,5 +231,5 @@ n_exprs3 <- lengths(nonzeroes)
 stopifnot(all.equal(lib_sizes, lib_sizes3))
 stopifnot(all.equal(n_exprs, n_exprs3))
 }
-\keyword{methods}
 \keyword{classes}
+\keyword{methods}
