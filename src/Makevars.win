@@ -1,4 +1,10 @@
-RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_LIBS")'|\
+C_SOURCES=$(wildcard *.c)
+CXX_SOURCES=$(wildcard *.cpp beachmat/*.cpp)
+SOURCES=$(C_SOURCES) $(CXX_SOURCES)
+OBJECTS=$(C_SOURCES:.c=.o) $(CXX_SOURCES:.cpp=.o)
+
+all: $(SHLIB)
+
+RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_CXX_LIBS")'|\
     "${R_HOME}/bin/R" --vanilla --slave)
 PKG_LIBS=$(RHDF5LIB_LIBS)
-

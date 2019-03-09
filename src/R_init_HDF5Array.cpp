@@ -1,7 +1,11 @@
-#include "HDF5Array.h"
+#include "Rcpp.h" /* must be first, avoid macro clashes with STL. */
 #include <R_ext/Rdynload.h>
 
 #define CALLMETHOD_DEF(fun, numArgs) {#fun, (DL_FUNC) &fun, numArgs}
+
+extern "C" {
+
+#include "HDF5Array.h"
 
 static const R_CallMethodDef callMethods[] = {
 
@@ -20,11 +24,18 @@ static const R_CallMethodDef callMethods[] = {
 	{NULL, NULL, 0}
 };
 
+}
+
+#include "beachmat/exports.h"
+
+extern "C" {
 
 void R_init_HDF5Array(DllInfo *info)
 {
 	R_registerRoutines(info, NULL, callMethods, NULL, NULL);
 
+#include "beachmat/exports.hpp"
 	return;
 }
 
+}
