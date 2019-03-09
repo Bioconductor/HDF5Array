@@ -1,0 +1,20 @@
+setupHDF5Matrix <- function(dims, storage.mode)
+# This is a convenience wrapper that, if given the matrix dimensions,
+# runs a series of R functions and returns the result to the C++ code.
+# The idea is to avoid multiple environment calls from C++.
+{
+    fname <- getHDF5DumpFile(for.use=TRUE)
+    dname <- getHDF5DumpName(for.use=TRUE)
+    chunk <- getHDF5DumpChunkDim(dims)
+    compress <- getHDF5DumpCompressionLevel()
+    appendDatasetCreationToHDF5DumpLog(fname, dname, dims, storage.mode, chunk, compress)
+    list(fname=fname, dname=dname, chunk=chunk, compress=compress)
+}
+
+# Add method to indicate that, in fact, HDF5Matrix access is supported.
+setMethod("supportCppAccess", "HDF5Matrix", function(x) TRUE)
+
+beachmat_HDF5Matrix_output_integer <- TRUE
+beachmat_HDF5Matrix_output_logical <- TRUE
+beachmat_HDF5Matrix_output_numeric <- TRUE
+beachmat_HDF5Matrix_output_character <- TRUE
