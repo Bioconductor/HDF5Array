@@ -14,7 +14,7 @@ setupHDF5Matrix <- function(dims, storage.mode)
 # Add method to indicate that, in fact, HDF5Matrix access is supported.
 setMethod("supportCppAccess", "HDF5Matrix", function(x) TRUE)
 
-beachmat_HDF5Matrix_output_integer <- TRUE
-beachmat_HDF5Matrix_output_logical <- TRUE
-beachmat_HDF5Matrix_output_numeric <- TRUE
-beachmat_HDF5Matrix_output_character <- TRUE
+beachmat_HDF5Matrix_integer_output <- TRUE
+beachmat_HDF5Matrix_logical_output <- TRUE
+beachmat_HDF5Matrix_numeric_output <- TRUE
+beachmat_HDF5Matrix_character_output <- TRUE
