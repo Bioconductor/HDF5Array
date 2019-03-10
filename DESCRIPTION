@@ -19,7 +19,7 @@ Depends: R (>= 3.4), methods, DelayedArray (>= 0.9.3), rhdf5 (>= 2.25.6)
 Imports: utils, tools, BiocGenerics (>= 0.25.1), S4Vectors, IRanges, beachmat
 LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib, Rcpp, beachmat
 Suggests: h5vcData, SummarizedExperiment (>= 1.9.6), GenomicRanges,
-	ExperimentHub, TENxBrainData, BiocParallel, BiocStyle
+	ExperimentHub, TENxBrainData, BiocParallel, BiocStyle, devtools, testthat
 License: Artistic-2.0
 Collate: h5mread.R
 	utils.R

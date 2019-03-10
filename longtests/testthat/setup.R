@@ -39,7 +39,7 @@ check_write_HDF5 <- function(FUN, mode)
     new.mats <- vector("list", length(mats)) 
 
     for (i in seq_along(mats)) { 
-        out <- .Call(paste0("set_col_all_", mode), mats[[i]], seq_len(ncol(mats[[i]])), package="beachtest")[[1]]
+        out <- .Call(paste0("set_col_all_", mode), mats[[i]], seq_len(ncol(mats[[i]])), PACKAGE="beachtest")[[1]]
         new.mats[[i]] <- out
         expect_s4_class(out, "HDF5Matrix")
         expect_identical(ref.mats[[i]], as.matrix(out))
