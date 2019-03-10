@@ -1,5 +1,5 @@
 # This tests the ability of the API to properly access integer HDF5Matrices.
-# library(testthat); library(beachtest); source("setup.R"); source("test-integer.R")
+# library(testthat); source("setup.R"); source("test-integer.R")
 
 hFUN <- integer_hFUN
 
