@@ -36,26 +36,6 @@ public:
     }
 
     // Basic getters.
-    void get_col(size_t c, Rcpp::IntegerVector::iterator out) {
-        get_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void get_col(size_t c, Rcpp::NumericVector::iterator out) {
-        get_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void get_row(size_t r, Rcpp::IntegerVector::iterator out) {
-        get_row(r, out, 0, get_ncol());
-        return;
-    }
-
-    void get_row(size_t r, Rcpp::NumericVector::iterator out) {
-        get_row(r, out, 0, get_ncol());
-        return;
-    }
-
     void get_col(size_t c, Rcpp::IntegerVector::iterator out, size_t first, size_t last) {
         reader.extract_col(c, static_cast<int*>(out), H5::PredType::NATIVE_INT32, first, last);
         return;

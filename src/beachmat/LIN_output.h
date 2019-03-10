@@ -27,26 +27,6 @@ public:
     }
 
     // Getters:
-    void get_col(size_t c, Rcpp::IntegerVector::iterator out) {
-        get_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void get_col(size_t c, Rcpp::NumericVector::iterator out) {
-        get_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void get_row(size_t r, Rcpp::IntegerVector::iterator out) {
-        get_row(r, out, 0, get_ncol());
-        return;
-    }
-
-    void get_row(size_t r, Rcpp::NumericVector::iterator out) {
-        get_row(r, out, 0, get_ncol());
-        return;
-    }
-
     T get(size_t r, size_t c) {
         T out;
         writer.extract_one(r, c, &out);
@@ -74,26 +54,6 @@ public:
     }
 
     // Setters:
-    void set_col(size_t c, Rcpp::IntegerVector::iterator out) {
-        set_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void set_col(size_t c, Rcpp::NumericVector::iterator out) {
-        set_col(c, out, 0, get_nrow());
-        return;
-    }
-
-    void set_row(size_t r, Rcpp::IntegerVector::iterator out) {
-        set_row(r, out, 0, get_ncol());
-        return;
-    }
-
-    void set_row(size_t r, Rcpp::NumericVector::iterator out) {
-        set_row(r, out, 0, get_ncol());
-        return;
-    }
-
     void set(size_t r, size_t c, T in) {
         writer.insert_one(r, c, &in);
         return;
