@@ -4,6 +4,48 @@
 
 extern "C" {
 
+void * HDF5Matrix_character_input_create(SEXP);
+
+void HDF5Matrix_character_input_destroy(void *);
+
+void * HDF5Matrix_character_input_clone(void *);
+
+void HDF5Matrix_character_input_dim(void*, size_t*, size_t*);
+
+void HDF5Matrix_character_input_get(void *, size_t, size_t, Rcpp::String*);
+
+void HDF5Matrix_character_input_getRow(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_input_getCol(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_input_getRows(void *, Rcpp::IntegerVector::iterator*, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_input_getCols(void *, Rcpp::IntegerVector::iterator*, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void * HDF5Matrix_character_output_create(size_t, size_t);
+
+void HDF5Matrix_character_output_destroy(void *);
+
+void * HDF5Matrix_character_output_clone(void *);
+
+SEXP HDF5Matrix_character_output_yield(void *);
+
+void HDF5Matrix_character_output_get(void *, size_t, size_t, Rcpp::String*);
+
+void HDF5Matrix_character_output_getRow(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_output_getCol(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_output_set(void *, size_t, size_t, Rcpp::String*);
+
+void HDF5Matrix_character_output_setRow(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_output_setCol(void *, size_t, Rcpp::StringVector::iterator*, size_t, size_t);
+
+void HDF5Matrix_character_output_setRowIndexed(void *, size_t, size_t, Rcpp::IntegerVector::iterator*, Rcpp::StringVector::iterator*);
+
+void HDF5Matrix_character_output_setColIndexed(void *, size_t, size_t, Rcpp::IntegerVector::iterator*, Rcpp::StringVector::iterator*);
+
 void * HDF5Matrix_integer_input_create (SEXP);
 
 void HDF5Matrix_integer_input_destroy (void *);

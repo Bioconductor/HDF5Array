@@ -17,7 +17,7 @@
 template<typename T, int RTYPE>
 class HDF5_writer : public beachmat::dim_checker {
 public:
-    HDF5_writer(size_t nr, size_t nc) : beachmat::dim_checker(nr, nc), 
+    HDF5_writer(size_t nr, size_t nc, size_t strlen=10) : beachmat::dim_checker(nr, nc), 
             rowlist(H5::FileAccPropList::DEFAULT.getId()), collist(H5::FileAccPropList::DEFAULT.getId()) {
 
         // Pulling out settings.
@@ -44,7 +44,7 @@ public:
 
         // Opening the file, setting the type and creating the data set.
         hfile.openFile(fname.c_str(), H5F_ACC_RDWR);
-        default_type=set_HDF5_data_type(RTYPE, 10); // TODO: allow users to set max string length.
+        default_type=set_HDF5_data_type(RTYPE, strlen);
         H5::DSetCreatPropList plist;
         const T empty=get_empty();
         plist.setFillValue(default_type, &empty);

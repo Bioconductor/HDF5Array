@@ -1,5 +1,47 @@
 #define REGISTER(x) R_RegisterCCallable("HDF5Array", #x, reinterpret_cast<DL_FUNC>(x))
 
+REGISTER(HDF5Matrix_character_input_create);
+
+REGISTER(HDF5Matrix_character_input_destroy);
+
+REGISTER(HDF5Matrix_character_input_clone);
+
+REGISTER(HDF5Matrix_character_input_dim);
+
+REGISTER(HDF5Matrix_character_input_get);
+
+REGISTER(HDF5Matrix_character_input_getRow);
+
+REGISTER(HDF5Matrix_character_input_getCol);
+
+REGISTER(HDF5Matrix_character_input_getRows);
+
+REGISTER(HDF5Matrix_character_input_getCols);
+
+REGISTER(HDF5Matrix_character_output_create);
+
+REGISTER(HDF5Matrix_character_output_destroy);
+
+REGISTER(HDF5Matrix_character_output_clone);
+
+REGISTER(HDF5Matrix_character_output_yield);
+
+REGISTER(HDF5Matrix_character_output_get);
+
+REGISTER(HDF5Matrix_character_output_getRow);
+
+REGISTER(HDF5Matrix_character_output_getCol);
+
+REGISTER(HDF5Matrix_character_output_set);
+
+REGISTER(HDF5Matrix_character_output_setRow);
+
+REGISTER(HDF5Matrix_character_output_setCol);
+
+REGISTER(HDF5Matrix_character_output_setRowIndexed);
+
+REGISTER(HDF5Matrix_character_output_setColIndexed);
+
 REGISTER(HDF5Matrix_integer_input_create);
 
 REGISTER(HDF5Matrix_integer_input_destroy);
