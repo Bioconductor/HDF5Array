@@ -11,9 +11,11 @@ setupHDF5Matrix <- function(dims, storage.mode)
     list(fname=fname, dname=dname, chunk=chunk, compress=compress)
 }
 
-# Add method to indicate that, in fact, HDF5Matrix access is supported.
-setMethod("supportCppAccess", "HDF5Matrix", function(x) TRUE)
-
+# Add flags to indicate that, in fact, HDF5Matrix read/write is supported.
+beachmat_HDF5Matrix_integer_input <- TRUE
+beachmat_HDF5Matrix_logical_input <- TRUE
+beachmat_HDF5Matrix_numeric_input <- TRUE
+beachmat_HDF5Matrix_character_input <- TRUE
 beachmat_HDF5Matrix_integer_output <- TRUE
 beachmat_HDF5Matrix_logical_output <- TRUE
 beachmat_HDF5Matrix_numeric_output <- TRUE

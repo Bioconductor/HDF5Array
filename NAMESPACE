@@ -9,7 +9,6 @@ import(S4Vectors)
 import(IRanges)
 import(DelayedArray)
 import(rhdf5)
-importFrom(beachmat,supportCppAccess)
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Export S4 classes
