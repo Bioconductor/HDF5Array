@@ -137,13 +137,13 @@ fname0 <- hub[["EH1039"]]
 h5ls(fname0)  # all datasets are 1D datasets
 
 index <- list(77 * sample(34088679, 5000, replace=TRUE))
-## h5mread() about 14x faster than h5read():
+## h5mread() about 3x faster than h5read():
 system.time(a <- h5mread(fname0, "mm10/data", index))
 system.time(b <- h5read(fname0, "mm10/data", index=index))
 stopifnot(identical(a, b))
 
 index <- list(sample(1306127, 7500, replace=TRUE))
-## h5mread() about 40x faster than h5read():
+## h5mread() about 20x faster than h5read():
 system.time(a <- h5mread(fname0, "mm10/barcodes", index))
 system.time(b <- h5read(fname0, "mm10/barcodes", index=index))
 stopifnot(identical(a, b))
@@ -155,7 +155,7 @@ h5ls(fname1)  # "counts" is a 2D dataset
 
 index <- list(sample(  27998, 250, replace=TRUE),
               sample(1306127, 250, replace=TRUE))
-## h5mread() about 2.5x faster than h5read():
+## h5mread() about 2x faster than h5read():
 system.time(a <- h5mread(fname1, "counts", index))
 system.time(b <- h5read(fname1, "counts", index=index))
 stopifnot(identical(a, b))
@@ -163,9 +163,9 @@ stopifnot(identical(a, b))
 ## The bigger the selection, the greater the speedup between
 ## h5read() and h5mread():
 \dontrun{
-  index <- list(sample(  27998, 1500, replace=TRUE),
-                sample(1306127, 1500, replace=TRUE))
-  ## h5mread() about 30x faster than h5read() (< 30s vs 14min):
+  index <- list(sample(  27998, 1000, replace=TRUE),
+                sample(1306127, 1000, replace=TRUE))
+  ## h5mread() about 8x faster than h5read() (22s vs 3min):
   system.time(a <- h5mread(fname1, "counts", index))
   system.time(b <- h5read(fname1, "counts", index=index))
   stopifnot(identical(a, b))
