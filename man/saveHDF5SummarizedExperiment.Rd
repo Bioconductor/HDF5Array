@@ -214,6 +214,8 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
     \item The \code{\link{writeHDF5Array}} function which
           \code{saveHDF5SummarizedExperiment} uses internally to write
           the assay data to disk.
+
+    \item \code{base::\link[base]{saveRDS}}
   }
 }
 
