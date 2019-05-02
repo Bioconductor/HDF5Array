@@ -1,3 +1,21 @@
+CHANGES IN VERSION 1.12.0
+-------------------------
+
+NEW FEATURES
+
+    o Add 'prefix' arg to save/loadHDF5SummarizedExperiment()
+
+    o Add quickResaveHDF5SummarizedExperiment() for fast re-saving after
+      initial saveHDF5SummarizedExperiment().
+      See ?quickResaveHDF5SummarizedExperiment for more information.
+
+    o Add h5mread() as a faster alternative to rhdf5::h5read(). It is now
+      the workhorse behind the extract_array() method for HDF5ArraySeed
+      objects. This change should significantly speed up block processing
+      of HDF5ArraySeed-based DelayedArray objects (including HDF5Array
+      objects).
+
+
 CHANGES IN VERSION 1.10.0
 -------------------------
 
