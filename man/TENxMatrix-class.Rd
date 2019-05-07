@@ -159,8 +159,21 @@ oneM50k <- oneM[ , 1:50000]
 ## by parallel::detectCores()) and 16 Gb of RAM, reasonably good
 ## performance is achieved by setting the automatic number of workers
 ## to 6 and automatic block size to 500 Mb:
-setAutoBPPARAM(MulticoreParam(workers=6))
-setAutoBlockSize(5e8)
+workers <- 6
+block_size <- 5e8  # 500 Mb
+if (.Platform$OS.type != "windows") {
+    setAutoBPPARAM(MulticoreParam(workers))
+} else {
+    ## MulticoreParam() is not supported on Windows so we use SnowParam()
+    ## on this platform. Also we reduce the block size to 250 Mb on
+    ## 32-bit Windows to avoid memory allocation problems (they tend to
+    ## be common there because a process cannot use more than 2 Gb of
+    ## memory).
+    setAutoBPPARAM(SnowParam(workers))
+    if (.Platform$r_arch == "i386")
+        block_size <- 2.5e8  # 250 Mb
+}
+setAutoBlockSize(block_size)
 DelayedArray:::set_verbose_block_processing(TRUE)
 
 ## We're ready to compute the library sizes, number of genes expressed
