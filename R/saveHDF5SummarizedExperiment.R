@@ -31,7 +31,7 @@
 {
     h5_paths <- lapply(seq_along(assays),
         function(i) {
-            a <- assays[[i]]
+            a <- getListElement(assays, i)
             ok <- unlist(seedApply(a, is, "HDF5ArraySeed"))
             if (!all(ok))
                 stop(wmsg("assay ", i, " in the SummarizedExperiment ",
@@ -52,11 +52,12 @@
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
-        assays[[i]] <- modify_seeds(assays[[i]],
+        a <- modify_seeds(getListElement(assays, i),
             function(x) {
                 x@filepath <- basename(x@filepath)
                 x
             })
+        assays <- setListElement(assays, i, a)
     }
     assays
 }
@@ -70,7 +71,7 @@
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
-        assays[[i]] <- modify_seeds(assays[[i]],
+        a <- modify_seeds(getListElement(assays, i),
             function(x) {
                 if (!is(x, "HDF5ArraySeed"))
                     stop(wmsg("assay ", i, " in the SummarizedExperiment ",
@@ -91,6 +92,7 @@
                               "object to load ", msg))
                 x
             })
+        assays <- setListElement(assays, i, a)
     }
     assays
 }
@@ -114,7 +116,7 @@
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
-        a <- assays[[i]]
+        a <- getListElement(assays, i)
         h5_name <- sprintf("assay%03d", i)
         if (verbose)
             message("Start writing assay ", i, "/", nassay, " to ",
@@ -124,7 +126,7 @@
         if (verbose)
             message("Finished writing assay ", i, "/", nassay, " to ",
                     "HDF5 file:\n  ", h5_path, "\n")
-        assays[[i]] <- a
+        assays <- setListElement(assays, i, a)
     }
     assays
 }
