@@ -29,7 +29,7 @@
   to an HDF5-based sparse matrix like one used by 10x Genomics for the
   1.3 Million Brain Cell Dataset.
   TENxMatrixSeed objects are not intended to be used directly. Most
-  end-users should create and manipulate \link{TENxMatrix} objects
+  end users should create and manipulate \link{TENxMatrix} objects
   instead. See \code{?\link{TENxMatrix}} for more information.
 }
 

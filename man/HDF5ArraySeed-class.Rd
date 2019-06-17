@@ -17,7 +17,7 @@
   HDF5ArraySeed is a low-level helper class for representing a pointer
   to an HDF5 dataset.
   HDF5ArraySeed objects are not intended to be used directly. Most
-  end-users should create and manipulate \link{HDF5Array} objects
+  end users should create and manipulate \link{HDF5Array} objects
   instead. See \code{?\link{HDF5Array}} for more information.
 }
 
