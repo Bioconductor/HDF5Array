@@ -87,7 +87,7 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 
 \seealso{
   \itemize{
-    \item \code{\link[rhdf5]{h5read}} in the \pkg{rhdf5}.
+    \item \code{\link[rhdf5]{h5read}} in the \pkg{rhdf5} package.
 
     \item \code{\link[DelayedArray]{type}} in the \pkg{DelayedArray}
           package.
@@ -117,13 +117,13 @@ m <- h5mread(path(M0), "M0", starts=list(1:5, NULL), as.integer=TRUE)
 storage.mode(m0) <- "integer"
 stopifnot(identical(m0[1:5, ], m))
 
-m1 <- matrix(1:60, ncol=6)
-M1 <- writeHDF5Array(m1, filepath=path(M0), name="M1")
-h5ls(path(M1))
+a0 <- array(1:120, c(10, 5, 7))
+A0 <- writeHDF5Array(a0, filepath=path(M0), name="A0")
+h5ls(path(A0))
 
-m <- h5mread(path(M1), "M1", starts=list(c(2, 7), NULL),
-                             counts=list(c(4, 2), NULL))
-stopifnot(identical(m1[c(2:5, 7:8), ], m))
+a <- h5mread(path(A0), "A0", starts=list(c(2, 7), NULL, 6),
+                             counts=list(c(4, 2), NULL, NULL))
+stopifnot(identical(a0[c(2:5, 7:8), , 6, drop=FALSE], a))
 
 ## ---------------------------------------------------------------------
 ## PERFORMANCE
