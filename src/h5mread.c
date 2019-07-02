@@ -373,7 +373,11 @@ static int set_selection(const DSet *dset, int method,
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
 	//clock_t t0 = clock();
-	if (method == 2) {
+	if (method == 1) {
+		num_blocks = select_hyperslabs(dset,
+					starts, counts, ans_dim,
+					nblock_buf->elts, midx_buf->elts);
+	} else {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "'method' is set to 2");
@@ -381,10 +385,6 @@ static int set_selection(const DSet *dset, int method,
 		}
 		num_blocks = select_elements(dset,
 					starts, ans_dim,
-					nblock_buf->elts, midx_buf->elts);
-	} else {
-		num_blocks = select_hyperslabs(dset,
-					starts, counts, ans_dim,
 					nblock_buf->elts, midx_buf->elts);
 	}
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;

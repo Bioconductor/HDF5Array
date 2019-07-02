@@ -81,7 +81,7 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
   Equivalent to:
   \preformatted{  typeof(h5mread(filepath, name, rep(list(integer(0)), ndim)))
   } where \code{ndim} is the number of dimensions (a.k.a. the \emph{rank}
-  in hdf5 jargon) of the dataset. \code{get_h5mread_returned_type} is
+  in HDF5 jargon) of the dataset. \code{get_h5mread_returned_type} is
   provided for convenience.
 }
 
@@ -97,6 +97,9 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 
     \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
           \pkg{TENxBrainData} package).
+
+    \item \code{\link{h5mread_from_reshaped}} to read data from a virtually
+          reshaped HDF5 dataset.
   }
 }
 
@@ -117,7 +120,7 @@ m <- h5mread(path(M0), "M0", starts=list(1:5, NULL), as.integer=TRUE)
 storage.mode(m0) <- "integer"
 stopifnot(identical(m0[1:5, ], m))
 
-a0 <- array(1:120, c(10, 5, 7))
+a0 <- array(1:350, c(10, 5, 7))
 A0 <- writeHDF5Array(a0, filepath=path(M0), name="A0")
 h5ls(path(A0))
 
