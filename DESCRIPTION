@@ -26,6 +26,8 @@ Collate: h5mread.R
 	utils.R
 	HDF5ArraySeed-class.R
 	HDF5Array-class.R
+	ReshapedHDF5ArraySeed-class.R
+	ReshapedHDF5Array-class.R
 	dump-management.R
 	writeHDF5Array.R
 	saveHDF5SummarizedExperiment.R

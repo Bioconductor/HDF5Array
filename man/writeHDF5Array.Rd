@@ -144,11 +144,11 @@ tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
 h5ls(tally_file)
 
-cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
+cvg0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 
-cov1 <- cov0[ , , 29000001:29000007]
+cvg1 <- cvg0[ , , 29000001:29000007]
 
-writeHDF5Array(cov1, out_file, "cov1")
+writeHDF5Array(cvg1, out_file, "cvg1")
 h5ls(out_file)
 }
 \keyword{methods}

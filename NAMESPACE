@@ -18,6 +18,8 @@ import(rhdf5)
 exportClasses(
     HDF5ArraySeed,
     HDF5Array, HDF5Matrix,
+    ReshapedHDF5ArraySeed,
+    ReshapedHDF5Array, ReshapedHDF5Matrix,
     HDF5RealizationSink,
     TENxMatrixSeed,
     TENxMatrix,
@@ -57,6 +59,8 @@ export(
     h5mread_from_reshaped,
     HDF5ArraySeed,
     HDF5Array,
+    ReshapedHDF5ArraySeed,
+    ReshapedHDF5Array,
     setHDF5DumpDir, getHDF5DumpDir,
     setHDF5DumpFile, getHDF5DumpFile, lsHDF5DumpFile,
     setHDF5DumpName, getHDF5DumpName,

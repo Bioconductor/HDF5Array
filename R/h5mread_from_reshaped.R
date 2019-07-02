@@ -13,7 +13,7 @@
     "10 x 15 x 1000 array or as a 150 x 1000 matrix)."
 )
 
-.get_collapsed_dims <- function(dim, dim0)
+find_dims_to_collapse <- function(dim, dim0)
 {
     if (prod(dim) != prod(dim0))
         stop(wmsg("Reshaping must preserve the length of the HDF5 dataset. ",
@@ -41,17 +41,24 @@
     c(along1, along2)
 }
 
-.h5mread_and_collapse_dims <- function(filepath, name, starts, along1, along2,
+collapse_dims <- function(dim0, collapse_along)
+{
+    if (is.null(collapse_along))
+        return(dim0)
+    along1 <- collapse_along[[1L]]
+    along2 <- collapse_along[[2L]]
+    c(dim0[seq_len(along1 - 1L)],
+      prod(dim0[along1:along2]),
+      dim0[seq_len(length(dim0) - along2) + along2])
+}
+
+.h5mread_and_collapse_dims <- function(filepath, name, starts, collapse_along,
                                        noreduce=FALSE, as.integer=FALSE,
                                        method=0L)
 {
     ans <- h5mread(filepath, name, starts, noreduce=noreduce,
                    as.integer=as.integer, method=method)
-    ans_dim <- dim(ans)
-    ans_dim <- c(ans_dim[seq_len(along1-1L)],
-                 prod(ans_dim[along1:along2]),
-                 ans_dim[seq_len(length(ans_dim)-along2) + along2])
-    dim(ans) <- ans_dim
+    dim(ans) <- collapse_dims(dim(ans), collapse_along)
     ans
 }
 
@@ -78,17 +85,17 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
 {
     dim <- DelayedArray:::normarg_dim(dim)
     dim0 <- h5dim(filepath, name)
-    collapsed_dims <- .get_collapsed_dims(dim, dim0)
+    collapse_along <- find_dims_to_collapse(dim, dim0)
     ndim <- length(dim)
     stopifnot(is.list(starts), length(starts) == ndim)
-    if (is.null(collapsed_dims)) {
+    if (is.null(collapse_along)) {
         ## No reshaping.
         ans <- h5mread(filepath, name, starts, noreduce=noreduce,
                        as.integer=as.integer, method=method)
         return(ans)
     }
-    along1 <- collapsed_dims[[1L]]
-    along2 <- collapsed_dims[[2L]]
+    along1 <- collapse_along[[1L]]
+    along2 <- collapse_along[[2L]]
     idx0 <- along1:along2
     Lstarts <- starts[seq_len(along1 - 1L)]
     Rstarts <- starts[seq_len(ndim - along1) + along1]
@@ -96,7 +103,7 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
     start1 <- starts[[along1]]
     if (is.null(start1)) {
         ans <- .h5mread_and_collapse_dims(filepath, name,
-                                          starts0, along1, along2,
+                                          starts0, collapse_along,
                                           noreduce=noreduce,
                                           as.integer=as.integer,
                                           method=method)
@@ -109,7 +116,7 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
     if (length(start1) == 0L) {
         starts0[idx0] <- rep.int(list(integer(0)), length(idx0))
         ans <- .h5mread_and_collapse_dims(filepath, name,
-                                          starts0, along1, along2,
+                                          starts0, collapse_along,
                                           noreduce=noreduce,
                                           as.integer=as.integer,
                                           method=method)
@@ -122,7 +129,7 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
         function(i) {
             starts0[idx0] <- index_list[[i]]
             .h5mread_and_collapse_dims(filepath, name,
-                                       starts0, along1, along2,
+                                       starts0, collapse_along,
                                        noreduce=noreduce,
                                        as.integer=as.integer,
                                        method=method)

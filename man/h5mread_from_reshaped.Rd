@@ -23,14 +23,17 @@ h5mread_from_reshaped(filepath, name, dim, starts, noreduce=FALSE,
     The name of the dataset in the HDF5 file.
   }
   \item{dim}{
-    A vector of dimensions that specifies how to reshape the HDF5 dataset
-    to read from. Note that the HDF5 dataset is treated as read-only so
-    never gets \emph{effectively} reshaped but \code{h5mread_from_reshaped}
-    gives that illusion.
+    A vector of dimensions that describes the virtual reshaping i.e.
+    the reshaping that is virtually applied upfront to the HDF5 dataset
+    to read from.
 
-    Also please note that we do NOT support arbitrary reshaping.
-    Only reshaping that reduces the number of dimensions by collapsing
-    a group of consecutive dimensions into a single dimension is supported.
+    Note that the HDF5 dataset is treated as read-only so never gets
+    \emph{effectively} reshaped, that is, the dataset dimensions encoded
+    in the HDF5 file are not mmodified.
+
+    Also please note that arbitrary reshapings are not supported.
+    Only reshapings that reduce the number of dimensions by collapsing
+    a group of consecutive dimensions into a single dimension are supported.
     For example, reshaping a 10 x 3 x 5 x 1000 array as a 10 x 15 x 1000
     array or as a 150 x 1000 matrix is supported.
   }
@@ -70,24 +73,24 @@ h5mread_from_reshaped(filepath, name, dim, starts, noreduce=FALSE,
 a1 <- array(1:350, c(10, 5, 7))
 A1 <- writeHDF5Array(a1, name="A1")
 
-## Collapse the first 2 dimensions.
+## Collapse the first 2 dimensions:
 h5mread_from_reshaped(path(A1), "A1", dim=c(50, 7),
                       starts=list(8:11, NULL))
 h5mread_from_reshaped(path(A1), "A1", dim=c(50, 7),
                       starts=list(8:11, NULL))
 
-## Collapse the last 2 dimensions.
+## Collapse the last 2 dimensions:
 h5mread_from_reshaped(path(A1), "A1", dim=c(10, 35),
                       starts=list(NULL, 3:11))
 
 a2 <- array(1:150000 + 0.1*runif(150000), c(10, 3, 5, 1000))
 A2 <- writeHDF5Array(a2, name="A2")
 
-## Collapse the 2nd and 3rd dimensions.
+## Collapse the 2nd and 3rd dimensions:
 h5mread_from_reshaped(path(A2), "A2", dim=c(10, 15, 1000),
                       starts=list(NULL, 8:11, 999:1000))
 
-## Collapse the first 3 dimensions.
+## Collapse the first 3 dimensions:
 h5mread_from_reshaped(path(A2), "A2", dim=c(150, 1000),
                       starts=list(71:110, 999:1000))
 }

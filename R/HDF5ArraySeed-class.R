@@ -16,8 +16,8 @@ setClass("HDF5ArraySeed",
                                     # quickResaveHDF5SummarizedExperiment()).
         name="character",           # Name of the dataset in the HDF5 file.
         dim="integer",
-        first_val="ANY",            # First value in the dataset.
-        chunkdim="integer_OR_NULL"
+        chunkdim="integer_OR_NULL",
+        first_val="ANY"             # First value in the dataset.
     )
 )
 
@@ -60,7 +60,7 @@ validate_HDF5ArraySeed_dataset <- function(x)
     if (!identical(h5_chunkdim, x@chunkdim))
         return(paste0("points to an HDF5 dataset ('", x@name, "') ",
                       "in HDF5 file '", x@filepath, "' ",
-                 "that does not have the expected chunk dimensions"))
+                      "that does not have the expected chunk dimensions"))
 
     TRUE
 }
@@ -135,7 +135,7 @@ setReplaceMethod("path", "HDF5ArraySeed",
 
         ## Check dim compatibility.
         new_dim <- h5dim(new_filepath, object@name)
-        object_dim <- dim(object)
+        object_dim <- object@dim
         if (!identical(new_dim, object_dim)) {
             new_dim_in1string <- paste0(new_dim, collapse=" x ")
             dim_in1string <- paste0(object_dim, collapse=" x ")

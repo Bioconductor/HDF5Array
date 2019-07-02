@@ -66,6 +66,10 @@ HDF5Array(filepath, name, type=NA)
     \item \link{TENxMatrix} objects for representing 10x Genomics
           datasets as \link[DelayedArray]{DelayedMatrix} objects.
 
+    \item \link{ReshapedHDF5Array} objects for representing HDF5 datasets
+          as \link[DelayedArray]{DelayedArray} objects with a user-supplied
+          upfront virtual reshaping.
+
     \item \link[DelayedArray]{DelayedArray} objects in the \pkg{DelayedArray}
           package.
 
@@ -99,37 +103,37 @@ library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16:
-cov0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
-cov0
+cvg0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
+cvg0
 
-is(cov0, "DelayedArray")  # TRUE
-seed(cov0)
-path(cov0)
-chunkdim(cov0)
+is(cvg0, "DelayedArray")  # TRUE
+seed(cvg0)
+path(cvg0)
+chunkdim(cvg0)
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames
 ## ---------------------------------------------------------------------
-dim(cov0)
+dim(cvg0)
 
-dimnames(cov0)
-dimnames(cov0) <- list(paste0("s", 1:6), c("+", "-"), NULL)
-dimnames(cov0)
+dimnames(cvg0)
+dimnames(cvg0) <- list(paste0("s", 1:6), c("+", "-"), NULL)
+dimnames(cvg0)
 
 ## ---------------------------------------------------------------------
 ## SLICING (A.K.A. SUBSETTING)
 ## ---------------------------------------------------------------------
-cov1 <- cov0[ , , 29000001:29000007]
-cov1
+cvg1 <- cvg0[ , , 29000001:29000007]
+cvg1
 
-dim(cov1)
-as.array(cov1)
-stopifnot(identical(dim(as.array(cov1)), dim(cov1)))
-stopifnot(identical(dimnames(as.array(cov1)), dimnames(cov1)))
+dim(cvg1)
+as.array(cvg1)
+stopifnot(identical(dim(as.array(cvg1)), dim(cvg1)))
+stopifnot(identical(dimnames(as.array(cvg1)), dimnames(cvg1)))
 
-cov2 <- cov0[ , "+", 29000001:29000007]
-cov2
-as.matrix(cov2)
+cvg2 <- cvg0[ , "+", 29000001:29000007]
+cvg2
+as.matrix(cvg2)
 
 ## ---------------------------------------------------------------------
 ## SummarizedExperiment OBJECTS WITH DELAYED ASSAYS
@@ -140,17 +144,17 @@ as.matrix(cov2)
  
 library(SummarizedExperiment)
 
-pcov <- cov0[ , 1, ]  # coverage on plus strand
-mcov <- cov0[ , 2, ]  # coverage on minus strand
+pcvg <- cvg0[ , 1, ]  # coverage on plus strand
+mcvg <- cvg0[ , 2, ]  # coverage on minus strand
 
-nrow(pcov)  # nb of samples
-ncol(pcov)  # length of Human chromosome 16
+nrow(pcvg)  # nb of samples
+ncol(pcvg)  # length of Human chromosome 16
 
 ## The convention for a SummarizedExperiment object is to have 1 column
-## per sample so first we need to transpose 'pcov' and 'mcov':
-pcov <- t(pcov)
-mcov <- t(mcov)
-se <- SummarizedExperiment(list(pcov=pcov, mcov=mcov))
+## per sample so first we need to transpose 'pcvg' and 'mcvg':
+pcvg <- t(pcvg)
+mcvg <- t(mcvg)
+se <- SummarizedExperiment(list(pcvg=pcvg, mcvg=mcvg))
 se
 stopifnot(validObject(se, complete=TRUE))
 
@@ -161,8 +165,8 @@ gpos
 rowRanges(se) <- gpos
 se
 stopifnot(validObject(se))
-assays(se)$pcov
-assays(se)$mcov
+assays(se)$pcvg
+assays(se)$mcvg
 }
 \keyword{classes}
 \keyword{methods}

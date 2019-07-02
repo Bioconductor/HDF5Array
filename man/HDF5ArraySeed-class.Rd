@@ -48,8 +48,7 @@ HDF5ArraySeed(filepath, name, type=NA)
   \itemize{
     \item \link{HDF5Array} objects.
 
-    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which
-          HDF5ArraySeed objects are implemented.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
   }
 }
 
@@ -61,11 +60,11 @@ tally_file <- system.file("extdata", "example.tally.hfs5",
 library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
-x <- HDF5ArraySeed(tally_file, "/ExampleStudy/16/Coverages")
-x
-path(x)
-dim(x)
-chunkdim(x)
+seed <- HDF5ArraySeed(tally_file, "/ExampleStudy/16/Coverages")
+seed
+path(seed)
+dim(seed)
+chunkdim(seed)
 }
 \keyword{classes}
 \keyword{methods}

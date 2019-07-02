@@ -87,11 +87,11 @@ h5ls(fname)
 ## The 1.3 Million Brain Cell Dataset is represented by the "mm10"
 ## group. We point the TENxMatrixSeed() constructor to this group
 ## to create a TENxMatrixSeed object representing the dataset:
-x <- TENxMatrixSeed(fname, "mm10")
-x
-path(x)
-dim(x)
-sparsity(x)
+seed <- TENxMatrixSeed(fname, "mm10")
+seed
+path(seed)
+dim(seed)
+sparsity(seed)
 }
 \keyword{classes}
 \keyword{methods}
