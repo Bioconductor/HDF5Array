@@ -82,9 +82,6 @@ ReshapedHDF5Array(filepath, name, dim, type=NA)
 }
 
 \examples{
-## ---------------------------------------------------------------------
-## CONSTRUCTION
-## ---------------------------------------------------------------------
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
