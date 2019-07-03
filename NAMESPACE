@@ -39,10 +39,10 @@ exportMethods(
     coerce,
 
     ## Methods for generics defined in the BiocGenerics package:
-    path, "path<-",
+    path, "path<-", type,
 
     ## Methods for generics defined in the DelayedArray package:
-    extract_array, type,
+    extract_array,
     sparsity, is_sparse, extract_sparse_array,
     read_sparse_block, write_sparse_block, write_block,
     matrixClass, DelayedArray, chunkdim,
