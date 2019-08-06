@@ -189,6 +189,8 @@ void _close_DSet(DSet *dset)
 {
 	if (dset->h5nchunk != NULL)
 		free(dset->h5nchunk);
+	if (dset->h5chunk_spacings != NULL)
+		free(dset->h5chunk_spacings);
 	if (dset->h5dim != NULL)
 		free(dset->h5dim);
 	if (dset->plist_id != -1)
@@ -222,6 +224,7 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset->space_id = -1;
 	dset->plist_id = -1;
 	dset->h5dim = NULL;
+	dset->h5chunk_spacings = NULL;
 	dset->h5nchunk = NULL;
 
 	/* Set 'storage_mode_attr'. */
@@ -315,20 +318,10 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset->plist_id = plist_id;
 
-	/* Allocate 'h5dim', 'h5chunk_spacings', and 'h5nchunk'. */
-	h5dim = _alloc_hsize_t_buf(2 * ndim, 0,
-				   "'h5dim' and 'h5chunk_spacings'");
+	/* Set 'h5dim'. */
+	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
-	h5chunk_spacings = h5dim + ndim;
-	h5nchunk = (int *) malloc(ndim * sizeof(int));
-	if (h5nchunk == NULL) {
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'h5nchunk'");
-		goto on_error;
-	}
-
-	/* Set 'h5dim'. */
 	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
@@ -337,33 +330,47 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset->h5dim = h5dim;
 
 	/* Set 'h5chunk_spacings'. */
-	if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
-		PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
-				    "an unexpected value");
-		goto on_error;
-	}
-	dset->h5chunk_spacings = h5chunk_spacings;
-
-	/* Set 'h5nchunk'. */
-	for (h5along = 0; h5along < ndim; h5along++) {
-		d = h5dim[h5along];
-		if (d == 0) {
-			h5nchunk[h5along] = 0;
-			continue;
-		}
-		spacing = h5chunk_spacings[h5along];
-		nchunk = d / spacing;
-		if (d % spacing != 0)
-			nchunk++;
-		if (nchunk > INT_MAX) {
-			PRINT_TO_ERRMSG_BUF("datasets with more than "
-				"INT_MAX chunks along any dimension\n  "
-				"are not supported at the moment");
+	if (H5Pget_layout(plist_id) == H5D_CHUNKED) {
+		h5chunk_spacings = _alloc_hsize_t_buf(ndim, 0,
+						      "'h5chunk_spacings'");
+		if (h5chunk_spacings == NULL)
+			goto on_error;
+		if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
+			PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
+					    "an unexpected value");
 			goto on_error;
 		}
-		h5nchunk[h5along] = nchunk;
+		dset->h5chunk_spacings = h5chunk_spacings;
 	}
-	dset->h5nchunk = h5nchunk;
+
+	/* Set 'h5nchunk'. */
+	if (dset->h5chunk_spacings != NULL) {
+		h5nchunk = (int *) malloc(ndim * sizeof(int));
+		if (h5nchunk == NULL) {
+			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+					    "for 'h5nchunk'");
+			goto on_error;
+		}
+		for (h5along = 0; h5along < ndim; h5along++) {
+			d = h5dim[h5along];
+			if (d == 0) {
+				h5nchunk[h5along] = 0;
+				continue;
+			}
+			spacing = dset->h5chunk_spacings[h5along];
+			nchunk = d / spacing;
+			if (d % spacing != 0)
+				nchunk++;
+			if (nchunk > INT_MAX) {
+				PRINT_TO_ERRMSG_BUF("datasets with more than "
+					"INT_MAX chunks along any dimension\n  "
+					"are not supported at the moment");
+				goto on_error;
+			}
+			h5nchunk[h5along] = nchunk;
+		}
+		dset->h5nchunk = h5nchunk;
+	}
 
 	/* Set 'ans_elt_size'. */
 	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, size);
@@ -372,10 +379,12 @@ int _get_DSet(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset->ans_elt_size = ans_elt_size;
 
 	/* Set 'chunk_data_buf_size'. */
-	chunk_data_buf_size = ans_elt_size;
-	for (h5along = 0; h5along < ndim; h5along++)
-		chunk_data_buf_size *= h5chunk_spacings[h5along];
-	dset->chunk_data_buf_size = chunk_data_buf_size;
+	if (dset->h5chunk_spacings != NULL) {
+		chunk_data_buf_size = ans_elt_size;
+		for (h5along = 0; h5along < ndim; h5along++)
+			chunk_data_buf_size *= dset->h5chunk_spacings[h5along];
+		dset->chunk_data_buf_size = chunk_data_buf_size;
+	}
 
 	/* Set 'mem_type_id'. */
 	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);

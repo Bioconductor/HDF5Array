@@ -534,6 +534,9 @@ static int read_data_3(const DSet *dset,
  *     intermediate buffer.
  *   - Copy the selected data from the intermediate buffer to the output
  *     array.
+ *
+ * Assumes that 'dset->h5chunk_spacings' and 'dset->h5nchunk' are NOT NULL.
+ * This is NOT checked!
  */
 
 static void set_nchunk_buf(const DSet *dset,
@@ -1079,6 +1082,9 @@ static int read_data_4_5(const DSet *dset, int method,
  *     the current chunk.
  *   - Call H5Dread(). This loads the selected data **directly** to the
  *     output array.
+ *
+ * Assumes that 'dset->h5chunk_spacings' and 'dset->h5nchunk' are NOT NULL.
+ * This is NOT checked!
  */
 
 /*
@@ -1441,7 +1447,7 @@ static int read_data_6(const DSet *dset,
  * C_h5mread()
  */
 
-/* Return R__NilValue on error. */
+/* Return R_NilValue on error. */
 static SEXP h5mread_1_2_3(const DSet *dset,
 			  SEXP starts, SEXP counts, int noreduce,
 			  int method, int *ans_dim)
@@ -1524,7 +1530,7 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 	return R_NilValue;
 }
 
-/* Return R__NilValue on error. */
+/* Return R_NilValue on error. */
 static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
 			  int method, int *ans_dim)
 {
@@ -1574,7 +1580,7 @@ static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
 	return R_NilValue;
 }
 
-/* Return R__NilValue on error. */
+/* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int, int method)
 {
@@ -1601,6 +1607,14 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	ans = R_NilValue;
 
 	if (dset.Rtype == STRSXP) {
+		/* Note that it should be easy to support contiguous string
+		   data by treating it as if it was made of a single chunk. */
+		if (dset.h5chunk_spacings == NULL) {
+			PRINT_TO_ERRMSG_BUF("contiguous (i.e. not chunked) "
+					    "string data is not supported "
+					    "at the moment");
+			goto on_error;
+		}
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "reading string data");
@@ -1616,18 +1630,20 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	} else if (method == 0) {
 		/* March 27, 2019: My early testing (from Nov 2018) seemed
 		   to indicate that method 6 was a better choice over method 4
-		   when 'counts' is NULL. Turns out that doing more testing
-		   today seems to indicate the opposite i.e. that method 4
-		   performs better than method 6 on all the datasets I've
-		   tested so far, including those used by Pete Hickey here:
+		   when the layout is chunked and 'counts' is NULL. Turns out
+		   that doing more testing today seems to indicate the opposite
+		   i.e. method 4 now seems to perform better than method 6 on
+		   all the datasets I've tested so far, including those used by
+		   Pete Hickey here:
 		     https://github.com/Bioconductor/DelayedArray/issues/13
 		   and those used in the examples in man/h5mread.Rd.
 		   Note sure what happened between Nov 2018 and today. Did I
 		   do something stupid in my early testing? Did something
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report. */
-		//method = counts == R_NilValue ? 6 : 1;
-		method = counts == R_NilValue ? 4 : 1;
+		method = dset.h5chunk_spacings != NULL &&
+			 //counts == R_NilValue ? 6 : 1;
+			 counts == R_NilValue ? 4 : 1;
 	}
 
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
