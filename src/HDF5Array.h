@@ -8,8 +8,9 @@
 #define PRINT_TO_ERRMSG_BUF(...) \
 	snprintf(_HDF5Array_errmsg_buf, ERRMSG_BUF_LENGTH, __VA_ARGS__)
 
-/* A data structure for representing an HDF5 dataset (tailored based on the
-   needs of C_h5mread()). */
+/* A data structure for handling an HDF5 dataset. Collect various information
+   about the dataset. What is collected are basically the things needed by the
+   C_h5mread() function. */
 typedef struct {
 	hid_t dset_id, dtype_id, space_id, plist_id, mem_type_id;
 	char *storage_mode_attr;
@@ -18,7 +19,7 @@ typedef struct {
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunk_spacings;
-} DSet;
+} DSetHandle;
 
 static inline long long int _get_trusted_elt(SEXP x, int i)
 {
@@ -100,7 +101,7 @@ SEXP C_map_starts_to_chunks(
 );
 
 
-/* DSet.c */
+/* DSetHandle.c */
 
 hsize_t *_alloc_hsize_t_buf(
 	size_t buflength,
@@ -108,14 +109,14 @@ hsize_t *_alloc_hsize_t_buf(
 	const char *what
 );
 
-void _close_DSet(DSet *dset);
+void _close_DSetHandle(DSetHandle *dset_handle);
 
-int _get_DSet(
+int _get_DSetHandle(
 	hid_t dset_id,
 	int as_int,
 	int Rtype_only,
 	int ndim,
-	DSet *dset
+	DSetHandle *dset_handle
 );
 
 hid_t _get_file_id(SEXP filepath);

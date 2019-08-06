@@ -116,39 +116,43 @@ static hid_t get_mem_space(int ndim, const int *ans_dim)
 	return mem_space_id;
 }
 
-static long long int check_selection_against_dset(const DSet *dset,
-			SEXP starts, SEXP counts, int *selection_dim_buf)
+static long long int check_selection_against_dset(
+		const DSetHandle *dset_handle,
+		SEXP starts, SEXP counts, int *selection_dim_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] = (long long int) dset->h5dim[h5along];
+		dim_buf->elts[along] =
+			(long long int) dset_handle->h5dim[h5along];
 	return _check_selection(starts, counts, dim_buf->elts,
 				selection_dim_buf);
 }
 
-static long long int check_ordered_selection_against_dset(const DSet *dset,
-			SEXP starts, SEXP counts, int *selection_dim_buf,
-			int *nstart_buf, int *nblock_buf,
-			long long int *last_block_start_buf)
+static long long int check_ordered_selection_against_dset(
+		const DSetHandle *dset_handle,
+		SEXP starts, SEXP counts, int *selection_dim_buf,
+		int *nstart_buf, int *nblock_buf,
+		long long int *last_block_start_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] = (long long int) dset->h5dim[h5along];
+		dim_buf->elts[along] =
+			(long long int) dset_handle->h5dim[h5along];
 	return _check_ordered_selection(starts, counts, dim_buf->elts,
 					selection_dim_buf,
 					nstart_buf, nblock_buf,
 					last_block_start_buf);
 }
 
-static int map_starts_to_chunks(const DSet *dset,
+static int map_starts_to_chunks(const DSetHandle *dset_handle,
 				SEXP starts,
 				int *nstart_buf,
 				IntAEAE *breakpoint_bufs,
@@ -157,14 +161,14 @@ static int map_starts_to_chunks(const DSet *dset,
 	int ndim, along, h5along;
 	LLongAE *dim_buf, *chunkdim_buf;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	dim_buf = new_LLongAE(ndim, ndim, 0);
 	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		dim_buf->elts[along] =
-			(long long int) dset->h5dim[h5along];
+			(long long int) dset_handle->h5dim[h5along];
 		chunkdim_buf->elts[along] =
-			(long long int) dset->h5chunk_spacings[h5along];
+			(long long int) dset_handle->h5chunk_spacings[h5along];
 	}
 	return _map_starts_to_chunks(starts, dim_buf->elts, chunkdim_buf->elts,
 				     nstart_buf,
@@ -219,17 +223,17 @@ static size_t set_nblock_buf(int ndim, SEXP starts,
 	return num_blocks;
 }
 
-static void init_srcvp_buf(const DSet *dset,
+static void init_srcvp_buf(const DSetHandle *dset_handle,
 			   SEXP starts, Viewport *srcvp_buf)
 {
 	int ndim, along, h5along;
 	hsize_t d;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) == R_NilValue) {
 			srcvp_buf->h5off[h5along] = 0;
-			d = dset->h5dim[h5along];
+			d = dset_handle->h5dim[h5along];
 		} else {
 			d = 1;
 		}
@@ -266,7 +270,7 @@ static void update_srcvp_buf(int ndim,
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
-static long long int select_hyperslabs(const DSet *dset,
+static long long int select_hyperslabs(const DSetHandle *dset_handle,
 			SEXP starts, SEXP counts, const int *ans_dim,
 			int *nblock_buf, int *midx_buf)
 {
@@ -274,20 +278,20 @@ static long long int select_hyperslabs(const DSet *dset,
 	Viewport srcvp_buf;
 	long long int num_hyperslabs;
 
-	ret = H5Sselect_none(dset->space_id);
+	ret = H5Sselect_none(dset_handle->space_id);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
 	}
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	set_nblock_buf(ndim, starts, 0, ans_dim, nblock_buf);
 
 	/* Allocate 'srcvp_buf'. */
 	if (alloc_Viewport(&srcvp_buf, ndim, 0) < 0)
 		return -1;
 
-	init_srcvp_buf(dset, starts, &srcvp_buf);
+	init_srcvp_buf(dset_handle, starts, &srcvp_buf);
 
 	/* Walk on the hyperslabs. */
 	num_hyperslabs = 0;
@@ -297,7 +301,7 @@ static long long int select_hyperslabs(const DSet *dset,
 		update_srcvp_buf(ndim, midx_buf, moved_along,
 				  starts, counts, &srcvp_buf);
 		/* Add to current selection. */
-		ret = add_hyperslab(dset->space_id, &srcvp_buf);
+		ret = add_hyperslab(dset_handle->space_id, &srcvp_buf);
 		if (ret < 0)
 			break;
 		moved_along = next_midx(ndim, nblock_buf, midx_buf);
@@ -329,7 +333,7 @@ static inline hsize_t *add_element(int ndim, const int *outer_midx,
 }
 
 /* Return nb of selected elements (or -1 on error). */
-static long long int select_elements(const DSet *dset,
+static long long int select_elements(const DSetHandle *dset_handle,
 			SEXP starts, const int *ans_dim,
 			int *nblock_buf, int *midx_buf)
 {
@@ -337,7 +341,7 @@ static long long int select_elements(const DSet *dset,
 	size_t num_elements;
 	hsize_t *coord_buf, *coord_p;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	num_elements = set_nblock_buf(ndim, starts, 1, ans_dim, nblock_buf);
 
 	/* Allocate 'coord_buf'. */
@@ -353,7 +357,7 @@ static long long int select_elements(const DSet *dset,
 		outer_moved_along = next_midx(ndim, nblock_buf, midx_buf);
 	} while (outer_moved_along < ndim);
 
-	ret = H5Sselect_elements(dset->space_id, H5S_SELECT_APPEND,
+	ret = H5Sselect_elements(dset_handle->space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	free(coord_buf);
 	if (ret < 0)
@@ -361,20 +365,20 @@ static long long int select_elements(const DSet *dset,
 	return (long long int) num_elements;
 }
 
-static int set_selection(const DSet *dset, int method,
+static int set_selection(const DSetHandle *dset_handle, int method,
 			 SEXP starts, SEXP counts, const int *ans_dim)
 {
 	int ndim;
 	IntAE *nblock_buf, *midx_buf;
 	long long int num_blocks;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
 	//clock_t t0 = clock();
 	if (method == 1) {
-		num_blocks = select_hyperslabs(dset,
+		num_blocks = select_hyperslabs(dset_handle,
 					starts, counts, ans_dim,
 					nblock_buf->elts, midx_buf->elts);
 	} else {
@@ -383,7 +387,7 @@ static int set_selection(const DSet *dset, int method,
 					    "'method' is set to 2");
 			return -1;
 		}
-		num_blocks = select_elements(dset,
+		num_blocks = select_elements(dset_handle,
 					starts, ans_dim,
 					nblock_buf->elts, midx_buf->elts);
 	}
@@ -394,13 +398,13 @@ static int set_selection(const DSet *dset, int method,
 	return num_blocks < 0 ? -1 : 0;
 }
 
-static int read_data_1_2(const DSet *dset, int method,
+static int read_data_1_2(const DSetHandle *dset_handle, int method,
 			 SEXP starts, SEXP counts, const int *ans_dim,
 			 void *out, hid_t mem_space_id)
 {
 	int ret;
 
-	ret = set_selection(dset, method,
+	ret = set_selection(dset_handle, method,
 			    starts, counts, ans_dim);
 	if (ret < 0)
 		return -1;
@@ -412,9 +416,9 @@ static int read_data_1_2(const DSet *dset, int method,
 	}
 
 	//clock_t t0 = clock();
-	ret = H5Dread(dset->dset_id,
-		      dset->mem_type_id, mem_space_id,
-		      dset->space_id, H5P_DEFAULT, out);
+	ret = H5Dread(dset_handle->dset_id,
+		      dset_handle->mem_type_id, mem_space_id,
+		      dset_handle->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	//printf("time for reading data from selection: %e\n",
@@ -433,7 +437,7 @@ static int read_data_1_2(const DSet *dset, int method,
  *
  */
 
-static int read_hyperslab(const DSet *dset,
+static int read_hyperslab(const DSetHandle *dset_handle,
 		SEXP starts, SEXP counts,
 		const int *midx, int moved_along,
 		Viewport *srcvp_buf, Viewport *destvp_buf,
@@ -442,7 +446,7 @@ static int read_hyperslab(const DSet *dset,
 	int ndim, along, h5along, i, ret;
 	SEXP start;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 
 	/* Update 'destvp_buf' and 'srcvp_buf' IN THAT ORDER! */
 	for (along = 0; along < ndim; along++) {
@@ -461,21 +465,21 @@ static int read_hyperslab(const DSet *dset,
 	}
 	update_srcvp_buf(ndim, midx, moved_along, starts, counts, srcvp_buf);
 
-	ret = set_hyperslab(dset->space_id, srcvp_buf);
+	ret = set_hyperslab(dset_handle->space_id, srcvp_buf);
 	if (ret < 0)
 		return -1;
 	ret = set_hyperslab(mem_space_id, destvp_buf);
 	if (ret < 0)
 		return -1;
-	ret = H5Dread(dset->dset_id,
-		      dset->mem_type_id, mem_space_id,
-		      dset->space_id, H5P_DEFAULT, out);
+	ret = H5Dread(dset_handle->dset_id,
+		      dset_handle->mem_type_id, mem_space_id,
+		      dset_handle->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	return ret;
 }
 
-static int read_data_3(const DSet *dset,
+static int read_data_3(const DSetHandle *dset_handle,
 		       SEXP starts, SEXP counts, const int *ans_dim,
 		       void *out, hid_t mem_space_id)
 {
@@ -484,7 +488,7 @@ static int read_data_3(const DSet *dset,
 	IntAE *nblock_buf, *midx_buf;
 	long long int num_hyperslabs;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
@@ -501,14 +505,14 @@ static int read_data_3(const DSet *dset,
 	}
 
 	/* Initialize 'srcvp_buf' (this also initializes 'destvp_buf.h5dim'). */
-	init_srcvp_buf(dset, starts, &srcvp_buf);
+	init_srcvp_buf(dset_handle, starts, &srcvp_buf);
 
 	/* Walk on the hyperslabs. */
 	num_hyperslabs = 0;
 	moved_along = ndim;
 	do {
 		num_hyperslabs++;
-		ret = read_hyperslab(dset, starts, counts,
+		ret = read_hyperslab(dset_handle, starts, counts,
 				     midx_buf->elts, moved_along,
 				     &srcvp_buf, &destvp_buf,
 				     out, mem_space_id);
@@ -535,29 +539,29 @@ static int read_data_3(const DSet *dset,
  *   - Copy the selected data from the intermediate buffer to the output
  *     array.
  *
- * Assumes that 'dset->h5chunk_spacings' and 'dset->h5nchunk' are NOT NULL.
- * This is NOT checked!
+ * Assumes that 'dset_handle->h5chunk_spacings' and 'dset_handle->h5nchunk'
+ * are NOT NULL. This is NOT checked!
  */
 
-static void set_nchunk_buf(const DSet *dset,
+static void set_nchunk_buf(const DSetHandle *dset_handle,
 			   const SEXP starts, const LLongAEAE *chunkidx_bufs,
 			   IntAE *nchunk_buf)
 {
 	int ndim, along, h5along, nchunk;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (VECTOR_ELT(starts, along) != R_NilValue) {
 			nchunk = LLongAE_get_nelt(chunkidx_bufs->elts[along]);
 		} else {
-			nchunk = dset->h5nchunk[h5along];
+			nchunk = dset_handle->h5nchunk[h5along];
 		}
 		nchunk_buf->elts[along] = nchunk;
 	}
 	return;
 }
 
-static void update_chunkvp_buf(const DSet *dset,
+static void update_chunkvp_buf(const DSetHandle *dset_handle,
 			const int *midx, int moved_along,
 			SEXP starts, const LLongAEAE *chunkidx_bufs,
 			Viewport *chunkvp_buf)
@@ -566,7 +570,7 @@ static void update_chunkvp_buf(const DSet *dset,
 	long long int chunkidx;
 	hsize_t spacing, off, d;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (along > moved_along)
 			break;
@@ -576,9 +580,9 @@ static void update_chunkvp_buf(const DSet *dset,
 		} else {
 			chunkidx = i;
 		}
-		spacing = dset->h5chunk_spacings[h5along];
+		spacing = dset_handle->h5chunk_spacings[h5along];
 		off = chunkidx * spacing;
-		d = dset->h5dim[h5along] - off;
+		d = dset_handle->h5dim[h5along] - off;
 		if (d > spacing)
 			d = spacing;
 		chunkvp_buf->h5off[h5along] = off;
@@ -636,23 +640,23 @@ static void update_destvp_buf(int ndim,
 /* It takes about 218s on my laptop to load all the chunks from the EH1040
  * dataset (big 10x Genomics brain dataset in dense format, chunks of 100x100,
  * wrapped in the TENxBrainData package). That's 60 microseconds per chunk! */
-static int load_chunk(const DSet *dset,
+static int load_chunk(const DSetHandle *dset_handle,
 		      const Viewport *chunkvp,
 		      const Viewport *middlevp,
 		      void *chunk_data_out, hid_t mem_space_id)
 {
 	int ret;
 
-	ret = set_hyperslab(dset->space_id, chunkvp);
+	ret = set_hyperslab(dset_handle->space_id, chunkvp);
 	if (ret < 0)
 		return -1;
 	ret = set_hyperslab(mem_space_id, middlevp);
 	if (ret < 0)
 		return -1;
 
-	ret = H5Dread(dset->dset_id,
-		      dset->mem_type_id, mem_space_id,
-		      dset->space_id, H5P_DEFAULT, chunk_data_out);
+	ret = H5Dread(dset_handle->dset_id,
+		      dset_handle->mem_type_id, mem_space_id,
+		      dset_handle->space_id, H5P_DEFAULT, chunk_data_out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	return ret;
@@ -726,7 +730,7 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
  */
 #define COMPRESSION_OVERHEAD 8	// empirical (increase if necessary)
 
-static int direct_load_chunk(const DSet *dset,
+static int direct_load_chunk(const DSetHandle *dset_handle,
 			     const Viewport *chunkvp,
 			     void *chunk_data_out,
 			     void *compressed_chunk_data_buf)
@@ -735,7 +739,7 @@ static int direct_load_chunk(const DSet *dset,
 	hsize_t chunk_storage_size;
 	uint32_t filters;
 
-	ret = H5Dget_chunk_storage_size(dset->dset_id,
+	ret = H5Dget_chunk_storage_size(dset_handle->dset_id,
 					chunkvp->h5off,
 					&chunk_storage_size);
 	if (ret < 0) {
@@ -743,17 +747,17 @@ static int direct_load_chunk(const DSet *dset,
 				    "returned an error");
 		return -1;
 	}
-	if (chunk_storage_size > dset->chunk_data_buf_size +
+	if (chunk_storage_size > dset_handle->chunk_data_buf_size +
 				 COMPRESSION_OVERHEAD)
 	{
 		PRINT_TO_ERRMSG_BUF("chunk storage size (%llu) bigger "
 				    "than expected (%lu + %d)",
 				    chunk_storage_size,
-				    dset->chunk_data_buf_size,
+				    dset_handle->chunk_data_buf_size,
 				    COMPRESSION_OVERHEAD);
 		return -1;
 	}
-	ret = H5Dread_chunk(dset->dset_id, H5P_DEFAULT,
+	ret = H5Dread_chunk(dset_handle->dset_id, H5P_DEFAULT,
 			    chunkvp->h5off, &filters,
 			    compressed_chunk_data_buf);
 	if (ret < 0) {
@@ -769,7 +773,7 @@ static int direct_load_chunk(const DSet *dset,
 	return uncompress_chunk_data(compressed_chunk_data_buf,
 				     chunk_storage_size,
 				     chunk_data_out,
-				     dset->chunk_data_buf_size);
+				     dset_handle->chunk_data_buf_size);
 }
 
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
@@ -850,7 +854,7 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
-static int gather_chunk_data(const DSet *dset,
+static int gather_chunk_data(const DSetHandle *dset_handle,
 			const int *outer_midx, int outer_moved_along,
 			SEXP starts, const IntAEAE *breakpoint_bufs,
 			const void *in,
@@ -866,17 +870,17 @@ static int gather_chunk_data(const DSet *dset,
 	const char *s;
 	SEXP ans_elt;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	init_in_offset_and_out_offset(ndim, starts,
 			outdim, destvp,
-			chunkvp, dset->h5chunk_spacings,
+			chunkvp, dset_handle->h5chunk_spacings,
 			&in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
 	while (1) {
 		num_elts++;
-		switch (dset->Rtype) {
+		switch (dset_handle->Rtype) {
 		    case LGLSXP:
 			LOGICAL(ans)[out_offset] = ((int *) in)[in_offset];
 		    break;
@@ -887,8 +891,8 @@ static int gather_chunk_data(const DSet *dset,
 			REAL(ans)[out_offset] = ((double *) in)[in_offset];
 		    break;
 		    case STRSXP:
-			s = (char *) in + in_offset * dset->size;
-			for (s_len = 0; s_len < dset->size; s_len++)
+			s = (char *) in + in_offset * dset_handle->size;
+			for (s_len = 0; s_len < dset_handle->size; s_len++)
 				if (s[s_len] == 0)
 					break;
 			ans_elt = PROTECT(mkCharLen(s, s_len));
@@ -897,7 +901,7 @@ static int gather_chunk_data(const DSet *dset,
 		    break;
 		    default:
 			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-					    CHAR(type2str(dset->Rtype)));
+					    CHAR(type2str(dset_handle->Rtype)));
 			return -1;
 		}
 		inner_moved_along = next_midx(ndim, destvp->dim,
@@ -908,7 +912,7 @@ static int gather_chunk_data(const DSet *dset,
 				inner_midx_buf, inner_moved_along,
 				starts,
 				outdim, destvp,
-				dset->h5chunk_spacings,
+				dset_handle->h5chunk_spacings,
 				&in_offset, &out_offset);
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
@@ -934,7 +938,7 @@ static int gather_chunk_data(const DSet *dset,
   There should be a way to retrieve information about how the data was
   shuffled.
  */
-static int read_data_4_5(const DSet *dset, int method,
+static int read_data_4_5(const DSetHandle *dset_handle, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
 			 const LLongAEAE *chunkidx_bufs,
@@ -947,8 +951,8 @@ static int read_data_4_5(const DSet *dset, int method,
 	IntAE *nchunk_buf, *outer_midx_buf, *inner_midx_buf;
 	long long int num_chunks, ndot;
 
-	ndim = dset->ndim;
-	mem_space_id = H5Screate_simple(ndim, dset->h5chunk_spacings,
+	ndim = dset_handle->ndim;
+	mem_space_id = H5Screate_simple(ndim, dset_handle->h5chunk_spacings,
 					NULL);
 	if (mem_space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
@@ -976,10 +980,10 @@ static int read_data_4_5(const DSet *dset, int method,
 	}
 
 	if (method == 4) {
-		chunk_data_buf = malloc(dset->chunk_data_buf_size);
+		chunk_data_buf = malloc(dset_handle->chunk_data_buf_size);
 	} else {
 		warning("method 5 is still experimental, use at your own risk");
-		chunk_data_buf = malloc(2 * dset->chunk_data_buf_size +
+		chunk_data_buf = malloc(2 * dset_handle->chunk_data_buf_size +
 					COMPRESSION_OVERHEAD);
 	}
 	if (chunk_data_buf == NULL) {
@@ -993,11 +997,11 @@ static int read_data_4_5(const DSet *dset, int method,
 	}
 	if (method != 4)
 		compressed_chunk_data_buf = chunk_data_buf +
-					    dset->chunk_data_buf_size;
+					    dset_handle->chunk_data_buf_size;
 
 	/* Prepare buffers. */
 	nchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_nchunk_buf(dset, starts, chunkidx_bufs, nchunk_buf);
+	set_nchunk_buf(dset_handle, starts, chunkidx_bufs, nchunk_buf);
 	outer_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
@@ -1014,17 +1018,17 @@ static int read_data_4_5(const DSet *dset, int method,
 		//		       num_chunks);
 		//	fflush(stdout);
 		//}
-		update_chunkvp_buf(dset,
+		update_chunkvp_buf(dset_handle,
 			outer_midx_buf->elts, moved_along,
 			starts, chunkidx_bufs, &chunkvp_buf);
 
 		//t0 = clock();
 		if (method == 4) {
-			ret = load_chunk(dset,
+			ret = load_chunk(dset_handle,
 					 &chunkvp_buf, &middlevp_buf,
 					 chunk_data_buf, mem_space_id);
 		} else {
-			ret = direct_load_chunk(dset,
+			ret = direct_load_chunk(dset_handle,
 					&chunkvp_buf,
 					chunk_data_buf,
 					compressed_chunk_data_buf);
@@ -1039,14 +1043,14 @@ static int read_data_4_5(const DSet *dset, int method,
 			starts, breakpoint_bufs,
 			&chunkvp_buf, &destvp_buf);
 
-		ret = gather_chunk_data(dset,
+		ret = gather_chunk_data(dset_handle,
 			outer_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs,
 			chunk_data_buf,
 			&chunkvp_buf,
 			ans, outdim, &destvp_buf,
 			inner_midx_buf->elts,
-			dset->mem_type_id);
+			dset_handle->mem_type_id);
 		if (ret < 0)
 			break;
 		//t_gather_chunk_data += clock() - t0;
@@ -1083,8 +1087,8 @@ static int read_data_4_5(const DSet *dset, int method,
  *   - Call H5Dread(). This loads the selected data **directly** to the
  *     output array.
  *
- * Assumes that 'dset->h5chunk_spacings' and 'dset->h5nchunk' are NOT NULL.
- * This is NOT checked!
+ * Assumes that 'dset_handle->h5chunk_spacings' and 'dset_handle->h5nchunk'
+ * are NOT NULL. This is NOT checked!
  */
 
 /*
@@ -1191,7 +1195,7 @@ static void update_inner_srcvp_buf(int ndim,
 }
 
 /* Return nb of selected elements (or -1 on error). */
-static long long int select_elements_from_chunk(const DSet *dset,
+static long long int select_elements_from_chunk(const DSetHandle *dset_handle,
 			SEXP starts,
 			const Viewport *destvp,
 			int *inner_midx_buf, hsize_t *coord_buf)
@@ -1202,13 +1206,13 @@ static long long int select_elements_from_chunk(const DSet *dset,
 	long long int coord;
 	SEXP start;
 
-	ret = H5Sselect_none(dset->space_id);
+	ret = H5Sselect_none(dset_handle->space_id);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
 	}
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 
 	/* Walk on the selected elements from the current chunk. */
 	num_elements = 0;
@@ -1233,7 +1237,7 @@ static long long int select_elements_from_chunk(const DSet *dset,
 					      inner_midx_buf);
 	} while (inner_moved_along < ndim);
 
-	ret = H5Sselect_elements(dset->space_id, H5S_SELECT_APPEND,
+	ret = H5Sselect_elements(dset_handle->space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	if (ret < 0)
 		return -1;
@@ -1241,24 +1245,25 @@ static long long int select_elements_from_chunk(const DSet *dset,
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
-static long long int select_intersection_of_blocks_with_chunk(const DSet *dset,
-			SEXP starts,
-			const Viewport *destvp, const Viewport *chunkvp,
-			const IntAEAE *inner_breakpoint_bufs,
-			const int *inner_nblock,
-			int *inner_midx_buf,
-			Viewport *inner_srcvp_buf)
+static long long int select_intersection_of_blocks_with_chunk(
+		const DSetHandle *dset_handle,
+		SEXP starts,
+		const Viewport *destvp, const Viewport *chunkvp,
+		const IntAEAE *inner_breakpoint_bufs,
+		const int *inner_nblock,
+		int *inner_midx_buf,
+		Viewport *inner_srcvp_buf)
 {
 	int ret, ndim, inner_moved_along;
 	long long int num_hyperslabs;
 
-	ret = H5Sselect_none(dset->space_id);
+	ret = H5Sselect_none(dset_handle->space_id);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
 	}
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 
 	init_inner_srcvp_buf(ndim, starts, chunkvp, inner_srcvp_buf);
 
@@ -1271,7 +1276,7 @@ static long long int select_intersection_of_blocks_with_chunk(const DSet *dset,
 				       inner_midx_buf, inner_moved_along,
 				       inner_breakpoint_bufs,
 				       inner_srcvp_buf);
-		ret = add_hyperslab(dset->space_id, inner_srcvp_buf);
+		ret = add_hyperslab(dset_handle->space_id, inner_srcvp_buf);
 		if (ret < 0)
 			return -1;
 		inner_moved_along = next_midx(ndim, inner_nblock,
@@ -1282,7 +1287,7 @@ static long long int select_intersection_of_blocks_with_chunk(const DSet *dset,
 	return num_hyperslabs;
 }
 
-static int read_selection(const DSet *dset,
+static int read_selection(const DSetHandle *dset_handle,
 			  const Viewport *destvp_buf,
 			  void *out, hid_t mem_space_id)
 {
@@ -1292,15 +1297,15 @@ static int read_selection(const DSet *dset,
 	if (ret < 0)
 		return -1;
 
-	ret = H5Dread(dset->dset_id,
-		      dset->mem_type_id, mem_space_id,
-		      dset->space_id, H5P_DEFAULT, out);
+	ret = H5Dread(dset_handle->dset_id,
+		      dset_handle->mem_type_id, mem_space_id,
+		      dset_handle->space_id, H5P_DEFAULT, out);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	return ret;
 }
 
-static int read_data_6(const DSet *dset,
+static int read_data_6(const DSetHandle *dset_handle,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
 		       const LLongAEAE *chunkidx_bufs,
@@ -1316,16 +1321,16 @@ static int read_data_6(const DSet *dset,
 	IntAEAE *inner_breakpoint_bufs;
 	long long int num_chunks, ndot;
 
-	switch (dset->Rtype) {
+	switch (dset_handle->Rtype) {
 	    case LGLSXP:  out = LOGICAL(ans); break;
 	    case INTSXP:  out = INTEGER(ans); break;
 	    case REALSXP: out = REAL(ans);    break;
 	    default:
 		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-				    CHAR(type2str(dset->Rtype)));
+				    CHAR(type2str(dset_handle->Rtype)));
 		return -1;
 	}
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	mem_space_id = get_mem_space(ndim, outdim);
 	if (mem_space_id < 0)
 		return -1;
@@ -1348,7 +1353,7 @@ static int read_data_6(const DSet *dset,
 	}
 
 	/* Allocate 'coord_buf'. */
-	//coord_buf = alloc_coord_buf(ndim, dset->h5chunk_spacings);
+	//coord_buf = alloc_coord_buf(ndim, dset_handle->h5chunk_spacings);
 	//if (coord_buf == NULL) {
 	//	free_Viewport(&destvp_buf);
 	//	free_Viewport(&inner_srcvp_buf);
@@ -1359,7 +1364,7 @@ static int read_data_6(const DSet *dset,
 
 	/* Prepare buffers. */
 	nchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_nchunk_buf(dset, starts, chunkidx_bufs, nchunk_buf);
+	set_nchunk_buf(dset_handle, starts, chunkidx_bufs, nchunk_buf);
 	outer_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_nblock_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
@@ -1378,7 +1383,7 @@ static int read_data_6(const DSet *dset,
 		//		       num_chunks);
 		//	fflush(stdout);
 		//}
-		update_chunkvp_buf(dset,
+		update_chunkvp_buf(dset_handle,
 			outer_midx_buf->elts, moved_along,
 			starts, chunkidx_bufs,
 			&chunkvp_buf);
@@ -1404,12 +1409,12 @@ static int read_data_6(const DSet *dset,
 		//printf("# chunk %lld: %s\n", num_chunks,
 		//       ret == 0 ? "select_elements" : "select_hyperslabs");
 		//if (ret == 0) {
-		//	ret = select_elements_from_chunk(dset,
+		//	ret = select_elements_from_chunk(dset_handle,
 		//		starts, &destvp_buf,
 		//		inner_midx_buf->elts, coord_buf);
 		//} else {
-			ret = select_intersection_of_blocks_with_chunk(dset,
-				starts, &destvp_buf, &chunkvp_buf,
+			ret = select_intersection_of_blocks_with_chunk(
+				dset_handle, starts, &destvp_buf, &chunkvp_buf,
 				inner_breakpoint_bufs, inner_nblock_buf->elts,
 				inner_midx_buf->elts, &inner_srcvp_buf);
 		//}
@@ -1418,7 +1423,8 @@ static int read_data_6(const DSet *dset,
 		//t_select_elements += clock() - t0;
 
 		//t0 = clock();
-		ret = read_selection(dset, &destvp_buf, out, mem_space_id);
+		ret = read_selection(dset_handle, &destvp_buf,
+				     out, mem_space_id);
 		if (ret < 0)
 			break;
 		//t_read_selection += clock() - t0;
@@ -1448,7 +1454,7 @@ static int read_data_6(const DSet *dset,
  */
 
 /* Return R_NilValue on error. */
-static SEXP h5mread_1_2_3(const DSet *dset,
+static SEXP h5mread_1_2_3(const DSetHandle *dset_handle,
 			  SEXP starts, SEXP counts, int noreduce,
 			  int method, int *ans_dim)
 {
@@ -1461,10 +1467,10 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 	hid_t mem_space_id;
 	int nprotect = 0;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	if (noreduce || method == 2) {
 		/* This call will populate 'ans_dim'. */
-		ans_len = check_selection_against_dset(dset,
+		ans_len = check_selection_against_dset(dset_handle,
 					starts, counts, ans_dim);
 		if (ans_len < 0)
 			return R_NilValue;
@@ -1474,7 +1480,7 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 		/* This call will populate 'ans_dim', 'nblock_buf',
 		   and 'last_block_start_buf'. */
-		ans_len = check_ordered_selection_against_dset(dset,
+		ans_len = check_ordered_selection_against_dset(dset_handle,
 					starts, counts, ans_dim,
 					nstart_buf->elts, nblock_buf->elts,
 					last_block_start_buf->elts);
@@ -1492,28 +1498,28 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 		}
 	}
 
-	ans = PROTECT(allocVector(dset->Rtype, (R_xlen_t) ans_len));
+	ans = PROTECT(allocVector(dset_handle->Rtype, (R_xlen_t) ans_len));
 	nprotect++;
 
 	if (ans_len != 0) {
-		switch (dset->Rtype) {
+		switch (dset_handle->Rtype) {
 		    case LGLSXP:  out = LOGICAL(ans); break;
 		    case INTSXP:  out = INTEGER(ans); break;
 		    case REALSXP: out = REAL(ans);    break;
 		    default:
 			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-					    CHAR(type2str(dset->Rtype)));
+					    CHAR(type2str(dset_handle->Rtype)));
 			goto on_error;
 		}
 		mem_space_id = get_mem_space(ndim, ans_dim);
 		if (mem_space_id < 0)
 			goto on_error;
 		if (method <= 2) {
-			ret = read_data_1_2(dset, method,
+			ret = read_data_1_2(dset_handle, method,
 					starts, counts, ans_dim,
 					out, mem_space_id);
 		} else {
-			ret = read_data_3(dset,
+			ret = read_data_3(dset_handle,
 					starts, counts, ans_dim,
 					out, mem_space_id);
 		}
@@ -1531,7 +1537,7 @@ static SEXP h5mread_1_2_3(const DSet *dset,
 }
 
 /* Return R_NilValue on error. */
-static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
+static SEXP h5mread_4_5_6(const DSetHandle *dset_handle, SEXP starts,
 			  int method, int *ans_dim)
 {
 	int ndim, ret, along;
@@ -1540,13 +1546,13 @@ static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
 	R_xlen_t ans_len;
 	SEXP ans;
 
-	ndim = dset->ndim;
+	ndim = dset_handle->ndim;
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
 	chunkidx_bufs = new_LLongAEAE(ndim, ndim);
 
 	/* This call will populate 'ans_dim', 'breakpoint_bufs',
 	   and 'chunkidx_bufs'. */
-	ret = map_starts_to_chunks(dset, starts,
+	ret = map_starts_to_chunks(dset_handle, starts,
 				   ans_dim, breakpoint_bufs, chunkidx_bufs);
 	if (ret < 0)
 		return R_NilValue;
@@ -1554,17 +1560,17 @@ static SEXP h5mread_4_5_6(const DSet *dset, SEXP starts,
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(dset->Rtype, ans_len));
+	ans = PROTECT(allocVector(dset_handle->Rtype, ans_len));
 
 	if (ans_len != 0) {
 		if (method <= 5) {
 			/* methods 4 and 5 */
-			ret = read_data_4_5(dset, method,
+			ret = read_data_4_5(dset_handle, method,
 					starts, breakpoint_bufs, chunkidx_bufs,
 					ans_dim, ans);
 		} else {
 			/* method 6 */
-			ret = read_data_6(dset,
+			ret = read_data_6(dset_handle,
 					starts, breakpoint_bufs, chunkidx_bufs,
 					ans_dim, ans);
 		}
@@ -1585,7 +1591,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int, int method)
 {
 	int ndim;
-	DSet dset;
+	DSetHandle dset_handle;
 	SEXP ans, ans_dim;
 
 	if (method < 0 || method > 6) {
@@ -1600,16 +1606,16 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		return R_NilValue;
 	}
 
-	/* _get_DSet() will do H5Dclose(dset_id) in case of an error. */
-	if (_get_DSet(dset_id, as_int, 0, ndim, &dset) < 0)
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, as_int, 0, ndim, &dset_handle) < 0)
 		return R_NilValue;
 
 	ans = R_NilValue;
 
-	if (dset.Rtype == STRSXP) {
+	if (dset_handle.Rtype == STRSXP) {
 		/* Note that it should be easy to support contiguous string
 		   data by treating it as if it was made of a single chunk. */
-		if (dset.h5chunk_spacings == NULL) {
+		if (dset_handle.h5chunk_spacings == NULL) {
 			PRINT_TO_ERRMSG_BUF("contiguous (i.e. not chunked) "
 					    "string data is not supported "
 					    "at the moment");
@@ -1641,7 +1647,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		   do something stupid in my early testing? Did something
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report. */
-		method = dset.h5chunk_spacings != NULL &&
+		method = dset_handle.h5chunk_spacings != NULL &&
 			 //counts == R_NilValue ? 6 : 1;
 			 counts == R_NilValue ? 4 : 1;
 	}
@@ -1649,13 +1655,13 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	ans_dim = PROTECT(NEW_INTEGER(ndim));
 
 	if (method <= 3) {
-		ans = h5mread_1_2_3(&dset, starts, counts, noreduce,
+		ans = h5mread_1_2_3(&dset_handle, starts, counts, noreduce,
 				    method, INTEGER(ans_dim));
 	} else if (counts != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF("'counts' must be NULL for "
 				    "methods 4, 5, and 6");
 	} else {
-		ans = h5mread_4_5_6(&dset, starts,
+		ans = h5mread_4_5_6(&dset_handle, starts,
 				    method, INTEGER(ans_dim));
 	}
 	if (ans != R_NilValue) {
@@ -1667,7 +1673,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	UNPROTECT(1);
 
     on_error:
-	_close_DSet(&dset);
+	_close_DSetHandle(&dset_handle);
 	return ans;
 }
 
