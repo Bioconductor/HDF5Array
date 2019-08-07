@@ -458,8 +458,7 @@ hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
 
 
 /****************************************************************************
- * C_create_DSetHandle_xp()
- *
+ * Used in R/DSetHandle-class.R
  */
 
 /* --- .Call ENTRY POINT --- */
