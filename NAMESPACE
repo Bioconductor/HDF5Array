@@ -16,6 +16,7 @@ import(rhdf5)
 ###
 
 exportClasses(
+    DSetHandle,
     HDF5ArraySeed,
     HDF5Array, HDF5Matrix,
     ReshapedHDF5ArraySeed,
@@ -36,7 +37,7 @@ exportMethods(
     dim, dimnames,
 
     ## Methods for generics defined in the methods package:
-    coerce,
+    coerce, show,
 
     ## Methods for generics defined in the BiocGenerics package:
     path, "path<-", type,
@@ -55,7 +56,8 @@ exportMethods(
 ###
 
 export(
-    get_h5mread_returned_type, h5mread,
+    DSetHandle, destroy_DSetHandle, get_h5mread_returned_type,
+    h5mread,
     h5mread_from_reshaped,
     HDF5ArraySeed,
     HDF5Array,

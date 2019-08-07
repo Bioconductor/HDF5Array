@@ -21,7 +21,8 @@ LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib
 Suggests: h5vcData, SummarizedExperiment (>= 1.15.1), GenomicRanges,
 	ExperimentHub, TENxBrainData, BiocParallel, GenomicFeatures, BiocStyle
 License: Artistic-2.0
-Collate: h5mread.R
+Collate: DSetHandle-class.R
+	h5mread.R
 	h5mread_from_reshaped.R
 	utils.R
 	HDF5ArraySeed-class.R

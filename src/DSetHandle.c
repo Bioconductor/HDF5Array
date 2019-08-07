@@ -124,13 +124,33 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 	return -1;
 }
 
+static const char *H5class2str(H5T_class_t H5class)
+{
+	static char s[20];
+
+	switch (H5class) {
+	    case H5T_INTEGER:   return "H5T_INTEGER";
+	    case H5T_FLOAT:     return "H5T_FLOAT";
+	    case H5T_STRING:    return "H5T_STRING";
+	    case H5T_TIME:      return "H5T_TIME";
+	    case H5T_BITFIELD:  return "H5T_BITFIELD";
+	    case H5T_OPAQUE:    return "H5T_OPAQUE";
+	    case H5T_COMPOUND:  return "H5T_COMPOUND";
+	    case H5T_REFERENCE: return "H5T_REFERENCE";
+	    case H5T_ENUM:      return "H5T_ENUM";
+	    case H5T_VLEN:      return "H5T_VLEN";
+	    case H5T_ARRAY:     return "H5T_ARRAY";
+	    default: break;
+	}
+	sprintf(s, "%d", H5class);
+	return s;
+}
+
 /* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
 static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
 				SEXPTYPE *Rtype)
 {
-	const char *classname;
-
 	switch (H5class) {
 	    case H5T_INTEGER:
 		*Rtype = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
@@ -144,20 +164,10 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
 				"dataset class is H5T_STRING");
 		*Rtype = STRSXP;
 		return 0;
-	    case H5T_TIME: classname = "H5T_TIME"; break;
-	    case H5T_BITFIELD: classname = "H5T_BITFIELD"; break;
-	    case H5T_OPAQUE: classname = "H5T_OPAQUE"; break;
-	    case H5T_COMPOUND: classname = "H5T_COMPOUND"; break;
-	    case H5T_REFERENCE: classname = "H5T_REFERENCE"; break;
-	    case H5T_ENUM: classname = "H5T_ENUM"; break;
-	    case H5T_VLEN: classname = "H5T_VLEN"; break;
-	    case H5T_ARRAY: classname = "H5T_ARRAY"; break;
-	    default:
-		PRINT_TO_ERRMSG_BUF("unknown dataset class identifier: %d",
-				    H5class);
-	    return -1;
+	    default: break;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s", classname);
+	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
+			    H5class2str(H5class));
 	return -1;
 }
 
@@ -204,6 +214,7 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 	H5Dclose(dset_handle->dset_id);
 }
 
+/* 4th arg ('ndim') is ignored when 3rd arg ('get_Rtype_only') is set to 1. */
 int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 		    DSetHandle *dset_handle)
 {
@@ -227,7 +238,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset_handle->h5chunk_spacings = NULL;
 	dset_handle->h5nchunk = NULL;
 
-	/* Set 'storage_mode_attr'. */
+	/* Set 'dset_handle->storage_mode_attr'. */
 	ret = H5Aexists(dset_id, "storage.mode");
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
@@ -240,7 +251,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 		dset_handle->storage_mode_attr = storage_mode_attr;
 	}
 
-	/* Set 'dtype_id'. */
+	/* Set 'dset_handle->dtype_id'. */
 	dtype_id = H5Dget_type(dset_id);
 	if (dtype_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
@@ -248,7 +259,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset_handle->dtype_id = dtype_id;
 
-	/* Set 'H5class'. */
+	/* Set 'dset_handle->H5class'. */
 	H5class = H5Tget_class(dtype_id);
 	if (H5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
@@ -256,7 +267,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset_handle->H5class = H5class;
 
-	/* Set 'size'. */
+	/* Set 'dset_handle->size'. */
 	size = H5Tget_size(dtype_id);
 	if (size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
@@ -264,7 +275,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset_handle->size = size;
 
-	/* Set 'Rtype'. */
+	/* Set 'dset_handle->Rtype'. */
 	if (dset_handle->storage_mode_attr != NULL) {
 		if (map_storage_mode_to_Rtype(storage_mode_attr, as_int,
 					      &Rtype) < 0)
@@ -285,7 +296,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 		return 0;
 	}
 
-	/* Set 'space_id'. */
+	/* Set 'dset_handle->space_id'. */
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
@@ -293,14 +304,14 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset_handle->space_id = space_id;
 
-	/* Set 'ndim'. */
+	/* Set 'dset_handle->ndim'. */
 	dset_ndim = H5Sget_simple_extent_ndims(space_id);
 	if (dset_ndim < 0) {
 		PRINT_TO_ERRMSG_BUF(
 			"H5Sget_simple_extent_ndims() returned an error");
 		goto on_error;
 	}
-	if (ndim != dset_ndim) {
+	if (ndim >= 0 && dset_ndim != ndim) {
 		PRINT_TO_ERRMSG_BUF(
 			"Dataset has %d dimensions but 'starts' has %d list "
 			"element%s.\n  'starts' must have one list element "
@@ -308,9 +319,9 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 			dset_ndim, ndim, ndim > 1 ? "s" : "");
 		goto on_error;
 	}
-	dset_handle->ndim = ndim;
+	dset_handle->ndim = dset_ndim;
 
-	/* Set 'plist_id'. */
+	/* Set 'dset_handle->plist_id'. */
 	plist_id = H5Dget_create_plist(dset_id);
 	if (plist_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
@@ -318,24 +329,26 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	}
 	dset_handle->plist_id = plist_id;
 
-	/* Set 'h5dim'. */
-	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
+	/* Set 'dset_handle->h5dim'. */
+	h5dim = _alloc_hsize_t_buf(dset_ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
-	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
+	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != dset_ndim) {
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
 		goto on_error;
 	}
 	dset_handle->h5dim = h5dim;
 
-	/* Set 'h5chunk_spacings'. */
+	/* Set 'dset_handle->h5chunk_spacings'. */
 	if (H5Pget_layout(plist_id) == H5D_CHUNKED) {
-		h5chunk_spacings = _alloc_hsize_t_buf(ndim, 0,
+		h5chunk_spacings = _alloc_hsize_t_buf(dset_ndim, 0,
 						      "'h5chunk_spacings'");
 		if (h5chunk_spacings == NULL)
 			goto on_error;
-		if (H5Pget_chunk(plist_id, ndim, h5chunk_spacings) != ndim) {
+		if (H5Pget_chunk(plist_id, dset_ndim, h5chunk_spacings) !=
+		    dset_ndim)
+		{
 			PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
 					    "an unexpected value");
 			goto on_error;
@@ -343,15 +356,15 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 		dset_handle->h5chunk_spacings = h5chunk_spacings;
 	}
 
-	/* Set 'h5nchunk'. */
+	/* Set 'dset_handle->h5nchunk'. */
 	if (dset_handle->h5chunk_spacings != NULL) {
-		h5nchunk = (int *) malloc(ndim * sizeof(int));
+		h5nchunk = (int *) malloc(dset_ndim * sizeof(int));
 		if (h5nchunk == NULL) {
 			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 					    "for 'h5nchunk'");
 			goto on_error;
 		}
-		for (h5along = 0; h5along < ndim; h5along++) {
+		for (h5along = 0; h5along < dset_ndim; h5along++) {
 			d = h5dim[h5along];
 			if (d == 0) {
 				h5nchunk[h5along] = 0;
@@ -372,22 +385,22 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 		dset_handle->h5nchunk = h5nchunk;
 	}
 
-	/* Set 'ans_elt_size'. */
+	/* Set 'dset_handle->ans_elt_size'. */
 	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, size);
 	if (ans_elt_size == 0)
 		goto on_error;
 	dset_handle->ans_elt_size = ans_elt_size;
 
-	/* Set 'chunk_data_buf_size'. */
+	/* Set 'dset_handle->chunk_data_buf_size'. */
 	if (dset_handle->h5chunk_spacings != NULL) {
 		chunk_data_buf_size = ans_elt_size;
-		for (h5along = 0; h5along < ndim; h5along++)
+		for (h5along = 0; h5along < dset_ndim; h5along++)
 			chunk_data_buf_size *=
 				dset_handle->h5chunk_spacings[h5along];
 		dset_handle->chunk_data_buf_size = chunk_data_buf_size;
 	}
 
-	/* Set 'mem_type_id'. */
+	/* Set 'dset_handle->mem_type_id'. */
 	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);
 	if (mem_type_id < 0)
 		goto on_error;
@@ -441,6 +454,127 @@ hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
 		      CHAR(name0), CHAR(STRING_ELT(filepath, 0)));
 	}
 	return dset_id;
+}
+
+
+/****************************************************************************
+ * C_create_DSetHandle_xp()
+ *
+ */
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_destroy_DSetHandle_xp(SEXP xp)
+{
+	DSetHandle *dset_handle;
+
+	dset_handle = R_ExternalPtrAddr(xp);
+	if (dset_handle != NULL) {
+		//printf("Destroying DSetHandle struct at address %p ... ",
+		//       dset_handle);
+		_close_DSetHandle(dset_handle);
+		free(dset_handle);
+		R_SetExternalPtrAddr(xp, NULL);
+		//printf("OK\n");
+	}
+
+	return R_NilValue;
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_create_DSetHandle_xp(SEXP filepath, SEXP name, SEXP as_integer)
+{
+	int as_int;
+	hid_t file_id, dset_id;
+	DSetHandle *dset_handle;
+
+	/* Check 'as_integer'. */
+	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
+		error("'as_integer' must be TRUE or FALSE");
+	as_int = LOGICAL(as_integer)[0];
+
+	file_id = _get_file_id(filepath);
+	dset_id = _get_dset_id(file_id, name, filepath);
+
+	dset_handle = (DSetHandle *) malloc(sizeof(DSetHandle));
+	if (dset_handle == NULL) {
+		H5Dclose(dset_id);
+		H5Fclose(file_id);
+		error("C_create_DSetHandle_xp(): malloc() failed");
+	}
+
+	if (_get_DSetHandle(dset_id, as_int, 0, -1, dset_handle) < 0) {
+		H5Fclose(file_id);
+		error(_HDF5Array_errmsg_buf);
+	}
+	H5Fclose(file_id);
+	//printf("DSetHandle struct created at address %p\n", dset_handle);
+
+	return R_MakeExternalPtr(dset_handle, R_NilValue, R_NilValue);
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_show_DSetHandle_xp(SEXP xp)
+{
+	const DSetHandle *dset_handle;
+	int h5along;
+
+	dset_handle = R_ExternalPtrAddr(xp);
+	if (dset_handle == NULL) {
+		Rprintf("Expired DSetHandle\n");
+		return R_NilValue;
+	}
+
+	Rprintf("DSetHandle:\n");
+	Rprintf("- dset_id = %lu\n", dset_handle->dset_id);
+
+	Rprintf("- storage_mode_attr = ");
+	if (dset_handle->storage_mode_attr == NULL) {
+		Rprintf("NULL");
+	} else {
+		Rprintf("\"%s\"", dset_handle->storage_mode_attr);
+	}
+	Rprintf("\n");
+
+	Rprintf("- dtype_id = %lu\n", dset_handle->dtype_id);
+
+	Rprintf("- H5class = %s\n", H5class2str(dset_handle->H5class));
+
+	Rprintf("- size = %lu\n", dset_handle->size);
+
+	Rprintf("- Rtype = \"%s\"\n", CHAR(type2str(dset_handle->Rtype)));
+
+	Rprintf("- space_id = %lu\n", dset_handle->space_id);
+
+	Rprintf("- ndim = %d\n", dset_handle->ndim);
+
+	Rprintf("- plist_id = %lu\n", dset_handle->plist_id);
+
+	Rprintf("- h5dim =");
+	for (h5along = 0; h5along < dset_handle->ndim; h5along++)
+		Rprintf(" %llu", dset_handle->h5dim[h5along]);
+	Rprintf("\n");
+
+	Rprintf("- h5chunk_spacings =");
+	if (dset_handle->h5chunk_spacings == NULL) {
+		Rprintf(" NULL\n");
+	} else {
+		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
+			Rprintf(" %llu",
+				dset_handle->h5chunk_spacings[h5along]);
+		Rprintf("\n");
+		Rprintf("    h5nchunk =");
+		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
+			Rprintf(" %d", dset_handle->h5nchunk[h5along]);
+		Rprintf("\n");
+		Rprintf("    chunk_data_buf_size = %lu\n",
+			dset_handle->chunk_data_buf_size);
+	}
+
+	Rprintf("- ans_elt_size = %lu\n", dset_handle->ans_elt_size);
+
+	Rprintf("- mem_type_id = %lu\n", dset_handle->mem_type_id);
+
+	return R_NilValue;
 }
 
 

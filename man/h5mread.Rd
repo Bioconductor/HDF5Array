@@ -1,6 +1,12 @@
 \name{h5mread}
 
+\alias{class:DSetHandle}
+\alias{DSetHandle-class}
+\alias{DSetHandle}
+\alias{destroy_DSetHandle}
+\alias{show,DSetHandle-method}
 \alias{get_h5mread_returned_type}
+
 \alias{h5mread}
 
 \title{An alternative to \code{rhdf5::h5read}}

@@ -127,6 +127,16 @@ hid_t _get_dset_id(
 	SEXP filepath
 );
 
+SEXP C_destroy_DSetHandle_xp(SEXP xp);
+
+SEXP C_create_DSetHandle_xp(
+	SEXP filepath,
+	SEXP name,
+	SEXP as_integer
+);
+
+SEXP C_show_DSetHandle_xp(SEXP xp);
+
 SEXP C_get_h5mread_returned_type(
 	SEXP filepath,
 	SEXP name,
