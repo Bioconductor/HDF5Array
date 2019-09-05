@@ -22,6 +22,9 @@
 \alias{read_sparse_block,TENxMatrixSeed-method}
 \alias{extractNonzeroDataByCol,TENxMatrixSeed-method}
 
+\alias{coerce,TENxMatrixSeed,dgCMatrix-method}
+\alias{coerce,TENxMatrixSeed,sparseMatrix-method}
+
 \title{TENxMatrixSeed objects}
 
 \description{

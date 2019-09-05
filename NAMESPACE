@@ -3,6 +3,7 @@ useDynLib(HDF5Array)
 import(methods)
 importFrom(utils, read.table)
 importFrom(tools, file_path_as_absolute)
+importFrom(Matrix, sparseMatrix)
 
 import(BiocGenerics)
 import(S4Vectors)

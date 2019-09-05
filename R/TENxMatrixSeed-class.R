@@ -490,3 +490,20 @@ setMethod("extractNonzeroDataByCol", "TENxMatrixSeed",
     }
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Coercion to dgCMatrix
+###
+
+.from_TENxMatrixSeed_to_dgCMatrix <- function(from)
+{
+    from_dim <- dim(from)
+    row_indices <- .get_row_indices(from@filepath, from@group) + 1L
+    indptr <- .get_indptr(from@filepath, from@group)
+    data <- .get_data(from@filepath, from@group)
+    sparseMatrix(i=row_indices, p=indptr, x=data, dims=dim(from),
+                 dimnames=dimnames(from))
+}
+setAs("TENxMatrixSeed", "dgCMatrix", .from_TENxMatrixSeed_to_dgCMatrix)
+setAs("TENxMatrixSeed", "sparseMatrix", .from_TENxMatrixSeed_to_dgCMatrix)
+

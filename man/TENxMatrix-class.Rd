@@ -16,6 +16,9 @@
 \alias{read_sparse_block,TENxMatrix-method}
 \alias{extractNonzeroDataByCol,TENxMatrix-method}
 
+\alias{coerce,TENxMatrix,dgCMatrix-method}
+\alias{coerce,TENxMatrix,sparseMatrix-method}
+
 \title{10x Genomics datasets as DelayedMatrix objects}
 
 \description{

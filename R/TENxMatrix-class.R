@@ -56,3 +56,12 @@ setMethod("extractNonzeroDataByCol", "TENxMatrix",
     function(x, j) extractNonzeroDataByCol(x@seed, j)
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Coercion to dgCMatrix
+###
+
+.from_TENxMatrix_to_dgCMatrix <- function(from) as(from@seed, "dgCMatrix")
+setAs("TENxMatrix", "dgCMatrix", .from_TENxMatrix_to_dgCMatrix)
+setAs("TENxMatrix", "sparseMatrix", .from_TENxMatrix_to_dgCMatrix)
+
