@@ -128,7 +128,7 @@ static long long int check_selection_against_dset(
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_handle->h5dim[h5along];
-	return _check_selection(starts, counts, dim_buf->elts,
+	return _check_selection(ndim, dim_buf->elts, starts, counts,
 				selection_dim_buf);
 }
 
@@ -146,7 +146,7 @@ static long long int check_ordered_selection_against_dset(
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) dset_handle->h5dim[h5along];
-	return _check_ordered_selection(starts, counts, dim_buf->elts,
+	return _check_ordered_selection(ndim, dim_buf->elts, starts, counts,
 					selection_dim_buf,
 					nstart_buf, nblock_buf,
 					last_block_start_buf);
@@ -168,9 +168,10 @@ static int map_starts_to_chunks(const DSetHandle *dset_handle,
 		dim_buf->elts[along] =
 			(long long int) dset_handle->h5dim[h5along];
 		chunkdim_buf->elts[along] =
-			(long long int) dset_handle->h5chunk_spacings[h5along];
+			(long long int) dset_handle->h5chunkdim[h5along];
 	}
-	return _map_starts_to_chunks(starts, dim_buf->elts, chunkdim_buf->elts,
+	return _map_starts_to_chunks(ndim, dim_buf->elts, chunkdim_buf->elts,
+				     starts,
 				     nstart_buf,
 				     breakpoint_bufs, chunkidx_bufs);
 }
@@ -212,7 +213,7 @@ static size_t set_nblock_buf(int ndim, SEXP starts,
 
 	num_blocks = 1;
 	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
+		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue) {
 			nblock = LENGTH(start);
 		} else {
@@ -227,11 +228,13 @@ static void init_srcvp_buf(const DSetHandle *dset_handle,
 			   SEXP starts, Viewport *srcvp_buf)
 {
 	int ndim, along, h5along;
+	SEXP start;
 	hsize_t d;
 
 	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (VECTOR_ELT(starts, along) == R_NilValue) {
+		start = GET_LIST_ELT(starts, along);
+		if (start == R_NilValue) {
 			srcvp_buf->h5off[h5along] = 0;
 			d = dset_handle->h5dim[h5along];
 		} else {
@@ -253,6 +256,8 @@ static void update_srcvp_buf(int ndim,
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
+		if (starts == R_NilValue)
+			continue;
 		start = VECTOR_ELT(starts, along);
 		if (start == R_NilValue)
 			continue;
@@ -299,7 +304,7 @@ static long long int select_hyperslabs(const DSetHandle *dset_handle,
 	do {
 		num_hyperslabs++;
 		update_srcvp_buf(ndim, midx_buf, moved_along,
-				  starts, counts, &srcvp_buf);
+				 starts, counts, &srcvp_buf);
 		/* Add to current selection. */
 		ret = add_hyperslab(dset_handle->space_id, &srcvp_buf);
 		if (ret < 0)
@@ -321,11 +326,11 @@ static inline hsize_t *add_element(int ndim, const int *outer_midx,
 
 	for (h5along = ndim - 1; h5along >= 0; h5along--) {
 		i = outer_midx[h5along];
-		start = VECTOR_ELT(starts, h5along);
-		if (start == R_NilValue) {
-			coord = i;
-		} else {
+		start = GET_LIST_ELT(starts, h5along);
+		if (start != R_NilValue) {
 			coord = _get_trusted_elt(start, i) - 1;
+		} else {
+			coord = i;
 		}
 		*(coord_p++) = (hsize_t) coord;
 	}
@@ -452,7 +457,7 @@ static int read_hyperslab(const DSetHandle *dset_handle,
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
-		start = VECTOR_ELT(starts, along);
+		start = GET_LIST_ELT(starts, along);
 		if (start == R_NilValue)
 			continue;
 		h5along = ndim - 1 - along;
@@ -539,8 +544,8 @@ static int read_data_3(const DSetHandle *dset_handle,
  *   - Copy the selected data from the intermediate buffer to the output
  *     array.
  *
- * Assumes that 'dset_handle->h5chunk_spacings' and 'dset_handle->h5nchunk'
- * are NOT NULL. This is NOT checked!
+ * Assumes that 'dset_handle->h5chunkdim' and 'dset_handle->h5nchunk' are NOT
+ * NULL. This is NOT checked!
  */
 
 static void set_nchunk_buf(const DSetHandle *dset_handle,
@@ -548,10 +553,12 @@ static void set_nchunk_buf(const DSetHandle *dset_handle,
 			   IntAE *nchunk_buf)
 {
 	int ndim, along, h5along, nchunk;
+	SEXP start;
 
 	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (VECTOR_ELT(starts, along) != R_NilValue) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue) {
 			nchunk = LLongAE_get_nelt(chunkidx_bufs->elts[along]);
 		} else {
 			nchunk = dset_handle->h5nchunk[h5along];
@@ -567,24 +574,26 @@ static void update_chunkvp_buf(const DSetHandle *dset_handle,
 			Viewport *chunkvp_buf)
 {
 	int ndim, along, h5along, i;
+	SEXP start;
 	long long int chunkidx;
-	hsize_t spacing, off, d;
+	hsize_t chunkd, off, d;
 
 	ndim = dset_handle->ndim;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (along > moved_along)
 			break;
 		i = midx[along];
-		if (VECTOR_ELT(starts, along) != R_NilValue) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue) {
 			chunkidx = chunkidx_bufs->elts[along]->elts[i];
 		} else {
 			chunkidx = i;
 		}
-		spacing = dset_handle->h5chunk_spacings[h5along];
-		off = chunkidx * spacing;
+		chunkd = dset_handle->h5chunkdim[h5along];
+		off = chunkidx * chunkd;
 		d = dset_handle->h5dim[h5along] - off;
-		if (d > spacing)
-			d = spacing;
+		if (d > chunkd)
+			d = chunkd;
 		chunkvp_buf->h5off[h5along] = off;
 		chunkvp_buf->h5dim[h5along] = d;
 	}
@@ -605,13 +614,15 @@ static void update_destvp_buf(int ndim,
 			const Viewport *chunkvp, Viewport *destvp_buf)
 {
 	int along, h5along, i, off, d;
+	SEXP start;
 	const int *breakpoint;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		if (along > moved_along)
 			break;
 		i = midx[along];
-		if (VECTOR_ELT(starts, along) != R_NilValue ) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue ) {
 			breakpoint = breakpoint_bufs->elts[along]->elts;
 			off = i == 0 ? 0 : breakpoint[i - 1];
 			d = breakpoint[i] - off;
@@ -779,7 +790,7 @@ static int direct_load_chunk(const DSetHandle *dset_handle,
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 			const int *outdim, const Viewport *destvp,
 			const Viewport *chunkvp,
-			const hsize_t *h5chunk_spacings,
+			const hsize_t *h5chunkdim,
 			size_t *in_offset, size_t *out_offset)
 {
 	size_t in_off, out_off;
@@ -788,10 +799,10 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 
 	in_off = out_off = 0;
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
-		in_off *= h5chunk_spacings[h5along];
+		in_off *= h5chunkdim[h5along];
 		out_off *= outdim[along];
 		i = destvp->off[along];
-		start = VECTOR_ELT(starts, along);
+		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue)
 			in_off += _get_trusted_elt(start, i) - 1 -
 				  chunkvp->h5off[h5along];
@@ -808,14 +819,14 @@ static inline void update_in_offset_and_out_offset(int ndim,
 			const int *inner_midx, int inner_moved_along,
 			SEXP starts,
 			const int *outdim, const Viewport *destvp,
-			const hsize_t *h5chunk_spacings,
+			const hsize_t *h5chunkdim,
 			size_t *in_offset, size_t *out_offset)
 {
 	SEXP start;
 	int i1, i0, along, h5along, di;
 	long long int in_off_inc, out_off_inc;
 
-	start = VECTOR_ELT(starts, inner_moved_along);
+	start = GET_LIST_ELT(starts, inner_moved_along);
 	if (start != R_NilValue) {
 		i1 = destvp->off[inner_moved_along] +
 		     inner_midx[inner_moved_along];
@@ -830,10 +841,10 @@ static inline void update_in_offset_and_out_offset(int ndim,
 		along = inner_moved_along - 1;
 		h5along = ndim - inner_moved_along;
 		do {
-			in_off_inc *= h5chunk_spacings[h5along];
+			in_off_inc *= h5chunkdim[h5along];
 			out_off_inc *= outdim[along];
 			di = 1 - destvp->dim[along];
-			start = VECTOR_ELT(starts, along);
+			start = GET_LIST_ELT(starts, along);
 			if (start != R_NilValue) {
 				i1 = destvp->off[along];
 				i0 = i1 - di;
@@ -873,7 +884,7 @@ static int gather_chunk_data(const DSetHandle *dset_handle,
 	ndim = dset_handle->ndim;
 	init_in_offset_and_out_offset(ndim, starts,
 			outdim, destvp,
-			chunkvp, dset_handle->h5chunk_spacings,
+			chunkvp, dset_handle->h5chunkdim,
 			&in_offset, &out_offset);
 
 	/* Walk on the selected elements in current chunk. */
@@ -912,7 +923,7 @@ static int gather_chunk_data(const DSetHandle *dset_handle,
 				inner_midx_buf, inner_moved_along,
 				starts,
 				outdim, destvp,
-				dset_handle->h5chunk_spacings,
+				dset_handle->h5chunkdim,
 				&in_offset, &out_offset);
 	};
 	//printf("# nb of selected elements in current chunk = %lld\n",
@@ -952,7 +963,7 @@ static int read_data_4_5(const DSetHandle *dset_handle, int method,
 	long long int num_chunks, ndot;
 
 	ndim = dset_handle->ndim;
-	mem_space_id = H5Screate_simple(ndim, dset_handle->h5chunk_spacings,
+	mem_space_id = H5Screate_simple(ndim, dset_handle->h5chunkdim,
 					NULL);
 	if (mem_space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
@@ -1087,19 +1098,19 @@ static int read_data_4_5(const DSetHandle *dset_handle, int method,
  *   - Call H5Dread(). This loads the selected data **directly** to the
  *     output array.
  *
- * Assumes that 'dset_handle->h5chunk_spacings' and 'dset_handle->h5nchunk'
- * are NOT NULL. This is NOT checked!
+ * Assumes that 'dset_handle->h5chunkdim' and 'dset_handle->h5nchunk' are NOT
+ * NULL. This is NOT checked!
  */
 
 /*
-static hsize_t *alloc_coord_buf(int ndim, const hsize_t *h5chunk_spacings)
+static hsize_t *alloc_coord_buf(int ndim, const hsize_t *h5chunkdim)
 {
 	size_t max_inner_block_per_chunk;
 	int along;
 
 	max_inner_block_per_chunk = 1;
 	for (along = 0; along < ndim; along++)
-		max_inner_block_per_chunk *= (h5chunk_spacings[along] + 1) / 2;
+		max_inner_block_per_chunk *= (h5chunkdim[along] + 1) / 2;
 	//printf("max_inner_block_per_chunk = %lu\n",
 	//	 max_inner_block_per_chunk);
 	return _alloc_hsize_t_buf(max_inner_block_per_chunk * ndim,
@@ -1123,7 +1134,7 @@ static void update_inner_breakpoints(int ndim, int moved_along,
 		inner_breakpoint_buf = inner_breakpoint_bufs->elts[along];
 		IntAE_set_nelt(inner_breakpoint_buf, 0);
 		d = destvp->dim[along];
-		start = VECTOR_ELT(starts, along);
+		start = GET_LIST_ELT(starts, along);
 		if (start == R_NilValue) {
 			IntAE_insert_at(inner_breakpoint_buf, 0, d);
 			inner_nblock_buf[along] = 1;
@@ -1150,10 +1161,12 @@ static void init_inner_srcvp_buf(int ndim,
 			Viewport *inner_srcvp_buf)
 {
 	int along, h5along;
+	SEXP start;
 	hsize_t d;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (VECTOR_ELT(starts, along) == R_NilValue) {
+		start = GET_LIST_ELT(starts, along);
+		if (start == R_NilValue) {
 			inner_srcvp_buf->h5off[h5along] =
 					chunkvp->h5off[h5along];
 			d = chunkvp->h5dim[h5along];
@@ -1178,6 +1191,8 @@ static void update_inner_srcvp_buf(int ndim,
 	for (along = 0; along < ndim; along++) {
 		if (along > inner_moved_along)
 			break;
+		if (starts == R_NilValue)
+			continue;
 		start = VECTOR_ELT(starts, along);
 		if (start == R_NilValue)
 			continue;
@@ -1225,11 +1240,11 @@ static long long int select_elements_from_chunk(const DSetHandle *dset_handle,
 		     along--, h5along++)
 		{
 			i = destvp->h5off[h5along] + inner_midx_buf[along];
-			start = VECTOR_ELT(starts, along);
-			if (start == R_NilValue) {
-				coord = i;
-			} else {
+			start = GET_LIST_ELT(starts, along);
+			if (start != R_NilValue) {
 				coord = _get_trusted_elt(start, i) - 1;
+			} else {
+				coord = i;
 			}
 			*(coord_p++) = (hsize_t) coord;
 		}
@@ -1353,7 +1368,7 @@ static int read_data_6(const DSetHandle *dset_handle,
 	}
 
 	/* Allocate 'coord_buf'. */
-	//coord_buf = alloc_coord_buf(ndim, dset_handle->h5chunk_spacings);
+	//coord_buf = alloc_coord_buf(ndim, dset_handle->h5chunkdim);
 	//if (coord_buf == NULL) {
 	//	free_Viewport(&destvp_buf);
 	//	free_Viewport(&inner_srcvp_buf);
@@ -1489,7 +1504,7 @@ static SEXP h5mread_1_2_3(const DSetHandle *dset_handle,
 		if (_selection_can_be_reduced(ndim, nstart_buf->elts,
 						    nblock_buf->elts)) {
 			reduced = PROTECT(_reduce_selection(
-						starts, counts, ans_dim,
+						ndim, starts, counts, ans_dim,
 						nblock_buf->elts,
 						last_block_start_buf->elts));
 			nprotect++;
@@ -1590,32 +1605,28 @@ static SEXP h5mread_4_5_6(const DSetHandle *dset_handle, SEXP starts,
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int, int method)
 {
-	int ndim;
-	DSetHandle dset_handle;
 	SEXP ans, ans_dim;
-
-	if (method < 0 || method > 6) {
-		H5Dclose(dset_id);
-		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 6");
-		return R_NilValue;
-	}
-
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0) {
-		H5Dclose(dset_id);
-		return R_NilValue;
-	}
-
-	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
-	if (_get_DSetHandle(dset_id, as_int, 0, ndim, &dset_handle) < 0)
-		return R_NilValue;
+	DSetHandle dset_handle;
+	int ret;
 
 	ans = R_NilValue;
 
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, as_int, 0, &dset_handle) < 0)
+		return ans;
+
+	ret = _shallow_check_selection(dset_handle.ndim, starts, counts);
+	if (ret < 0)
+		goto on_error;
+
+	if (method < 0 || method > 6) {
+		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 6");
+		goto on_error;
+	}
 	if (dset_handle.Rtype == STRSXP) {
 		/* Note that it should be easy to support contiguous string
 		   data by treating it as if it was made of a single chunk. */
-		if (dset_handle.h5chunk_spacings == NULL) {
+		if (dset_handle.h5chunkdim == NULL) {
 			PRINT_TO_ERRMSG_BUF("contiguous (i.e. not chunked) "
 					    "string data is not supported "
 					    "at the moment");
@@ -1647,12 +1658,12 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		   do something stupid in my early testing? Did something
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report. */
-		method = dset_handle.h5chunk_spacings != NULL &&
+		method = dset_handle.h5chunkdim != NULL &&
 			 //counts == R_NilValue ? 6 : 1;
 			 counts == R_NilValue ? 4 : 1;
 	}
 
-	ans_dim = PROTECT(NEW_INTEGER(ndim));
+	ans_dim = PROTECT(NEW_INTEGER(dset_handle.ndim));
 
 	if (method <= 3) {
 		ans = h5mread_1_2_3(&dset_handle, starts, counts, noreduce,

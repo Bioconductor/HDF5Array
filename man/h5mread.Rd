@@ -19,7 +19,7 @@
 }
 
 \usage{
-h5mread(filepath, name, starts, counts=NULL, noreduce=FALSE,
+h5mread(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
         as.integer=FALSE, method=0L)
 
 get_h5mread_returned_type(filepath, name, as.integer=FALSE)
@@ -34,11 +34,15 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
     The name of the dataset in the HDF5 file.
   }
   \item{starts, counts}{
-    2 lists specifying the array selection. The 2 lists must have one list
-    element per dimension in the dataset.
+    \code{starts} and \code{counts} are used to specify the \emph{array
+    selection}. Each argument can be either \code{NULL} or a list with
+    one list element per dimension in the dataset.
 
-    Each list element in \code{starts} must be a vector of valid
-    positive indices along the corresponding dimension in the dataset.
+    If \code{starts} and \code{counts} are both \code{NULL}, then the entire
+    dataset is read.
+
+    If \code{starts} is a list, each list element in it must be a vector of
+    valid positive indices along the corresponding dimension in the dataset.
     An empty vector (\code{integer(0)}) is accepted and indicates an empty
     selection along that dimension. A \code{NULL} is accepted and indicates
     a \emph{full} selection along the dimension so has the same meaning
@@ -53,8 +57,8 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
     A \code{NULL} indicates that a single position is selected for each
     value along the corresponding dimension.
 
-    If \code{counts} is NULL, then each index in each \code{starts} list
-    element indicates a single position selection along the corresponding
+    If \code{counts} is \code{NULL}, then each index in each \code{starts}
+    list element indicates a single position selection along the corresponding
     dimension. Note that in this case the \code{starts} argument is
     equivalent to the \code{index} argument of \code{\link[rhdf5]{h5read}}
     and \code{\link[DelayedArray]{extract_array}} (with the caveat that
@@ -115,6 +119,9 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 ## ---------------------------------------------------------------------
 m0 <- matrix((runif(600) - 0.5) * 10, ncol=12)
 M0 <- writeHDF5Array(m0, name="M0")
+
+m <- h5mread(path(M0), "M0")
+stopifnot(identical(m0, m))
 
 m <- h5mread(path(M0), "M0", starts=list(NULL, c(3, 12:8)))
 stopifnot(identical(m0[ , c(3, 12:8)], m))

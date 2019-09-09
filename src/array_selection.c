@@ -101,23 +101,20 @@ static inline void set_trusted_elt(SEXP x, int i, long long int val)
 /* Called at the very beginning of the various .Call entry points where
    it's used (and before any resource is allocated) so it's ok to error()
    immediately in case of error. */
-static const long long int *check_dim(SEXP dim, int ndim)
+static const long long int *check_dim(SEXP dim)
 {
+	int ndim, i, ret;
 	long long int *dim_p, d;
-	int along, ret;
 
-	if (dim == R_NilValue)
-		return NULL;
 	if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
-		error("'dim' must be an integer vector (or NULL)");
-	if (LENGTH(dim) != ndim)
-		error("'starts' and 'dim' must have the same length");
+		error("'dim' must be an integer vector");
+	ndim = LENGTH(dim);
 	dim_p = new_LLongAE(ndim, ndim, 0)->elts;
-	for (along = 0; along < ndim; along++) {
-		ret = get_untrusted_elt(dim, along, &d, "dim", -1);
+	for (i = 0; i < ndim; i++) {
+		ret = get_untrusted_elt(dim, i, &d, "dim", -1);
 		if (ret < 0)
 			error(_HDF5Array_errmsg_buf);
-		dim_p[along] = d;
+		dim_p[i] = d;
 	}
 	return dim_p;
 }
@@ -127,31 +124,44 @@ static const long long int *check_dim(SEXP dim, int ndim)
  * Shallow check of an array selection
  */
 
-/* Only check that 'starts' is a list and that 'counts' is NULL or a list
-   of the same length as 'starts'.
-   Return the nb of list elements in 'starts'. */
-int _shallow_check_selection(SEXP starts, SEXP counts)
+/* Only check that each of 'starts' and 'counts' is either NULL or a list
+   of length as 'ndim'.
+   Return 0 is the selection is valid and -1 if it's not. */
+int _shallow_check_selection(int ndim, SEXP starts, SEXP counts)
 {
-	int ndim;
-
+	if (starts == R_NilValue) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF(
+				"'counts' must be NULL when 'starts' is NULL");
+			return -1;
+		}
+		return 0;
+	}
 	if (!isVectorList(starts)) {  // IS_LIST() is broken
-		PRINT_TO_ERRMSG_BUF("'starts' must be a list");
+		PRINT_TO_ERRMSG_BUF("'starts' must be a list (or NULL)");
 		return -1;
 	}
-	ndim = LENGTH(starts);
-	if (counts != R_NilValue) {
-		if (!isVectorList(counts)) {  // IS_LIST() is broken
-			PRINT_TO_ERRMSG_BUF("'counts' must "
-					    "be a list (or NULL)");
-			return -1;
-		}
-		if (LENGTH(counts) != ndim) {
-			PRINT_TO_ERRMSG_BUF("'starts' and 'counts' must "
-					    "have the same length");
-			return -1;
-		}
+	if (LENGTH(starts) != ndim) {
+		PRINT_TO_ERRMSG_BUF(
+			"Array has %d dimension%s but 'starts' has %d "
+			"list element%s.\n  'starts' must have one "
+			"list element per dimension in the dataset.",
+			ndim, ndim > 1 ? "s" : "",
+			LENGTH(starts), LENGTH(starts) > 1 ? "s" : "");
+		return -1;
 	}
-	return ndim;
+	if (counts == R_NilValue)
+		return 0;
+	if (!isVectorList(counts)) {  // IS_LIST() is broken
+		PRINT_TO_ERRMSG_BUF("'counts' must be a list (or NULL)");
+		return -1;
+	}
+	if (LENGTH(counts) != ndim) {
+		PRINT_TO_ERRMSG_BUF("'counts' must have one list element "
+				    "per list element in 'starts'");
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -218,8 +228,8 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 	return 0;
 }
 
-static int check_selection_along(SEXP start, SEXP count, int along,
-				 long long int d)
+static int check_selection_along(int along,
+				 SEXP start, SEXP count, long long int d)
 {
 	long long int selection_dim, s, c, e;
 	int n, i, ret;
@@ -295,30 +305,27 @@ static int check_selection_along(SEXP start, SEXP count, int along,
 	return (int) selection_dim;
 }
 
-/* Assume that 'starts' is a list and that 'counts' is NULL or a list
-   of the same length as 'starts'. This should have been checked
-   by _shallow_check_selection() already so is not checked again.
+/* 'dim' must be NULL or point to an array of 'ndim' elements.
 
-   'dim' is assumed to be NULL or to have the same length as 'starts'.
+   'starts' and 'counts' are **assumed** to be NULL or lists of length 'ndim'.
+   This should have been already checked by _shallow_check_selection() so is
+   not checked again.
 
-   'selection_dim_buf' is assumed to have the same length as 'starts'.
+   'selection_dim_buf' must point to an array of 'ndim' elements.
 */
-long long int _check_selection(SEXP starts, SEXP counts,
-		     const long long int *dim, int *selection_dim_buf)
+long long int _check_selection(int ndim, const long long int *dim,
+			SEXP starts, SEXP counts, int *selection_dim_buf)
 {
 	long long int selection_len;
-	int ndim, along, selection_dim;
+	int along, selection_dim;
 	SEXP start, count;
 
 	selection_len = 1;
-	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
-					     : R_NilValue;
-		selection_dim = check_selection_along(
-					start, count, along,
-					dim != NULL ? dim[along] : -1);
+		start = GET_LIST_ELT(starts, along);
+		count = GET_LIST_ELT(counts, along);
+		selection_dim = check_selection_along(along,
+						      start, count, dim[along]);
 		if (selection_dim < 0)
 			return -1;
 		selection_dim_buf[along] = selection_dim;
@@ -330,19 +337,21 @@ long long int _check_selection(SEXP starts, SEXP counts,
 /* --- .Call ENTRY POINT ---
  * Return the dimensions of the selection.
  */
-SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
+SEXP C_check_selection(SEXP dim, SEXP starts, SEXP counts)
 {
-	int ndim;
 	const long long int *dim_p;
+	int ndim, ret;
 	IntAE *selection_dim_buf;
 	long long int selection_len;
 
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0)
+	dim_p = check_dim(dim);
+	ndim = LENGTH(dim);
+	ret = _shallow_check_selection(ndim, starts, counts);
+	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
-	dim_p = check_dim(dim, ndim);
+
 	selection_dim_buf = new_IntAE(ndim, ndim, 0);
-	selection_len = _check_selection(starts, counts, dim_p,
+	selection_len = _check_selection(ndim, dim_p, starts, counts,
 					 selection_dim_buf->elts);
 	if (selection_len < 0)
 		error(_HDF5Array_errmsg_buf);
@@ -354,8 +363,8 @@ SEXP C_check_selection(SEXP starts, SEXP counts, SEXP dim)
  * Deep check of an ordered array selection (in preparation for reduction)
  */
 
-static int check_ordered_selection_along_NULL_start(SEXP count, int along,
-			long long int d,
+static int check_ordered_selection_along_NULL_start(int along,
+			SEXP count, long long int d,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
@@ -388,8 +397,8 @@ static int check_ordered_selection_along_NULL_start(SEXP count, int along,
 	return selection_dim;
 }
 
-static int check_ordered_selection_along(SEXP start, SEXP count, int along,
-			long long int d,
+static int check_ordered_selection_along(int along,
+			SEXP start, SEXP count, long long int d,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
@@ -397,8 +406,8 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 	int n, i, ret;
 
 	if (start == R_NilValue)
-		return check_ordered_selection_along_NULL_start(count, along,
-				d,
+		return check_ordered_selection_along_NULL_start(along,
+				count, d,
 				nstart_buf, nblock_buf, last_block_start_buf);
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
@@ -465,32 +474,30 @@ static int check_ordered_selection_along(SEXP start, SEXP count, int along,
 	return (int) selection_dim;
 }
 
-/* Assume that 'starts' is a list and that 'counts' is NULL or a list
-   of the same length as 'starts'. This should have been checked
-   by _shallow_check_selection() already so is not checked again.
+/* 'dim' must be NULL or point to an array of 'ndim' elements.
 
-   'dim' is assumed to be NULL or to have the same length as 'starts'.
+   'starts' and 'counts' are **assumed** to be NULL or lists of length 'ndim'.
+   This should have been already checked by _shallow_check_selection() so is
+   not checked again.
 
-   'selection_dim_buf', 'nstart_buf', 'nblock_buf', and 'last_block_start_buf'
-   are assumed to have the same length as 'starts'.
+   Each of 'selection_dim_buf', 'nstart_buf', 'nblock_buf', and
+   'last_block_start_buf' must point to an array of 'ndim' elements.
 */
-long long int _check_ordered_selection(SEXP starts, SEXP counts,
-			const long long int *dim, int *selection_dim_buf,
+long long int _check_ordered_selection(int ndim, const long long int *dim,
+			SEXP starts, SEXP counts, int *selection_dim_buf,
 			int *nstart_buf, int *nblock_buf,
 			long long int *last_block_start_buf)
 {
 	long long int selection_len;
-	int ndim, along, selection_dim;
+	int along, selection_dim;
 	SEXP start, count;
 
 	selection_len = 1;
-	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		count = counts != R_NilValue ? VECTOR_ELT(counts, along)
-					     : R_NilValue;
-		selection_dim = check_ordered_selection_along(
-					start, count, along,
+		start = GET_LIST_ELT(starts, along);
+		count = GET_LIST_ELT(counts, along);
+		selection_dim = check_ordered_selection_along(along,
+					start, count,
 					dim != NULL ? dim[along] : -1,
 					nstart_buf, nblock_buf,
 					last_block_start_buf);
@@ -505,23 +512,25 @@ long long int _check_ordered_selection(SEXP starts, SEXP counts,
 /* --- .Call ENTRY POINT ---
  * Return the dimensions of the selection.
  */
-SEXP C_check_ordered_selection(SEXP starts, SEXP counts, SEXP dim)
+SEXP C_check_ordered_selection(SEXP dim, SEXP starts, SEXP counts)
 {
-	int ndim;
 	const long long int *dim_p;
+	int ndim, ret;
 	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	long long int selection_len;
 
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0)
+	dim_p = check_dim(dim);
+	ndim = LENGTH(dim);
+	ret = _shallow_check_selection(ndim, starts, counts);
+	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
-	dim_p = check_dim(dim, ndim);
+
 	selection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-	selection_len = _check_ordered_selection(starts, counts, dim_p,
+	selection_len = _check_ordered_selection(ndim, dim_p, starts, counts,
 				selection_dim_buf->elts,
 				nstart_buf->elts, nblock_buf->elts,
 				last_block_start_buf->elts);
@@ -609,7 +618,8 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 	return;
 }
 
-static void reduce_selection_along(SEXP start, SEXP count, int along,
+static void reduce_selection_along(int along,
+				   SEXP start, SEXP count,
 				   const int *selection_dim,
 				   const int *nblock,
 				   const long long int *last_block_start,
@@ -646,28 +656,29 @@ static void reduce_selection_along(SEXP start, SEXP count, int along,
 	return;
 }
 
-SEXP _reduce_selection(SEXP starts, SEXP counts,
+SEXP _reduce_selection(int ndim, SEXP starts, SEXP counts,
 		       const int *selection_dim,
 		       const int *nblock,
 		       const long long int *last_block_start)
 {
-	int ndim, along;
 	SEXP reduced_starts, reduced_counts, start, count, ans;
+	int along;
 
 	//clock_t t0 = clock();
-	ndim = LENGTH(starts);
 	reduced_starts = PROTECT(NEW_LIST(ndim));
 	reduced_counts = PROTECT(NEW_LIST(ndim));
-	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		count = counts != R_NilValue ? VECTOR_ELT(counts, along) :
-					       R_NilValue;
-		reduce_selection_along(start, count, along,
-				       selection_dim,
-				       nblock, last_block_start,
-				       reduced_starts, reduced_counts);
+	if (starts != R_NilValue) {
+		for (along = 0; along < ndim; along++) {
+			start = VECTOR_ELT(starts, along);
+			if (start == R_NilValue)
+				continue;
+			count = GET_LIST_ELT(counts, along);
+			reduce_selection_along(along,
+					       start, count,
+					       selection_dim,
+					       nblock, last_block_start,
+					       reduced_starts, reduced_counts);
+		}
 	}
 	ans = PROTECT(NEW_LIST(2));
 	SET_VECTOR_ELT(ans, 0, reduced_starts);
@@ -686,25 +697,27 @@ SEXP _reduce_selection(SEXP starts, SEXP counts,
  * The 2 lists have the same length as 'starts'. Also they have the same
  * shape (i.e. same lengths()).
  */
-SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
+SEXP C_reduce_selection(SEXP dim, SEXP starts, SEXP counts)
 {
-	int ndim;
 	const long long int *dim_p;
+	int ndim, ret;
 	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	long long int selection_len;
 
-	ndim = _shallow_check_selection(starts, counts);
-	if (ndim < 0)
+	dim_p = check_dim(dim);
+	ndim = LENGTH(dim);
+	ret = _shallow_check_selection(ndim, starts, counts);
+	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
-	dim_p = check_dim(dim, ndim);
+
 	selection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
 
 	/* 1st pass */
-	selection_len = _check_ordered_selection(starts, counts, dim_p,
+	selection_len = _check_ordered_selection(ndim, dim_p, starts, counts,
 				selection_dim_buf->elts,
 				nstart_buf->elts, nblock_buf->elts,
 				last_block_start_buf->elts);
@@ -716,7 +729,7 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
 		return R_NilValue;
 
 	/* 2nd pass */
-	return _reduce_selection(starts, counts,
+	return _reduce_selection(ndim, starts, counts,
 				 selection_dim_buf->elts, nblock_buf->elts,
 				 last_block_start_buf->elts);
 }
@@ -726,8 +739,8 @@ SEXP C_reduce_selection(SEXP starts, SEXP counts, SEXP dim)
  * Map array selection to chunks
  */
 
-static int map_start_to_chunks(SEXP start, int along,
-		long long int d, long long int chunkd,
+static int map_start_to_chunks(int along,
+		long long int d, long long int chunkd, SEXP start,
 		int *nstart_buf,
 		IntAE *breakpoint_buf, LLongAE *chunkidx_buf)
 {
@@ -796,26 +809,28 @@ static int map_start_to_chunks(SEXP start, int along,
 	return 0;
 }
 
-/* Assume that 'starts' is a list. This should have been checked by
-   _shallow_check_selection() already so is not checked again.
+/* 'dim' and 'chunkdim' must point to arrays of 'ndim' elements.
 
-   'dim', 'chunk_spacings', 'nstart_buf', 'breakpoint_bufs', and
-   'chunkidx_bufs' are assumed to have the same length as 'starts'.
+   'starts' is **assumed** to be NULL or a list of length 'ndim'.
+   This should have been already checked by _shallow_check_selection() so is
+   not checked again.
+
+   Each of 'nstart_buf', 'breakpoint_bufs', and 'chunkidx_bufs' must point
+   to an array of 'ndim' elements.
 */
-int _map_starts_to_chunks(SEXP starts,
-		const long long int *dim,
-		const long long int *chunk_spacings,
+int _map_starts_to_chunks(int ndim, const long long int *dim,
+		const long long int *chunkdim,
+		SEXP starts,
 		int *nstart_buf,
 		IntAEAE *breakpoint_bufs, LLongAEAE *chunkidx_bufs)
 {
-	int ndim, along, ret;
+	int along, ret;
 	SEXP start;
 
-	ndim = LENGTH(starts);
 	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		ret = map_start_to_chunks(start, along,
-					  dim[along], chunk_spacings[along],
+		start = GET_LIST_ELT(starts, along);
+		ret = map_start_to_chunks(along,
+					  dim[along], chunkdim[along], start,
 					  nstart_buf,
 					  breakpoint_bufs->elts[along],
 					  chunkidx_bufs->elts[along]);
@@ -825,45 +840,49 @@ int _map_starts_to_chunks(SEXP starts,
 	return 0;
 }
 
-static SEXP to_integer_LIST(const IntAEAE *aeae, SEXP starts)
+static SEXP to_integer_LIST(int ndim, const IntAEAE *aeae, SEXP starts)
 {
-	int ndim, along;
 	SEXP ans, ans_elt, start;
+	int along;
+	const IntAE *ae;
 
-	ndim = LENGTH(starts);
 	ans = PROTECT(NEW_LIST(ndim));
-	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		ans_elt = PROTECT(new_INTEGER_from_IntAE(aeae->elts[along]));
-		SET_VECTOR_ELT(ans, along, ans_elt);
-		UNPROTECT(1);
+	if (starts != R_NilValue) {
+		for (along = 0; along < ndim; along++) {
+			start = VECTOR_ELT(starts, along);
+			if (start == R_NilValue)
+				continue;
+			ae = aeae->elts[along];
+			ans_elt = PROTECT(new_INTEGER_from_IntAE(ae));
+			SET_VECTOR_ELT(ans, along, ans_elt);
+			UNPROTECT(1);
+		}
 	}
 	UNPROTECT(1);
 	return ans;
 }
 
-static SEXP to_numeric_LIST(const LLongAEAE *aeae, SEXP starts)
+static SEXP to_numeric_LIST(int ndim, const LLongAEAE *aeae, SEXP starts)
 {
-	int ndim, along;
 	SEXP ans, ans_elt, start;
+	int along;
 	const LLongAE *ae;
 	R_xlen_t ans_elt_len, i;
 
-	ndim = LENGTH(starts);
 	ans = PROTECT(NEW_LIST(ndim));
-	for (along = 0; along < ndim; along++) {
-		start = VECTOR_ELT(starts, along);
-		if (start == R_NilValue)
-			continue;
-		ae = aeae->elts[along];
-		ans_elt_len = LLongAE_get_nelt(ae);
-		ans_elt = PROTECT(NEW_NUMERIC(ans_elt_len));
-		for (i = 0; i < ans_elt_len; i++)
-			REAL(ans_elt)[i] = (double) ae->elts[i];
-		SET_VECTOR_ELT(ans, along, ans_elt);
-		UNPROTECT(1);
+	if (starts != R_NilValue) {
+		for (along = 0; along < ndim; along++) {
+			start = VECTOR_ELT(starts, along);
+			if (start == R_NilValue)
+				continue;
+			ae = aeae->elts[along];
+			ans_elt_len = LLongAE_get_nelt(ae);
+			ans_elt = PROTECT(NEW_NUMERIC(ans_elt_len));
+			for (i = 0; i < ans_elt_len; i++)
+				REAL(ans_elt)[i] = (double) ae->elts[i];
+			SET_VECTOR_ELT(ans, along, ans_elt);
+			UNPROTECT(1);
+		}
 	}
 	UNPROTECT(1);
 	return ans;
@@ -876,71 +895,58 @@ static SEXP to_numeric_LIST(const LLongAEAE *aeae, SEXP starts)
  * The 2 lists have the same length as 'starts'. Also they have the same
  * shape (i.e. same lengths()).
  */
-SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunk_spacings)
+SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 {
-	int ndim, along, ret;
-	LLongAE *dim_buf, *chunk_spacings_buf;
-	long long int d, chunkd;
+	const long long int *dim_p;
+	int ndim, ret, i;
+	LLongAE *chunkdim_buf;
+	long long int chunkd;
 	IntAE *nstart_buf;
 	IntAEAE *breakpoint_bufs;
 	LLongAEAE *chunkidx_bufs;
 	SEXP ans, ans_elt;
 
-	ndim = _shallow_check_selection(starts, R_NilValue);
-	if (ndim < 0)
+	dim_p = check_dim(dim);
+	ndim = LENGTH(dim);
+	ret = _shallow_check_selection(ndim, starts, R_NilValue);
+	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
 
-	if (!(IS_INTEGER(dim) || IS_NUMERIC(dim)))
-		error("'dim' must be an integer vector (or NULL)");
-	if (LENGTH(dim) != ndim)
-		error("'starts' and 'dim' must have the same length");
-	if (!(IS_INTEGER(chunk_spacings) || IS_NUMERIC(chunk_spacings)))
-		error("'chunk_spacings' must be an integer vector (or NULL)");
-	if (LENGTH(chunk_spacings) != ndim)
-		error("'starts' and 'chunk_spacings' must "
-		      "have the same length");
-
-	dim_buf = new_LLongAE(ndim, ndim, 0);
-	chunk_spacings_buf = new_LLongAE(ndim, ndim, 0);
-	for (along = 0; along < ndim; along++) {
-		ret = get_untrusted_elt(dim, along, &d,
-					"dim", -1);
-		if (ret < 0)
-			error(_HDF5Array_errmsg_buf);
-		ret = get_untrusted_elt(chunk_spacings, along, &chunkd,
-					"chunk_spacings", -1);
+	if (!(IS_INTEGER(chunkdim) || IS_NUMERIC(chunkdim)))
+		error("'chunkdim' must be an integer vector");
+	if (LENGTH(chunkdim) != ndim)
+		error("'chunkdim' must have the same length as 'dim'");
+	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
+	for (i = 0; i < ndim; i++) {
+		ret = get_untrusted_elt(chunkdim, i, &chunkd, "chunkdim", -1);
 		if (ret < 0)
 			error(_HDF5Array_errmsg_buf);
 		if (chunkd < 0)
-			error("'chunk_spacings' cannot "
-			      "contain negative values");
-		if (chunkd == 0 && d != 0)
-			error("values in 'chunk_spacings' cannot be 0 unless "
+			error("'chunkdim' cannot contain negative values");
+		if (chunkd == 0 && dim_p[i] != 0)
+			error("values in 'chunkdim' cannot be 0 unless "
 			      "their corresponding value\n  in 'dim' is "
 			      "also 0");
-		dim_buf->elts[along] = d;
-		chunk_spacings_buf->elts[along] = chunkd;
+		chunkdim_buf->elts[i] = chunkd;
 	}
 
 	nstart_buf = new_IntAE(ndim, ndim, 0);
 	breakpoint_bufs = new_IntAEAE(ndim, ndim);
 	chunkidx_bufs = new_LLongAEAE(ndim, ndim);
-	ret = _map_starts_to_chunks(starts,
-			dim_buf->elts, chunk_spacings_buf->elts,
+	ret = _map_starts_to_chunks(ndim, dim_p, chunkdim_buf->elts,
+			starts,
 			nstart_buf->elts,
 			breakpoint_bufs, chunkidx_bufs);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf);
 
 	ans = PROTECT(NEW_LIST(2));
-	ans_elt = PROTECT(to_integer_LIST(breakpoint_bufs, starts));
+	ans_elt = PROTECT(to_integer_LIST(ndim, breakpoint_bufs, starts));
 	SET_VECTOR_ELT(ans, 0, ans_elt);
 	UNPROTECT(1);
-	ans_elt = PROTECT(to_numeric_LIST(chunkidx_bufs, starts));
+	ans_elt = PROTECT(to_numeric_LIST(ndim, chunkidx_bufs, starts));
 	SET_VECTOR_ELT(ans, 1, ans_elt);
 	UNPROTECT(2);
 	return ans;
 }
-
-
 

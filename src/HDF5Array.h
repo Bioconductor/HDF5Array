@@ -18,8 +18,11 @@ typedef struct {
 	size_t size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk;
-	hsize_t *h5dim, *h5chunk_spacings;
+	hsize_t *h5dim, *h5chunkdim;
 } DSetHandle;
+
+/* Like VECTOR_ELT(x, i) except that 'x' can be R_NilValue. */
+#define	GET_LIST_ELT(x, i) ((x) != R_NilValue ? VECTOR_ELT(x, i) : R_NilValue)
 
 static inline long long int _get_trusted_elt(SEXP x, int i)
 {
@@ -33,27 +36,30 @@ static inline long long int _get_trusted_elt(SEXP x, int i)
 char _HDF5Array_errmsg_buf[ERRMSG_BUF_LENGTH];
 
 int _shallow_check_selection(
+	int ndim,
 	SEXP starts,
 	SEXP counts
 );
 
 long long int _check_selection(
+	int ndim,
+	const long long int *dim,
 	SEXP starts,
 	SEXP counts,
-	const long long int *dim,
 	int *selection_dim_buf
 );
 
 SEXP C_check_selection(
+	SEXP dim,
 	SEXP starts,
-	SEXP counts,
-	SEXP dim
+	SEXP counts
 );
 
 long long int _check_ordered_selection(
+	int ndim,
+	const long long int *dim,
 	SEXP starts,
 	SEXP counts,
-	const long long int *dim,
 	int *selection_dim_buf,
 	int *nstart_buf,
 	int *nblock_buf,
@@ -61,9 +67,9 @@ long long int _check_ordered_selection(
 );
 
 SEXP C_check_ordered_selection(
+	SEXP dim,
 	SEXP starts,
-	SEXP counts,
-	SEXP dim
+	SEXP counts
 );
 
 int _selection_can_be_reduced(
@@ -73,6 +79,7 @@ int _selection_can_be_reduced(
 );
 
 SEXP _reduce_selection(
+	int ndim,
 	SEXP starts, SEXP counts,
 	const int *selection_dim,
 	const int *nblock,
@@ -80,15 +87,16 @@ SEXP _reduce_selection(
 );
 
 SEXP C_reduce_selection(
+	SEXP dim,
 	SEXP starts,
-	SEXP counts,
-	SEXP dim
+	SEXP counts
 );
 
 int _map_starts_to_chunks(
-	SEXP starts,
+	int ndim,
 	const long long int *dim,
-	const long long int *chunk_spacings,
+	const long long int *chunkdim,
+	SEXP starts,
 	int *nstart_buf,
 	IntAEAE *breakpoint_bufs,
 	LLongAEAE *chunkidx_bufs
@@ -97,7 +105,7 @@ int _map_starts_to_chunks(
 SEXP C_map_starts_to_chunks(
 	SEXP starts,
 	SEXP dim,
-	SEXP chunk_spacings
+	SEXP chunkdim
 );
 
 
@@ -115,7 +123,6 @@ int _get_DSetHandle(
 	hid_t dset_id,
 	int as_int,
 	int Rtype_only,
-	int ndim,
 	DSetHandle *dset_handle
 );
 

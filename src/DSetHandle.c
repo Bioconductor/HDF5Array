@@ -199,8 +199,8 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 {
 	if (dset_handle->h5nchunk != NULL)
 		free(dset_handle->h5nchunk);
-	if (dset_handle->h5chunk_spacings != NULL)
-		free(dset_handle->h5chunk_spacings);
+	if (dset_handle->h5chunkdim != NULL)
+		free(dset_handle->h5chunkdim);
 	if (dset_handle->h5dim != NULL)
 		free(dset_handle->h5dim);
 	if (dset_handle->plist_id != -1)
@@ -214,8 +214,7 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 	H5Dclose(dset_handle->dset_id);
 }
 
-/* 4th arg ('ndim') is ignored when 3rd arg ('get_Rtype_only') is set to 1. */
-int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
+int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 		    DSetHandle *dset_handle)
 {
 	char *storage_mode_attr;
@@ -223,8 +222,8 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	H5T_class_t H5class;
 	size_t size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
-	int dset_ndim, *h5nchunk, h5along;
-	hsize_t *h5dim, *h5chunk_spacings, d, spacing, nchunk;
+	int ndim, *h5nchunk, h5along;
+	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
 	htri_t ret;
 
 	dset_handle->dset_id = dset_id;
@@ -235,7 +234,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset_handle->space_id = -1;
 	dset_handle->plist_id = -1;
 	dset_handle->h5dim = NULL;
-	dset_handle->h5chunk_spacings = NULL;
+	dset_handle->h5chunkdim = NULL;
 	dset_handle->h5nchunk = NULL;
 
 	/* Set 'dset_handle->storage_mode_attr'. */
@@ -305,21 +304,13 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset_handle->space_id = space_id;
 
 	/* Set 'dset_handle->ndim'. */
-	dset_ndim = H5Sget_simple_extent_ndims(space_id);
-	if (dset_ndim < 0) {
+	ndim = H5Sget_simple_extent_ndims(space_id);
+	if (ndim < 0) {
 		PRINT_TO_ERRMSG_BUF(
 			"H5Sget_simple_extent_ndims() returned an error");
 		goto on_error;
 	}
-	if (ndim >= 0 && dset_ndim != ndim) {
-		PRINT_TO_ERRMSG_BUF(
-			"Dataset has %d dimensions but 'starts' has %d list "
-			"element%s.\n  'starts' must have one list element "
-			"per dimension in the dataset.",
-			dset_ndim, ndim, ndim > 1 ? "s" : "");
-		goto on_error;
-	}
-	dset_handle->ndim = dset_ndim;
+	dset_handle->ndim = ndim;
 
 	/* Set 'dset_handle->plist_id'. */
 	plist_id = H5Dget_create_plist(dset_id);
@@ -330,49 +321,46 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset_handle->plist_id = plist_id;
 
 	/* Set 'dset_handle->h5dim'. */
-	h5dim = _alloc_hsize_t_buf(dset_ndim, 0, "'h5dim'");
+	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
-	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != dset_ndim) {
+	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
 		goto on_error;
 	}
 	dset_handle->h5dim = h5dim;
 
-	/* Set 'dset_handle->h5chunk_spacings'. */
+	/* Set 'dset_handle->h5chunkdim'. */
 	if (H5Pget_layout(plist_id) == H5D_CHUNKED) {
-		h5chunk_spacings = _alloc_hsize_t_buf(dset_ndim, 0,
-						      "'h5chunk_spacings'");
-		if (h5chunk_spacings == NULL)
+		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
+		if (h5chunkdim == NULL)
 			goto on_error;
-		if (H5Pget_chunk(plist_id, dset_ndim, h5chunk_spacings) !=
-		    dset_ndim)
-		{
+		if (H5Pget_chunk(plist_id, ndim, h5chunkdim) != ndim) {
 			PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
 					    "an unexpected value");
 			goto on_error;
 		}
-		dset_handle->h5chunk_spacings = h5chunk_spacings;
+		dset_handle->h5chunkdim = h5chunkdim;
 	}
 
 	/* Set 'dset_handle->h5nchunk'. */
-	if (dset_handle->h5chunk_spacings != NULL) {
-		h5nchunk = (int *) malloc(dset_ndim * sizeof(int));
+	if (dset_handle->h5chunkdim != NULL) {
+		h5nchunk = (int *) malloc(ndim * sizeof(int));
 		if (h5nchunk == NULL) {
 			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 					    "for 'h5nchunk'");
 			goto on_error;
 		}
-		for (h5along = 0; h5along < dset_ndim; h5along++) {
+		for (h5along = 0; h5along < ndim; h5along++) {
 			d = h5dim[h5along];
 			if (d == 0) {
 				h5nchunk[h5along] = 0;
 				continue;
 			}
-			spacing = dset_handle->h5chunk_spacings[h5along];
-			nchunk = d / spacing;
-			if (d % spacing != 0)
+			chunkd = dset_handle->h5chunkdim[h5along];
+			nchunk = d / chunkd;
+			if (d % chunkd != 0)
 				nchunk++;
 			if (nchunk > INT_MAX) {
 				PRINT_TO_ERRMSG_BUF("datasets with more than "
@@ -392,11 +380,11 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only, int ndim,
 	dset_handle->ans_elt_size = ans_elt_size;
 
 	/* Set 'dset_handle->chunk_data_buf_size'. */
-	if (dset_handle->h5chunk_spacings != NULL) {
+	if (dset_handle->h5chunkdim != NULL) {
 		chunk_data_buf_size = ans_elt_size;
-		for (h5along = 0; h5along < dset_ndim; h5along++)
+		for (h5along = 0; h5along < ndim; h5along++)
 			chunk_data_buf_size *=
-				dset_handle->h5chunk_spacings[h5along];
+				dset_handle->h5chunkdim[h5along];
 		dset_handle->chunk_data_buf_size = chunk_data_buf_size;
 	}
 
@@ -501,7 +489,8 @@ SEXP C_create_DSetHandle_xp(SEXP filepath, SEXP name, SEXP as_integer)
 		error("C_create_DSetHandle_xp(): malloc() failed");
 	}
 
-	if (_get_DSetHandle(dset_id, as_int, 0, -1, dset_handle) < 0) {
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, as_int, 0, dset_handle) < 0) {
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf);
 	}
@@ -553,13 +542,13 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 		Rprintf(" %llu", dset_handle->h5dim[h5along]);
 	Rprintf("\n");
 
-	Rprintf("- h5chunk_spacings =");
-	if (dset_handle->h5chunk_spacings == NULL) {
+	Rprintf("- h5chunkdim =");
+	if (dset_handle->h5chunkdim == NULL) {
 		Rprintf(" NULL\n");
 	} else {
 		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
 			Rprintf(" %llu",
-				dset_handle->h5chunk_spacings[h5along]);
+				dset_handle->h5chunkdim[h5along]);
 		Rprintf("\n");
 		Rprintf("    h5nchunk =");
 		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
@@ -598,9 +587,8 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 
 	file_id = _get_file_id(filepath);
 	dset_id = _get_dset_id(file_id, name, filepath);
-	/* 4th arg ('ndim') is ignored when 3rd arg ('get_Rtype_only') is
-	   set to 1. _get_DSetHandle() will do H5Dclose(dset_id). */
-	if (_get_DSetHandle(dset_id, as_int, 1, 0, &dset_handle) < 0) {
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, as_int, 1, &dset_handle) < 0) {
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf);
 	}
