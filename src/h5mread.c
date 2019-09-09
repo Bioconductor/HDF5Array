@@ -1627,9 +1627,9 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		/* Note that it should be easy to support contiguous string
 		   data by treating it as if it was made of a single chunk. */
 		if (dset_handle.h5chunkdim == NULL) {
-			PRINT_TO_ERRMSG_BUF("contiguous (i.e. not chunked) "
-					    "string data is not supported "
-					    "at the moment");
+			PRINT_TO_ERRMSG_BUF("reading contiguous (i.e. not "
+					    "chunked) string data is not "
+					    "supported at the moment");
 			goto on_error;
 		}
 		if (counts != R_NilValue) {
@@ -1640,27 +1640,26 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		if (method == 0) {
 			method = 4;
 		} else if (method != 4 && method != 5) {
-			PRINT_TO_ERRMSG_BUF("reading string data is only "
-					    "supported by methods 4 and 5");
+			PRINT_TO_ERRMSG_BUF("only methods 4 and 5 support "
+					    "reading string data");
 			goto on_error;
 		}
 	} else if (method == 0) {
 		/* March 27, 2019: My early testing (from Nov 2018) seemed
 		   to indicate that method 6 was a better choice over method 4
-		   when the layout is chunked and 'counts' is NULL. Turns out
-		   that doing more testing today seems to indicate the opposite
-		   i.e. method 4 now seems to perform better than method 6 on
-		   all the datasets I've tested so far, including those used by
-		   Pete Hickey here:
+		   when 'starts' is not NULL, 'counts' is NULL, and the layout
+		   is chunked. Turns out that doing more testing today seems
+		   to indicate the opposite i.e. method 4 now seems to perform
+		   better than method 6 on all the datasets I've tested so far,
+		   including those used by Pete Hickey here:
 		     https://github.com/Bioconductor/DelayedArray/issues/13
 		   and those used in the examples in man/h5mread.Rd.
 		   Note sure what happened between Nov 2018 and today. Did I
 		   do something stupid in my early testing? Did something
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report. */
-		method = dset_handle.h5chunkdim != NULL &&
-			 //counts == R_NilValue ? 6 : 1;
-			 counts == R_NilValue ? 4 : 1;
+		method = starts != R_NilValue && counts == R_NilValue &&
+			 dset_handle.h5chunkdim != NULL ? 4 : 1;
 	}
 
 	ans_dim = PROTECT(NEW_INTEGER(dset_handle.ndim));
@@ -1668,9 +1667,12 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (method <= 3) {
 		ans = h5mread_1_2_3(&dset_handle, starts, counts, noreduce,
 				    method, INTEGER(ans_dim));
+	} else if (dset_handle.h5chunkdim == NULL) {
+		PRINT_TO_ERRMSG_BUF("methods 4, 5, and 6 can only be used "
+				    "on a chunked dataset");
 	} else if (counts != R_NilValue) {
-		PRINT_TO_ERRMSG_BUF("'counts' must be NULL for "
-				    "methods 4, 5, and 6");
+		PRINT_TO_ERRMSG_BUF("methods 4, 5, and 6 can only be used "
+				    "when 'counts' is NULL");
 	} else {
 		ans = h5mread_4_5_6(&dset_handle, starts,
 				    method, INTEGER(ans_dim));
