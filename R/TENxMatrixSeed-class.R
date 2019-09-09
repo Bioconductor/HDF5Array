@@ -70,9 +70,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 .get_TENx_component <- function(filepath, group, name, idx=NULL)
 {
     name <- paste0(group, "/", name)
-    if (!is.null(idx))
-        idx <- list(idx)
-    as.vector(h5read(filepath, name, index=idx))
+    as.vector(h5mread(filepath, name, starts=list(idx)))
 }
 
 ### Return the dimensions of the matrix.
@@ -82,7 +80,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 .get_indptr <- function(filepath, group)
 {
     name <- paste0(group, "/indptr")
-    as.vector(h5read(filepath, name, bit64conversion="double"))
+    as.vector(h5mread(filepath, name))
 }
 
 .get_data <- function(filepath, group, idx=NULL)
@@ -91,7 +89,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 .linear_get_data <- function(filepath, group, start=NULL, count=NULL)
 {
     name <- paste0(group, "/data")
-    as.vector(h5read(filepath, name, start=start, count=count))
+    as.vector(h5mread(filepath, name, starts=list(start), counts=list(count)))
 }
 
 ### Return 0-based row indices.
@@ -101,7 +99,8 @@ setMethod("dimnames", "TENxMatrixSeed",
 .linear_get_row_indices <- function(filepath, group, start=NULL, count=NULL)
 {
     name <- paste0(group, "/indices")
-    as.vector(h5read(filepath, name, start=start, count=count))
+    as.vector(h5mread(filepath, name, starts=list(start), counts=list(count),
+                      as.integer=TRUE))
 }
 
 ### Return the rownames of the matrix.
@@ -190,9 +189,9 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### .extract_nonzero_data_by_col()
 ###
 
-### Extract nonzero data using the "random" method. This method is
-### based on h5read( , index=idx) which retrieves an arbitrary/random
-### subset of the data.
+### Extract nonzero data using the "random" method.
+### This method is based on h5mread( , starts=list(idx)) which retrieves an
+### arbitrary/random subset of the data.
 ### 'j' must be an integer vector containing valid col indices. It cannot
 ### be NULL.
 .random_extract_nonzero_data_by_col <- function(x, j)
@@ -203,10 +202,10 @@ setMethod("dimnames", "TENxMatrixSeed",
     relist(data, data_indices)
 }
 
-### Extract nonzero data using the "linear" method. This method is
-### based on h5read( , start=start, count=count) which retrieves a
-### linear subset of the data and is much faster than doing
-### h5read( , index=list(seq(start, length.out=count))).
+### Extract nonzero data using the "linear" method.
+### This method is based on h5mread( , starts=list(start), counts=list(count))
+### which retrieves a linear subset of the data and should be more efficient
+### than doing h5mread( , starts=list(seq(start, length.out=count))).
 ### 'j' must be NULL or an integer vector containing valid col indices. It
 ### should not be empty.
 .linear_extract_nonzero_data_by_col <- function(x, j)
@@ -268,7 +267,7 @@ setMethod("dimnames", "TENxMatrixSeed",
 ###
 
 ### Load sparse data using the "random" method.
-### This method is based on h5read( , index=idx) which retrieves an
+### This method is based on h5mread( , starts=list(idx)) which retrieves an
 ### arbitrary/random subset of the data.
 ### 'i' must be NULL or an integer vector containing valid row indices.
 ### 'j' must be an integer vector containing valid col indices. It cannot
@@ -295,11 +294,11 @@ setMethod("dimnames", "TENxMatrixSeed",
 }
 
 ### Load sparse data using the "linear" method.
-### This method is based on h5read( , start=start, count=count) which
-### retrieves a linear subset of the data and is much faster than doing
-### h5read( , index=list(seq(start, length.out=count))).
+### This method is based on h5mread( , starts=list(start), counts=list(count))
+### which retrieves a linear subset of the data and should be more efficient
+### than doing h5mread( , starts=list(seq(start, length.out=count))).
 ### 'j' must be NULL or a non-empty integer vector containing valid
-### col indices.  ### The output is not affected by duplicates in 'j'.
+### col indices. The output is not affected by duplicates in 'j'.
 ### Return a SparseArraySeed object.
 .linear_load_SparseArraySeed_from_TENxMatrixSeed <- function(x, j)
 {
