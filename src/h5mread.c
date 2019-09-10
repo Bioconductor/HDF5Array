@@ -1474,7 +1474,7 @@ static SEXP h5mread_1_2_3(const DSetHandle *dset_handle,
 			  int method, int *ans_dim)
 {
 	int ndim, ret;
-	long long ans_len;
+	long long int ans_len;
 	IntAE *nstart_buf, *nblock_buf;
 	LLongAE *last_block_start_buf;
 	SEXP ans, reduced;
@@ -1607,7 +1607,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 {
 	SEXP ans, ans_dim;
 	DSetHandle dset_handle;
-	int ret;
+	int ret, along;
 
 	ans = R_NilValue;
 
@@ -1647,19 +1647,30 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	} else if (method == 0) {
 		/* March 27, 2019: My early testing (from Nov 2018) seemed
 		   to indicate that method 6 was a better choice over method 4
-		   when 'starts' is not NULL, 'counts' is NULL, and the layout
-		   is chunked. Turns out that doing more testing today seems
-		   to indicate the opposite i.e. method 4 now seems to perform
-		   better than method 6 on all the datasets I've tested so far,
-		   including those used by Pete Hickey here:
+		   when the layout is chunked and 'counts' is NULL. Turns out
+		   that doing more testing today seems to indicate the opposite
+		   i.e. method 4 now seems to perform better than method 6 on
+		   all the datasets I've tested so far, including those used
+		   by Pete Hickey here:
 		     https://github.com/Bioconductor/DelayedArray/issues/13
 		   and those used in the examples in man/h5mread.Rd.
 		   Note sure what happened between Nov 2018 and today. Did I
 		   do something stupid in my early testing? Did something
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report. */
-		method = starts != R_NilValue && counts == R_NilValue &&
-			 dset_handle.h5chunkdim != NULL ? 4 : 1;
+		method = 1;
+		if (dset_handle.h5chunkdim != NULL &&
+		    counts == R_NilValue &&
+		    starts != R_NilValue)
+		{
+			for (along = 0; along < dset_handle.ndim; along++) {
+				if (VECTOR_ELT(starts, along) != R_NilValue) {
+					//method = 6;
+					method = 4;
+					break;
+				}
+			}
+		}
 	}
 
 	ans_dim = PROTECT(NEW_INTEGER(dset_handle.ndim));

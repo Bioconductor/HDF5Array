@@ -49,7 +49,9 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
         if (!is.null(counts))
             stop(wmsg("'counts' must be NULL when 'starts' is NULL"))
     } else if (is.list(starts)) {
-        if (is.null(counts)) {
+        order_starts <- is.null(counts) &&
+                        !all(S4Vectors:::sapply_isNULL(starts))
+        if (order_starts) {
             ## Round the 'starts'.
             starts0 <- lapply(starts,
                 function(start) {
@@ -63,15 +65,20 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
                     start
                 })
             ok <- vapply(starts0,
-                function(start) is.null(start) || isStrictlySorted(start),
+                function(start0) is.null(start0) || isStrictlySorted(start0),
                 logical(1))
-            starts <- lapply(seq_along(starts0),
-                function(i) {
-                    start <- starts0[[i]]
-                    if (ok[[i]])
-                        return(start)
-                    unique(sort(start))
-                })
+            order_starts <- !all(ok)
+            if (order_starts) {
+                starts <- lapply(seq_along(starts0),
+                    function(i) {
+                        start0 <- starts0[[i]]
+                        if (ok[[i]])
+                            return(start0)
+                        unique(sort(start0))
+                    })
+            } else {
+                starts <- starts0
+            }
         }
     } else {
         stop(wmsg("'starts' must be a list (or NULL)"))
@@ -79,7 +86,7 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
     ans <- .Call("C_h5mread", filepath, name, starts, counts, noreduce,
                               as.integer, method,
                               PACKAGE="HDF5Array")
-    if (is.null(starts) || !is.null(counts))
+    if (is.null(starts) || !order_starts)
         return(ans)
     Nindex <- lapply(seq_along(starts0),
         function(i) {
