@@ -67,64 +67,55 @@ setMethod("dimnames", "TENxMatrixSeed",
 ###
 
 ### All the 10xGenomics components are monodimensional.
-.get_TENx_component <- function(filepath, group, name, idx=NULL)
+.read_tenx_component <- function(filepath, group, name, start=NULL, count=NULL,
+                                 as.integer=FALSE)
 {
     name <- paste0(group, "/", name)
-    as.vector(h5mread(filepath, name, starts=list(idx)))
+    if (!is.null(start))
+        start <- list(start)
+    if (!is.null(count))
+        count <- list(count)
+    as.vector(h5mread(filepath, name, starts=start, counts=count,
+                      as.integer=as.integer))
 }
 
 ### Return the dimensions of the matrix.
-.get_shape <- function(filepath, group)
-    .get_TENx_component(filepath, group, "shape")
+.get_tenx_shape <- function(filepath, group)
+    .read_tenx_component(filepath, group, "shape")
 
-.get_indptr <- function(filepath, group)
-{
-    name <- paste0(group, "/indptr")
-    as.vector(h5mread(filepath, name))
-}
+.get_tenx_indptr <- function(filepath, group)
+    .read_tenx_component(filepath, group, "indptr")
 
-.get_data <- function(filepath, group, idx=NULL)
-    .get_TENx_component(filepath, group, "data", idx=idx)
+.get_tenx_data <- function(filepath, group, start=NULL, count=NULL)
+    .read_tenx_component(filepath, group, "data", start=start, count=count)
 
-.linear_get_data <- function(filepath, group, start=NULL, count=NULL)
-{
-    name <- paste0(group, "/data")
-    as.vector(h5mread(filepath, name, starts=list(start), counts=list(count)))
-}
-
-### Return 0-based row indices.
-.get_row_indices <- function(filepath, group, idx=NULL)
-    .get_TENx_component(filepath, group, "indices", idx=idx)
-
-.linear_get_row_indices <- function(filepath, group, start=NULL, count=NULL)
-{
-    name <- paste0(group, "/indices")
-    as.vector(h5mread(filepath, name, starts=list(start), counts=list(count),
-                      as.integer=TRUE))
-}
+### The row indices in the HDF5 file are 0-based but we return them 1-based.
+.get_tenx_row_indices <- function(filepath, group, start=NULL, count=NULL)
+    .read_tenx_component(filepath, group, "indices", start=start, count=count,
+                         as.integer=TRUE) + 1L
 
 ### Return the rownames of the matrix.
-.get_genes <- function(filepath, group, idx=NULL)
+.get_tenx_genes <- function(filepath, group)
 {
     if (!h5exists(filepath, paste0(group, "/genes")))
         return(NULL)
-    .get_TENx_component(filepath, group, "genes", idx=idx)
+    .read_tenx_component(filepath, group, "genes")
 }
 
 ### Currently unused.
-.get_gene_names <- function(filepath, group, idx=NULL)
+.get_tenx_gene_names <- function(filepath, group)
 {
     if (!h5exists(filepath, paste0(group, "/gene_names")))
         return(NULL)
-    .get_TENx_component(filepath, group, "gene_names", idx=idx)
+    .read_tenx_component(filepath, group, "gene_names")
 }
 
 ### Return the colnames of the matrix.
-.get_barcodes <- function(filepath, group, idx=NULL)
+.get_tenx_barcodes <- function(filepath, group)
 {
     if (!h5exists(filepath, paste0(group, "/barcodes")))
         return(NULL)
-    .get_TENx_component(filepath, group, "barcodes", idx=idx)
+    .read_tenx_component(filepath, group, "barcodes")
 }
 
 
@@ -173,12 +164,11 @@ setMethod("dimnames", "TENxMatrixSeed",
     start <- x@col_ranges[j1, "start"]
     count_per_col <- x@col_ranges[j12, "width"]
     count <- sum(count_per_col)
-    ans_nzdata <- .linear_get_data(x@filepath, x@group,
-                                   start=start, count=count)
+    ans_nzdata <- .get_tenx_data(x@filepath, x@group, start=start, count=count)
     if (!as.sparse)
         return(relist(ans_nzdata, PartitioningByWidth(count_per_col)))
-    row_indices <- .linear_get_row_indices(x@filepath, x@group,
-                                           start=start, count=count) + 1L
+    row_indices <- .get_tenx_row_indices(x@filepath, x@group,
+                                         start=start, count=count)
     col_indices <- rep.int(j12, count_per_col)
     ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
     SparseArraySeed(dim(x), ans_aind, ans_nzdata, check=FALSE)
@@ -190,15 +180,15 @@ setMethod("dimnames", "TENxMatrixSeed",
 ###
 
 ### Extract nonzero data using the "random" method.
-### This method is based on h5mread( , starts=list(idx)) which retrieves an
-### arbitrary/random subset of the data.
+### This method is based on h5mread( , starts=list(start)) which retrieves
+### an arbitrary/random subset of the data.
 ### 'j' must be an integer vector containing valid col indices. It cannot
 ### be NULL.
 .random_extract_nonzero_data_by_col <- function(x, j)
 {
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
-    data <- .get_data(x@filepath, x@group, idx=idx2)
+    data <- .get_tenx_data(x@filepath, x@group, start=idx2)
     relist(data, data_indices)
 }
 
@@ -267,8 +257,8 @@ setMethod("dimnames", "TENxMatrixSeed",
 ###
 
 ### Load sparse data using the "random" method.
-### This method is based on h5mread( , starts=list(idx)) which retrieves an
-### arbitrary/random subset of the data.
+### This method is based on h5mread( , starts=list(start)) which retrieves
+### an arbitrary/random subset of the data.
 ### 'i' must be NULL or an integer vector containing valid row indices.
 ### 'j' must be an integer vector containing valid col indices. It cannot
 ### be NULL.
@@ -280,7 +270,7 @@ setMethod("dimnames", "TENxMatrixSeed",
     stopifnot(is.null(i) || is.numeric(i), is.numeric(j))
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
-    row_indices <- .get_row_indices(x@filepath, x@group, idx=idx2) + 1L
+    row_indices <- .get_tenx_row_indices(x@filepath, x@group, start=idx2)
     col_indices <- rep.int(j, lengths(data_indices))
     if (!is.null(i)) {
         keep_idx <- which(row_indices %in% i)
@@ -289,7 +279,7 @@ setMethod("dimnames", "TENxMatrixSeed",
         col_indices <- col_indices[keep_idx]
     }
     ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
-    ans_nzdata <- .get_data(x@filepath, x@group, idx=idx2)
+    ans_nzdata <- .get_tenx_data(x@filepath, x@group, start=idx2)
     SparseArraySeed(dim(x), ans_aind, ans_nzdata, check=FALSE)
 }
 
@@ -341,7 +331,7 @@ setMethod("dimnames", "TENxMatrixSeed",
     ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L)) {
         ## Return an empty matrix.
-        data0 <- .get_data(x@filepath, x@group, idx=integer(0))
+        data0 <- .get_tenx_data(x@filepath, x@group, start=integer(0))
         return(array(data0, dim=ans_dim))
     }
     sas <- .load_SparseArraySeed_from_TENxMatrixSeed(x, index)  # I/O
@@ -376,13 +366,13 @@ TENxMatrixSeed <- function(filepath, group="mm10")
         stop(wmsg("'group' cannot be the empty string"))
 
     ## dim
-    dim <- .get_shape(filepath, group)
+    dim <- .get_tenx_shape(filepath, group)
     stopifnot(length(dim) == 2L)
 
     ## dimnames
-    rownames <- .get_genes(filepath, group)
+    rownames <- .get_tenx_genes(filepath, group)
     stopifnot(is.null(rownames) || length(rownames) == dim[[1L]])
-    colnames <- .get_barcodes(filepath, group)
+    colnames <- .get_tenx_barcodes(filepath, group)
     stopifnot(is.null(colnames) || length(colnames) == dim[[2L]])
     dimnames <- list(rownames, colnames)
 
@@ -390,7 +380,7 @@ TENxMatrixSeed <- function(filepath, group="mm10")
     data_len <- h5length(filepath, paste0(group, "/data"))
     indices_len <- h5length(filepath, paste0(group, "/indices"))
     stopifnot(data_len == indices_len)
-    indptr <- .get_indptr(filepath, group)
+    indptr <- .get_tenx_indptr(filepath, group)
     stopifnot(length(indptr) == dim[[2L]] + 1L,
               indptr[[1L]] == 0L,
               indptr[[length(indptr)]] == data_len)
@@ -496,9 +486,9 @@ setMethod("extractNonzeroDataByCol", "TENxMatrixSeed",
 
 .from_TENxMatrixSeed_to_dgCMatrix <- function(from)
 {
-    row_indices <- .get_row_indices(from@filepath, from@group) + 1L
-    indptr <- .get_indptr(from@filepath, from@group)
-    data <- .get_data(from@filepath, from@group)
+    row_indices <- .get_tenx_row_indices(from@filepath, from@group)
+    indptr <- .get_tenx_indptr(from@filepath, from@group)
+    data <- .get_tenx_data(from@filepath, from@group)
     sparseMatrix(i=row_indices, p=indptr, x=data, dims=dim(from),
                  dimnames=dimnames(from))
 }
