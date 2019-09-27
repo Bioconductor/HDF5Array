@@ -12,7 +12,7 @@
 
 h5exists <- function(filepath, name)
 {
-    fid <- H5Fopen(filepath)
+    fid <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
     on.exit(H5Fclose(fid))
     H5Lexists(fid, name)
 }
