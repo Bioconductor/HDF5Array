@@ -85,10 +85,7 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
     if (adjust) {
         dim <- h5dim(filepath, name, as.integer=FALSE)
         ## A sanity check that should never fail.
-        if (length(chunkdim) != length(dim) || any(chunkdim > pmax(dim, 1L)))
-            stop(wmsg("the chunk dimensions of HDF5 dataset '", name, "' ",
-                      "from file '", filepath, "' are not compatible with ",
-                      "its dimensions"))
+        stopifnot(length(chunkdim) == length(dim))
         chunkdim <- as.integer(pmin(dim, chunkdim))
     }
     chunkdim
