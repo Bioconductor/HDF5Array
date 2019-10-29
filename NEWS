@@ -1,3 +1,19 @@
+CHANGES IN VERSION 1.14.0
+-------------------------
+
+NEW FEATURES
+
+    o Add coercions from TENxMatrix (or TENxMatrixSeed) to dgCMatrix
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o h5mread() argument 'starts' now defaults to NULL
+
+BUG FIXES
+
+    o h5mread() now supports datasets with contiguous layout (i.e. not chunked)
+
+
 CHANGES IN VERSION 1.12.0
 -------------------------
 
