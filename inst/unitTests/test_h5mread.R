@@ -267,6 +267,7 @@ test_h5mread_2D <- function()
         do_2D_tests(m0, M0, noreduce=TRUE, method=3L)
         do_2D_tests(m0, M0, method=4L)
         do_2D_tests(m0, M0, method=6L)
+        do_2D_tests(m0, M0, method=7L)
         do_2D_tests(m0, M0)
     }
 
@@ -282,11 +283,14 @@ test_h5mread_2D <- function()
         do_2D_tests(m1, M1, noreduce=TRUE, method=3L)
         do_2D_tests(m1, M1, method=4L)
         do_2D_tests(m1, M1, method=6L)
+        do_2D_tests(m1, M1, method=7L)
         do_2D_tests(m1, M1)
         storage.mode(m1) <- "integer"
         do_2D_tests(m1, M1, as.integer=TRUE)
         do_2D_tests(m1, M1, as.integer=TRUE, method=1L)
+        do_2D_tests(m1, M1, as.integer=TRUE, method=4L)
         do_2D_tests(m1, M1, as.integer=TRUE, method=6L)
+        do_2D_tests(m1, M1, as.integer=TRUE, method=7L)
     }
 
     ## with a numeric matrix
@@ -301,11 +305,14 @@ test_h5mread_2D <- function()
         do_2D_tests(m2, M2, noreduce=TRUE, method=3L)
         do_2D_tests(m2, M2, method=4L)
         do_2D_tests(m2, M2, method=6L)
+        do_2D_tests(m2, M2, method=7L)
         do_2D_tests(m2, M2)
         storage.mode(m2) <- "integer"
         do_2D_tests(m2, M2, as.integer=TRUE)
         do_2D_tests(m2, M2, as.integer=TRUE, method=1L)
+        do_2D_tests(m2, M2, as.integer=TRUE, method=4L)
         do_2D_tests(m2, M2, as.integer=TRUE, method=6L)
+        do_2D_tests(m2, M2, as.integer=TRUE, method=7L)
     }
 
     ## with a character matrix
@@ -407,6 +414,7 @@ test_h5mread_3D <- function()
         do_3D_tests(a0, A0, noreduce=TRUE, method=3L)
         do_3D_tests(a0, A0, method=4L)
         do_3D_tests(a0, A0, method=6L)
+        do_3D_tests(a0, A0, method=7L)
         do_3D_tests(a0, A0)
     }
 
@@ -422,11 +430,14 @@ test_h5mread_3D <- function()
         do_3D_tests(a1, A1, noreduce=TRUE, method=3L)
         do_3D_tests(a1, A1, method=4L)
         do_3D_tests(a1, A1, method=6L)
+        do_3D_tests(a1, A1, method=7L)
         do_3D_tests(a1, A1)
         storage.mode(a1) <- "integer"
         do_3D_tests(a1, A1, as.integer=TRUE)
         do_3D_tests(a1, A1, as.integer=TRUE, method=1L)
+        do_3D_tests(a1, A1, as.integer=TRUE, method=4L)
         do_3D_tests(a1, A1, as.integer=TRUE, method=6L)
+        do_3D_tests(a1, A1, as.integer=TRUE, method=7L)
     }
 
     ## with a numeric array
@@ -441,11 +452,14 @@ test_h5mread_3D <- function()
         do_3D_tests(a2, A2, noreduce=TRUE, method=3L)
         do_3D_tests(a2, A2, method=4L)
         do_3D_tests(a2, A2, method=6L)
+        do_3D_tests(a2, A2, method=7L)
         do_3D_tests(a2, A2)
         storage.mode(a2) <- "integer"
         do_3D_tests(a2, A2, as.integer=TRUE)
         do_3D_tests(a2, A2, as.integer=TRUE, method=1L)
+        do_3D_tests(a2, A2, as.integer=TRUE, method=4L)
         do_3D_tests(a2, A2, as.integer=TRUE, method=6L)
+        do_3D_tests(a2, A2, as.integer=TRUE, method=7L)
     }
 
     ## with a character array
