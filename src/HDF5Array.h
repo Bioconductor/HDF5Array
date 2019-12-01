@@ -6,7 +6,7 @@
 #define ERRMSG_BUF_LENGTH 256
 
 #define PRINT_TO_ERRMSG_BUF(...) \
-	snprintf(_HDF5Array_errmsg_buf, ERRMSG_BUF_LENGTH, __VA_ARGS__)
+	snprintf(_HDF5Array_errmsg_buf(), ERRMSG_BUF_LENGTH, __VA_ARGS__)
 
 /* A data structure for handling an HDF5 dataset. Collect various information
    about the dataset. What is collected are basically the things needed by the
@@ -33,7 +33,7 @@ static inline long long int _get_trusted_elt(SEXP x, int i)
 
 /* array_selection.c */
 
-char _HDF5Array_errmsg_buf[ERRMSG_BUF_LENGTH];
+char * _HDF5Array_errmsg_buf();
 
 int _shallow_check_selection(
 	int ndim,

@@ -492,7 +492,7 @@ SEXP C_create_DSetHandle_xp(SEXP filepath, SEXP name, SEXP as_integer)
 	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
 	if (_get_DSetHandle(dset_id, as_int, 0, dset_handle) < 0) {
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf);
+		error(_HDF5Array_errmsg_buf());
 	}
 	H5Fclose(file_id);
 	//printf("DSetHandle struct created at address %p\n", dset_handle);
@@ -590,7 +590,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
 	if (_get_DSetHandle(dset_id, as_int, 1, &dset_handle) < 0) {
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf);
+		error(_HDF5Array_errmsg_buf());
 	}
 	H5Fclose(file_id);
 	return ScalarString(type2str(dset_handle.Rtype));

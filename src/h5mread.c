@@ -1946,7 +1946,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	H5Fclose(file_id);
 	if (ans == R_NilValue) {
 		UNPROTECT(1);
-		error(_HDF5Array_errmsg_buf);
+		error(_HDF5Array_errmsg_buf());
 	}
 	UNPROTECT(1);
 	return ans;
