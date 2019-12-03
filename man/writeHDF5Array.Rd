@@ -64,6 +64,9 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
   }
+  \item{maxdim}{
+    The maximum extension of the array.
+  }
 }
 
 \details{
