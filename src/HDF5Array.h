@@ -19,6 +19,7 @@ typedef struct {
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunkdim;
+	H5D_layout_t layout;
 } DSetHandle;
 
 /* Like VECTOR_ELT(x, i) except that 'x' can be R_NilValue. */

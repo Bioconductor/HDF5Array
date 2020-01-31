@@ -126,7 +126,7 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 
 static const char *H5class2str(H5T_class_t H5class)
 {
-	static char s[20];
+	static char s[32];
 
 	switch (H5class) {
 	    case H5T_INTEGER:   return "H5T_INTEGER";
@@ -142,7 +142,7 @@ static const char *H5class2str(H5T_class_t H5class)
 	    case H5T_ARRAY:     return "H5T_ARRAY";
 	    default: break;
 	}
-	sprintf(s, "%d", H5class);
+	sprintf(s, "unknown (%d)", H5class);
 	return s;
 }
 
@@ -169,6 +169,21 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
 	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
 			    H5class2str(H5class));
 	return -1;
+}
+
+static const char *layout2str(H5D_layout_t layout)
+{
+	static char s[32];
+
+	switch (layout) {
+	    case H5D_COMPACT:    return "H5D_COMPACT";
+	    case H5D_CONTIGUOUS: return "H5D_CONTIGUOUS";
+	    case H5D_CHUNKED:    return "H5D_CHUNKED";
+	    case H5D_VIRTUAL:    return "H5D_VIRTUAL";
+	    default: break;
+	}
+	sprintf(s, "unknown (%d)", layout);
+	return s;
 }
 
 static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t size)
@@ -199,7 +214,8 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 {
 	if (dset_handle->h5nchunk != NULL)
 		free(dset_handle->h5nchunk);
-	if (dset_handle->h5chunkdim != NULL)
+	if (dset_handle->h5chunkdim != NULL &&
+	    dset_handle->h5chunkdim != dset_handle->h5dim)
 		free(dset_handle->h5chunkdim);
 	if (dset_handle->h5dim != NULL)
 		free(dset_handle->h5dim);
@@ -331,8 +347,11 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	}
 	dset_handle->h5dim = h5dim;
 
+	/* Set 'dset_handle->layout'. */
+	dset_handle->layout = H5Pget_layout(plist_id);
+
 	/* Set 'dset_handle->h5chunkdim'. */
-	if (H5Pget_layout(plist_id) == H5D_CHUNKED) {
+	if (dset_handle->layout == H5D_CHUNKED) {
 		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
 		if (h5chunkdim == NULL)
 			goto on_error;
@@ -342,6 +361,13 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 			goto on_error;
 		}
 		dset_handle->h5chunkdim = h5chunkdim;
+	} else if (dset_handle->Rtype == STRSXP) {
+		/* Even though the dataset is contiguous, we treat it as
+		   if it was made of a single chunk. This is so we can
+		   use h5mread() methods 4 or 5 on it, which work only
+		   on chunked data and are the only methods that know
+		   how to handle string data. */
+		dset_handle->h5chunkdim = dset_handle->h5dim;
 	}
 
 	/* Set 'dset_handle->h5nchunk'. */
@@ -542,6 +568,8 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 		Rprintf(" %llu", dset_handle->h5dim[h5along]);
 	Rprintf("\n");
 
+	Rprintf("- layout = %s\n", layout2str(dset_handle->layout));
+
 	Rprintf("- h5chunkdim =");
 	if (dset_handle->h5chunkdim == NULL) {
 		Rprintf(" NULL\n");
@@ -549,6 +577,9 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
 			Rprintf(" %llu",
 				dset_handle->h5chunkdim[h5along]);
+		if (dset_handle->layout != H5D_CHUNKED &&
+		    dset_handle->h5chunkdim == dset_handle->h5dim)
+			Rprintf(" (artificially set to h5dim)");
 		Rprintf("\n");
 		Rprintf("    h5nchunk =");
 		for (h5along = 0; h5along < dset_handle->ndim; h5along++)

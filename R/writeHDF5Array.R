@@ -14,13 +14,14 @@
 setClass("HDF5RealizationSink",
     contains="RealizationSink",
     representation(
-        dim="integer",          # Naming this slot "dim" makes dim() work
-                                # out of the box.
+        dim="integer",              # Naming this slot "dim" makes dim() work
+                                    # out of the box.
         dimnames="list",
-        type="character",       # Single string.
-        filepath="character",   # Single string.
-        name="character",       # Dataset name.
-        chunkdim="integer"      # Parallel to 'dim' slot.
+        type="character",           # Single string.
+        filepath="character",       # Single string.
+        name="character",           # Dataset name.
+        chunkdim="integer_OR_NULL"  # An integer vector parallel to the 'dim'
+                                    # slot or NULL.
     )
 )
 
@@ -61,6 +62,9 @@ setMethod("type", "HDF5RealizationSink", function(x) x@type)
     chunkdim
 }
 
+### Unlike with rhdf5::h5createDataset(), if 'chunkdim' is NULL then an
+### automatic chunk geometry will be used. To write "unchunked data" (a.k.a.
+### contiguous data), 'chunkdim' must be set to 0.
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, name=NULL,
@@ -81,11 +85,17 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         ## getHDF5DumpChunkDim() to return 'chunkdim(x)' if it's not NULL.
         ## See TODO comment in dump-management.R
         chunkdim <- getHDF5DumpChunkDim(dim)
+    } else if (isSingleNumber(chunkdim) && chunkdim == 0) {
+        chunkdim <- NULL  # no chunking
     } else {
         chunkdim <- .normarg_chunkdim(chunkdim, dim)
     }
     if (is.null(level)) {
-        level <- getHDF5DumpCompressionLevel()
+        if (is.null(chunkdim)) {
+            level <- 0L
+        } else {
+            level <- getHDF5DumpCompressionLevel()
+        }
     } else {
         level <- normalize_compression_level(level)
     }
@@ -154,8 +164,11 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### writeHDF5Array()
 ###
 
-### Write the dataset to the current dump if 'filepath' and 'name' are not
-### specified.
+### If 'filepath' and 'name' are NULL (the default), write the dataset to
+### the current dump.
+### If 'chunkdim' is NULL, an automatic chunk geometry will be used.
+### To write "unchunked data" (a.k.a. contiguous data), 'chunkdim' must be
+### set to 0.
 ### Return an HDF5Array object pointing to the newly written HDF5 dataset
 ### on disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs

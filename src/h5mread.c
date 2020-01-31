@@ -1831,14 +1831,6 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		goto on_error;
 	}
 	if (dset_handle.Rtype == STRSXP) {
-		/* Note that it should be easy to support contiguous string
-		   data by treating it as if it was made of a single chunk. */
-		if (dset_handle.h5chunkdim == NULL) {
-			PRINT_TO_ERRMSG_BUF("reading contiguous (i.e. not "
-					    "chunked) string data is not "
-					    "supported at the moment");
-			goto on_error;
-		}
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "reading string data");
@@ -1891,8 +1883,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		ans = h5mread_1_2_3(&dset_handle, starts, counts, noreduce,
 				    method, INTEGER(ans_dim));
 	} else if (dset_handle.h5chunkdim == NULL) {
-		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can only be used "
-				    "on a chunked dataset");
+		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 cannot be used "
+				    "on a contiguous dataset (unless\n"
+				    "  it contains string data in which "
+				    "case methods 4 and 5 can be used)");
 	} else if (counts != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can only be used "
 				    "when 'counts' is NULL");

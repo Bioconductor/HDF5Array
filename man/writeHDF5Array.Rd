@@ -53,8 +53,12 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
   }
   \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.
-    By default, \code{getHDF5DumpChunkDim(dim(x))} will be used.
+    By default (i.e. when \code{chunkdim} is set to \code{NULL}),
+    \code{getHDF5DumpChunkDim(dim(x))} will be used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.
+
+    Set \code{chunkdim} to 0 to write \emph{unchunked data} (a.k.a.
+    \emph{contiguous data}).
   }
   \item{level}{
     The compression level to use for writing the data to disk.
