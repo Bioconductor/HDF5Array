@@ -15,11 +15,11 @@ typedef struct {
 	hid_t dset_id, dtype_id, space_id, plist_id, mem_type_id;
 	char *storage_mode_attr;
 	H5T_class_t H5class;
-	size_t size, ans_elt_size, chunk_data_buf_size;
+	size_t H5size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunkdim;
-	H5D_layout_t layout;
+	H5D_layout_t H5layout;
 } DSetHandle;
 
 /* Like VECTOR_ELT(x, i) except that 'x' can be R_NilValue. */

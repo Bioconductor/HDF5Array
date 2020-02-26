@@ -39,6 +39,7 @@ static void *get_dataptr(SEXP x)
 	    case LGLSXP:  return LOGICAL(x);
 	    case INTSXP:  return INTEGER(x);
 	    case REALSXP: return REAL(x);
+	    case RAWSXP:  return RAW(x);
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return NULL;
@@ -880,7 +881,7 @@ static int load_chunk(const DSetHandle *dset_handle,
 }
 
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
-			const int *outdim, const Viewport *destvp,
+			const int *out_dim, const Viewport *destvp,
 			const Viewport *chunkvp,
 			const hsize_t *h5chunkdim,
 			size_t *in_offset, size_t *out_offset)
@@ -892,7 +893,7 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 	in_off = out_off = 0;
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
 		in_off *= h5chunkdim[h5along];
-		out_off *= outdim[along];
+		out_off *= out_dim[along];
 		i = destvp->off[along];
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue)
@@ -910,7 +911,7 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 static inline void update_in_offset_and_out_offset(int ndim,
 			const int *inner_midx, int inner_moved_along,
 			SEXP starts,
-			const int *outdim, const Viewport *destvp,
+			const int *out_dim, const Viewport *destvp,
 			const hsize_t *h5chunkdim,
 			size_t *in_offset, size_t *out_offset)
 {
@@ -934,7 +935,7 @@ static inline void update_in_offset_and_out_offset(int ndim,
 		h5along = ndim - inner_moved_along;
 		do {
 			in_off_inc *= h5chunkdim[h5along];
-			out_off_inc *= outdim[along];
+			out_off_inc *= out_dim[along];
 			di = 1 - destvp->dim[along];
 			start = GET_LIST_ELT(starts, along);
 			if (start != R_NilValue) {
@@ -958,14 +959,12 @@ static inline void update_in_offset_and_out_offset(int ndim,
 }
 
 static int gather_chunk_data(const DSetHandle *dset_handle,
-			int outer_moved_along,
-			SEXP starts, const IntAEAE *breakpoint_bufs,
+			SEXP starts,
 			const void *in,
 			const Viewport *chunkvp,
-			SEXP ans, const int *outdim,
+			SEXP ans, const int *out_dim,
 			const Viewport *destvp,
-			int *inner_midx_buf,
-			hid_t mem_type_id)
+			int *inner_midx_buf)
 {
 	int ndim, inner_moved_along;
 	size_t in_offset, out_offset, s_len;
@@ -975,7 +974,7 @@ static int gather_chunk_data(const DSetHandle *dset_handle,
 
 	ndim = dset_handle->ndim;
 	init_in_offset_and_out_offset(ndim, starts,
-			outdim, destvp,
+			out_dim, destvp,
 			chunkvp, dset_handle->h5chunkdim,
 			&in_offset, &out_offset);
 
@@ -994,13 +993,16 @@ static int gather_chunk_data(const DSetHandle *dset_handle,
 			REAL(ans)[out_offset] = ((double *) in)[in_offset];
 		    break;
 		    case STRSXP:
-			s = (char *) in + in_offset * dset_handle->size;
-			for (s_len = 0; s_len < dset_handle->size; s_len++)
+			s = (char *) in + in_offset * dset_handle->H5size;
+			for (s_len = 0; s_len < dset_handle->H5size; s_len++)
 				if (s[s_len] == 0)
 					break;
 			ans_elt = PROTECT(mkCharLen(s, s_len));
 			SET_STRING_ELT(ans, out_offset, ans_elt);
 			UNPROTECT(1);
+		    break;
+		    case RAWSXP:
+			RAW(ans)[out_offset] = ((char *) in)[in_offset];
 		    break;
 		    default:
 			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
@@ -1014,7 +1016,7 @@ static int gather_chunk_data(const DSetHandle *dset_handle,
 		update_in_offset_and_out_offset(ndim,
 				inner_midx_buf, inner_moved_along,
 				starts,
-				outdim, destvp,
+				out_dim, destvp,
 				dset_handle->h5chunkdim,
 				&in_offset, &out_offset);
 	};
@@ -1055,13 +1057,11 @@ static int read_data_from_chunk_4_5(const DSetHandle *dset_handle, int method,
 	if (ret < 0)
 		return ret;
 	ret = gather_chunk_data(dset_handle,
-			moved_along,
-			starts, breakpoint_bufs,
+			starts,
 			chunk_data_buf,
 			chunkvp_buf,
 			ans, ans_dim, destvp_buf,
-			inner_midx_buf,
-			dset_handle->mem_type_id);
+			inner_midx_buf);
 	return ret;
 }
 

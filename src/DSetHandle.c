@@ -9,6 +9,43 @@
 #include <limits.h>  /* for INT_MAX */
 
 
+static const char *H5class2str(H5T_class_t H5class)
+{
+	static char s[32];
+
+	switch (H5class) {
+	    case H5T_INTEGER:   return "H5T_INTEGER";
+	    case H5T_FLOAT:     return "H5T_FLOAT";
+	    case H5T_STRING:    return "H5T_STRING";
+	    case H5T_TIME:      return "H5T_TIME";
+	    case H5T_BITFIELD:  return "H5T_BITFIELD";
+	    case H5T_OPAQUE:    return "H5T_OPAQUE";
+	    case H5T_COMPOUND:  return "H5T_COMPOUND";
+	    case H5T_REFERENCE: return "H5T_REFERENCE";
+	    case H5T_ENUM:      return "H5T_ENUM";
+	    case H5T_VLEN:      return "H5T_VLEN";
+	    case H5T_ARRAY:     return "H5T_ARRAY";
+	    default: break;
+	}
+	sprintf(s, "unknown (%d)", H5class);
+	return s;
+}
+
+static const char *H5layout2str(H5D_layout_t H5layout)
+{
+	static char s[32];
+
+	switch (H5layout) {
+	    case H5D_COMPACT:    return "H5D_COMPACT";
+	    case H5D_CONTIGUOUS: return "H5D_CONTIGUOUS";
+	    case H5D_CHUNKED:    return "H5D_CHUNKED";
+	    case H5D_VIRTUAL:    return "H5D_VIRTUAL";
+	    default: break;
+	}
+	sprintf(s, "unknown (%d)", H5layout);
+	return s;
+}
+
 hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
 {
 	hsize_t *buf;
@@ -118,42 +155,32 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 		*Rtype = STRSXP;
 		return 0;
 	}
+	if (strcmp(storage_mode, "raw") == 0) {
+		*Rtype = as_int ? INTSXP : RAWSXP;
+		return 0;
+	}
 	PRINT_TO_ERRMSG_BUF("the dataset to read has a \"storage.mode\" "
 			    "attribute set to unsupported value: \"%s\"",
 			    storage_mode);
 	return -1;
 }
 
-static const char *H5class2str(H5T_class_t H5class)
-{
-	static char s[32];
-
-	switch (H5class) {
-	    case H5T_INTEGER:   return "H5T_INTEGER";
-	    case H5T_FLOAT:     return "H5T_FLOAT";
-	    case H5T_STRING:    return "H5T_STRING";
-	    case H5T_TIME:      return "H5T_TIME";
-	    case H5T_BITFIELD:  return "H5T_BITFIELD";
-	    case H5T_OPAQUE:    return "H5T_OPAQUE";
-	    case H5T_COMPOUND:  return "H5T_COMPOUND";
-	    case H5T_REFERENCE: return "H5T_REFERENCE";
-	    case H5T_ENUM:      return "H5T_ENUM";
-	    case H5T_VLEN:      return "H5T_VLEN";
-	    case H5T_ARRAY:     return "H5T_ARRAY";
-	    default: break;
-	}
-	sprintf(s, "unknown (%d)", H5class);
-	return s;
-}
-
 /* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
    support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
-static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
+static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t H5size,
 				SEXPTYPE *Rtype)
 {
 	switch (H5class) {
 	    case H5T_INTEGER:
-		*Rtype = (as_int || size <= sizeof(int)) ? INTSXP : REALSXP;
+		if (as_int) {
+			*Rtype = INTSXP;
+		} else if (H5size <= sizeof(char)) {
+			*Rtype = RAWSXP;
+		} else if (H5size <= sizeof(int)) {
+			*Rtype = INTSXP;
+		} else {
+			*Rtype = REALSXP;
+		}
 		return 0;
 	    case H5T_FLOAT:
 		*Rtype = as_int ? INTSXP : REALSXP;
@@ -171,28 +198,14 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t size,
 	return -1;
 }
 
-static const char *layout2str(H5D_layout_t layout)
-{
-	static char s[32];
-
-	switch (layout) {
-	    case H5D_COMPACT:    return "H5D_COMPACT";
-	    case H5D_CONTIGUOUS: return "H5D_CONTIGUOUS";
-	    case H5D_CHUNKED:    return "H5D_CHUNKED";
-	    case H5D_VIRTUAL:    return "H5D_VIRTUAL";
-	    default: break;
-	}
-	sprintf(s, "unknown (%d)", layout);
-	return s;
-}
-
-static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t size)
+static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t H5size)
 {
 	switch (Rtype) {
 	    case LGLSXP:
 	    case INTSXP:  return sizeof(int);
 	    case REALSXP: return sizeof(double);
-	    case STRSXP:  return size;
+	    case STRSXP:  return H5size;
+	    case RAWSXP:  return sizeof(char);
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return 0;
@@ -205,6 +218,7 @@ static hid_t get_mem_type_id_from_Rtype(SEXPTYPE Rtype, hid_t dtype_id)
 	    case INTSXP:  return H5T_NATIVE_INT;
 	    case REALSXP: return H5T_NATIVE_DOUBLE;
 	    case STRSXP:  return dtype_id;
+	    case RAWSXP:  return H5T_NATIVE_UCHAR;
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return -1;
@@ -236,7 +250,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	char *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
 	H5T_class_t H5class;
-	size_t size, ans_elt_size, chunk_data_buf_size;
+	size_t H5size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
@@ -282,13 +296,13 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	}
 	dset_handle->H5class = H5class;
 
-	/* Set 'dset_handle->size'. */
-	size = H5Tget_size(dtype_id);
-	if (size == 0) {
+	/* Set 'dset_handle->H5size'. */
+	H5size = H5Tget_size(dtype_id);
+	if (H5size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
 		goto on_error;
 	}
-	dset_handle->size = size;
+	dset_handle->H5size = H5size;
 
 	/* Set 'dset_handle->Rtype'. */
 	if (dset_handle->storage_mode_attr != NULL) {
@@ -296,7 +310,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 					      &Rtype) < 0)
 			goto on_error;
 	} else {
-		if (map_H5class_to_Rtype(H5class, as_int, size, &Rtype) < 0)
+		if (map_H5class_to_Rtype(H5class, as_int, H5size, &Rtype) < 0)
 			goto on_error;
 	}
 	if (Rtype == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
@@ -347,11 +361,11 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	}
 	dset_handle->h5dim = h5dim;
 
-	/* Set 'dset_handle->layout'. */
-	dset_handle->layout = H5Pget_layout(plist_id);
+	/* Set 'dset_handle->H5layout'. */
+	dset_handle->H5layout = H5Pget_layout(plist_id);
 
 	/* Set 'dset_handle->h5chunkdim'. */
-	if (dset_handle->layout == H5D_CHUNKED) {
+	if (dset_handle->H5layout == H5D_CHUNKED) {
 		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
 		if (h5chunkdim == NULL)
 			goto on_error;
@@ -400,7 +414,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	}
 
 	/* Set 'dset_handle->ans_elt_size'. */
-	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, size);
+	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, H5size);
 	if (ans_elt_size == 0)
 		goto on_error;
 	dset_handle->ans_elt_size = ans_elt_size;
@@ -553,7 +567,7 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 
 	Rprintf("- H5class = %s\n", H5class2str(dset_handle->H5class));
 
-	Rprintf("- size = %lu\n", dset_handle->size);
+	Rprintf("- H5size = %lu\n", dset_handle->H5size);
 
 	Rprintf("- Rtype = \"%s\"\n", CHAR(type2str(dset_handle->Rtype)));
 
@@ -568,7 +582,7 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 		Rprintf(" %llu", dset_handle->h5dim[h5along]);
 	Rprintf("\n");
 
-	Rprintf("- layout = %s\n", layout2str(dset_handle->layout));
+	Rprintf("- H5layout = %s\n", H5layout2str(dset_handle->H5layout));
 
 	Rprintf("- h5chunkdim =");
 	if (dset_handle->h5chunkdim == NULL) {
@@ -577,7 +591,7 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 		for (h5along = 0; h5along < dset_handle->ndim; h5along++)
 			Rprintf(" %llu",
 				dset_handle->h5chunkdim[h5along]);
-		if (dset_handle->layout != H5D_CHUNKED &&
+		if (dset_handle->H5layout != H5D_CHUNKED &&
 		    dset_handle->h5chunkdim == dset_handle->h5dim)
 			Rprintf(" (artificially set to h5dim)");
 		Rprintf("\n");

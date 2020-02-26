@@ -121,6 +121,19 @@ setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 setMethod("write_block", "HDF5RealizationSink",
     function(x, viewport, block)
     {
+        ## rhdf5::h5write() does not support writing data of type "raw"
+        ## at the moment (rhdf5 2.31.5), even to a dataset created with
+        ## rhdf5::h5createDataset(..., H5type="H5T_STD_U8LE") like it
+        ## should normally be the case if 'x@type' is "raw" (see
+        ## h5createDataset2() in R/utils.R). However it does seem to work
+        ## properly if the data is first turned into an integer vector.
+        ## Note that this conversion to integer makes 'block' 4x bigger
+        ## in memory which could introduce a serious inefficiency if blocks
+        ## are big so this workaround should be temporary only. The right
+        ## thing to do is to make rhdf5::h5write() natively support data
+        ## of type "raw".
+        if (x@type == "raw")
+            block <- as.integer(block)
         h5write(block, x@filepath, x@name,
                 start=start(viewport), count=width(viewport))
     }
