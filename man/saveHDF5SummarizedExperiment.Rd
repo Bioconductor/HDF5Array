@@ -284,7 +284,7 @@ loadHDF5SummarizedExperiment(dir, prefix="xx_")
 se2 <- loadHDF5SummarizedExperiment(dir, prefix="xx_")
 se2 <- se2[1:14, ]
 assay1 <- assay(se2, withDimnames=FALSE)
-assays(se2) <- c(assays(se2), list(score=assay1/100))
+assays(se2, withDimnames=FALSE) <- c(assays(se2), list(score=assay1/100))
 rowRanges(se2) <- GRanges("chr1", IRanges(1:14, width=5))
 rownames(se2) <- letters[1:14]
 se2
