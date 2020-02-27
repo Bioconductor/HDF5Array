@@ -26,8 +26,9 @@
 }
 
 \usage{
-writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
-               verbose=FALSE)
+writeHDF5Array(x, filepath=NULL, name=NULL,
+                  H5type=NULL, chunkdim=NULL, level=NULL,
+                  verbose=FALSE)
 }
 
 \arguments{
@@ -50,6 +51,26 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
     \code{NULL} or the name of the HDF5 dataset to write.
     If \code{NULL}, then the name returned by \code{\link{getHDF5DumpName}}
     will be used.
+  }
+  \item{H5type}{
+    The H5 datatype to use for the HDF5 dataset to be written to the HDF5
+    file is automatically inferred from the type of \code{x} (\code{type(x)}).
+    Advanced users can override this by specifying the H5 datatype they want
+    via the \code{H5type} argument.
+
+    See \code{rhdf5::h5const("H5T")} for a list of available H5 datatypes.
+    See References section below for the link to the HDF Group's Support
+    Portal where H5 predefined datatypes are documented.
+
+    A typical use case is to use a datatype that is smaller than the
+    automatic one in order to reduce the size of the dataset on disk.
+    For example you could use \code{"H5T_IEEE_F32LE"} when \code{type(x)}
+    is \code{"double"} and you don't care about preserving the precision
+    of 64-bit floating-point numbers (the automatic H5 datatype used for
+    \code{"double"} is \code{"H5T_IEEE_F64LE"}).
+    Another example is to use \code{"H5T_STD_U16LE"} when \code{x} contains
+    small non-negative integer values like counts (the automatic H5
+    datatype used for \code{"integer"} is \code{"H5T_STD_I32LE"}).
   }
   \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.
@@ -103,6 +124,11 @@ writeHDF5Array(x, filepath=NULL, name=NULL, chunkdim=NULL, level=NULL,
 
   See \code{?\link{DelayedArray}} for general information about
   \link{DelayedArray} objects.
+}
+
+\references{
+  Documentation of the H5 predefined datatypes on the HDF Group's Support
+  Portal: \url{https://portal.hdfgroup.org/display/HDF5/Predefined+Datatypes}
 }
 
 \seealso{

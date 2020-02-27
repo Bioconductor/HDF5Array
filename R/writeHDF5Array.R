@@ -68,7 +68,7 @@ setMethod("type", "HDF5RealizationSink", function(x) x@type)
 ### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, name=NULL,
-                                chunkdim=NULL, level=NULL)
+                                H5type=NULL, chunkdim=NULL, level=NULL)
 {
     if (is.null(filepath)) {
         filepath <- getHDF5DumpFile(for.use=TRUE)
@@ -100,7 +100,8 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         level <- normalize_compression_level(level)
     }
     create_and_log_HDF5_dataset(filepath, name, dim,
-                                type=type, chunkdim=chunkdim, level=level)
+                                type=type, H5type=H5type,
+                                chunkdim=chunkdim, level=level)
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
@@ -186,14 +187,15 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### on disk.
 ### FIXME: This needs to write the dimnames to the file. See various FIXMEs
 ### above in this file about this.
-writeHDF5Array <- function(x, filepath=NULL, name=NULL, chunkdim=NULL,
-                           level=NULL, verbose=FALSE)
+writeHDF5Array <- function(x, filepath=NULL, name=NULL,
+                           H5type=NULL, chunkdim=NULL, level=NULL,
+                           verbose=FALSE)
 {
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
     sink <- HDF5RealizationSink(dim(x), dimnames(x), type(x),
                                 filepath=filepath, name=name,
-                                chunkdim=chunkdim, level=level)
+                                H5type=H5type, chunkdim=chunkdim, level=level)
     if (verbose) {
         old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
         on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
