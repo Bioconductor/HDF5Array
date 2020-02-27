@@ -40,8 +40,11 @@ HDF5Array(filepath, name, type=NA)
     The name of the dataset in the HDF5 file.
   }
   \item{type}{
-    \code{NA} or the \emph{R atomic type} (specified as a single string)
-    corresponding to the type of the HDF5 dataset.
+    By default the \code{\link[DelayedArray]{type}} of the returned
+    object is inferred from the H5 datatype of the HDF5 dataset.
+    This can be overridden by specifying the \code{type} argument.
+    The specified type must be an \emph{R atomic type} (e.g.
+    \code{"integer"}) or \code{"list"}.
   }
 }
 
@@ -95,11 +98,18 @@ HDF5Array(filepath, name, type=NA)
 ## ---------------------------------------------------------------------
 ## CONSTRUCTION
 ## ---------------------------------------------------------------------
+
+toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
+library(rhdf5)  # for h5ls()
+h5ls(toy_h5)
+
+HDF5Array(toy_h5, "M2")
+HDF5Array(toy_h5, "M2", type="integer")
+HDF5Array(toy_h5, "M2", type="complex")
+
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
-
-library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16:

@@ -135,10 +135,6 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 		return 0;
 	}
 	if (strcmp(storage_mode, "integer") == 0) {
-		if (as_int)
-			warning("'as.integer' is ignored when the dataset to "
-				"read has a \"storage.mode\" attribute set "
-				"to \"integer\"");
 		*Rtype = INTSXP;
 		return 0;
 	}

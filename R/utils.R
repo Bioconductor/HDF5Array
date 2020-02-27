@@ -96,14 +96,14 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
 ### A thin wrapper around h5mread()
 ###
 
-h5read2 <- function(filepath, name, index=NULL)
+h5read2 <- function(filepath, name, index=NULL, as.integer=FALSE)
 {
     if (!is.null(index))
         index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
     ## h5read() emits an annoying warning when it loads integer values that
     ## cannot be represented in R (and thus are converted to NAs).
     #suppressWarnings(h5read(filepath, name, index=index))
-    h5mread(filepath, name, starts=index)
+    h5mread(filepath, name, starts=index, as.integer=as.integer)
 }
 
 

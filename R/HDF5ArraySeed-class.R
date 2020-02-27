@@ -15,6 +15,7 @@ setClass("HDF5ArraySeed",
                                     # can be compared (required by
                                     # quickResaveHDF5SummarizedExperiment()).
         name="character",           # Name of the dataset in the HDF5 file.
+        type="character",           # NA or the wanted type.
         dim="integer",
         chunkdim="integer_OR_NULL",
         first_val="ANY"             # First value in the dataset.
@@ -117,14 +118,20 @@ normarg_path <- function(path, what1, what2)
     file_path_as_absolute(path)  # return absolute path in canonical form
 }
 
-### Will fail if the dataset is empty (i.e. if at least one of its
-### dimensions is 0).
-.read_h5dataset_first_val <- function(filepath, name, ndim)
+### Return a fake value (of the correct type) if the dataset is empty i.e.
+### if at least one of its dimensions is 0.
+.read_h5dataset_first_val <- function(filepath, name, dim)
 {
-    index <- rep.int(list(1L), ndim)
-    ans <- h5read2(filepath, name, index)
-    stopifnot(length(ans) == 1L)  # sanity check
-    ans[[1L]]  # drop any attribute
+    if (any(dim == 0L)) {
+        type <- get_h5mread_returned_type(filepath, name)
+        val <- vector(type, 1L)  # fake value
+    } else {
+        index <- rep.int(list(1L), length(dim))
+        ans <- h5read2(filepath, name, index)
+        stopifnot(length(ans) == 1L)  # sanity check
+        val <- ans[[1L]]  # drop any attribute
+    }
+    val
 }
 
 setReplaceMethod("path", "HDF5ArraySeed",
@@ -148,7 +155,7 @@ setReplaceMethod("path", "HDF5ArraySeed",
         ## Check first val compatibility.
         new_first_val <- .read_h5dataset_first_val(new_filepath,
                                                    object@name,
-                                                   length(object_dim))
+                                                   object_dim)
         if (!identical(new_first_val, object@first_val))
             stop(wmsg("first value in HDF5 dataset '", object@name, "' ",
                       "from file '", value, "' is not ",
@@ -157,6 +164,23 @@ setReplaceMethod("path", "HDF5ArraySeed",
         ## Set new path.
         object@filepath <- new_filepath
         object
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type() getter
+###
+
+### Override the default method (defined in the DelayedArray package) with
+### a much faster one.
+setMethod("type", "HDF5ArraySeed",
+    function(x)
+    {
+        type <- x@type
+        if (is.na(type))
+            type <- get_h5mread_returned_type(path(x), x@name)
+        type
     }
 )
 
@@ -173,15 +197,14 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 ### extract_array()
 ###
 
+### If the user requested a specific type when HDF5ArraySeed object 'x'
+### was constructed then we must return an array of that type.
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
-    if (any(ans_dim == 0L)) {
-        ans <- x@first_val[0]
-        dim(ans) <- ans_dim
-    } else {
-        ans <- h5read2(path(x), x@name, index)
-    }
+    as_int <- !is.na(x@type) && x@type == "integer"
+    ans <- h5read2(path(x), x@name, index, as.integer=as_int)
+    if (!is.na(x@type) && typeof(ans) != x@type)
+        storage.mode(ans) <- x@type
     ans
 }
 
@@ -206,37 +229,37 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 ### back.
 HDF5ArraySeed <- function(filepath, name, type=NA)
 {
+    ## Check 'filepath'.
     filepath <- normarg_path(filepath, "'filepath'", "HDF5 dataset")
+
+    ## Check 'name'.
     if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying the name ",
-                  "of the dataset in the HDF5 file"))
+        stop(wmsg("'name' must be a single string specifying ",
+                  "the name of the dataset in the HDF5 file"))
     if (name == "")
         stop(wmsg("'name' cannot be the empty string"))
+
+    ## Check 'type'
     if (!isSingleStringOrNA(type))
         stop(wmsg("'type' must be a single string or NA"))
-    dim <- h5dim(filepath, name)
-    if (any(dim == 0L)) {
-        if (is.na(type))
-            stop(wmsg("This HDF5 dataset is empty! Don't know how to ",
-                      "determine the type of an empty HDF5 dataset at the ",
-                      "moment. Please use the 'type' argument to help me ",
-                      "(see '?HDF5Array' for more information)."))
-        first_val <- vector(type, 1L)  # fake value
-        if (!is.atomic(first_val))
-            stop(wmsg("invalid type: ", type))
-    } else {
-        first_val <- .read_h5dataset_first_val(filepath, name, length(dim))
-        detected_type <- typeof(first_val)
-        if (!(is.na(type) || type == detected_type))
-            stop(wmsg("the type specified via the 'type' argument (", type,
-                      ") doesn't match the type of this HDF5 dataset (",
-                      detected_type, ")"))
+    if (is.na(type)) {
+        type <- as.character(type)
+    } else if (type != "list") {
+        tmp <- try(vector(type), silent=TRUE)
+        if (inherits(tmp, "try-error") || !is.atomic(tmp))
+            stop(wmsg("'type' must be an R atomic type ",
+                      "(e.g. \"integer\") or \"list\""))
     }
+
+    dim <- h5dim(filepath, name)
     chunkdim <- h5chunkdim(filepath, name, adjust=TRUE)
+    first_val <- .read_h5dataset_first_val(filepath, name, dim)
+
     new2("HDF5ArraySeed", filepath=filepath,
                           name=name,
+                          type=type,
                           dim=dim,
-                          first_val=first_val,
-                          chunkdim=chunkdim)
+                          chunkdim=chunkdim,
+                          first_val=first_val)
 }
 
