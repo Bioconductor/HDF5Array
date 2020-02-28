@@ -404,11 +404,11 @@ showHDF5DumpLog <- function()
 }
 
 create_and_log_HDF5_dataset <- function(filepath, name, dim, maxdim=dim,
-                                        type="double", H5type=NULL,
+                                        type="double", H5type=NULL, size=NULL,
                                         chunkdim=dim, level=6L)
 {
     h5createDataset2(filepath, name, dim, maxdim=maxdim,
-                     type=type, H5type=H5type,
+                     type=type, H5type=H5type, size=size,
                      chunkdim=chunkdim, level=level)
     appendDatasetCreationToHDF5DumpLog(filepath, name, dim,
                                        type, chunkdim, level)
