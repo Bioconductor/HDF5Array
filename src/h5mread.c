@@ -1931,7 +1931,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'method' must be a single integer");
 	method0 = INTEGER(method)[0];
 
-	file_id = _get_file_id(filepath);
+	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
 
 	/* h5mread() will do H5Dclose(dset_id). */

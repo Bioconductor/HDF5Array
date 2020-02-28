@@ -445,9 +445,10 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
  * error() immediately in case of error.
  */
 
-hid_t _get_file_id(SEXP filepath)
+hid_t _get_file_id(SEXP filepath, int readonly)
 {
 	SEXP filepath0;
+	unsigned int flags;
 	hid_t file_id;
 
 	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
@@ -455,7 +456,8 @@ hid_t _get_file_id(SEXP filepath)
 	filepath0 = STRING_ELT(filepath, 0);
 	if (filepath0 == NA_STRING)
 		error("'filepath' cannot be NA");
-	file_id = H5Fopen(CHAR(filepath0), H5F_ACC_RDONLY, H5P_DEFAULT);
+	flags = readonly ? H5F_ACC_RDONLY : H5F_ACC_RDWR;
+	file_id = H5Fopen(CHAR(filepath0), flags, H5P_DEFAULT);
 	if (file_id < 0)
 		error("failed to open file '%s'", CHAR(filepath0));
 	return file_id;
@@ -515,7 +517,7 @@ SEXP C_create_DSetHandle_xp(SEXP filepath, SEXP name, SEXP as_integer)
 		error("'as_integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
-	file_id = _get_file_id(filepath);
+	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
 
 	dset_handle = (DSetHandle *) malloc(sizeof(DSetHandle));
@@ -626,9 +628,10 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 		error("'as_integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
-	file_id = _get_file_id(filepath);
+	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
-	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	/* _get_DSetHandle() takes care of doing H5Dclose(dset_id) when
+           the 3rd argument is set to 1. */
 	if (_get_DSetHandle(dset_id, as_int, 1, &dset_handle) < 0) {
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());

@@ -2,13 +2,7 @@
 ## have "SystemRequirements: GNU make" in the DESCRIPTION file.
 ## See Rhtslib's vignette for details.
 
-RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_LIBS")'|\
+RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_HL_LIBS")'|\
     "${R_HOME}/bin/R" --vanilla --slave)
 PKG_LIBS=$(RHDF5LIB_LIBS)
 
-## Detect whether Rhdf5lib has the HDF5 High Level library or not.
-has_hdf5_hl := $(shell (echo "${RHDF5LIB_LIBS}" | grep hdf5_hl > /dev/null) && echo "1")
-
-ifeq (${has_hdf5_hl},1)
-	PKG_CPPFLAGS=-DHAS_HDF5_HL
-endif

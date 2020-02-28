@@ -8,13 +8,14 @@
 ### NOT exported!
 check_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call("C_check_selection", dim, starts, counts, PACKAGE="HDF5Array")
+    .Call2("C_check_selection", dim, starts, counts, PACKAGE="HDF5Array")
 }
 
 ### NOT exported!
 check_ordered_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call("C_check_ordered_selection", dim, starts, counts, PACKAGE="HDF5Array")
+    .Call2("C_check_ordered_selection", dim, starts, counts,
+           PACKAGE="HDF5Array")
 }
 
 ### The selection must be strictly ascending along each dimension.
@@ -28,13 +29,13 @@ check_ordered_selection <- function(dim, starts=NULL, counts=NULL)
 ### NOT exported!
 reduce_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call("C_reduce_selection", dim, starts, counts, PACKAGE="HDF5Array")
+    .Call2("C_reduce_selection", dim, starts, counts, PACKAGE="HDF5Array")
 }
 
 ### NOT exported!
 map_starts_to_chunks <- function(starts, dim, chunkdim)
 {
-    .Call("C_map_starts_to_chunks", starts, dim, chunkdim, PACKAGE="HDF5Array")
+    .Call2("C_map_starts_to_chunks", starts, dim, chunkdim, PACKAGE="HDF5Array")
 }
 
 ### When both 'starts' and 'counts' are specified, the selection must be
@@ -83,9 +84,9 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
     } else {
         stop(wmsg("'starts' must be a list (or NULL)"))
     }
-    ans <- .Call("C_h5mread", filepath, name, starts, counts, noreduce,
-                              as.integer, method,
-                              PACKAGE="HDF5Array")
+    ans <- .Call2("C_h5mread", filepath, name, starts, counts, noreduce,
+                               as.integer, method,
+                               PACKAGE="HDF5Array")
     if (is.null(starts) || !order_starts)
         return(ans)
     Nindex <- lapply(seq_along(starts0),

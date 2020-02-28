@@ -165,6 +165,48 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Set/find the HDF5 datasets representing the dimnames of a given HDF5
+### dataset
+###
+
+### 'dimnames' must be a **character** vector containing the names of
+### existing HDF5 datasets of H5 class STRING. It must have one element per
+### dimension in dataset 'name'. NAs are interpreted as NULL names along the
+### corresponding dimension.
+h5setdimnames <- function(filepath, name, dimnames)
+{
+    stopifnot(is.character(dimnames))
+    .Call2("C_h5setdimnames", filepath, name, dimnames, PACKAGE="HDF5Array")
+}
+
+### Return a character vector containing the names of the HDF5 datasets
+### representing the dimnames of dataset 'name'.
+h5getdimnames <- function(filepath, name)
+{
+    .Call2("C_h5getdimnames", filepath, name, PACKAGE="HDF5Array")
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Set/get the "dimension labels" of an HDF5 dataset
+###
+### The "dimension labels" the HDF5 equivalent of the names on 'dimnames(a)'
+### in R.
+###
+
+h5setdimlabels <- function(filepath, name, labels)
+{
+    stopifnot(is.character(labels))
+    .Call2("C_h5setdimlabels", filepath, name, labels, PACKAGE="HDF5Array")
+}
+
+h5getdimlabels <- function(filepath, name)
+{
+    .Call2("C_h5getdimlabels", filepath, name, PACKAGE="HDF5Array")
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Detect and trim trailing slahes in a character vector
 ###
 

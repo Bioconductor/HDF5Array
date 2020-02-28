@@ -8,7 +8,27 @@ dimnames
   way to do this is by storing the dimnames in HDF5 Dimension Scale datasets
   (1 dataset per character vector in the list returned by dimnames(x)):
 
-    https://www.hdfgroup.org/HDF5/Tutor/h5dimscale.html
+  Old doc:
+    https://support.hdfgroup.org/HDF5/Tutor/h5dimscale.html
+    https://support.hdfgroup.org/HDF5/doc/HL/RM_H5DS.html
+
+  New doc:
+    https://portal.hdfgroup.org/display/HDF5/HDF5+Dimension+Scale+%28H5DS%29+Interface
+
+  When writing 'x':
+  - write array data to dataset named "A" -> did
+  - if 'x' has dimnames:
+    - create a group called "A_dimnames" (h5createGroup)
+    - save the dimnames as 1D string datasets called "A_dimnames/1",
+      "A_dimnames/2", etc...
+    - for each "A_dimnames/i":
+        H5DSset_scale(dsid, NULL);
+        H5DSattach_scale(did, dsid, i);
+        if !is.null(names(dimnames(x))[[i]]):
+            label = names(dimnames(x))[[i]];
+            H5DSset_label(did, i, label);
+
+  When reading:
 
   Operations that write a new HDF5 dataset to disk (e.g. matrix multiplication,
   or coercion to HDF5ArraySeed or HDF5Array) would then need to be modified to

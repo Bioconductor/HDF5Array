@@ -127,7 +127,10 @@ int _get_DSetHandle(
 	DSetHandle *dset_handle
 );
 
-hid_t _get_file_id(SEXP filepath);
+hid_t _get_file_id(
+	SEXP filepath,
+	int readonly
+);
 
 hid_t _get_dset_id(
 	hid_t file_id,
@@ -162,5 +165,30 @@ SEXP C_h5mread(
 	SEXP noreduce,
 	SEXP as_integer,
 	SEXP method
+);
+
+
+/* h5dimnames.c */
+
+SEXP C_h5setdimnames(
+	SEXP filepath,
+	SEXP name,
+	SEXP dimnames
+);
+
+SEXP C_h5getdimnames(
+	SEXP filepath,
+	SEXP name
+);
+
+SEXP C_h5setdimlabels(
+	SEXP filepath,
+	SEXP name,
+	SEXP labels
+);
+
+SEXP C_h5getdimlabels(
+	SEXP filepath,
+	SEXP name
 );
 

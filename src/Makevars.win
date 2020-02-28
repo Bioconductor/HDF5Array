@@ -1,4 +1,4 @@
-RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_LIBS")'|\
+RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_HL_LIBS")'|\
     "${R_HOME}/bin/R" --vanilla --slave)
 PKG_LIBS=$(RHDF5LIB_LIBS)
 
