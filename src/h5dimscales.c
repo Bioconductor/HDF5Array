@@ -1,6 +1,5 @@
 /****************************************************************************
- *           Set/find the HDF5 datasets representing the dimnames           *
- *                         of a given HDF5 dataset                          *
+ *         Low-level manipulation of HDF5 Dimension Scale datasets          *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "HDF5Array.h"
@@ -12,21 +11,21 @@
 
 
 /****************************************************************************
- * C_h5setdimnames() and C_h5getdimnames()
+ * C_h5setdimscales() and C_h5getdimscales()
  */
 
-static int set_names_along(hid_t file_id, hid_t dset_id, int along,
-			   const char *dn)
+static int set_scale_along(hid_t file_id, hid_t dset_id, int along,
+			   const char *dsset_name, const char *scalename)
 {
 	hid_t dsset_id;
 	int ret;
 
-	dsset_id = H5Dopen(file_id, dn, H5P_DEFAULT);
+	dsset_id = H5Dopen(file_id, dsset_name, H5P_DEFAULT);
 	if (dsset_id < 0) {
-		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dn);
+		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsset_name);
 		return -1;
 	}
-	ret = H5DSset_scale(dsset_id, "names");
+	ret = H5DSset_scale(dsset_id, scalename);
 	if (ret < 0) {
 		H5Dclose(dsset_id);
 		PRINT_TO_ERRMSG_BUF("H5DSset_scale() failed");
@@ -43,21 +42,23 @@ static int set_names_along(hid_t file_id, hid_t dset_id, int along,
 }
 
 /* --- .Call ENTRY POINT --- */
-SEXP C_h5setdimnames(SEXP filepath, SEXP name, SEXP dimnames)
+SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP scalename, SEXP dsnames)
 {
 	hid_t file_id, dset_id;
+	const char *scalename0;
 	int ndim, along, ret;
-	SEXP dn;
+	SEXP dsset_name;
 
 	file_id = _get_file_id(filepath, 0);
 	dset_id = _get_dset_id(file_id, name, filepath);
+	scalename0 = CHAR(STRING_ELT(scalename, 0));
 
-	ndim = LENGTH(dimnames);
+	ndim = LENGTH(dsnames);
 	for (along = 0; along < ndim; along++) {
-		dn = STRING_ELT(dimnames, along);
-		if (dn != NA_STRING) {
-			ret = set_names_along(file_id, dset_id, along,
-					      CHAR(dn));
+		dsset_name = STRING_ELT(dsnames, along);
+		if (dsset_name != NA_STRING) {
+			ret = set_scale_along(file_id, dset_id, along,
+					      CHAR(dsset_name), scalename0);
 			if (ret < 0) {
 				H5Dclose(dset_id);
 				H5Fclose(file_id);
@@ -72,10 +73,11 @@ SEXP C_h5setdimnames(SEXP filepath, SEXP name, SEXP dimnames)
 }
 
 /* --- .Call ENTRY POINT --- */
-SEXP C_h5getdimnames(SEXP filepath, SEXP name)
+SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 {
 	hid_t file_id, dset_id;
 	DSetHandle dset_handle;
+	const char *scalename0;
 	int along, ret;
 
 	file_id = _get_file_id(filepath, 1);
@@ -85,6 +87,7 @@ SEXP C_h5getdimnames(SEXP filepath, SEXP name)
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
 	}
+	scalename0 = CHAR(STRING_ELT(scalename, 0));
 
 	for (along = 0; along < dset_handle.ndim; along++) {
 		ret = H5DSget_num_scales(dset_id, (unsigned int) along);

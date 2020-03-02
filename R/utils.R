@@ -141,11 +141,6 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
                              type="double", H5type=NULL, size=NULL,
                              chunkdim=dim, level=6L)
 {
-    ## rhdf5::h5createDataset() does not support 'storage.mode="raw"'
-    ## at the moment (rhdf5 2.31.5), unless 'H5type' is specified, so
-    ## we use a temporary workaround.
-    if (type == "raw" && is.null(H5type))
-        H5type <- "H5T_STD_U8LE"
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
@@ -155,48 +150,6 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     if (!ok)
         stop(wmsg("failed to create dataset '", name, "' ",
                   "in file '", filepath, "'"), call.=FALSE)
-}
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Set/find the HDF5 datasets representing the dimnames of a given HDF5
-### dataset
-###
-
-### 'dimnames' must be a **character** vector containing the names of
-### existing HDF5 datasets of H5 class STRING. It must have one element per
-### dimension in dataset 'name'. NAs are interpreted as NULL names along the
-### corresponding dimension.
-h5setdimnames <- function(filepath, name, dimnames)
-{
-    stopifnot(is.character(dimnames))
-    .Call2("C_h5setdimnames", filepath, name, dimnames, PACKAGE="HDF5Array")
-}
-
-### Return a character vector containing the names of the HDF5 datasets
-### representing the dimnames of dataset 'name'.
-h5getdimnames <- function(filepath, name)
-{
-    .Call2("C_h5getdimnames", filepath, name, PACKAGE="HDF5Array")
-}
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Set/get the "dimension labels" of an HDF5 dataset
-###
-### The "dimension labels" the HDF5 equivalent of the names on 'dimnames(a)'
-### in R.
-###
-
-h5setdimlabels <- function(filepath, name, labels)
-{
-    stopifnot(is.character(labels))
-    .Call2("C_h5setdimlabels", filepath, name, labels, PACKAGE="HDF5Array")
-}
-
-h5getdimlabels <- function(filepath, name)
-{
-    .Call2("C_h5getdimlabels", filepath, name, PACKAGE="HDF5Array")
 }
 
 
