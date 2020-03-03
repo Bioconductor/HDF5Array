@@ -14,28 +14,140 @@
  * C_h5setdimscales() and C_h5getdimscales()
  */
 
+static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
+				int is_scale,
+				const char *scalename, CharAE *NAME_buf)
+{
+	int ret;
+	hid_t attr_id, attr_type_id;
+	H5T_class_t attr_H5class;
+	hsize_t attr_size;
+
+	ret = H5Aexists(dsset_id, "NAME");
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aexists() failed");
+		return -1;
+	}
+	if (ret == 0) {
+		if (!is_scale || scalename == NULL)
+			return 0;
+		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
+				    "dimension scale named \"%s\":\n  "
+				    "dataset is already an unnamed "
+				    "dimension scale", dsset_name, scalename);
+		return -1;
+	}
+	if (scalename == NULL) {
+		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to "
+				    "an unnamed dimension scale:\n  "
+				    "there is a \"NAME\" attribute "
+				    "on this dataset", dsset_name);
+		return -1;
+	}
+	attr_id = H5Aopen(dsset_id, "NAME", H5P_DEFAULT);
+	if (attr_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aopen() failed");
+		return -1;
+	}
+	attr_type_id = H5Aget_type(attr_id);
+	if (attr_type_id < 0) {
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Aget_type() failed");
+		return -1;
+	}
+	attr_H5class = H5Tget_class(attr_type_id);
+	if (attr_H5class == H5T_NO_CLASS) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Tget_class() failed");
+		return -1;
+	}
+	if (attr_H5class != H5T_STRING) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
+				    "dimension scale named \"%s\":\n  "
+				    "there is already a \"NAME\" attribute "
+				    "on this dataset but it's not of class "
+				    "H5T_STRING\n  (converting the dataset "
+				    "to a dimension scale would replace this "
+				    "attribute)", dsset_name, scalename);
+		return -1;
+	}
+	attr_size = H5Aget_storage_size(attr_id);
+	if (attr_size == 0) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
+		return -1;
+	}
+	if (attr_size > CharAE_get_nelt(NAME_buf)) {
+		CharAE_extend(NAME_buf, (size_t) attr_size);
+		CharAE_set_nelt(NAME_buf, (size_t) attr_size);
+	}
+	ret = H5Aread(attr_id, attr_type_id, NAME_buf->elts);
+	H5Tclose(attr_type_id);
+	H5Aclose(attr_id);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aread() returned an error");
+		return -1;
+	}
+	if (strcmp(NAME_buf->elts, scalename)) {
+		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
+				    "dimension scale named \"%s\":\n  "
+				    "there is already a \"NAME\" attribute "
+				    "set to \"%s\" on this dataset",
+				    dsset_name, scalename, NAME_buf->elts);
+		return -1;
+	}
+	return 0;
+}
+
 static int set_scale_along(hid_t file_id, hid_t dset_id, int along,
-			   const char *dsset_name, const char *scalename)
+			   const char *dsset_name, const char *scalename,
+			   CharAE *NAME_buf)
 {
 	hid_t dsset_id;
-	int ret;
+	int is_scale, ret;
 
 	dsset_id = H5Dopen(file_id, dsset_name, H5P_DEFAULT);
 	if (dsset_id < 0) {
 		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsset_name);
 		return -1;
 	}
-	ret = H5DSset_scale(dsset_id, scalename);
-	if (ret < 0) {
+	is_scale = H5DSis_scale(dsset_id);
+	if (is_scale < 0) {
 		H5Dclose(dsset_id);
-		PRINT_TO_ERRMSG_BUF("H5DSset_scale() failed");
+		PRINT_TO_ERRMSG_BUF("H5DSis_scale() failed");
 		return -1;
 	}
-	ret = H5DSattach_scale(dset_id, dsset_id, (unsigned int) along);
+	ret = check_NAME_attribute(dsset_id, dsset_name, is_scale,
+				   scalename, NAME_buf);
 	if (ret < 0) {
 		H5Dclose(dsset_id);
-		PRINT_TO_ERRMSG_BUF("H5DSattach_scale() failed");
 		return -1;
+	}
+	if (is_scale == 0) {
+		ret = H5DSset_scale(dsset_id, scalename);
+		if (ret < 0) {
+			H5Dclose(dsset_id);
+			PRINT_TO_ERRMSG_BUF("H5DSset_scale() failed");
+			return -1;
+		}
+	}
+	ret = H5DSis_attached(dset_id, dsset_id, (unsigned int) along);
+	if (ret < 0) {
+		H5Dclose(dsset_id);
+		PRINT_TO_ERRMSG_BUF("H5DSis_attached() failed");
+		return -1;
+	}
+	if (ret == 0) {
+		ret = H5DSattach_scale(dset_id, dsset_id, (unsigned int) along);
+		if (ret < 0) {
+			H5Dclose(dsset_id);
+			PRINT_TO_ERRMSG_BUF("H5DSattach_scale() failed");
+			return -1;
+		}
 	}
 	H5Dclose(dsset_id);
 	return 0;
@@ -48,17 +160,22 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP scalename, SEXP dsnames)
 	const char *scalename0;
 	int ndim, along, ret;
 	SEXP dsset_name;
+	CharAE *NAME_buf;
 
 	file_id = _get_file_id(filepath, 0);
 	dset_id = _get_dset_id(file_id, name, filepath);
-	scalename0 = CHAR(STRING_ELT(scalename, 0));
+	scalename0 = scalename == R_NilValue ? NULL
+					     : CHAR(STRING_ELT(scalename, 0));
 
 	ndim = LENGTH(dsnames);
+	NAME_buf = new_CharAE(0);
 	for (along = 0; along < ndim; along++) {
 		dsset_name = STRING_ELT(dsnames, along);
 		if (dsset_name != NA_STRING) {
 			ret = set_scale_along(file_id, dset_id, along,
-					      CHAR(dsset_name), scalename0);
+					      CHAR(dsset_name),
+					      scalename0,
+					      NAME_buf);
 			if (ret < 0) {
 				H5Dclose(dset_id);
 				H5Fclose(file_id);
@@ -72,13 +189,39 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP scalename, SEXP dsnames)
 	return R_NilValue;
 }
 
+static herr_t scale_visitor1(hid_t dset_id, unsigned int along, hid_t dsset_id,
+			     void *visitor_data)
+{
+	ssize_t max_name_size, name_size;
+	char buffer[100];
+
+	printf("scale_visitor1: along = %u -- dsset_id = %lu\n",
+		along, dsset_id);
+	name_size = H5Iget_name(dsset_id, NULL, 0);
+	printf("name_size = %ld\n", name_size);
+	H5Iget_name(dsset_id, buffer, name_size + 1);
+	printf("name: %s\n", buffer);
+	return 0;
+}
+
+static herr_t scale_visitor2(hid_t dset_id, unsigned int along, hid_t dsset_id,
+			     void *visitor_data)
+{
+	const char *scalename;
+
+	scalename = visitor_data;
+
+	//printf("along = %u -- dsset_id = %lu\n", along, dsset_id);
+	return 0;
+}
+
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 {
 	hid_t file_id, dset_id;
 	DSetHandle dset_handle;
 	const char *scalename0;
-	int along, ret;
+	int along, ret, *idx;
 
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
@@ -89,9 +232,24 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 	}
 	scalename0 = CHAR(STRING_ELT(scalename, 0));
 
+	idx = NULL;
 	for (along = 0; along < dset_handle.ndim; along++) {
 		ret = H5DSget_num_scales(dset_id, (unsigned int) along);
 		printf("num_scales = %d\n", ret);
+		ret = H5DSiterate_scales(dset_id, (unsigned int) along,
+				idx, scale_visitor1, NULL);
+		if (ret < 0) {
+			_close_DSetHandle(&dset_handle);
+			H5Fclose(file_id);
+			error(_HDF5Array_errmsg_buf());
+		}
+		ret = H5DSiterate_scales(dset_id, (unsigned int) along,
+				idx, scale_visitor2, (void *) scalename0);
+		if (ret < 0) {
+			_close_DSetHandle(&dset_handle);
+			H5Fclose(file_id);
+			error(_HDF5Array_errmsg_buf());
+		}
 	}
 
 	_close_DSetHandle(&dset_handle);

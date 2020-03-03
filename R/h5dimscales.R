@@ -20,7 +20,8 @@
 ###              corresponding dimension.
 h5setdimscales <- function(filepath, name, scalename, dsnames)
 {
-    stopifnot(isSingleString(scalename), is.character(dsnames))
+    stopifnot(is.null(scalename) || isSingleString(scalename),
+              is.character(dsnames))
     .Call2("C_h5setdimscales", filepath, name, scalename, dsnames,
                                PACKAGE="HDF5Array")
 }
