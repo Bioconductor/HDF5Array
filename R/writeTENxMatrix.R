@@ -14,7 +14,11 @@
 {
     name <- paste0(group, "/", name)
     if (is.character(data)) {
-        size <- max(nchar(data)) + 1L
+        ## TODO: Adding 1L will no longer be needed once rhdf5 writes character
+        ## data as NULL-padded strings instead of NULL-terminated strings.
+        ## This change is implemented in the "string-padding" branch of rhdf5.
+        ## See https://github.com/grimbough/rhdf5/pull/57 (not merged yet).
+        size <- max(nchar(data), na.rm=TRUE) + 1L
     } else {
         size <- NULL
     }

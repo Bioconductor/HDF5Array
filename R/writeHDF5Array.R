@@ -183,9 +183,13 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
         stop("'verbose' must be TRUE or FALSE")
     x_type <- type(x)
     if (x_type == "character") {
-        ## Calling 'max(nchar(x))' will trigger block processing if 'x' is a
-        ## DelayedArray object so it might take a while.
-        size <- max(nchar(x)) + 1L
+        ## Calling 'max(nchar(x), na.rm=TRUE)' will trigger block processing
+        ## if 'x' is a DelayedArray object so it might take a while.
+        ## TODO: Adding 1L will no longer be needed once rhdf5 writes character
+        ## data as NULL-padded strings instead of NULL-terminated strings.
+        ## This change is implemented in the "string-padding" branch of rhdf5.
+        ## See https://github.com/grimbough/rhdf5/pull/57 (not merged yet).
+        size <- max(nchar(x), na.rm=TRUE) + 1L
     } else {
         size <- NULL
     }
