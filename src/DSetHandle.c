@@ -61,71 +61,80 @@ hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
 	return buf;
 }
 
-
-/****************************************************************************
- * _get_DSetHandle() / _close_DSetHandle()
+/* Get the value (expected to be a string) of a given attribute of class
+   H5T_STRING. Return:
+    -1: if an error occurs;
+     0: if dataset 'dset_id' has no attribute with the name specified
+        in 'attr_name';
+     1: if dataset 'dset_id' has an attribute with the name specified
+        in 'attr_name' but the attribute is not of class H5T_STRING;
+     2: if dataset 'dset_id' has an attribute with the name specified
+        in 'attr_name' and the attribute is of class H5T_STRING (in which
+        case, and only in this case, the value of the attribute is copied
+        to 'str_buf').
  */
-
-static char *get_storage_mode_attr(hid_t dset_id)
+int _get_h5_attrib_str(hid_t dset_id, const char *attr_name, CharAE *str_buf)
 {
+	int ret;
 	hid_t attr_id, attr_type_id;
 	H5T_class_t attr_H5class;
 	hsize_t attr_size;
-	char *storage_mode_attr;
-	herr_t ret;
 
-	attr_id = H5Aopen(dset_id, "storage.mode", H5P_DEFAULT);
+	ret = H5Aexists(dset_id, attr_name);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
+		return -1;
+	}
+	if (ret == 0)
+		return 0;
+	attr_id = H5Aopen(dset_id, attr_name, H5P_DEFAULT);
 	if (attr_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Aopen() returned an error");
-		return NULL;
+		return -1;
 	}
 	attr_type_id = H5Aget_type(attr_id);
 	if (attr_type_id < 0) {
 		H5Aclose(attr_id);
-		PRINT_TO_ERRMSG_BUF("H5Aget_type() returned 0");
-		return NULL;
+		PRINT_TO_ERRMSG_BUF("H5Aget_type() returned an error");
+		return -1;
 	}
 	attr_H5class = H5Tget_class(attr_type_id);
 	if (attr_H5class == H5T_NO_CLASS) {
 		H5Tclose(attr_type_id);
 		H5Aclose(attr_id);
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
-		return NULL;
+		return -1;
 	}
 	if (attr_H5class != H5T_STRING) {
 		H5Tclose(attr_type_id);
 		H5Aclose(attr_id);
-		PRINT_TO_ERRMSG_BUF("attribute \"storage.mode\" is "
-				    "not of expected type H5T_STRING");
-		return NULL;
+		return 1;
 	}
 	attr_size = H5Aget_storage_size(attr_id);
 	if (attr_size == 0) {
 		H5Tclose(attr_type_id);
 		H5Aclose(attr_id);
 		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
-		return NULL;
+		return -1;
 	}
-	//printf("attr_size = %llu\n", attr_size);
-	storage_mode_attr = (char *) malloc((size_t) attr_size);
-	if (storage_mode_attr == NULL) {
-		H5Tclose(attr_type_id);
-		H5Aclose(attr_id);
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'storage_mode_attr'");
-		return NULL;
+	if (attr_size > str_buf->_buflength) {
+		CharAE_extend(str_buf, (size_t) attr_size);
+		CharAE_set_nelt(str_buf, (size_t) attr_size);
 	}
-	ret = H5Aread(attr_id, attr_type_id, storage_mode_attr);
+	ret = H5Aread(attr_id, attr_type_id, str_buf->elts);
 	H5Tclose(attr_type_id);
 	H5Aclose(attr_id);
 	if (ret < 0) {
-		free(storage_mode_attr);
 		PRINT_TO_ERRMSG_BUF("H5Aread() returned an error");
-		return NULL;
+		return -1;
 	}
-	//printf("storage_mode_attr: %s\n", storage_mode_attr);
-	return storage_mode_attr;
+	return 2;
 }
+
+
+/****************************************************************************
+ * _get_DSetHandle() / _close_DSetHandle()
+ */
 
 static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 				     SEXPTYPE *Rtype)
@@ -243,6 +252,7 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 		    DSetHandle *dset_handle)
 {
+	CharAE *str_buf;
 	char *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
 	H5T_class_t H5class;
@@ -264,17 +274,25 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	dset_handle->h5nchunk = NULL;
 
 	/* Set 'dset_handle->storage_mode_attr'. */
-	ret = H5Aexists(dset_id, "storage.mode");
-	if (ret < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
+	str_buf = new_CharAE(0);
+	ret = _get_h5_attrib_str(dset_id, "storage.mode", str_buf);
+	if (ret < 0)
+		goto on_error;
+	if (ret == 1) {
+		PRINT_TO_ERRMSG_BUF("attribute \"storage.mode\" is "
+				    "not of expected type H5T_STRING");
 		goto on_error;
 	}
-	if (ret > 0) {
-		storage_mode_attr = get_storage_mode_attr(dset_id);
-		if (storage_mode_attr == NULL)
+	if (ret == 2) {
+		storage_mode_attr = (char *) malloc(CharAE_get_nelt(str_buf));
+		if (storage_mode_attr == NULL) {
+			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+					    "for 'storage_mode_attr'");
 			goto on_error;
+		}
+		strcpy(storage_mode_attr, str_buf->elts);
 		dset_handle->storage_mode_attr = storage_mode_attr;
-	}
+        }
 
 	/* Set 'dset_handle->dtype_id'. */
 	dtype_id = H5Dget_type(dset_id);
@@ -631,7 +649,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
 	/* _get_DSetHandle() takes care of doing H5Dclose(dset_id) when
-           the 3rd argument is set to 1. */
+	   the 3rd argument is set to 1. */
 	if (_get_DSetHandle(dset_id, as_int, 1, &dset_handle) < 0) {
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());

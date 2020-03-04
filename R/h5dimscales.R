@@ -31,7 +31,7 @@ h5setdimscales <- function(filepath, name, scalename, dsnames)
 ### for dimension scale 'scalename'.
 h5getdimscales <- function(filepath, name, scalename)
 {
-    stopifnot(isSingleString(scalename))
+    stopifnot(is.null(scalename) || isSingleString(scalename))
     .Call2("C_h5getdimscales", filepath, name, scalename,
                                PACKAGE="HDF5Array")
 }

@@ -118,6 +118,12 @@ hsize_t *_alloc_hsize_t_buf(
 	const char *what
 );
 
+int _get_h5_attrib_str(
+	hid_t dset_id,
+	const char *attr_name,
+	CharAE *str_buf
+);
+
 void _close_DSetHandle(DSetHandle *dset_handle);
 
 int _get_DSetHandle(
