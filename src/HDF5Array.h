@@ -179,14 +179,14 @@ SEXP C_h5mread(
 SEXP C_h5setdimscales(
 	SEXP filepath,
 	SEXP name,
-	SEXP scalename,
-	SEXP dsnames
+	SEXP dsnames,
+	SEXP scalename
 );
 
 SEXP C_h5getdimscales(
 	SEXP filepath,
-	SEXP scalename,
-	SEXP name
+	SEXP name,
+	SEXP scalename
 );
 
 SEXP C_h5setdimlabels(

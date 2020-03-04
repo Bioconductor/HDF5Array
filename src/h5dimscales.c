@@ -157,24 +157,25 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
 		if (!is_scale || scalename == NULL)
 			return 0;
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
-				    "Dimension Scale named \"%s\":\n  "
-				    "dataset is already a Dimension Scale "
-				    "and is an **unnamed** one", dsset_name,
-				    scalename);
+				    "Dimension Scale named \"%s\"\n  "
+				    "because dataset is already a "
+				    "Dimension Scale and is "
+				    "an **unnamed** one",
+				    dsset_name, scalename);
 		return -1;
 	}
 	if (scalename == NULL) {
-		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to "
-				    "an unnamed Dimension Scale:\n  "
-				    "there is a \"NAME\" attribute "
-				    "on this dataset", dsset_name);
+		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to an "
+				    "**unnamed** Dimension Scale\n  "
+				    "because dataset has a \"NAME\" "
+				    "attribute", dsset_name);
 		return -1;
 	}
 	if (ret == 1) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
-				    "Dimension Scale named \"%s\":\n  "
-				    "there is already a \"NAME\" attribute "
-				    "on this dataset but it's not of class "
+				    "Dimension Scale named \"%s\"\n  "
+				    "because dataset has a \"NAME\" "
+				    "attribute that is **not** of class "
 				    "H5T_STRING\n  (converting the dataset "
 				    "to a Dimension Scale would replace this "
 				    "attribute)", dsset_name, scalename);
@@ -182,9 +183,9 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
 	}
 	if (strcmp(NAME_buf->elts, scalename) != 0) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
-				    "Dimension Scale named \"%s\":\n  "
-				    "there is already a \"NAME\" attribute "
-				    "set to \"%s\" on this dataset",
+				    "Dimension Scale named \"%s\"\n  "
+				    "because dataset has a \"NAME\" "
+				    "attribute set to \"%s\"",
 				    dsset_name, scalename, NAME_buf->elts);
 		return -1;
 	}
@@ -276,7 +277,7 @@ static int set_scale_along(hid_t file_id,
 }
 
 /* --- .Call ENTRY POINT --- */
-SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP scalename, SEXP dsnames)
+SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
 {
 	hid_t file_id, dset_id;
 	CharAE *buf0, *buf1, *buf2, *buf3;
@@ -306,9 +307,7 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP scalename, SEXP dsnames)
 		ret = -1;
 		goto on_error;
 	}
-
-	/* We treat an empty scalename as no scalename at all. */
-	if (scalename == R_NilValue || LENGTH(STRING_ELT(scalename, 0)) == 0) {
+	if (STRING_ELT(scalename, 0) == NA_STRING) {
 		scalename0 = NULL;
 	} else {
 		scalename0 = CHAR(STRING_ELT(scalename, 0));
@@ -359,6 +358,7 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 	DSetHandle dset_handle;
 	const char *scalename0;
 	CharAE *name_buf, *NAME_buf;
+	SEXP ans, ans_elt;
 	int along, ret;
 
 	file_id = _get_file_id(filepath, 1);
@@ -368,17 +368,17 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
 	}
-	/* We treat an empty scalename as no scalename at all. */
-	if (scalename == R_NilValue || LENGTH(STRING_ELT(scalename, 0)) == 0) {
+	if (STRING_ELT(scalename, 0) == NA_STRING) {
 		scalename0 = NULL;
 	} else {
 		scalename0 = CHAR(STRING_ELT(scalename, 0));
 	}
 
+	ans = PROTECT(NEW_CHARACTER(dset_handle.ndim));
+
 	name_buf = new_CharAE(0);
 	NAME_buf = new_CharAE(0);
 	for (along = 0; along < dset_handle.ndim; along++) {
-		printf("along = %d: ", along);
 		ret = get_scale_along(dset_id, along, scalename0,
 				      name_buf, NAME_buf);
 		if (ret < 0) {
@@ -387,15 +387,19 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 			error(_HDF5Array_errmsg_buf());
 		}
 		if (ret == 0) {
-			printf("NA\n");
+			SET_STRING_ELT(ans, along, NA_STRING);
 		} else {
-			printf("%s\n", name_buf->elts);
+			ans_elt = PROTECT(mkChar(name_buf->elts));
+			SET_STRING_ELT(ans, along, ans_elt);
+			UNPROTECT(1);
 		}
 	}
 
 	_close_DSetHandle(&dset_handle);
 	H5Fclose(file_id);
-	return R_NilValue;
+
+	UNPROTECT(1);
+	return ans;
 }
 
 
@@ -408,24 +412,20 @@ SEXP C_h5setdimlabels(SEXP filepath, SEXP name, SEXP labels)
 {
 	hid_t file_id, dset_id;
 	int ndim, along, ret;
-	SEXP labels_elt;
-	const char *label;
+	SEXP label;
 
 	if (labels == R_NilValue)
 		return R_NilValue;
 
 	file_id = _get_file_id(filepath, 0);
 	dset_id = _get_dset_id(file_id, name, filepath);
-
 	ndim = LENGTH(labels);
+
 	for (along = 0; along < ndim; along++) {
-		labels_elt = STRING_ELT(labels, along);
-		if (labels_elt == NA_STRING || LENGTH(labels_elt) == 0) {
-			label = "";
-		} else {
-			label = CHAR(labels_elt);
-		}
-		ret = H5DSset_label(dset_id, (unsigned int) along, label);
+		label = STRING_ELT(labels, along);
+		if (label == NA_STRING)
+			continue;
+		ret = H5DSset_label(dset_id, (unsigned int) along, CHAR(label));
 		if (ret < 0) {
 			H5Dclose(dset_id);
 			H5Fclose(file_id);
