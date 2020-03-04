@@ -117,10 +117,9 @@ int _get_h5_attrib_str(hid_t dset_id, const char *attr_name, CharAE *str_buf)
 		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
 		return -1;
 	}
-	if (attr_size > str_buf->_buflength) {
+	if (attr_size > str_buf->_buflength)
 		CharAE_extend(str_buf, (size_t) attr_size);
-		CharAE_set_nelt(str_buf, (size_t) attr_size);
-	}
+	CharAE_set_nelt(str_buf, (size_t) attr_size);
 	ret = H5Aread(attr_id, attr_type_id, str_buf->elts);
 	H5Tclose(attr_type_id);
 	H5Aclose(attr_id);
