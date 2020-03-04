@@ -177,6 +177,10 @@ setReplaceMethod("path", "HDF5ArraySeed",
 setMethod("type", "HDF5ArraySeed",
     function(x)
     {
+        ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
+        ## the "type" slot.
+        if (!.hasSlot(x, "type"))
+            return(type(x@first_val))
         type <- x@type
         if (is.na(type))
             type <- get_h5mread_returned_type(path(x), x@name)
@@ -201,6 +205,10 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 ### was constructed then we must return an array of that type.
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
+    ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
+    ## the "type" slot.
+    if (!.hasSlot(x, "type"))
+        return(h5read2(path(x), x@name, index))
     as_int <- !is.na(x@type) && x@type == "integer"
     ans <- h5read2(path(x), x@name, index, as.integer=as_int)
     if (!is.na(x@type) && typeof(ans) != x@type)
