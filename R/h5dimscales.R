@@ -10,14 +10,14 @@
 ### h5setdimscales() / h5getdimscales()
 ###
 
-### 'name':      The name of the dataset on which to set dimension scale
-###              datasets.
-### 'dsnames':   The names of the existing HDF5 datasets (1 per dimension in
-###              dataset 'name') to attach along the dimensions of dataset
-###              'name'. An NA means that nothing is attached along the
-###              corresponding dimension.
-### 'scalename': The name of the dimension scale (analog to the name of an
-###              attribute in R).
+### name:      The name of the dataset on which to set Dimension Scales.
+### dsnames:   A character vector containing the names of the existing HDF5
+###            datasets (1 per dimension in dataset 'name') to attach along
+###            the dimensions of dataset 'name'. NAs are allowed and, if
+###            present, nothing will get attached along the corresponding
+###            dimensions.
+### scalename: The name of the Dimension Scale (analog to the name of an
+###            attribute in R).
 h5setdimscales <- function(filepath, name, dsnames, scalename=NA_character_)
 {
     stopifnot(isSingleStringOrNA(scalename), is.character(dsnames))
@@ -27,7 +27,7 @@ h5setdimscales <- function(filepath, name, dsnames, scalename=NA_character_)
 
 ### Retrieve the names of the existing HDF5 datasets (1 per dimension in
 ### dataset 'name') currently attached along the dimensions of dataset 'name'
-### for dimension scale 'scalename'.
+### for Dimension Scale 'scalename'.
 h5getdimscales <- function(filepath, name, scalename=NA_character_)
 {
     stopifnot(isSingleStringOrNA(scalename))

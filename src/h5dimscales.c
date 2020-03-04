@@ -144,7 +144,7 @@ static int check_no_other_links_with_this_NAME(
  * C_h5setdimscales() and C_h5getdimscales()
  */
 
-static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
+static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
 				int is_scale,
 				const char *scalename, CharAE *NAME_buf)
 {
@@ -161,14 +161,14 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
 				    "because dataset is already a "
 				    "Dimension Scale and is "
 				    "an **unnamed** one",
-				    dsset_name, scalename);
+				    dsname, scalename);
 		return -1;
 	}
 	if (scalename == NULL) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to an "
 				    "**unnamed** Dimension Scale\n  "
 				    "because dataset has a \"NAME\" "
-				    "attribute", dsset_name);
+				    "attribute", dsname);
 		return -1;
 	}
 	if (ret == 1) {
@@ -178,7 +178,7 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
 				    "attribute that is **not** of class "
 				    "H5T_STRING\n  (converting the dataset "
 				    "to a Dimension Scale would replace this "
-				    "attribute)", dsset_name, scalename);
+				    "attribute)", dsname, scalename);
 		return -1;
 	}
 	if (strcmp(NAME_buf->elts, scalename) != 0) {
@@ -186,7 +186,7 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
 				    "Dimension Scale named \"%s\"\n  "
 				    "because dataset has a \"NAME\" "
 				    "attribute set to \"%s\"",
-				    dsset_name, scalename, NAME_buf->elts);
+				    dsname, scalename, NAME_buf->elts);
 		return -1;
 	}
 	return 0;
@@ -196,15 +196,15 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsset_name,
    mode). */
 static int set_scale_along(hid_t file_id,
 		hid_t dset_id, const char *dset_name,
-		int along, const char *dsset_name, const char *scalename,
+		int along, const char *dsname, const char *scalename,
 		CharAE *buf1, CharAE *buf2, CharAE *buf3)
 {
 	hid_t dsset_id;
 	int ret, is_scale, is_attached;
 
-	dsset_id = H5Dopen(file_id, dsset_name, H5P_DEFAULT);
+	dsset_id = H5Dopen(file_id, dsname, H5P_DEFAULT);
 	if (dsset_id < 0) {
-		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsset_name);
+		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsname);
 		return -1;
 	}
 	if (buf1 != NULL) {
@@ -241,7 +241,7 @@ static int set_scale_along(hid_t file_id,
 		is_attached = 0;
 	}
 	if (buf1 != NULL) {
-		ret = check_NAME_attribute(dsset_id, dsset_name, is_scale,
+		ret = check_NAME_attribute(dsset_id, dsname, is_scale,
 					   scalename, buf1);
 		if (ret < 0) {
 			H5Dclose(dsset_id);
@@ -276,24 +276,38 @@ static int set_scale_along(hid_t file_id,
 	return 0;
 }
 
-/* --- .Call ENTRY POINT --- */
-SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
+static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
+			     const char *scalename, CharAE *dset_name_buf)
 {
 	hid_t file_id, dset_id;
-	CharAE *buf0, *buf1, *buf2, *buf3;
-	int ret, ndim, along;
-	const char *scalename0;
-	SEXP dsset_name;
+	DSetHandle dset_handle;
+	CharAE *buf1, *buf2, *buf3;
+	int ret, along;
+	SEXP dsname;
 
-	file_id = _get_file_id(filepath, 0);
+	if (!IS_CHARACTER(dsnames))
+		error("'dsnames' must be a character vector");
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
+		H5Fclose(file_id);
+		error(_HDF5Array_errmsg_buf());
+	}
 
-	/* Retrieve **canonical name** of dataset 'dset_id' (we cannot use
-	   'CHAR(STRING_ELT(name, 0))' for that). */
-	buf0 = new_CharAE(0);
-	ret = get_dsname(dset_id, buf0);
+	/* Retrieve **canonical name** of dataset 'dset_id' ('name' contains
+	   a user-supplied name that is not necessarily canonical). */
+	ret = get_dsname(dset_id, dset_name_buf);
 	if (ret < 0)
 		goto on_error;
+
+	if (LENGTH(dsnames) > dset_handle.ndim) {
+		PRINT_TO_ERRMSG_BUF("'dsnames' cannot be longer than the "
+				    "nb of dimensions of dataset '%s' (%d)",
+				    dset_name_buf->elts, dset_handle.ndim);
+		ret = -1;
+		goto on_error;
+	}
 
 	ret = H5DSis_scale(dset_id);
 	if (ret < 0) {
@@ -303,41 +317,57 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
 	if (ret > 0) {
 		PRINT_TO_ERRMSG_BUF("dataset '%s' is a Dimension Scale "
 				    "(a Dimension Scale dataset\n  cannot "
-				    "have Dimension Scales)", buf0->elts);
+				    "have Dimension Scales)",
+				    dset_name_buf->elts);
 		ret = -1;
 		goto on_error;
 	}
-	if (STRING_ELT(scalename, 0) == NA_STRING) {
-		scalename0 = NULL;
-	} else {
-		scalename0 = CHAR(STRING_ELT(scalename, 0));
-	}
-	ndim = LENGTH(dsnames);
 
-	/* We use 2 passes to make the change atomic. */
-
-	/* 1st pass: dry-run */
 	buf1 = new_CharAE(0);
 	buf2 = new_CharAE(0);
 	buf3 = new_CharAE(0);
-	for (along = 0; along < ndim; along++) {
-		dsset_name = STRING_ELT(dsnames, along);
-		if (dsset_name != NA_STRING) {
-			ret = set_scale_along(file_id, dset_id, buf0->elts,
-					      along, CHAR(dsset_name),
-					      scalename0, buf1, buf2, buf3);
+	for (along = 0; along < LENGTH(dsnames); along++) {
+		dsname = STRING_ELT(dsnames, along);
+		if (dsname != NA_STRING) {
+			ret = set_scale_along(file_id,
+					      dset_id, dset_name_buf->elts,
+					      along, CHAR(dsname),
+					      scalename, buf1, buf2, buf3);
 			if (ret < 0)
 				goto on_error;
 		}
 	}
 
-	/* 2nd pass: do it */
-	for (along = 0; along < ndim; along++) {
-		dsset_name = STRING_ELT(dsnames, along);
-		if (dsset_name != NA_STRING) {
-			ret = set_scale_along(file_id, dset_id, buf0->elts,
-					      along, CHAR(dsset_name),
-					      scalename0, NULL, NULL, NULL);
+    on_error:
+	H5Dclose(dset_id);
+	H5Fclose(file_id);
+	if (ret < 0)
+		error(_HDF5Array_errmsg_buf());
+	return;
+}
+
+static void set_scales_pass2(SEXP filepath, SEXP name, SEXP dsnames,
+			     const char *scalename, const char *dset_name)
+{
+	hid_t file_id, dset_id;
+	DSetHandle dset_handle;
+	int ret, along;
+	SEXP dsname;
+
+	file_id = _get_file_id(filepath, 0);  /* read/write */
+	dset_id = _get_dset_id(file_id, name, filepath);
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
+		H5Fclose(file_id);
+		error(_HDF5Array_errmsg_buf());
+	}
+
+	for (along = 0; along < LENGTH(dsnames); along++) {
+		dsname = STRING_ELT(dsnames, along);
+		if (dsname != NA_STRING) {
+			ret = set_scale_along(file_id, dset_id, dset_name,
+					      along, CHAR(dsname),
+					      scalename, NULL, NULL, NULL);
 			if (ret < 0)  /* should never happen */
 				goto on_error;
 		}
@@ -348,6 +378,31 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
 	H5Fclose(file_id);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf());
+	return;
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
+{
+	const char *scalename0;
+	CharAE *dset_name_buf;
+
+	if (STRING_ELT(scalename, 0) == NA_STRING) {
+		scalename0 = NULL;
+	} else {
+		scalename0 = CHAR(STRING_ELT(scalename, 0));
+	}
+	dset_name_buf = new_CharAE(0);
+
+	/* We use 2 passes to make the changes to the file atomic. */
+
+	/* 1st pass: dry-run */
+	set_scales_pass1(filepath, name, dsnames, scalename0,
+			 dset_name_buf);
+	/* 2nd pass: do it */
+	set_scales_pass2(filepath, name, dsnames, scalename0,
+			 dset_name_buf->elts);
+
 	return R_NilValue;
 }
 
@@ -361,7 +416,7 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 	SEXP ans, ans_elt;
 	int along, ret;
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
 	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
@@ -450,7 +505,7 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	char *label_buf;
 	SEXP labels, label;
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
 	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
