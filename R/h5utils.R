@@ -179,7 +179,7 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     not_is_NULL
 }
 
-.normarg_dsnames <- function(dsnames, not_is_NULL, filepath)
+.normarg_dsnames <- function(dsnames, not_is_NULL, filepath, name)
 {
     stopifnot(is.character(dsnames), length(dsnames) == length(not_is_NULL))
     if (any(not_is_NULL & is.na(dsnames)))
@@ -220,7 +220,7 @@ h5writeDimnames <- function(filepath, name, dimnames, dsnames)
     not_is_NULL <- .check_dimnames(dimnames, dim, name)
 
     ## Check 'dsnames'.
-    dsnames <- .normarg_dsnames(dsnames, not_is_NULL, filepath)
+    dsnames <- .normarg_dsnames(dsnames, not_is_NULL, filepath, name)
 
     ## Write dimnames.
     for (along in which(not_is_NULL)) {

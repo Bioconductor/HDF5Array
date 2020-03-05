@@ -2,6 +2,7 @@ useDynLib(HDF5Array)
 
 import(methods)
 importFrom(utils, read.table)
+importFrom(stats, setNames)
 importFrom(tools, file_path_as_absolute)
 importFrom(Matrix, sparseMatrix)
 

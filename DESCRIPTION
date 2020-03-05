@@ -16,7 +16,8 @@ Maintainer: Hervé Pagès <hpages@fredhutch.org>
 biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.11.4), rhdf5 (>= 2.31.6)
-Imports: utils, tools, Matrix, BiocGenerics (>= 0.31.5), S4Vectors, IRanges
+Imports: utils, stats, tools, Matrix,
+	BiocGenerics (>= 0.31.5), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib
 SystemRequirements: GNU make
 Suggests: h5vcData, SummarizedExperiment (>= 1.15.1), GenomicRanges,
