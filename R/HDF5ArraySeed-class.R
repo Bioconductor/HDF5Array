@@ -19,6 +19,9 @@ setClass("HDF5ArraySeed",
         dim="integer",
         chunkdim="integer_OR_NULL",
         first_val="ANY"             # First value in the dataset.
+    ),
+    prototype(
+        type=NA_character_
     )
 )
 
