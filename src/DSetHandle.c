@@ -465,6 +465,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 hid_t _get_file_id(SEXP filepath, int readonly)
 {
 	SEXP filepath0;
+	herr_t ret;
 	unsigned int flags;
 	hid_t file_id;
 
@@ -473,6 +474,9 @@ hid_t _get_file_id(SEXP filepath, int readonly)
 	filepath0 = STRING_ELT(filepath, 0);
 	if (filepath0 == NA_STRING)
 		error("'filepath' cannot be NA");
+	ret = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+	if (ret < 0)
+		error("H5Eset_auto() returned an error");
 	flags = readonly ? H5F_ACC_RDONLY : H5F_ACC_RDWR;
 	file_id = H5Fopen(CHAR(filepath0), flags, H5P_DEFAULT);
 	if (file_id < 0)

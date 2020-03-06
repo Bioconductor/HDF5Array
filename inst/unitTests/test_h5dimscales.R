@@ -18,8 +18,11 @@ test_h5setdimscales_h5getdimscales <- function()
     current <- h5getdimscales(h5file, "A")
     checkIdentical(target, current)
 
-    h5setdimscales(h5file, "A", c("B", "stuff/C", NA, "more stuff/D"))
-    target <- c("/B", "/stuff/C", NA, "/more stuff/D")
+    dsnames <- c("B", "stuff/C", NA, "more stuff/D")
+    current <- h5setdimscales(h5file, "A", dsnames)
+    checkIdentical(c(TRUE, TRUE, FALSE, TRUE), current)
+
+    target <- paste0("/", dsnames); target[is.na(dsnames)] <- NA
     current <- h5getdimscales(h5file, "A")
     checkIdentical(target, current)
 
@@ -27,10 +30,40 @@ test_h5setdimscales_h5getdimscales <- function()
     current <- h5getdimscales(h5file, "A", "foo")
     checkIdentical(target, current)
 
-    h5setdimscales(h5file, "A", c(NA, "E", "more stuff/E", "E"), "foo")
-    target <- c(NA, "/E", "/more stuff/E", "/E")
+    dsnames <- c(NA, "E", "more stuff/E", "E")
+    current <- h5setdimscales(h5file, "A", dsnames, "foo")
+    checkIdentical(c(FALSE, TRUE, TRUE, TRUE), current)
+
+    target <- paste0("/", dsnames); target[is.na(dsnames)] <- NA
     current <- h5getdimscales(h5file, "A", "foo")
     checkIdentical(target, current)
+
+    for (name in paste0("Adim", 1:4))
+        writeHDF5Array(matrix(1:2), h5file, name)
+    for (scalename in c(NA, "foo", "bar"))
+        scales <- h5getdimscales(h5file, "A", scalename)
+        for (dsname1 in c(NA, "Adim1", "B"))
+          for (dsname2 in c(NA, "Adim2", "E"))
+            for (dsname3 in c(NA, "Adim3", "bogus"))
+              for (dsname4 in c(NA, "Adim4", "bogus")) {
+                dsnames <- c(dsname1, dsname2, dsname3, dsname4)
+                scales2 <- paste0("/", dsnames)
+                ok <- scales2 == scales | is.na(scales2) | is.na(scales)
+                if (dsname1 %in% "B" && !(scalename %in% NA))
+                    ok[[1]] <- FALSE
+                if (dsname2 %in% "E" && !(scalename %in% "foo"))
+                    ok[[2]] <- FALSE
+                if (!all(ok) || "bogus" %in% dsnames) {
+                    checkException(h5setdimscales(h5file, "A", dsnames,
+                                                  scalename),
+                                   silent=TRUE)
+                    next
+                }
+                target <- !is.na(dsnames)
+                current <- h5setdimscales(h5file, "A", dsnames, scalename,
+                                          dry.run=TRUE)
+                checkIdentical(target, current)
+              }
 }
 
 test_h5setdimlabels_h5getdimlabels <- function()

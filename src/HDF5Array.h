@@ -180,7 +180,8 @@ SEXP C_h5setdimscales(
 	SEXP filepath,
 	SEXP name,
 	SEXP dsnames,
-	SEXP scalename
+	SEXP scalename,
+	SEXP dry_run
 );
 
 SEXP C_h5getdimscales(

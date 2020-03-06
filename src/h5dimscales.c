@@ -143,7 +143,7 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
    named 'scalename' (via its "NAME" attribute) on dimension 'along' of
    dataset 'dset_id'. Return: 0 if no, 1 if yes, -1 if error.
  */
-static int scale_is_already_set_along(hid_t file_id,
+static int check_scale_along(hid_t file_id,
 		hid_t dset_id, const char *dset_name,
 		int along, const char *dsname, const char *scalename,
 		CharAE *name_buf1, CharAE *name_buf2, CharAE *buf)
@@ -270,14 +270,14 @@ static int set_scale_along(hid_t file_id, hid_t dset_id,
 	return 0;
 }
 
-static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
-			     const char *scalename, CharAE *dset_name_buf)
+static SEXP check_scales(SEXP filepath, SEXP name, SEXP dsnames,
+			 const char *scalename, CharAE *dset_name_buf)
 {
 	hid_t file_id, dset_id;
 	DSetHandle dset_handle;
 	CharAE *buf1, *buf2, *buf3;
 	int ret, along;
-	SEXP dsname;
+	SEXP ans, dsname;
 
 	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
@@ -315,31 +315,36 @@ static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
 		goto on_error;
 	}
 
+	ans = PROTECT(NEW_LOGICAL(dset_handle.ndim));
 	buf1 = new_CharAE(0);
 	buf2 = new_CharAE(0);
 	buf3 = new_CharAE(0);
 	for (along = 0; along < LENGTH(dsnames); along++) {
 		dsname = STRING_ELT(dsnames, along);
-		if (dsname == NA_STRING)
+		if (dsname == NA_STRING) {
+			LOGICAL(ans)[along] = 0;
 			continue;
-		ret = scale_is_already_set_along(file_id,
+		}
+		ret = check_scale_along(file_id,
 					dset_id, dset_name_buf->elts,
 					along, CHAR(dsname), scalename,
 					buf1, buf2, buf3);
 		if (ret < 0)
 			goto on_error;
+		LOGICAL(ans)[along] = !ret;
 	}
 
     on_error:
 	_close_DSetHandle(&dset_handle);
 	H5Fclose(file_id);
+	UNPROTECT(1);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf());
-	return;
+	return ans;
 }
 
-static void set_scales_pass2(SEXP filepath, SEXP name, SEXP dsnames,
-			     const char *scalename, const char *dset_name)
+static void set_scales(SEXP filepath, SEXP name, SEXP dsnames,
+		       const char *scalename, const char *dset_name)
 {
 	hid_t file_id, dset_id;
 	DSetHandle dset_handle;
@@ -373,10 +378,13 @@ static void set_scales_pass2(SEXP filepath, SEXP name, SEXP dsnames,
 }
 
 /* --- .Call ENTRY POINT --- */
-SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
+SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename,
+		      SEXP dry_run)
 {
 	const char *scalename0;
 	CharAE *dset_name_buf;
+	SEXP ans;
+	int along, do_it;
 
 	if (!IS_CHARACTER(dsnames))
 		error("'dsnames' must be a character vector");
@@ -386,18 +394,40 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
 	} else {
 		scalename0 = CHAR(STRING_ELT(scalename, 0));
 	}
+
 	dset_name_buf = new_CharAE(0);
 
 	/* We use 2 passes to make the changes to the file atomic. */
 
 	/* 1st pass: dry-run */
-	set_scales_pass1(filepath, name, dsnames, scalename0,
-			 dset_name_buf);
-	/* 2nd pass: do it */
-	set_scales_pass2(filepath, name, dsnames, scalename0,
-			 dset_name_buf->elts);
+	ans = PROTECT(check_scales(filepath, name, dsnames, scalename0,
+				   dset_name_buf));
 
-	return R_NilValue;
+	/* 2nd pass: do it */
+	if (!LOGICAL(dry_run)[0]) {
+		/* We could just call set_scales() and it will do the right
+		   thing even if there is nothing to do (it acts as a no-op
+		   along the dimensions that already have the requested scales).
+		   Except that it starts by opening the file in read/write
+		   mode so will fail on a read-only file!
+		   By calling set_scales() only if there is something to do,
+		   we make h5setdimscales() work on a read-only file if all
+		   the requested scales are already set on dataset 'name'.
+		   It also makes the thing twice faster which is nice. */
+		do_it = 0;
+		for (along = 0; along < LENGTH(dsnames); along++) {
+			if (LOGICAL(ans)[along]) {
+				do_it = 1;
+				break;
+			}
+		}
+		if (do_it)
+			set_scales(filepath, name, dsnames, scalename0,
+				   dset_name_buf->elts);
+	}
+
+	UNPROTECT(1);
+	return ans;
 }
 
 /* --- .Call ENTRY POINT --- */
