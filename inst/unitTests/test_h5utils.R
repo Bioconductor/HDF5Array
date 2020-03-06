@@ -15,13 +15,7 @@ test_h5writeDimnames_h5readDimnames <- function()
 
     ## Write dimnames for 'A'.
     Adimnames <- list(letters[1:4], NULL, 11:12, NULL)
-    Adimnames_group <- paste(dirname(Aname),
-                             paste0(basename(Aname), "dimnames"),
-                             sep="/")
-    Adsnames <- paste(Adimnames_group, sprintf("%03d", seq_along(dim(A))),
-                      sep="/")
-    h5createGroup(h5file, Adimnames_group)
-    h5writeDimnames(h5file, Aname, Adimnames, Adsnames)
+    h5writeDimnames(h5file, Aname, Adimnames)
     target <- lapply(Adimnames,
         function(dn) if (is.null(dn)) NULL else as.character(dn)
     )
@@ -29,8 +23,9 @@ test_h5writeDimnames_h5readDimnames <- function()
     checkIdentical(target, current)
 
     ## Write dimnames (with dimlabels) for 'B'.
-    Bdimnames <- list(X=letters[1:2], Y=NULL, LETTERS[1:4])
-    h5writeDimnames(h5file, Bname, Bdimnames, c("X", "Y", "Z"))
+    Bdimnames <- list(x=letters[1:2], y=NULL, LETTERS[1:4])
+    dsnames <- c("X", "Y", "Z")
+    h5writeDimnames(h5file, Bname, Bdimnames, dsnames=dsnames)
     current <- h5readDimnames(h5file, Bname)
     checkIdentical(Bdimnames, current)
 
@@ -38,18 +33,18 @@ test_h5writeDimnames_h5readDimnames <- function()
     Cdimnames <- list(NULL, NULL)
 
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(h5file, Cname, Cdimnames, c("C1", "C2"))
+    h5writeDimnames(h5file, Cname, Cdimnames)
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames) <- c("", "")
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(h5file, Cname, Cdimnames, c("C1", "C2"))
+    h5writeDimnames(h5file, Cname, Cdimnames)
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames)[[1]] <- "x"
-    h5writeDimnames(h5file, Cname, Cdimnames, c("C1", "C2"))
+    h5writeDimnames(h5file, Cname, Cdimnames, group="more stuff")
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(Cdimnames, current)
 }
