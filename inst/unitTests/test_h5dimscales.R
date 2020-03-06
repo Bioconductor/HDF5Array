@@ -19,8 +19,12 @@ test_h5setdimscales_h5getdimscales <- function()
     checkIdentical(target, current)
 
     dsnames <- c("B", "stuff/C", NA, "more stuff/D")
+    target <- c(TRUE, TRUE, FALSE, TRUE)
+    current <- h5setdimscales(h5file, "A", dsnames, dry.run=TRUE)
+    checkIdentical(target, current)
     current <- h5setdimscales(h5file, "A", dsnames)
-    checkIdentical(c(TRUE, TRUE, FALSE, TRUE), current)
+    checkIdentical(target, current)
+    checkIdentical(logical(4), h5setdimscales(h5file, "A", dsnames))
 
     target <- paste0("/", dsnames); target[is.na(dsnames)] <- NA
     current <- h5getdimscales(h5file, "A")
@@ -31,8 +35,12 @@ test_h5setdimscales_h5getdimscales <- function()
     checkIdentical(target, current)
 
     dsnames <- c(NA, "E", "more stuff/E", "E")
+    target <- c(FALSE, TRUE, TRUE, TRUE)
+    current <- h5setdimscales(h5file, "A", dsnames, "foo", dry.run=TRUE)
+    checkIdentical(target, current)
     current <- h5setdimscales(h5file, "A", dsnames, "foo")
-    checkIdentical(c(FALSE, TRUE, TRUE, TRUE), current)
+    checkIdentical(target, current)
+    checkIdentical(logical(4), h5setdimscales(h5file, "A", dsnames, "foo"))
 
     target <- paste0("/", dsnames); target[is.na(dsnames)] <- NA
     current <- h5getdimscales(h5file, "A", "foo")

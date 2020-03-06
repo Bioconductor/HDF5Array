@@ -10,6 +10,40 @@
 #include <limits.h>  /* for INT_MAX */
 
 
+/****************************************************************************
+ * C_h5isdimscale()
+ */
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_h5isdimscale(SEXP filepath, SEXP name)
+{
+	hid_t file_id, dset_id;
+	DSetHandle dset_handle;
+	int is_scale;
+
+	file_id = _get_file_id(filepath, 1);  /* read-only */
+	dset_id = _get_dset_id(file_id, name, filepath);
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
+		H5Fclose(file_id);
+		error(_HDF5Array_errmsg_buf());
+	}
+
+	is_scale = H5DSis_scale(dset_id);
+
+	_close_DSetHandle(&dset_handle);
+	H5Fclose(file_id);
+
+	if (is_scale < 0)
+		error("H5DSis_scale() returned an error");
+	return ScalarLogical(is_scale);
+}
+
+
+/****************************************************************************
+ * C_h5getdimscales()
+ */
+
 static int get_dsname(hid_t dset_id, CharAE *name_buf)
 {
 	ssize_t name_size;
@@ -79,9 +113,60 @@ static int get_scale_along(hid_t dset_id, int along, const char *scalename,
 				  scale_visitor, &visitor_data);
 }
 
+/* --- .Call ENTRY POINT --- */
+SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
+{
+	hid_t file_id, dset_id;
+	DSetHandle dset_handle;
+	const char *scalename0;
+	CharAE *name_buf, *NAME_buf;
+	SEXP ans, ans_elt;
+	int along, ret;
+
+	file_id = _get_file_id(filepath, 1);  /* read-only */
+	dset_id = _get_dset_id(file_id, name, filepath);
+	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
+	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
+		H5Fclose(file_id);
+		error(_HDF5Array_errmsg_buf());
+	}
+	if (STRING_ELT(scalename, 0) == NA_STRING) {
+		scalename0 = NULL;
+	} else {
+		scalename0 = CHAR(STRING_ELT(scalename, 0));
+	}
+
+	ans = PROTECT(NEW_CHARACTER(dset_handle.ndim));
+
+	name_buf = new_CharAE(0);
+	NAME_buf = new_CharAE(0);
+	for (along = 0; along < dset_handle.ndim; along++) {
+		ret = get_scale_along(dset_id, along, scalename0,
+				      name_buf, NAME_buf);
+		if (ret < 0) {
+			_close_DSetHandle(&dset_handle);
+			H5Fclose(file_id);
+			error(_HDF5Array_errmsg_buf());
+		}
+		if (ret == 0) {
+			SET_STRING_ELT(ans, along, NA_STRING);
+		} else {
+			ans_elt = PROTECT(mkChar(name_buf->elts));
+			SET_STRING_ELT(ans, along, ans_elt);
+			UNPROTECT(1);
+		}
+	}
+
+	_close_DSetHandle(&dset_handle);
+	H5Fclose(file_id);
+
+	UNPROTECT(1);
+	return ans;
+}
+
 
 /****************************************************************************
- * C_h5setdimscales() and C_h5getdimscales()
+ * C_h5setdimscales()
  */
 
 static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
@@ -221,55 +306,6 @@ static int check_scale_along(hid_t file_id,
 	return -1;
 }
 
-static int set_scale_along(hid_t file_id, hid_t dset_id,
-		int along, const char *dsname, const char *scalename)
-{
-	hid_t dsset_id;
-	int is_scale, is_attached, ret;
-
-	dsset_id = H5Dopen(file_id, dsname, H5P_DEFAULT);
-	if (dsset_id < 0) {
-		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsname);
-		return -1;
-	}
-	is_scale = H5DSis_scale(dsset_id);
-	if (is_scale < 0) {
-		H5Dclose(dsset_id);
-		PRINT_TO_ERRMSG_BUF("H5DSis_scale() returned an error");
-		return -1;
-	}
-	if (is_scale) {
-		is_attached = H5DSis_attached(dset_id, dsset_id,
-					      (unsigned int) along);
-		if (is_attached < 0) {
-			H5Dclose(dsset_id);
-			PRINT_TO_ERRMSG_BUF("H5DSis_attached() "
-					    "returned an error");
-			return -1;
-		}
-	} else {
-		ret = H5DSset_scale(dsset_id, scalename);
-		if (ret < 0) {
-			H5Dclose(dsset_id);
-			PRINT_TO_ERRMSG_BUF("H5DSset_scale() "
-					    "returned an error");
-			return -1;
-		}
-		is_attached = 0;
-	}
-	if (!is_attached) {
-		ret = H5DSattach_scale(dset_id, dsset_id, (unsigned int) along);
-		if (ret < 0) {
-			H5Dclose(dsset_id);
-			PRINT_TO_ERRMSG_BUF("H5DSattach_scale() "
-					    "returned an error");
-			return -1;
-		}
-	}
-	H5Dclose(dsset_id);
-	return 0;
-}
-
 static SEXP check_scales(SEXP filepath, SEXP name, SEXP dsnames,
 			 const char *scalename, CharAE *dset_name_buf)
 {
@@ -341,6 +377,55 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dsnames,
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf());
 	return ans;
+}
+
+static int set_scale_along(hid_t file_id, hid_t dset_id,
+		int along, const char *dsname, const char *scalename)
+{
+	hid_t dsset_id;
+	int is_scale, is_attached, ret;
+
+	dsset_id = H5Dopen(file_id, dsname, H5P_DEFAULT);
+	if (dsset_id < 0) {
+		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsname);
+		return -1;
+	}
+	is_scale = H5DSis_scale(dsset_id);
+	if (is_scale < 0) {
+		H5Dclose(dsset_id);
+		PRINT_TO_ERRMSG_BUF("H5DSis_scale() returned an error");
+		return -1;
+	}
+	if (is_scale) {
+		is_attached = H5DSis_attached(dset_id, dsset_id,
+					      (unsigned int) along);
+		if (is_attached < 0) {
+			H5Dclose(dsset_id);
+			PRINT_TO_ERRMSG_BUF("H5DSis_attached() "
+					    "returned an error");
+			return -1;
+		}
+	} else {
+		ret = H5DSset_scale(dsset_id, scalename);
+		if (ret < 0) {
+			H5Dclose(dsset_id);
+			PRINT_TO_ERRMSG_BUF("H5DSset_scale() "
+					    "returned an error");
+			return -1;
+		}
+		is_attached = 0;
+	}
+	if (!is_attached) {
+		ret = H5DSattach_scale(dset_id, dsset_id, (unsigned int) along);
+		if (ret < 0) {
+			H5Dclose(dsset_id);
+			PRINT_TO_ERRMSG_BUF("H5DSattach_scale() "
+					    "returned an error");
+			return -1;
+		}
+	}
+	H5Dclose(dsset_id);
+	return 0;
 }
 
 static void set_scales(SEXP filepath, SEXP name, SEXP dsnames,
@@ -430,94 +515,10 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename,
 	return ans;
 }
 
-/* --- .Call ENTRY POINT --- */
-SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
-{
-	hid_t file_id, dset_id;
-	DSetHandle dset_handle;
-	const char *scalename0;
-	CharAE *name_buf, *NAME_buf;
-	SEXP ans, ans_elt;
-	int along, ret;
-
-	file_id = _get_file_id(filepath, 1);  /* read-only */
-	dset_id = _get_dset_id(file_id, name, filepath);
-	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
-	if (_get_DSetHandle(dset_id, 0, 0, &dset_handle) < 0) {
-		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
-	}
-	if (STRING_ELT(scalename, 0) == NA_STRING) {
-		scalename0 = NULL;
-	} else {
-		scalename0 = CHAR(STRING_ELT(scalename, 0));
-	}
-
-	ans = PROTECT(NEW_CHARACTER(dset_handle.ndim));
-
-	name_buf = new_CharAE(0);
-	NAME_buf = new_CharAE(0);
-	for (along = 0; along < dset_handle.ndim; along++) {
-		ret = get_scale_along(dset_id, along, scalename0,
-				      name_buf, NAME_buf);
-		if (ret < 0) {
-			_close_DSetHandle(&dset_handle);
-			H5Fclose(file_id);
-			error(_HDF5Array_errmsg_buf());
-		}
-		if (ret == 0) {
-			SET_STRING_ELT(ans, along, NA_STRING);
-		} else {
-			ans_elt = PROTECT(mkChar(name_buf->elts));
-			SET_STRING_ELT(ans, along, ans_elt);
-			UNPROTECT(1);
-		}
-	}
-
-	_close_DSetHandle(&dset_handle);
-	H5Fclose(file_id);
-
-	UNPROTECT(1);
-	return ans;
-}
-
 
 /****************************************************************************
- * C_h5setdimlabels() and C_h5getdimlabels()
+ * C_h5getdimlabels() and C_h5setdimlabels()
  */
-
-/* --- .Call ENTRY POINT --- */
-SEXP C_h5setdimlabels(SEXP filepath, SEXP name, SEXP labels)
-{
-	hid_t file_id, dset_id;
-	int ndim, along, ret;
-	SEXP label;
-
-	if (labels == R_NilValue)
-		return R_NilValue;
-
-	file_id = _get_file_id(filepath, 0);
-	dset_id = _get_dset_id(file_id, name, filepath);
-	ndim = LENGTH(labels);
-
-	for (along = 0; along < ndim; along++) {
-		label = STRING_ELT(labels, along);
-		if (label == NA_STRING)
-			continue;
-		ret = H5DSset_label(dset_id, (unsigned int) along, CHAR(label));
-		if (ret < 0) {
-			H5Dclose(dset_id);
-			H5Fclose(file_id);
-			PRINT_TO_ERRMSG_BUF("H5DSset_label() failed on "
-					    "label %d", along + 1);
-			error(_HDF5Array_errmsg_buf());
-		}
-	}
-
-	H5Dclose(dset_id);
-	H5Fclose(file_id);
-	return R_NilValue;
-}
 
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
@@ -593,5 +594,38 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	H5Fclose(file_id);
 	UNPROTECT(1);
 	return labels;
+}
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_h5setdimlabels(SEXP filepath, SEXP name, SEXP labels)
+{
+	hid_t file_id, dset_id;
+	int ndim, along, ret;
+	SEXP label;
+
+	if (labels == R_NilValue)
+		return R_NilValue;
+
+	file_id = _get_file_id(filepath, 0);
+	dset_id = _get_dset_id(file_id, name, filepath);
+	ndim = LENGTH(labels);
+
+	for (along = 0; along < ndim; along++) {
+		label = STRING_ELT(labels, along);
+		if (label == NA_STRING)
+			continue;
+		ret = H5DSset_label(dset_id, (unsigned int) along, CHAR(label));
+		if (ret < 0) {
+			H5Dclose(dset_id);
+			H5Fclose(file_id);
+			PRINT_TO_ERRMSG_BUF("H5DSset_label() failed on "
+					    "label %d", along + 1);
+			error(_HDF5Array_errmsg_buf());
+		}
+	}
+
+	H5Dclose(dset_id);
+	H5Fclose(file_id);
+	return R_NilValue;
 }
 

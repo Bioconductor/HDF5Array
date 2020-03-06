@@ -7,8 +7,29 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### h5setdimscales() / h5getdimscales()
+### h5isdimscale()
 ###
+
+h5isdimscale <- function(filepath, name)
+{
+    .Call2("C_h5isdimscale", filepath, name, PACKAGE="HDF5Array")
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### h5getdimscales() / h5setdimscales()
+###
+
+### Retrieve the names of the existing HDF5 datasets (1 per dimension in
+### dataset 'name') currently attached along the dimensions of dataset 'name'
+### for Dimension Scale 'scalename'.
+h5getdimscales <- function(filepath, name, scalename=NA_character_)
+{
+    stopifnot(isSingleStringOrNA(scalename))
+    scalename <- as.character(scalename)
+    .Call2("C_h5getdimscales", filepath, name, scalename,
+                               PACKAGE="HDF5Array")
+}
 
 ### name:      The name of the dataset on which to set Dimension Scales.
 ### dsnames:   A character vector containing the names of the existing HDF5
@@ -29,34 +50,23 @@ h5setdimscales <- function(filepath, name, dsnames, scalename=NA_character_,
                                PACKAGE="HDF5Array")
 }
 
-### Retrieve the names of the existing HDF5 datasets (1 per dimension in
-### dataset 'name') currently attached along the dimensions of dataset 'name'
-### for Dimension Scale 'scalename'.
-h5getdimscales <- function(filepath, name, scalename=NA_character_)
-{
-    stopifnot(isSingleStringOrNA(scalename))
-    scalename <- as.character(scalename)
-    .Call2("C_h5getdimscales", filepath, name, scalename,
-                               PACKAGE="HDF5Array")
-}
-
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Set/get the "dimension labels" of an HDF5 dataset
+### Get/set the "dimension labels" of an HDF5 dataset
 ###
 ### The "dimension labels" the HDF5 equivalent of the names on 'dimnames(a)'
 ### in R.
 ###
+
+h5getdimlabels <- function(filepath, name)
+{
+    .Call2("C_h5getdimlabels", filepath, name, PACKAGE="HDF5Array")
+}
 
 h5setdimlabels <- function(filepath, name, labels)
 {
     stopifnot(is.character(labels))
     invisible(.Call2("C_h5setdimlabels", filepath, name, labels,
                                          PACKAGE="HDF5Array"))
-}
-
-h5getdimlabels <- function(filepath, name)
-{
-    .Call2("C_h5getdimlabels", filepath, name, PACKAGE="HDF5Array")
 }
 

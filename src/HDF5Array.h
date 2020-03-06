@@ -176,12 +176,9 @@ SEXP C_h5mread(
 
 /* h5dimscales.c */
 
-SEXP C_h5setdimscales(
+SEXP C_h5isdimscale(
 	SEXP filepath,
-	SEXP name,
-	SEXP dsnames,
-	SEXP scalename,
-	SEXP dry_run
+	SEXP name
 );
 
 SEXP C_h5getdimscales(
@@ -190,14 +187,22 @@ SEXP C_h5getdimscales(
 	SEXP scalename
 );
 
-SEXP C_h5setdimlabels(
+SEXP C_h5setdimscales(
 	SEXP filepath,
 	SEXP name,
-	SEXP labels
+	SEXP dsnames,
+	SEXP scalename,
+	SEXP dry_run
 );
 
 SEXP C_h5getdimlabels(
 	SEXP filepath,
 	SEXP name
+);
+
+SEXP C_h5setdimlabels(
+	SEXP filepath,
+	SEXP name,
+	SEXP labels
 );
 
