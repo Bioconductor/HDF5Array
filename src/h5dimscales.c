@@ -39,8 +39,8 @@ typedef struct {
 	CharAE *NAME_buf;
 } VisitorData;
 
-static herr_t scale_visitor1(hid_t dset_id, unsigned int along, hid_t dsset_id,
-			     void *data)
+static herr_t scale_visitor(hid_t dset_id, unsigned int along, hid_t dsset_id,
+			    void *data)
 {
 	VisitorData *visitor_data;
 	int ret;
@@ -64,44 +64,6 @@ static herr_t scale_visitor1(hid_t dset_id, unsigned int along, hid_t dsset_id,
 	return 1;
 }
 
-static herr_t scale_visitor2(hid_t dset_id, unsigned int along, hid_t dsset_id,
-			     void *data)
-{
-	VisitorData *visitor_data;
-	int ret;
-
-	visitor_data = (VisitorData *) data;
-	ret = get_dsname(dsset_id, visitor_data->name_buf);
-	if (ret < 0)
-		return -1;
-	if (strcmp(visitor_data->name_buf->elts, visitor_data->dsset_name) == 0)
-		return 0;
-	ret = _get_h5_attrib_str(dsset_id, "NAME", visitor_data->NAME_buf);
-	if (ret < 0)
-		return -1;
-	if (ret == 0) {
-		if (visitor_data->scalename != NULL)
-			return 0;
-		PRINT_TO_ERRMSG_BUF("dimension %u of dataset '%s' is already "
-				    "linked to unnamed\n  Dimension Scale "
-				    "dataset '%s'", along + 1,
-				    visitor_data->dset_name,
-				    visitor_data->name_buf->elts);
-		return -1;
-	}
-	if (visitor_data->scalename == NULL ||
-	    ret == 1 ||
-	    strcmp(visitor_data->NAME_buf->elts, visitor_data->scalename) != 0)
-		return 0;
-	PRINT_TO_ERRMSG_BUF("dimension %u of dataset '%s' is already "
-			    "linked to Dimension Scale\n  dataset '%s' "
-			    "named \"%s\" (via \"NAME\" attribute)", along + 1,
-			    visitor_data->dset_name,
-			    visitor_data->name_buf->elts,
-			    visitor_data->scalename);
-	return -1;
-}
-
 static int get_scale_along(hid_t dset_id, int along, const char *scalename,
 		CharAE *name_buf, CharAE *NAME_buf)
 {
@@ -114,29 +76,7 @@ static int get_scale_along(hid_t dset_id, int along, const char *scalename,
 
 	idx = NULL;
 	return H5DSiterate_scales(dset_id, (unsigned int) along, idx,
-				  scale_visitor1, &visitor_data);
-}
-
-static int check_no_other_links_with_this_NAME(
-		hid_t dset_id, const char *dset_name,
-		int along, hid_t dsset_id, const char *scalename,
-		CharAE *buf1, CharAE *buf2, CharAE *buf3)
-{
-	int ret, *idx;
-	VisitorData visitor_data;
-
-	ret = get_dsname(dsset_id, buf1);
-	if (ret < 0)
-		return -1;
-	visitor_data.dset_name = dset_name;
-	visitor_data.dsset_name = buf1->elts;
-	visitor_data.scalename = scalename;
-	visitor_data.name_buf = buf2;
-	visitor_data.NAME_buf = buf3;
-
-	idx = NULL;
-	return H5DSiterate_scales(dset_id, (unsigned int) along, idx,
-				  scale_visitor2, &visitor_data);
+				  scale_visitor, &visitor_data);
 }
 
 
@@ -145,7 +85,6 @@ static int check_no_other_links_with_this_NAME(
  */
 
 static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
-				int is_scale,
 				const char *scalename, CharAE *NAME_buf)
 {
 	int ret;
@@ -154,15 +93,23 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
 	if (ret < 0)
 		return -1;
 	if (ret == 0) {
-		if (!is_scale || scalename == NULL)
+		if (scalename == NULL)
 			return 0;
-		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
-				    "Dimension Scale named \"%s\"\n  "
-				    "because dataset is already a "
-				    "Dimension Scale and is "
-				    "an **unnamed** one",
-				    dsname, scalename);
-		return -1;
+		ret = H5DSis_scale(dsset_id);
+		if (ret < 0) {
+			PRINT_TO_ERRMSG_BUF("H5DSis_scale() returned an error");
+			return -1;
+		}
+		if (ret > 0) {
+			PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
+					    "Dimension Scale named \"%s\"\n  "
+					    "because dataset is already a "
+					    "Dimension Scale but is "
+					    "an **unnamed** one",
+					    dsname, scalename);
+			return -1;
+		}
+		return 0;
 	}
 	if (scalename == NULL) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to an "
@@ -174,7 +121,7 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
 	if (ret == 1) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
 				    "Dimension Scale named \"%s\"\n  "
-				    "because dataset has a \"NAME\" "
+				    "because dataset already has a \"NAME\" "
 				    "attribute that is **not** of class "
 				    "H5T_STRING\n  (converting the dataset "
 				    "to a Dimension Scale would replace this "
@@ -184,7 +131,7 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
 	if (strcmp(NAME_buf->elts, scalename) != 0) {
 		PRINT_TO_ERRMSG_BUF("won't convert dataset '%s' to a "
 				    "Dimension Scale named \"%s\"\n  "
-				    "because dataset has a \"NAME\" "
+				    "because dataset already has a \"NAME\" "
 				    "attribute set to \"%s\"",
 				    dsname, scalename, NAME_buf->elts);
 		return -1;
@@ -192,35 +139,98 @@ static int check_NAME_attribute(hid_t dsset_id, const char *dsname,
 	return 0;
 }
 
-/* If 'buf1' != NULL then only check feasibility but don't do it (dry-run
-   mode). */
-static int set_scale_along(hid_t file_id,
+/* Check whether or not dataset 'dsname' is already set as a Dimension Scale
+   named 'scalename' (via its "NAME" attribute) on dimension 'along' of
+   dataset 'dset_id'. Return: 0 if no, 1 if yes, -1 if error.
+ */
+static int scale_is_already_set_along(hid_t file_id,
 		hid_t dset_id, const char *dset_name,
 		int along, const char *dsname, const char *scalename,
-		CharAE *buf1, CharAE *buf2, CharAE *buf3)
+		CharAE *name_buf1, CharAE *name_buf2, CharAE *buf)
 {
 	hid_t dsset_id;
-	int ret, is_scale, is_attached;
+	int ret;
 
 	dsset_id = H5Dopen(file_id, dsname, H5P_DEFAULT);
 	if (dsset_id < 0) {
 		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsname);
 		return -1;
 	}
-	if (buf1 != NULL) {
-		/* Retrieve **canonical name** of dataset 'dsset_id'. */
-		ret = get_dsname(dsset_id, buf1);
-		if (ret < 0) {
-			H5Dclose(dsset_id);
-			return -1;
-		}
-		if (strcmp(buf1->elts, dset_name) == 0) {
-			H5Dclose(dsset_id);
-			PRINT_TO_ERRMSG_BUF("cannot set dataset '%s' as a "
-					    "Dimension Scale on itself",
-					    dset_name);
-			return -1;
-		}
+	/* Retrieve **canonical name** of dataset 'dsset_id'. */
+	ret = get_dsname(dsset_id, name_buf1);
+	if (ret < 0) {
+		H5Dclose(dsset_id);
+		return -1;
+	}
+	if (strcmp(name_buf1->elts, dset_name) == 0) {
+		H5Dclose(dsset_id);
+		PRINT_TO_ERRMSG_BUF("cannot set dataset '%s' as a "
+				    "Dimension Scale on itself",
+				    dset_name);
+		return -1;
+	}
+	/* Check if 'dsset_id' has scales on it, in which case we won't be
+	   able to turn it into a Dimension Scale. */
+	ret = H5Aexists(dsset_id, "DIMENSION_LIST");
+	if (ret < 0) {
+		H5Dclose(dsset_id);
+		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
+		return -1;
+	}
+	if (ret) {
+		H5Dclose(dsset_id);
+		PRINT_TO_ERRMSG_BUF("dataset '%s' already has Dimension "
+				    "Scales on it so cannot be turned\n  "
+				    "itself into a Dimension Scale (a "
+                                    "Dimension Scale dataset cannot have\n  "
+                                    "Dimension Scales)", name_buf1->elts);
+		return -1;
+	}
+	ret = get_scale_along(dset_id, along, scalename,
+			      name_buf2, buf);
+	if (ret < 0) {
+		H5Dclose(dsset_id);
+		return -1;
+	}
+	if (ret == 0) {
+		/* Now that we know that 'dsset_id' is not already set as
+		   a Dimension Scale named 'scalename' on dimension 'along'
+		   of 'dset_id', we also want to make sure that it **would**
+		   be ok to create that link. We return -1 if not. */
+		ret = check_NAME_attribute(dsset_id, dsname, scalename, buf);
+		H5Dclose(dsset_id);
+		return ret < 0 ? -1 : 0;
+	}
+	if (strcmp(name_buf2->elts, name_buf1->elts) == 0) {
+		H5Dclose(dsset_id);
+		return 1;
+	}
+	if (scalename == NULL) {
+		PRINT_TO_ERRMSG_BUF("dimension %d of dataset '%s' is already "
+				    "linked to unnamed\n  Dimension Scale "
+				    "dataset '%s'", along + 1,
+				    dset_name, name_buf2->elts);
+	} else {
+		PRINT_TO_ERRMSG_BUF("dimension %d of dataset '%s' is already "
+				    "linked to Dimension Scale\n  "
+				    "dataset '%s' named \"%s\" (via \"NAME\" "
+				    "attribute)", along + 1,
+				    dset_name, name_buf2->elts, scalename);
+	}
+	H5Dclose(dsset_id);
+	return -1;
+}
+
+static int set_scale_along(hid_t file_id, hid_t dset_id,
+		int along, const char *dsname, const char *scalename)
+{
+	hid_t dsset_id;
+	int is_scale, is_attached, ret;
+
+	dsset_id = H5Dopen(file_id, dsname, H5P_DEFAULT);
+	if (dsset_id < 0) {
+		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dsname);
+		return -1;
 	}
 	is_scale = H5DSis_scale(dsset_id);
 	if (is_scale < 0) {
@@ -238,23 +248,6 @@ static int set_scale_along(hid_t file_id,
 			return -1;
 		}
 	} else {
-		is_attached = 0;
-	}
-	if (buf1 != NULL) {
-		ret = check_NAME_attribute(dsset_id, dsname, is_scale,
-					   scalename, buf1);
-		if (ret < 0) {
-			H5Dclose(dsset_id);
-			return -1;
-		}
-		ret = check_no_other_links_with_this_NAME(dset_id, dset_name,
-							  along, dsset_id,
-							  scalename,
-							  buf1, buf2, buf3);
-		H5Dclose(dsset_id);
-		return ret;
-	}
-	if (!is_scale) {
 		ret = H5DSset_scale(dsset_id, scalename);
 		if (ret < 0) {
 			H5Dclose(dsset_id);
@@ -262,6 +255,7 @@ static int set_scale_along(hid_t file_id,
 					    "returned an error");
 			return -1;
 		}
+		is_attached = 0;
 	}
 	if (!is_attached) {
 		ret = H5DSattach_scale(dset_id, dsset_id, (unsigned int) along);
@@ -285,8 +279,6 @@ static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
 	int ret, along;
 	SEXP dsname;
 
-	if (!IS_CHARACTER(dsnames))
-		error("'dsnames' must be a character vector");
 	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
@@ -316,8 +308,8 @@ static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
 	}
 	if (ret > 0) {
 		PRINT_TO_ERRMSG_BUF("dataset '%s' is a Dimension Scale "
-				    "(a Dimension Scale dataset\n  cannot "
-				    "have Dimension Scales)",
+				    "(cannot set Dimension Scales\n  "
+				    "on a Dimension Scale dataset)",
 				    dset_name_buf->elts);
 		ret = -1;
 		goto on_error;
@@ -328,18 +320,18 @@ static void set_scales_pass1(SEXP filepath, SEXP name, SEXP dsnames,
 	buf3 = new_CharAE(0);
 	for (along = 0; along < LENGTH(dsnames); along++) {
 		dsname = STRING_ELT(dsnames, along);
-		if (dsname != NA_STRING) {
-			ret = set_scale_along(file_id,
-					      dset_id, dset_name_buf->elts,
-					      along, CHAR(dsname),
-					      scalename, buf1, buf2, buf3);
-			if (ret < 0)
-				goto on_error;
-		}
+		if (dsname == NA_STRING)
+			continue;
+		ret = scale_is_already_set_along(file_id,
+					dset_id, dset_name_buf->elts,
+					along, CHAR(dsname), scalename,
+					buf1, buf2, buf3);
+		if (ret < 0)
+			goto on_error;
 	}
 
     on_error:
-	H5Dclose(dset_id);
+	_close_DSetHandle(&dset_handle);
 	H5Fclose(file_id);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf());
@@ -364,17 +356,16 @@ static void set_scales_pass2(SEXP filepath, SEXP name, SEXP dsnames,
 
 	for (along = 0; along < LENGTH(dsnames); along++) {
 		dsname = STRING_ELT(dsnames, along);
-		if (dsname != NA_STRING) {
-			ret = set_scale_along(file_id, dset_id, dset_name,
-					      along, CHAR(dsname),
-					      scalename, NULL, NULL, NULL);
-			if (ret < 0)  /* should never happen */
-				goto on_error;
-		}
+		if (dsname == NA_STRING)
+			continue;
+		ret = set_scale_along(file_id, dset_id,
+				      along, CHAR(dsname), scalename);
+		if (ret < 0)  /* should never happen */
+			goto on_error;
 	}
 
     on_error:
-	H5Dclose(dset_id);
+	_close_DSetHandle(&dset_handle);
 	H5Fclose(file_id);
 	if (ret < 0)
 		error(_HDF5Array_errmsg_buf());
@@ -386,6 +377,9 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dsnames, SEXP scalename)
 {
 	const char *scalename0;
 	CharAE *dset_name_buf;
+
+	if (!IS_CHARACTER(dsnames))
+		error("'dsnames' must be a character vector");
 
 	if (STRING_ELT(scalename, 0) == NA_STRING) {
 		scalename0 = NULL;
