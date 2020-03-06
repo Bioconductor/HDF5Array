@@ -16,8 +16,8 @@ h5mread_from_reshaped(filepath, name, dim, starts, noreduce=FALSE,
 
 \arguments{
   \item{filepath}{
-    The path (as a single character string) to the HDF5 file where the
-    dataset to read from is located.
+    The path (as a single string) to the HDF5 file where the dataset
+    to read from is located.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.

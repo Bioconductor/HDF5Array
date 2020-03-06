@@ -190,7 +190,7 @@ SEXP C_h5getdimscales(
 SEXP C_h5setdimscales(
 	SEXP filepath,
 	SEXP name,
-	SEXP dsnames,
+	SEXP dimscales,
 	SEXP scalename,
 	SEXP dry_run
 );
@@ -203,6 +203,6 @@ SEXP C_h5getdimlabels(
 SEXP C_h5setdimlabels(
 	SEXP filepath,
 	SEXP name,
-	SEXP labels
+	SEXP dimlabels
 );
 

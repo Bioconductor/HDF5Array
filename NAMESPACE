@@ -61,6 +61,7 @@ export(
     DSetHandle, destroy_DSetHandle, get_h5mread_returned_type,
     h5mread,
     h5mread_from_reshaped,
+    h5writeDimnames, h5readDimnames,
     HDF5ArraySeed,
     HDF5Array,
     ReshapedHDF5ArraySeed,

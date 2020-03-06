@@ -2,7 +2,7 @@
 ### Some low-level HDF5 utilities
 ### -------------------------------------------------------------------------
 ###
-### Nothing in this file is exported.
+### Unless stated otherwise, nothing in this file is exported.
 ###
 
 
@@ -165,15 +165,15 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
         stop(wmsg("cannot write dimnames for an HDF5 dataset '", name, "' ",
                   "that contains the dimnames of another dataset in ",
                   "the HDF5 file"))
-    scales <- h5getdimscales(filepath, name, "dimnames")
-    if (!all(is.na(scales))) {
-        scales <- scales[!is.na(scales)]
+    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
+    if (!all(is.na(dimscales))) {
+        dimscales <- dimscales[!is.na(dimscales)]
         stop(wmsg("the dimnames for HDF5 dataset '", name, "' are ",
                   "already stored in the following dataset(s): ",
-                  paste(paste0("'", scales, "'"), collapse=", ")))
+                  paste(paste0("'", dimscales, "'"), collapse=", ")))
     }
-    labels <- h5getdimlabels(filepath, name)
-    if (!is.null(labels))
+    dimlabels <- h5getdimlabels(filepath, name)
+    if (!is.null(dimlabels))
         stop(wmsg("HDF5 dataset '", name, "' already has dimension labels"))
 }
 
@@ -185,17 +185,17 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     not_is_NULL <- !S4Vectors:::sapply_isNULL(dimnames)
     for (along in which(not_is_NULL)) {
         dn <- dimnames[[along]]
-        if (!(is.vector(dn) && is.atomic(dn) || is.factor(dn)))
+        if (!(is.vector(dn) && is.atomic(dn)))
             stop(wmsg("each list element in the supplied 'dimnames' ",
-                      "must be NULL, or an atomic vector, or a factor"))
+                      "must an atomic vector or a NULL"))
         if (length(dn) != dim[[along]])
             stop(wmsg("length of 'dimnames[[", along, "]]' ",
                       "(", length(dn), ") must equal the extent ",
                       "of the corresponding dimension in HDF5 ",
                       "dataset '", name, "' (", dim[[along]], ")"))
     }
-    labels <- names(dimnames)
-    if (!is.null(labels) && any(is.na(labels)))
+    dimlabels <- names(dimnames)
+    if (!is.null(dimlabels) && any(is.na(dimlabels)))
         stop(wmsg("'names(dimnames)' cannot contain NAs"))
     not_is_NULL
 }
@@ -209,47 +209,47 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     group
 }
 
-.normarg_dsnames <- function(dsnames, group, not_is_NULL, filepath, name)
+.normarg_dimscales <- function(dimscales, group, not_is_NULL, filepath, name)
 {
     ndim <- length(not_is_NULL)
-    if (is.null(dsnames)) {
+    if (is.null(dimscales)) {
+        ## Generate automatic dataset names.
         digits <- as.integer(log10(ndim + 0.5)) + 1L
         fmt <- paste0("%0", digits, "d")
-        dsnames <- sprintf(fmt, seq_len(ndim))
+        dimscales <- sprintf(fmt, seq_len(ndim))
     } else {
-        if (!is.character(dsnames) || length(dsnames) != ndim)
-            stop(wmsg("'dsnames' must be a character vector containing ",
+        if (!is.character(dimscales) || length(dimscales) != ndim)
+            stop(wmsg("'dimscales' must be a character vector containing ",
                       "the names of the HDF5 datasets (1 per list element ",
                       "in 'dimnames') where to write the dimnames"))
-        if (any(not_is_NULL & is.na(dsnames)))
-            stop(wmsg("'dsnames' cannot have NAs associated with ",
+        if (any(not_is_NULL & is.na(dimscales)))
+            stop(wmsg("'dimscales' cannot have NAs associated with ",
                       "list elements in 'dimnames' that are not NULL"))
     }
     if (nzchar(group))
-        dsnames <- paste0(group, "/", dsnames)
-    dsnames[!not_is_NULL] <- NA_character_
+        dimscales <- paste0(group, "/", dimscales)
+    dimscales[!not_is_NULL] <- NA_character_
     for (along in which(not_is_NULL)) {
-        dsname <- dsnames[[along]]
-        if (h5exists(filepath, dsname))
-            stop(wmsg("dataset '", dsname, "' already exists"))
+        dimscale <- dimscales[[along]]
+        if (h5exists(filepath, dimscale))
+            stop(wmsg("dataset '", dimscale, "' already exists"))
     }
-    dsnames
+    dimscales
 }
 
-### name:     The name of the HDF5 dataset on which to set the dimnames.
-### dimnames: A list (possibly named) with 1 list element per dimension in
-###           dataset 'name'.
-### group:    The name of the HDF5 group where to write the dimnames.
-###           If NA, the group name is automatically generated from 'name'.
-###           An empty string ("") means that no group should be used.
-###           Otherwise, the names in 'dsnames' must be relative to the
-###           specified group name.
-### dsnames:  A character vector containing the names of the HDF5 datasets
-###           (1 per list element in 'dimnames') where to write the dimnames.
-###           Names associated with dimensions for which the corresponding
-###           list elements in 'dimnames' are NULL are ignored (hence can be
-###           NAs).
-h5writeDimnames <- function(filepath, name, dimnames, group=NA, dsnames=NULL)
+### dimnames:  A list (possibly named) with 1 list element per dimension in
+###            dataset 'name'.
+### name:      The name of the HDF5 dataset on which to set the dimnames.
+### group:     The name of the HDF5 group where to write the dimnames.
+###            If NA, the group name is automatically generated from 'name'.
+###            An empty string ("") means that no group should be used.
+###            Otherwise, the names in 'dimscales' must be relative to the
+###            specified group name.
+### dimscales: A character vector containing the names of the HDF5 datasets
+###            (1 per list element in 'dimnames') where to write the dimnames.
+###            Names associated with NULL list elements in 'dimnames' are
+###            ignored.
+h5writeDimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
 {
     ## 1. Lots of checks.
 
@@ -262,7 +262,8 @@ h5writeDimnames <- function(filepath, name, dimnames, group=NA, dsnames=NULL)
 
     group <- .normarg_group(group, name)
 
-    dsnames <- .normarg_dsnames(dsnames, group, not_is_NULL, filepath, name)
+    dimscales <- .normarg_dimscales(dimscales, group, not_is_NULL,
+                                    filepath, name)
 
     ## 2. Write to the HDF5 file.
 
@@ -273,30 +274,30 @@ h5writeDimnames <- function(filepath, name, dimnames, group=NA, dsnames=NULL)
     ## Write dimnames.
     for (along in which(not_is_NULL)) {
         dn <- dimnames[[along]]
-        dsname <- dsnames[[along]]
-        h5write(dn, filepath, dsname)
+        dimscale <- dimscales[[along]]
+        h5write(dn, filepath, dimscale)
     }
 
     ## Attach new datasets to dimensions of dataset 'name'.
-    h5setdimscales(filepath, name, dsnames, "dimnames")
+    h5setdimscales(filepath, name, dimscales, scalename="dimnames")
 
     ## Set the dimension labels.
-    labels <- names(dimnames)
-    if (!is.null(labels) && any(nzchar(labels)))
-        h5setdimlabels(filepath, name, labels)
+    dimlabels <- names(dimnames)
+    if (!is.null(dimlabels) && any(nzchar(dimlabels)))
+        h5setdimlabels(filepath, name, dimlabels)
 }
 
 h5readDimnames <- function(filepath, name)
 {
-    scales <- h5getdimscales(filepath, name, "dimnames")
-    labels <- h5getdimlabels(filepath, name)
-    if (all(is.na(scales)) && is.null(labels))
+    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
+    dimlabels <- h5getdimlabels(filepath, name)
+    if (all(is.na(dimscales)) && is.null(dimlabels))
         return(NULL)
-    lapply(setNames(scales, labels),
-           function(scale) {
-               if (is.na(scale))
+    lapply(setNames(dimscales, dimlabels),
+           function(dimscale) {
+               if (is.na(dimscale))
                    return(NULL)
-               as.character(h5mread(filepath, scale))
+               DelayedArray:::set_dim(h5mread(filepath, dimscale), NULL)
            })
 }
 

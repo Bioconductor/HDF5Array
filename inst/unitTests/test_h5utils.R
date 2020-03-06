@@ -15,17 +15,14 @@ test_h5writeDimnames_h5readDimnames <- function()
 
     ## Write dimnames for 'A'.
     Adimnames <- list(letters[1:4], NULL, 11:12, NULL)
-    h5writeDimnames(h5file, Aname, Adimnames)
-    target <- lapply(Adimnames,
-        function(dn) if (is.null(dn)) NULL else as.character(dn)
-    )
+    h5writeDimnames(Adimnames, h5file, Aname)
     current <- h5readDimnames(h5file, Aname)
-    checkIdentical(target, current)
+    checkIdentical(Adimnames, current)
 
     ## Write dimnames (with dimlabels) for 'B'.
     Bdimnames <- list(x=letters[1:2], y=NULL, LETTERS[1:4])
-    dsnames <- c("X", "Y", "Z")
-    h5writeDimnames(h5file, Bname, Bdimnames, dsnames=dsnames)
+    dimscales <- c("X", "Y", "Z")
+    h5writeDimnames(Bdimnames, h5file, Bname, dimscales=dimscales)
     current <- h5readDimnames(h5file, Bname)
     checkIdentical(Bdimnames, current)
 
@@ -33,18 +30,18 @@ test_h5writeDimnames_h5readDimnames <- function()
     Cdimnames <- list(NULL, NULL)
 
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(h5file, Cname, Cdimnames)
+    h5writeDimnames(Cdimnames, h5file, Cname)
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames) <- c("", "")
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(h5file, Cname, Cdimnames)
+    h5writeDimnames(Cdimnames, h5file, Cname)
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames)[[1]] <- "x"
-    h5writeDimnames(h5file, Cname, Cdimnames, group="more stuff")
+    h5writeDimnames(Cdimnames, h5file, Cname, group="more stuff")
     current <- h5readDimnames(h5file, Cname)
     checkIdentical(Cdimnames, current)
 }

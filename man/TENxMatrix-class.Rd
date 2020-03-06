@@ -45,8 +45,8 @@ extractNonzeroDataByCol(x, j)
 
 \arguments{
   \item{filepath}{
-    The path (as a single character string) to the HDF5 file where the
-    10x Genomics dataset is located.
+    The path (as a single string) to the HDF5 file where the 10x Genomics
+    dataset is located.
   }
   \item{group}{
     The name of the group in the HDF5 file containing the 10x Genomics data.

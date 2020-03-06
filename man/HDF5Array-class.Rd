@@ -33,8 +33,8 @@ HDF5Array(filepath, name, type=NA)
 
 \arguments{
   \item{filepath}{
-    The path (as a single character string) to the HDF5 file where the
-    dataset is located.
+    The path (as a single string) to the HDF5 file where the dataset
+    is located.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
