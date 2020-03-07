@@ -154,7 +154,7 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### h5writeDimnames() / h5readDimnames()
+### write_h5dimnames() / read_h5dimnames()
 ###
 
 .check_filepath_and_name <- function(filepath, name)
@@ -250,7 +250,7 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
 ###            (1 per list element in 'dimnames') where to write the dimnames.
 ###            Names associated with NULL list elements in 'dimnames' are
 ###            ignored.
-h5writeDimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
+write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
 {
     ## 1. Lots of checks.
 
@@ -288,26 +288,10 @@ h5writeDimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
         h5setdimlabels(filepath, name, dimlabels)
 }
 
-h5checkDimnames <- function(filepath, name)
+### Exported!
+read_h5dimnames <- function(filepath, name)
 {
     dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
-    dim <- h5dim(filepath, name)
-    for (along in which(!is.na(dimscales))) {
-        dimscale <- dimscales[[along]]
-        dimscale_len <- prod(h5dim(filepath, dimscale))
-        if (dimscale_len != dim[[along]])
-            stop(wmsg("length of dataset '", dimscale, "' ",
-                      "(", dimscale_len, ") is not equal to the ",
-                      "extent of the corresponding dimension in ",
-                      "HDF5 dataset '", name, "' (", dim[[along]], ")"))
-    }
-    dimscales
-}
-
-### Exported!
-h5readDimnames <- function(filepath, name)
-{
-    dimscales <- h5checkDimnames(filepath, name)
     dimlabels <- h5getdimlabels(filepath, name)
     if (all(is.na(dimscales)) && is.null(dimlabels))
         return(NULL)
@@ -317,5 +301,27 @@ h5readDimnames <- function(filepath, name)
                    return(NULL)
                DelayedArray:::set_dim(h5mread(filepath, dimscale), NULL)
            })
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### validate_lengths_of_h5dimnames()
+###
+
+validate_lengths_of_h5dimnames <- function(filepath, name)
+{
+    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
+    dim <- h5dim(filepath, name)
+    for (along in which(!is.na(dimscales))) {
+        dimscale <- dimscales[[along]]
+        dimscale_len <- prod(h5dim(filepath, dimscale))
+        if (dimscale_len != dim[[along]])
+            return(paste0("HDF5 dataset '", name, "' has invalid ",
+                          "dimnames: length of dataset '", dimscale, "' ",
+                          "(", dimscale_len, ") is not equal to ",
+                          "the extent of dimension ", along, " in ",
+                          "dataset '", name, "' (", dim[[along]], ")"))
+    }
+    TRUE
 }
 

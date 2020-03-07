@@ -1,7 +1,7 @@
-test_h5writeDimnames_h5readDimnames <- function()
+test_write_read_h5dimnames <- function()
 {
-    h5writeDimnames <- HDF5Array:::h5writeDimnames
-    h5readDimnames <- HDF5Array:::h5readDimnames
+    write_h5dimnames <- HDF5Array:::write_h5dimnames
+    read_h5dimnames <- HDF5Array:::read_h5dimnames
 
     h5file <- tempfile(fileext=".h5")
     h5createFile(h5file)
@@ -15,34 +15,34 @@ test_h5writeDimnames_h5readDimnames <- function()
 
     ## Write dimnames for 'A'.
     Adimnames <- list(letters[1:4], NULL, 11:12, NULL)
-    h5writeDimnames(Adimnames, h5file, Aname)
-    current <- h5readDimnames(h5file, Aname)
+    write_h5dimnames(Adimnames, h5file, Aname)
+    current <- read_h5dimnames(h5file, Aname)
     checkIdentical(Adimnames, current)
 
     ## Write dimnames (with dimlabels) for 'B'.
     Bdimnames <- list(x=letters[1:2], y=NULL, LETTERS[1:4])
     dimscales <- c("X", "Y", "Z")
-    h5writeDimnames(Bdimnames, h5file, Bname, dimscales=dimscales)
-    current <- h5readDimnames(h5file, Bname)
+    write_h5dimnames(Bdimnames, h5file, Bname, dimscales=dimscales)
+    current <- read_h5dimnames(h5file, Bname)
     checkIdentical(Bdimnames, current)
 
     ## Write dimnames for 'C'.
     Cdimnames <- list(NULL, NULL)
 
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(Cdimnames, h5file, Cname)
-    current <- h5readDimnames(h5file, Cname)
+    write_h5dimnames(Cdimnames, h5file, Cname)
+    current <- read_h5dimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames) <- c("", "")
     ## Does not actually write anything to the HDF5 file.
-    h5writeDimnames(Cdimnames, h5file, Cname)
-    current <- h5readDimnames(h5file, Cname)
+    write_h5dimnames(Cdimnames, h5file, Cname)
+    current <- read_h5dimnames(h5file, Cname)
     checkIdentical(NULL, current)
 
     names(Cdimnames)[[1]] <- "x"
-    h5writeDimnames(Cdimnames, h5file, Cname, group="more stuff")
-    current <- h5readDimnames(h5file, Cname)
+    write_h5dimnames(Cdimnames, h5file, Cname, group="more stuff")
+    current <- read_h5dimnames(h5file, Cname)
     checkIdentical(Cdimnames, current)
 }
 

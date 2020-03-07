@@ -105,7 +105,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
-        h5writeDimnames(dimnames, filepath, name)
+        write_h5dimnames(dimnames, filepath, name)
     }
     new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
                                 filepath=filepath, name=name,

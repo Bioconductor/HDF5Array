@@ -100,6 +100,12 @@ validate_HDF5ArraySeed_dataset <- function(x)
     if (!isTRUE(msg))
         return(paste0("object ", msg))
 
+    ## Check that the dimnames stored in the file are consistent with
+    ## the dimensions of the HDF5 dataset.
+    msg <- validate_lengths_of_h5dimnames(x_filepath, x_name)
+    if (!isTRUE(msg))
+        return(msg)
+
     TRUE
 }
 

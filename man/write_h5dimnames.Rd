@@ -1,19 +1,19 @@
-\name{h5writeDimnames}
+\name{write_h5dimnames}
 
-\alias{h5writeDimnames}
-\alias{h5readDimnames}
+\alias{write_h5dimnames}
+\alias{read_h5dimnames}
 
 \title{Write/read the dimnames of an HDF5 dataset}
 
 \description{
-  \code{h5writeDimnames} and \code{h5readDimnames} can be used to
+  \code{write_h5dimnames} and \code{read_h5dimnames} can be used to
   write/read the dimnames of an HDF5 dataset to/from disk.
 }
 
 \usage{
-h5writeDimnames(dimnames, filepath, name, group=NA, dimscales=NULL)
+write_h5dimnames(dimnames, filepath, name, group=NA, dimscales=NULL)
 
-h5readDimnames(filepath, name)
+read_h5dimnames(filepath, name)
 }
 
 \arguments{
@@ -60,9 +60,9 @@ h5readDimnames(filepath, name)
 }
 
 \value{
-  \code{h5writeDimnames} returns nothing.
+  \code{write_h5dimnames} returns nothing.
 
-  \code{h5readDimnames} returns a list (possibly named) with one list
+  \code{read_h5dimnames} returns a list (possibly named) with one list
   element per dimension in HDF5 dataset \code{name} and containing its
   dimnames retrieved from the file.
 }
@@ -70,11 +70,11 @@ h5readDimnames(filepath, name)
 \seealso{
   \itemize{
     \item \code{\link[rhdf5]{h5write}} in the \pkg{rhdf5} package that
-          \code{h5writeDimnames} uses internally to write the dimnames
+          \code{write_h5dimnames} uses internally to write the dimnames
           to the HDF5 file.
 
     \item \code{\link{h5mread}} in this package (\pkg{HDF5Array}) that
-          \code{h5readDimnames} uses internally to read the dimnames
+          \code{read_h5dimnames} uses internally to read the dimnames
           from the HDF5 file.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
@@ -90,14 +90,14 @@ h5file <- tempfile(fileext=".h5")
 h5write(m0, h5file, "m0")  # h5write() ignores the dimnames
 h5ls(h5file)
 
-h5writeDimnames(dimnames(m0), h5file, "m0")
+write_h5dimnames(dimnames(m0), h5file, "m0")
 h5ls(h5file)
 
-h5readDimnames(h5file, "m0")
+read_h5dimnames(h5file, "m0")
 
 ## Reconstruct 'm0' from HDF5 file.
 m <- h5mread(h5file, "m0")
-dimnames(m) <- h5readDimnames(h5file, "m0")
+dimnames(m) <- read_h5dimnames(h5file, "m0")
 stopifnot(identical(m0, m))
 }
 \keyword{methods}
