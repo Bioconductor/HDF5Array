@@ -13,6 +13,7 @@
    C_h5mread() function. */
 typedef struct {
 	hid_t dset_id, dtype_id, space_id, plist_id, mem_type_id;
+	char *h5name;  /* canonical name as retrieved by H5Iget_name() */
 	char *storage_mode_attr;
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size, chunk_data_buf_size;
@@ -118,19 +119,21 @@ hsize_t *_alloc_hsize_t_buf(
 	const char *what
 );
 
-int _get_h5_attrib_str(
+int _get_h5attrib_str(
 	hid_t dset_id,
 	const char *attr_name,
-	CharAE *str_buf
+	CharAE *buf
 );
 
-void _close_DSetHandle(DSetHandle *dset_handle);
+void _destroy_DSetHandle(
+	DSetHandle *dset_handle
+);
 
-int _get_DSetHandle(
+int _init_DSetHandle(
+	DSetHandle *dset_handle,
 	hid_t dset_id,
 	int as_int,
-	int Rtype_only,
-	DSetHandle *dset_handle
+	int Rtype_only
 );
 
 hid_t _get_file_id(

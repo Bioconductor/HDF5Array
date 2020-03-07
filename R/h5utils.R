@@ -190,9 +190,9 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
                       "must an atomic vector or a NULL"))
         if (length(dn) != dim[[along]])
             stop(wmsg("length of 'dimnames[[", along, "]]' ",
-                      "(", length(dn), ") must equal the extent ",
-                      "of the corresponding dimension in HDF5 ",
-                      "dataset '", name, "' (", dim[[along]], ")"))
+                      "(", length(dn), ") must equal the ",
+                      "extent of the corresponding dimension in ",
+                      "HDF5 dataset '", name, "' (", dim[[along]], ")"))
     }
     dimlabels <- names(dimnames)
     if (!is.null(dimlabels) && any(is.na(dimlabels)))
@@ -237,6 +237,7 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     dimscales
 }
 
+### Exported!
 ### dimnames:  A list (possibly named) with 1 list element per dimension in
 ###            dataset 'name'.
 ### name:      The name of the HDF5 dataset on which to set the dimnames.
@@ -287,9 +288,26 @@ h5writeDimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
         h5setdimlabels(filepath, name, dimlabels)
 }
 
-h5readDimnames <- function(filepath, name)
+h5checkDimnames <- function(filepath, name)
 {
     dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
+    dim <- h5dim(filepath, name)
+    for (along in which(!is.na(dimscales))) {
+        dimscale <- dimscales[[along]]
+        dimscale_len <- prod(h5dim(filepath, dimscale))
+        if (dimscale_len != dim[[along]])
+            stop(wmsg("length of dataset '", dimscale, "' ",
+                      "(", dimscale_len, ") is not equal to the ",
+                      "extent of the corresponding dimension in ",
+                      "HDF5 dataset '", name, "' (", dim[[along]], ")"))
+    }
+    dimscales
+}
+
+### Exported!
+h5readDimnames <- function(filepath, name)
+{
+    dimscales <- h5checkDimnames(filepath, name)
     dimlabels <- h5getdimlabels(filepath, name)
     if (all(is.na(dimscales)) && is.null(dimlabels))
         return(NULL)

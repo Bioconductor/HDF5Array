@@ -61,6 +61,33 @@ hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
 	return buf;
 }
 
+/* Does not distinguish between no name and an empty name (i.e. a name
+   that is the empty string). */
+static char *get_h5name(hid_t obj_id)
+{
+	ssize_t name_size;
+	char *h5name;
+
+	name_size = H5Iget_name(obj_id, NULL, 0);
+	if (name_size < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Iget_name() returned an error");
+		return NULL;
+	}
+	name_size++;
+	h5name = (char *) malloc((size_t) name_size);
+	if (h5name == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'h5name'");
+		return NULL;
+	}
+	name_size = H5Iget_name(obj_id, h5name, (size_t) name_size);
+	if (name_size < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Iget_name() returned an error");
+		return NULL;
+	}
+	return h5name;
+}
+
 /* Get the value (expected to be a string) of a given attribute of class
    H5T_STRING. Return:
     -1: if an error occurs;
@@ -71,9 +98,9 @@ hsize_t *_alloc_hsize_t_buf(size_t buflength, int zeroes, const char *what)
      2: if dataset 'dset_id' has an attribute with the name specified
         in 'attr_name' and the attribute is of class H5T_STRING (in which
         case, and only in this case, the value of the attribute is copied
-        to 'str_buf').
+        to 'buf').
  */
-int _get_h5_attrib_str(hid_t dset_id, const char *attr_name, CharAE *str_buf)
+int _get_h5attrib_str(hid_t dset_id, const char *attr_name, CharAE *buf)
 {
 	int ret;
 	hid_t attr_id, attr_type_id;
@@ -117,10 +144,10 @@ int _get_h5_attrib_str(hid_t dset_id, const char *attr_name, CharAE *str_buf)
 		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
 		return -1;
 	}
-	if (attr_size > str_buf->_buflength)
-		CharAE_extend(str_buf, (size_t) attr_size);
-	CharAE_set_nelt(str_buf, (size_t) attr_size);
-	ret = H5Aread(attr_id, attr_type_id, str_buf->elts);
+	if ((size_t) attr_size > buf->_buflength)
+		CharAE_extend(buf, (size_t) attr_size);
+	CharAE_set_nelt(buf, (size_t) attr_size);
+	ret = H5Aread(attr_id, attr_type_id, buf->elts);
 	H5Tclose(attr_type_id);
 	H5Aclose(attr_id);
 	if (ret < 0) {
@@ -132,7 +159,7 @@ int _get_h5_attrib_str(hid_t dset_id, const char *attr_name, CharAE *str_buf)
 
 
 /****************************************************************************
- * _get_DSetHandle() / _close_DSetHandle()
+ * _init_DSetHandle() / _destroy_DSetHandle()
  */
 
 static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
@@ -228,7 +255,7 @@ static hid_t get_mem_type_id_from_Rtype(SEXPTYPE Rtype, hid_t dtype_id)
 	return -1;
 }
 
-void _close_DSetHandle(DSetHandle *dset_handle)
+void _destroy_DSetHandle(DSetHandle *dset_handle)
 {
 	if (dset_handle->h5nchunk != NULL)
 		free(dset_handle->h5nchunk);
@@ -245,14 +272,15 @@ void _close_DSetHandle(DSetHandle *dset_handle)
 		H5Tclose(dset_handle->dtype_id);
 	if (dset_handle->storage_mode_attr != NULL)
 		free(dset_handle->storage_mode_attr);
-	H5Dclose(dset_handle->dset_id);
+	if (dset_handle->h5name != NULL)
+		free(dset_handle->h5name);
+	return;
 }
 
-int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
-		    DSetHandle *dset_handle)
+int _init_DSetHandle(DSetHandle *dset_handle, hid_t dset_id,
+		     int as_int, int get_Rtype_only)
 {
-	CharAE *str_buf;
-	char *storage_mode_attr;
+	char *h5name, *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size, chunk_data_buf_size;
@@ -260,10 +288,13 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	int ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
 	htri_t ret;
+	CharAE *buf;
 
 	dset_handle->dset_id = dset_id;
 
-	/* Initialize the fields that _close_DSetHandle() will look at. */
+	/* Initialize the fields that _destroy_DSetHandle() will free
+	   or close. */
+	dset_handle->h5name = NULL;
 	dset_handle->storage_mode_attr = NULL;
 	dset_handle->dtype_id = -1;
 	dset_handle->space_id = -1;
@@ -272,9 +303,15 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	dset_handle->h5chunkdim = NULL;
 	dset_handle->h5nchunk = NULL;
 
+	/* Set 'dset_handle->h5name'. */
+	h5name = get_h5name(dset_id);
+	if (h5name == NULL)
+		goto on_error;
+	dset_handle->h5name = h5name;
+
 	/* Set 'dset_handle->storage_mode_attr'. */
-	str_buf = new_CharAE(0);
-	ret = _get_h5_attrib_str(dset_id, "storage.mode", str_buf);
+	buf = new_CharAE(0);
+	ret = _get_h5attrib_str(dset_id, "storage.mode", buf);
 	if (ret < 0)
 		goto on_error;
 	if (ret == 1) {
@@ -283,15 +320,15 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 		goto on_error;
 	}
 	if (ret == 2) {
-		storage_mode_attr = (char *) malloc(CharAE_get_nelt(str_buf));
+		storage_mode_attr = (char *) malloc(CharAE_get_nelt(buf));
 		if (storage_mode_attr == NULL) {
 			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 					    "for 'storage_mode_attr'");
 			goto on_error;
 		}
-		strcpy(storage_mode_attr, str_buf->elts);
+		strcpy(storage_mode_attr, buf->elts);
 		dset_handle->storage_mode_attr = storage_mode_attr;
-        }
+	}
 
 	/* Set 'dset_handle->dtype_id'. */
 	dtype_id = H5Dget_type(dset_id);
@@ -333,10 +370,8 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	}
 	dset_handle->Rtype = Rtype;
 
-	if (get_Rtype_only) {
-		_close_DSetHandle(dset_handle);
+	if (get_Rtype_only)
 		return 0;
-	}
 
 	/* Set 'dset_handle->space_id'. */
 	space_id = H5Dget_space(dset_id);
@@ -449,7 +484,7 @@ int _get_DSetHandle(hid_t dset_id, int as_int, int get_Rtype_only,
 	return 0;
 
     on_error:
-	_close_DSetHandle(dset_handle);
+	_destroy_DSetHandle(dset_handle);
 	return -1;
 }
 
@@ -517,7 +552,8 @@ SEXP C_destroy_DSetHandle_xp(SEXP xp)
 	if (dset_handle != NULL) {
 		//printf("Destroying DSetHandle struct at address %p ... ",
 		//       dset_handle);
-		_close_DSetHandle(dset_handle);
+		_destroy_DSetHandle(dset_handle);
+		H5Dclose(dset_handle->dset_id);
 		free(dset_handle);
 		R_SetExternalPtrAddr(xp, NULL);
 		//printf("OK\n");
@@ -548,8 +584,8 @@ SEXP C_create_DSetHandle_xp(SEXP filepath, SEXP name, SEXP as_integer)
 		error("C_create_DSetHandle_xp(): malloc() failed");
 	}
 
-	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
-	if (_get_DSetHandle(dset_id, as_int, 0, dset_handle) < 0) {
+	if (_init_DSetHandle(dset_handle, dset_id, as_int, 0) < 0) {
+		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
 	}
@@ -573,6 +609,8 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 
 	Rprintf("DSetHandle:\n");
 	Rprintf("- dset_id = %lu\n", dset_handle->dset_id);
+
+	Rprintf("- h5name = \"%s\"\n", dset_handle->h5name);
 
 	Rprintf("- storage_mode_attr = ");
 	if (dset_handle->storage_mode_attr == NULL) {
@@ -640,7 +678,7 @@ SEXP C_show_DSetHandle_xp(SEXP xp)
 /* --- .Call ENTRY POINT --- */
 SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 {
-	int as_int;
+	int as_int, ret;
 	hid_t file_id, dset_id;
 	DSetHandle dset_handle;
 
@@ -651,13 +689,13 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
-	/* _get_DSetHandle() takes care of doing H5Dclose(dset_id) when
-	   the 3rd argument is set to 1. */
-	if (_get_DSetHandle(dset_id, as_int, 1, &dset_handle) < 0) {
-		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
-	}
+	ret = _init_DSetHandle(&dset_handle, dset_id, as_int, 1);
+	/* It's ok to close 'dset_id' **before** destroying its handle. */
+	H5Dclose(dset_id);
 	H5Fclose(file_id);
+	if (ret < 0)
+		error(_HDF5Array_errmsg_buf());
+	_destroy_DSetHandle(&dset_handle);
 	return ScalarString(type2str(dset_handle.Rtype));
 }
 

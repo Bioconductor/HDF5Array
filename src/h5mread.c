@@ -1818,8 +1818,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	ans = R_NilValue;
 
-	/* _get_DSetHandle() will do H5Dclose(dset_id) in case of an error. */
-	if (_get_DSetHandle(dset_id, as_int, 0, &dset_handle) < 0)
+	if (_init_DSetHandle(&dset_handle, dset_id, as_int, 0) < 0)
 		return ans;
 
 	ret = _shallow_check_selection(dset_handle.ndim, starts, counts);
@@ -1903,7 +1902,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	UNPROTECT(1);
 
     on_error:
-	_close_DSetHandle(&dset_handle);
+	_destroy_DSetHandle(&dset_handle);
 	return ans;
 }
 
@@ -1933,16 +1932,13 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
-
-	/* h5mread() will do H5Dclose(dset_id). */
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
 			      as_int, method0));
+	H5Dclose(dset_id);
 	H5Fclose(file_id);
-	if (ans == R_NilValue) {
-		UNPROTECT(1);
-		error(_HDF5Array_errmsg_buf());
-	}
 	UNPROTECT(1);
+	if (ans == R_NilValue)
+		error(_HDF5Array_errmsg_buf());
 	return ans;
 }
 

@@ -65,7 +65,6 @@ setMethod("type", "HDF5RealizationSink", function(x) x@type)
 ### Unlike with rhdf5::h5createDataset(), if 'chunkdim' is NULL then an
 ### automatic chunk geometry will be used. To write "unchunked data" (a.k.a.
 ### contiguous data), 'chunkdim' must be set to 0.
-### FIXME: Investigate the possiblity to write the dimnames to the HDF5 file.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, name=NULL,
                                 H5type=NULL, size=NULL,
@@ -106,7 +105,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
-        ## TODO: Write the dimnames to the HDF5 file.
+        h5writeDimnames(dimnames, filepath, name)
     }
     new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
                                 filepath=filepath, name=name,
@@ -136,7 +135,7 @@ setMethod("write_block", "HDF5RealizationSink",
 ### FIXME: This coercion needs to propagate the dimnames *thru* the HDF5 file.
 ### For more details about this, see FIXME right before definition of
 ### HDF5RealizationSink() above in this file and right before definition of
-### HDF5ArraySeed() in HDF5Array-class.R.
+### HDF5ArraySeed() in HDF5ArraySeed-class.R.
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
     function(from) HDF5ArraySeed(from@filepath, from@name, type=from@type)
 )
@@ -177,10 +176,13 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### above in this file about this.
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                            H5type=NULL, chunkdim=NULL, level=NULL,
-                           verbose=FALSE)
+                           with.dimnames=FALSE, verbose=FALSE)
 {
+    if (!isTRUEorFALSE(with.dimnames))
+        stop("'with.dimnames' must be TRUE or FALSE")
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
+    sink_dimnames <- if (with.dimnames) dimnames(x) else NULL
     x_type <- type(x)
     if (x_type == "character") {
         ## Calling 'max(nchar(x), na.rm=TRUE)' will trigger block processing
@@ -193,7 +195,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
     } else {
         size <- NULL
     }
-    sink <- HDF5RealizationSink(dim(x), dimnames(x), x_type,
+    sink <- HDF5RealizationSink(dim(x), sink_dimnames, x_type,
                                 filepath=filepath, name=name,
                                 H5type=H5type, size=size,
                                 chunkdim=chunkdim, level=level)
