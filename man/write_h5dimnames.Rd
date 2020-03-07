@@ -143,8 +143,8 @@ write_h5dimnames(dimnames(m0), h5file, "m2")
 HDF5Array(h5file, "m2")
 
 ## Note that at step 2. you can use the extra arguments of
-## write_h5dimnames() to take full control of where the dimnames should
-## be stored in the file:
+## write_h5dimnames() to take full control of where the dimnames
+## should be stored in the file:
 writeHDF5Array(m0, h5file, "m3")
 write_h5dimnames(dimnames(m0), h5file, "m3",
                  group="a_secret_place", dimscales=c("NA", "m3_dim2"))
@@ -158,7 +158,7 @@ stopifnot(identical(dimnames(m0), read_h5dimnames(h5file, "m3")))
 stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "m3"))))
 
 ## ---------------------------------------------------------------------
-## USE A NON-CHARACTER TYPE TO STORE THE DIMNAMES
+## STORE THE DIMNAMES AS NON-CHARACTER TYPES
 ## ---------------------------------------------------------------------
 
 writeHDF5Array(m0, h5file, "m4")
