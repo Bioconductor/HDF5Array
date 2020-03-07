@@ -9,8 +9,9 @@
 	snprintf(_HDF5Array_errmsg_buf(), ERRMSG_BUF_LENGTH, __VA_ARGS__)
 
 /* A data structure for handling an HDF5 dataset. Collect various information
-   about the dataset. What is collected are basically the things needed by the
-   C_h5mread() function. */
+   about the dataset. What is collected is basically the union of the things
+   needed by functions C_h5mread(), C_h5getdimscales(), and C_h5setdimscales().
+ */
 typedef struct {
 	hid_t dset_id, dtype_id, space_id, plist_id, mem_type_id;
 	char *h5name;  /* canonical name as retrieved by H5Iget_name() */
@@ -21,7 +22,7 @@ typedef struct {
 	int ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunkdim;
 	H5D_layout_t H5layout;
-} DSetHandle;
+} H5DSetDescriptor;
 
 /* Like VECTOR_ELT(x, i) except that 'x' can be R_NilValue. */
 #define	GET_LIST_ELT(x, i) ((x) != R_NilValue ? VECTOR_ELT(x, i) : R_NilValue)
@@ -111,7 +112,7 @@ SEXP C_map_starts_to_chunks(
 );
 
 
-/* DSetHandle.c */
+/* H5DSetDescriptor.c */
 
 hsize_t *_alloc_hsize_t_buf(
 	size_t buflength,
@@ -125,12 +126,12 @@ int _get_h5attrib_str(
 	CharAE *buf
 );
 
-void _destroy_DSetHandle(
-	DSetHandle *dset_handle
+void _destroy_H5DSetDescriptor(
+	H5DSetDescriptor *h5dset
 );
 
-int _init_DSetHandle(
-	DSetHandle *dset_handle,
+int _init_H5DSetDescriptor(
+	H5DSetDescriptor *h5dset,
 	hid_t dset_id,
 	int as_int,
 	int Rtype_only
@@ -147,15 +148,15 @@ hid_t _get_dset_id(
 	SEXP filepath
 );
 
-SEXP C_destroy_DSetHandle_xp(SEXP xp);
+SEXP C_destroy_H5DSetDescriptor_xp(SEXP xp);
 
-SEXP C_create_DSetHandle_xp(
+SEXP C_new_H5DSetDescriptor_xp(
 	SEXP filepath,
 	SEXP name,
 	SEXP as_integer
 );
 
-SEXP C_show_DSetHandle_xp(SEXP xp);
+SEXP C_show_H5DSetDescriptor_xp(SEXP xp);
 
 SEXP C_get_h5mread_returned_type(
 	SEXP filepath,

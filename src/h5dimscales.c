@@ -37,7 +37,7 @@ SEXP C_h5isdimscale(SEXP filepath, SEXP name)
 
 typedef struct {
 	const char *scalename;
-	DSetHandle *dimscale_handle;
+	H5DSetDescriptor *h5dimscale;
 	CharAE *NAME_buf;
 } VisitorData;
 
@@ -45,45 +45,45 @@ static herr_t visitor(hid_t dset_id, unsigned int along, hid_t dimscale_id,
 		      void *data)
 {
 	VisitorData *visitor_data;
-	DSetHandle *dimscale_handle;
+	H5DSetDescriptor *h5dimscale;
 	int ret;
 
 	visitor_data = (VisitorData *) data;
-	dimscale_handle = visitor_data->dimscale_handle;
-	ret = _init_DSetHandle(dimscale_handle, dimscale_id, 0, 0);
+	h5dimscale = visitor_data->h5dimscale;
+	ret = _init_H5DSetDescriptor(h5dimscale, dimscale_id, 0, 0);
 	if (ret < 0)
 		return -1;
 	ret = _get_h5attrib_str(dimscale_id, "NAME", visitor_data->NAME_buf);
 	if (ret < 0) {
-		_destroy_DSetHandle(dimscale_handle);
+		_destroy_H5DSetDescriptor(h5dimscale);
 		return -1;
 	}
 	if (ret == 0) {
 		if (visitor_data->scalename == NULL)
 			return 1;
-		_destroy_DSetHandle(dimscale_handle);
+		_destroy_H5DSetDescriptor(h5dimscale);
 		return 0;
 	}
 	if (ret == 2 &&
 	    visitor_data->scalename != NULL &&
 	    strcmp(visitor_data->NAME_buf->elts, visitor_data->scalename) == 0)
 		return 1;
-	_destroy_DSetHandle(dimscale_handle);
+	_destroy_H5DSetDescriptor(h5dimscale);
 	return 0;
 }
 
-static int get_scale_along(const DSetHandle *dset_handle,
+static int get_scale_along(const H5DSetDescriptor *h5dset,
 		int along, const char *scalename,
-		DSetHandle *dimscale_handle, CharAE *NAME_buf)
+		H5DSetDescriptor *h5dimscale, CharAE *NAME_buf)
 {
 	int *idx;
 	VisitorData visitor_data;
 
 	visitor_data.scalename = scalename;
-	visitor_data.dimscale_handle = dimscale_handle;
+	visitor_data.h5dimscale = h5dimscale;
 	visitor_data.NAME_buf = NAME_buf;
 	idx = NULL;
-	return H5DSiterate_scales(dset_handle->dset_id,
+	return H5DSiterate_scales(h5dset->dset_id,
 				  (unsigned int) along, idx,
 				  visitor, &visitor_data);
 }
@@ -93,7 +93,7 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 {
 	const char *scalename0;
 	hid_t file_id, dset_id;
-	DSetHandle dset_handle, dimscale_handle;
+	H5DSetDescriptor h5dset, h5dimscale;
 	SEXP ans, ans_elt;
 	CharAE *NAME_buf;
 	int along, ret;
@@ -106,20 +106,20 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 
 	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
-	if (_init_DSetHandle(&dset_handle, dset_id, 0, 0) < 0) {
+	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
 	}
 
-	ans = PROTECT(NEW_CHARACTER(dset_handle.ndim));
+	ans = PROTECT(NEW_CHARACTER(h5dset.ndim));
 
 	NAME_buf = new_CharAE(0);
-	for (along = 0; along < dset_handle.ndim; along++) {
-		ret = get_scale_along(&dset_handle, along, scalename0,
-				      &dimscale_handle, NAME_buf);
+	for (along = 0; along < h5dset.ndim; along++) {
+		ret = get_scale_along(&h5dset, along, scalename0,
+				      &h5dimscale, NAME_buf);
 		if (ret < 0) {
-			_destroy_DSetHandle(&dset_handle);
+			_destroy_H5DSetDescriptor(&h5dset);
 			H5Dclose(dset_id);
 			H5Fclose(file_id);
 			error(_HDF5Array_errmsg_buf());
@@ -127,14 +127,14 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 		if (ret == 0) {
 			SET_STRING_ELT(ans, along, NA_STRING);
 		} else {
-			ans_elt = PROTECT(mkChar(dimscale_handle.h5name));
-			_destroy_DSetHandle(&dimscale_handle);
+			ans_elt = PROTECT(mkChar(h5dimscale.h5name));
+			_destroy_H5DSetDescriptor(&h5dimscale);
 			SET_STRING_ELT(ans, along, ans_elt);
 			UNPROTECT(1);
 		}
 	}
 
-	_destroy_DSetHandle(&dset_handle);
+	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 
@@ -202,16 +202,16 @@ static int check_NAME_attribute(hid_t dimscale_id, const char *dimscale,
 	return 0;
 }
 
-/* Check whether or not dataset 'dimscale' is already set as a Dimension Scale
-   named 'scalename' (via its "NAME" attribute) on dimension 'along' of
-   dataset 'dset_handle'. Return: 0 if no, 1 if yes, -1 if error.
+/* Check whether or not dataset 'dimscale' is already set as a Dimension
+   Scale named 'scalename' (via its "NAME" attribute) on dimension 'along'
+   of dataset 'h5dset'. Return: 0 if no, 1 if yes, -1 if error.
  */
-static int check_scale_along(hid_t file_id, const DSetHandle *dset_handle,
+static int check_scale_along(hid_t file_id, const H5DSetDescriptor *h5dset,
 		int along, const char *dimscale, const char *scalename,
 		CharAE *NAME_buf)
 {
 	hid_t dimscale_id;
-	DSetHandle dimscale_handle, dimscale_handle2;
+	H5DSetDescriptor h5dimscale, h5dimscale2;
 	int ret;
 
 	dimscale_id = H5Dopen(file_id, dimscale, H5P_DEFAULT);
@@ -219,58 +219,58 @@ static int check_scale_along(hid_t file_id, const DSetHandle *dset_handle,
 		PRINT_TO_ERRMSG_BUF("failed to open dataset '%s'", dimscale);
 		return -1;
 	}
-	ret = _init_DSetHandle(&dimscale_handle, dimscale_id, 0, 0);
+	ret = _init_H5DSetDescriptor(&h5dimscale, dimscale_id, 0, 0);
 	if (ret < 0)
 		return -1;
-	if (strcmp(dimscale_handle.h5name, dset_handle->h5name) == 0) {
-		_destroy_DSetHandle(&dimscale_handle);
+	if (strcmp(h5dimscale.h5name, h5dset->h5name) == 0) {
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		PRINT_TO_ERRMSG_BUF("cannot set dataset '%s' as a "
 				    "Dimension Scale on itself",
-				    dset_handle->h5name);
+				    h5dset->h5name);
 		return -1;
 	}
 	/* Check if 'dimscale_id' has scales on it, in which case we won't be
 	   able to turn it into a Dimension Scale. */
 	ret = H5Aexists(dimscale_id, "DIMENSION_LIST");
 	if (ret < 0) {
-		_destroy_DSetHandle(&dimscale_handle);
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
 		return -1;
 	}
 	if (ret) {
-		_destroy_DSetHandle(&dimscale_handle);
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		PRINT_TO_ERRMSG_BUF("dataset '%s' already has Dimension "
 				    "Scales on it so cannot be turned\n  "
 				    "itself into a Dimension Scale (a "
 				    "Dimension Scale dataset cannot have\n  "
 				    "Dimension Scales)",
-				    dimscale_handle.h5name);
+				    h5dimscale.h5name);
 		return -1;
 	}
-	ret = get_scale_along(dset_handle, along, scalename,
-			      &dimscale_handle2, NAME_buf);
+	ret = get_scale_along(h5dset, along, scalename,
+			      &h5dimscale2, NAME_buf);
 	if (ret < 0) {
-		_destroy_DSetHandle(&dimscale_handle);
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		return -1;
 	}
 	if (ret == 0) {
 		/* Now that we know that 'dimscale_id' is not already set as
 		   a Dimension Scale named 'scalename' on dimension 'along'
-		   of 'dset_handle', we also want to make sure that it
+		   of 'h5dset', we also want to make sure that it
 		   **would** be ok to create that link. We return -1 if not. */
 		ret = check_NAME_attribute(dimscale_id, dimscale,
 					   scalename, NAME_buf);
-		_destroy_DSetHandle(&dimscale_handle);
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		return ret < 0 ? -1 : 0;
 	}
-	if (strcmp(dimscale_handle2.h5name, dimscale_handle.h5name) == 0) {
-		_destroy_DSetHandle(&dimscale_handle2);
-		_destroy_DSetHandle(&dimscale_handle);
+	if (strcmp(h5dimscale2.h5name, h5dimscale.h5name) == 0) {
+		_destroy_H5DSetDescriptor(&h5dimscale2);
+		_destroy_H5DSetDescriptor(&h5dimscale);
 		H5Dclose(dimscale_id);
 		return 1;
 	}
@@ -278,19 +278,19 @@ static int check_scale_along(hid_t file_id, const DSetHandle *dset_handle,
 		PRINT_TO_ERRMSG_BUF("dimension %d of dataset '%s' is already "
 				    "linked to unnamed\n  Dimension Scale "
 				    "dataset '%s'", along + 1,
-				    dset_handle->h5name,
-				    dimscale_handle2.h5name);
+				    h5dset->h5name,
+				    h5dimscale2.h5name);
 	} else {
 		PRINT_TO_ERRMSG_BUF("dimension %d of dataset '%s' is already "
 				    "linked to Dimension Scale\n  "
 				    "dataset '%s' named \"%s\" (via \"NAME\" "
 				    "attribute)", along + 1,
-				    dset_handle->h5name,
-				    dimscale_handle2.h5name,
+				    h5dset->h5name,
+				    h5dimscale2.h5name,
 				    scalename);
 	}
-	_destroy_DSetHandle(&dimscale_handle2);
-	_destroy_DSetHandle(&dimscale_handle);
+	_destroy_H5DSetDescriptor(&h5dimscale2);
+	_destroy_H5DSetDescriptor(&h5dimscale);
 	H5Dclose(dimscale_id);
 	return -1;
 }
@@ -299,23 +299,23 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 			 const char *scalename)
 {
 	hid_t file_id, dset_id;
-	DSetHandle dset_handle;
+	H5DSetDescriptor h5dset;
 	int ret, along;
 	SEXP ans, dimscale;
 	CharAE *NAME_buf;
 
 	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
-	if (_init_DSetHandle(&dset_handle, dset_id, 0, 0) < 0) {
+	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
 	}
 
-	if (LENGTH(dimscales) > dset_handle.ndim) {
+	if (LENGTH(dimscales) > h5dset.ndim) {
 		PRINT_TO_ERRMSG_BUF("'dimscales' cannot be longer than the "
 				    "nb of dimensions of dataset '%s' (%d)",
-				    dset_handle.h5name, dset_handle.ndim);
+				    h5dset.h5name, h5dset.ndim);
 		ret = -1;
 		goto on_error;
 	}
@@ -329,12 +329,12 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 		PRINT_TO_ERRMSG_BUF("dataset '%s' is a Dimension Scale "
 				    "(cannot set Dimension Scales\n  "
 				    "on a Dimension Scale dataset)",
-				    dset_handle.h5name);
+				    h5dset.h5name);
 		ret = -1;
 		goto on_error;
 	}
 
-	ans = PROTECT(NEW_LOGICAL(dset_handle.ndim));
+	ans = PROTECT(NEW_LOGICAL(h5dset.ndim));
 	NAME_buf = new_CharAE(0);
 	for (along = 0; along < LENGTH(dimscales); along++) {
 		dimscale = STRING_ELT(dimscales, along);
@@ -342,7 +342,7 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 			LOGICAL(ans)[along] = 0;
 			continue;
 		}
-		ret = check_scale_along(file_id, &dset_handle,
+		ret = check_scale_along(file_id, &h5dset,
 					along, CHAR(dimscale), scalename,
 					NAME_buf);
 		if (ret < 0)
@@ -351,7 +351,7 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	}
 
     on_error:
-	_destroy_DSetHandle(&dset_handle);
+	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	UNPROTECT(1);
@@ -414,13 +414,13 @@ static void set_scales(SEXP filepath, SEXP name, SEXP dimscales,
 		       const char *scalename)
 {
 	hid_t file_id, dset_id;
-	DSetHandle dset_handle;
+	H5DSetDescriptor h5dset;
 	int ret, along;
 	SEXP dimscale;
 
 	file_id = _get_file_id(filepath, 0);  /* read/write */
 	dset_id = _get_dset_id(file_id, name, filepath);
-	if (_init_DSetHandle(&dset_handle, dset_id, 0, 0) < 0) {
+	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
@@ -437,7 +437,7 @@ static void set_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	}
 
     on_error:
-	_destroy_DSetHandle(&dset_handle);
+	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ret < 0)
@@ -502,7 +502,7 @@ SEXP C_h5setdimscales(SEXP filepath, SEXP name, SEXP dimscales, SEXP scalename,
 SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 {
 	hid_t file_id, dset_id;
-	DSetHandle dset_handle;
+	H5DSetDescriptor h5dset;
 	int along;
 	ssize_t max_label_size, label_size;
 	char *label_buf;
@@ -510,7 +510,7 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 
 	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
-	if (_init_DSetHandle(&dset_handle, dset_id, 0, 0) < 0) {
+	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error(_HDF5Array_errmsg_buf());
@@ -518,11 +518,11 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 
 	/* First pass */
 	max_label_size = 0;
-	for (along = 0; along < dset_handle.ndim; along++) {
+	for (along = 0; along < h5dset.ndim; along++) {
 		label_size = H5DSget_label(dset_id, (unsigned int) along,
 					   NULL, 0);
 		if (label_size < 0) {
-			_destroy_DSetHandle(&dset_handle);
+			_destroy_H5DSetDescriptor(&h5dset);
 			H5Dclose(dset_id);
 			H5Fclose(file_id);
 			error("H5DSget_label() returned an error");
@@ -533,7 +533,7 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	}
 
 	if (max_label_size == 0) {
-		_destroy_DSetHandle(&dset_handle);
+		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		return R_NilValue;
@@ -547,19 +547,19 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	}
 	label_buf = (char *) malloc((size_t) max_label_size + 1);
 	if (label_buf == NULL) {
-		_destroy_DSetHandle(&dset_handle);
+		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
 		error("failed to allocate memory for 'label_buf'");
 	}
-	ans = PROTECT(NEW_CHARACTER(dset_handle.ndim));
-	for (along = 0; along < dset_handle.ndim; along++) {
+	ans = PROTECT(NEW_CHARACTER(h5dset.ndim));
+	for (along = 0; along < h5dset.ndim; along++) {
 		label_size = H5DSget_label(dset_id, (unsigned int) along,
 					   label_buf, max_label_size + 1);
 		/* Should never happen. */
 		if (label_size < 0) {
 			free(label_buf);
-			_destroy_DSetHandle(&dset_handle);
+			_destroy_H5DSetDescriptor(&h5dset);
 			H5Dclose(dset_id);
 			H5Fclose(file_id);
 			error("H5DSget_label() returned an error");
@@ -572,7 +572,7 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	}
 
 	free(label_buf);
-	_destroy_DSetHandle(&dset_handle);
+	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	UNPROTECT(1);

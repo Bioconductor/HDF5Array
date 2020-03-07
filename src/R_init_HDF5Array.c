@@ -11,10 +11,10 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_reduce_selection, 3),
 	CALLMETHOD_DEF(C_map_starts_to_chunks, 3),
 
-/* DSetHandle.c */
-	CALLMETHOD_DEF(C_destroy_DSetHandle_xp, 1),
-	CALLMETHOD_DEF(C_create_DSetHandle_xp, 3),
-	CALLMETHOD_DEF(C_show_DSetHandle_xp, 1),
+/* H5DSetDescriptor.c */
+	CALLMETHOD_DEF(C_destroy_H5DSetDescriptor_xp, 1),
+	CALLMETHOD_DEF(C_new_H5DSetDescriptor_xp, 3),
+	CALLMETHOD_DEF(C_show_H5DSetDescriptor_xp, 1),
 	CALLMETHOD_DEF(C_get_h5mread_returned_type, 3),
 
 /* h5mread.c */

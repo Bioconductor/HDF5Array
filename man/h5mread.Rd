@@ -1,10 +1,10 @@
 \name{h5mread}
 
-\alias{class:DSetHandle}
-\alias{DSetHandle-class}
-\alias{DSetHandle}
-\alias{destroy_DSetHandle}
-\alias{show,DSetHandle-method}
+\alias{class:H5DSetDescriptor}
+\alias{H5DSetDescriptor-class}
+\alias{H5DSetDescriptor}
+\alias{destroy_H5DSetDescriptor}
+\alias{show,H5DSetDescriptor-method}
 \alias{get_h5mread_returned_type}
 
 \alias{h5mread}

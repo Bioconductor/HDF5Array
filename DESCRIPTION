@@ -24,7 +24,7 @@ Suggests: h5vcData, SummarizedExperiment (>= 1.15.1), GenomicRanges,
 	ExperimentHub, TENxBrainData, BiocParallel, GenomicFeatures, BiocStyle
 License: Artistic-2.0
 Collate: utils.R
-	DSetHandle-class.R
+	H5DSetDescriptor-class.R
 	h5mread.R
 	h5mread_from_reshaped.R
 	h5dimscales.R
