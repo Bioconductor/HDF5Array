@@ -132,32 +132,16 @@ setMethod("write_block", "HDF5RealizationSink",
 ### Coercing an HDF5RealizationSink object
 ###
 
-### FIXME: This coercion needs to propagate the dimnames *thru* the HDF5 file.
-### For more details about this, see FIXME right before definition of
-### HDF5RealizationSink() above in this file and right before definition of
-### HDF5ArraySeed() in HDF5ArraySeed-class.R.
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
     function(from) HDF5ArraySeed(from@filepath, from@name, type=from@type)
 )
 
-### Note that this coercion currently drops the dimnames but will naturally
-### propagate them when coercion from HDF5RealizationSink to HDF5ArraySeed
-### propagates them. See FIXME above.
 setAs("HDF5RealizationSink", "HDF5Array",
     function(from) DelayedArray(as(from, "HDF5ArraySeed"))
 )
 
 setAs("HDF5RealizationSink", "DelayedArray",
-    function(from)
-    {
-        ans <- HDF5Array(as(from, "HDF5ArraySeed"))
-        ## Temporarily needed because coercion from HDF5RealizationSink to
-        ## HDF5ArraySeed does not propagate the dimnames at the moment. See
-        ## FIXME above.
-        ## TODO: Remove line below when FIXME above is addressed.
-        dimnames(ans) <- dimnames(from)
-        ans
-    }
+    function(from) DelayedArray(as(from, "HDF5ArraySeed"))
 )
 
 
@@ -172,8 +156,6 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### set to 0.
 ### Return an HDF5Array object pointing to the newly written HDF5 dataset
 ### on disk.
-### FIXME: This needs to write the dimnames to the file. See various FIXMEs
-### above in this file about this.
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                            H5type=NULL, chunkdim=NULL, level=NULL,
                            with.dimnames=FALSE, verbose=FALSE)
@@ -218,7 +200,8 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
 ### an HDF5RealizationSink object.
 ###
 
-.as_HDF5Array <- function(from) writeHDF5Array(from)  # write to current dump
+### Write to current dump.
+.as_HDF5Array <- function(from) writeHDF5Array(from, with.dimnames=TRUE)
 
 setAs("ANY", "HDF5Array", .as_HDF5Array)
 

@@ -207,6 +207,16 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### dimnames() getter
+###
+
+### Does access the file!
+setMethod("dimnames", "HDF5ArraySeed",
+    function(x) read_h5dimnames(path(x), x@name, as.character=TRUE)
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### extract_array()
 ###
 
@@ -240,10 +250,6 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 ### Constructor
 ###
 
-### Return an HDF5ArraySeed object with NO dimnames!
-### FIXME: Investigate the possiblity to store the dimnames in the HDF5 file
-### and make dimnames() on the object returned by HDF5ArraySeed() bring them
-### back.
 HDF5ArraySeed <- function(filepath, name, type=NA)
 {
     ## Check 'filepath'.

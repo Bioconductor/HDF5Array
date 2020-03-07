@@ -28,7 +28,7 @@
 \usage{
 writeHDF5Array(x, filepath=NULL, name=NULL,
                   H5type=NULL, chunkdim=NULL, level=NULL,
-                  verbose=FALSE)
+                  with.dimnames=FALSE, verbose=FALSE)
 }
 
 \arguments{
@@ -86,6 +86,16 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     By default, \code{getHDF5DumpCompressionLevel()} will be used.
     See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
+  \item{with.dimnames}{
+    By default the dimnames on \code{x} are not written to the HDF5 file.
+    Set \code{with.dimnames} to \code{TRUE} to also have them written.
+
+    Note that low-level function \code{\link{write_h5dimnames}} is used
+    internally to write the dimnames to disk. Setting \code{with.dimnames}
+    to \code{FALSE} and calling \code{\link{write_h5dimnames}} is another
+    way to write the dimnames on \code{x} to disk that gives more control.
+    See \code{?\link{write_h5dimnames}} for more information.
+  }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
   }
@@ -135,6 +145,9 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   \itemize{
     \item \link{HDF5Array} objects.
 
+    \item \code{\link{write_h5dimnames}} for writing the dimnames of an
+          HDF5 dataset to disk.
+
     \item \code{\link{saveHDF5SummarizedExperiment}} and
           \code{\link{loadHDF5SummarizedExperiment}} in this
           package (the \pkg{HDF5Array} package) for saving/loading
@@ -152,18 +165,29 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
 ## ---------------------------------------------------------------------
 ## WRITE AN ORDINARY ARRAY TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
-m <- matrix(runif(350, min=-1), nrow=25)
-out_file <- tempfile()
+m <- matrix(runif(364, min=-1), nrow=26,
+            dimnames=list(letters, LETTERS[1:14]))
 
-M1 <- writeHDF5Array(m, out_file, name="M1", chunkdim=c(5, 5))
+h5file <- tempfile(fileext=".h5")
+
+M1 <- writeHDF5Array(m, h5file, name="M1", chunkdim=c(5, 5))
 M1
 chunkdim(M1)
+
+## By default, writeHDF5Array() does not write the dimnames to the HDF5
+## file so they are lost:
+HDF5Array(h5file, "M1")   # no dimnames
+
+## Set 'with.dimnames' to TRUE to write them to the file:
+writeHDF5Array(m, h5file, name="M1b", with.dimnames=TRUE)
+
+HDF5Array(h5file, "M1b")  # the dimnames are back
 
 ## ---------------------------------------------------------------------
 ## WRITE A DelayedArray OBJECT TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
 M2 <- log(t(DelayedArray(m)) + 1)
-M2 <- writeHDF5Array(M2, out_file, name="M2", chunkdim=c(5, 5))
+M2 <- writeHDF5Array(M2, h5file, name="M2", chunkdim=c(5, 5))
 M2
 chunkdim(M2)
 
@@ -178,7 +202,7 @@ cvg0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
 
 cvg1 <- cvg0[ , , 29000001:29000007]
 
-writeHDF5Array(cvg1, out_file, "cvg1")
-h5ls(out_file)
+writeHDF5Array(cvg1, h5file, "cvg1")
+h5ls(h5file)
 }
 \keyword{methods}

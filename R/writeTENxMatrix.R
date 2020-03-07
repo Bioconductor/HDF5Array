@@ -274,11 +274,11 @@ setAs("TENxRealizationSink", "TENxMatrixSeed",
 )
 
 setAs("TENxRealizationSink", "TENxMatrix",
-    function(from) TENxMatrix(as(from, "TENxMatrixSeed"))
+    function(from) DelayedArray(as(from, "TENxMatrixSeed"))
 )
 
 setAs("TENxRealizationSink", "DelayedArray",
-    function(from) TENxMatrix(as(from, "TENxMatrixSeed"))
+    function(from) DelayedArray(as(from, "TENxMatrixSeed"))
 )
 
 
@@ -319,7 +319,8 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
 ### a TENxRealizationSink object.
 ###
 
-.as_TENxMatrix <- function(from) writeTENxMatrix(from)  # write to current dump
+### Write to current dump.
+.as_TENxMatrix <- function(from) writeTENxMatrix(from)
 
 setAs("ANY", "TENxMatrix", .as_TENxMatrix)
 

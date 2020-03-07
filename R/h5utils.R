@@ -163,14 +163,14 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     ## on it.
     if (h5isdimscale(filepath, name))
         stop(wmsg("cannot write dimnames for an HDF5 dataset '", name, "' ",
-                  "that contains the dimnames of another dataset in ",
+                  "that contains the dimnames for another dataset in ",
                   "the HDF5 file"))
     dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
     if (!all(is.na(dimscales))) {
         dimscales <- dimscales[!is.na(dimscales)]
-        stop(wmsg("the dimnames for HDF5 dataset '", name, "' are ",
-                  "already stored in the following dataset(s): ",
-                  paste(paste0("'", dimscales, "'"), collapse=", ")))
+        stop(wmsg("the dimnames for HDF5 dataset '", name, "' are already ",
+                  "stored in HDF5 file '", filepath, "' (in dataset(s): ",
+                  paste(paste0("'", dimscales, "'"), collapse=", "), ")"))
     }
     dimlabels <- h5getdimlabels(filepath, name)
     if (!is.null(dimlabels))
@@ -289,8 +289,10 @@ write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
 }
 
 ### Exported!
-read_h5dimnames <- function(filepath, name)
+read_h5dimnames <- function(filepath, name, as.character=FALSE)
 {
+    if (!isTRUEorFALSE(as.character))
+        stop(wmsg("'as.character' must be TRUE or FALSE"))
     dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
     dimlabels <- h5getdimlabels(filepath, name)
     if (all(is.na(dimscales)) && is.null(dimlabels))
@@ -299,7 +301,14 @@ read_h5dimnames <- function(filepath, name)
            function(dimscale) {
                if (is.na(dimscale))
                    return(NULL)
-               DelayedArray:::set_dim(h5mread(filepath, dimscale), NULL)
+               dn <- h5mread(filepath, dimscale)
+               if (as.character) {
+                   ## as.character() drops all attributes so no need to
+                   ## explicitly drop the "dim" attribute.
+                   as.character(dn)
+               } else {
+                   DelayedArray:::set_dim(dn, NULL)
+               }
            })
 }
 
