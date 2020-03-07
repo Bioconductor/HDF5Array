@@ -1,25 +1,29 @@
-\name{write_h5dimnames}
+\name{h5writeDimnames}
 
-\alias{write_h5dimnames}
-\alias{read_h5dimnames}
+\alias{h5writeDimnames}
+\alias{h5readDimnames}
+\alias{set_h5dimnames}
+\alias{get_h5dimnames}
 
 \title{Write/read the dimnames of an HDF5 dataset}
 
 \description{
-  Low-level functions \code{write_h5dimnames} and \code{read_h5dimnames}
+  Low-level functions \code{h5writeDimnames} and \code{h5readDimnames}
   can be used to write/read the dimnames of an HDF5 dataset to/from
   the HDF5 file.
 
-  Note that \code{write_h5dimnames} is used internally by
+  Note that \code{h5writeDimnames} is used internally by
   \code{\link{writeHDF5Array}(x, ..., with.dimnames=TRUE)}
   to write the dimnames of \code{x} together with the array
   data to the HDF5 file.
 }
 
 \usage{
-write_h5dimnames(dimnames, filepath, name, group=NA, dimscales=NULL)
+h5writeDimnames(dimnames, filepath, name, group=NA, h5dimnames=NULL)
+h5readDimnames(filepath, name, as.character=FALSE)
 
-read_h5dimnames(filepath, name, as.character=FALSE)
+set_h5dimnames(filepath, name, h5dimnames, dry.run=FALSE)
+get_h5dimnames(filepath, name)
 }
 
 \arguments{
@@ -32,12 +36,21 @@ read_h5dimnames(filepath, name, as.character=FALSE)
     of the corresponding dimension in the HDF5 dataset.
   }
   \item{filepath}{
-    The path (as a single string) to the HDF5 file where the dimnames
-    should be written to or read from.
+    For \code{h5writeDimnames} and \code{h5readDimnames}: The path (as a
+    single string) to the HDF5 file where the dimnames should be written
+    to or read from.
+
+    For \code{set_h5dimnames} and \code{get_h5dimnames}: The path (as a
+    single string) to the HDF5 file where to set or get the
+    \emph{h5dimnames}.
   }
   \item{name}{
-    The name of the dataset in the HDF5 file for which the dimnames should
-    be written or read.
+    For \code{h5writeDimnames} and \code{h5readDimnames}: The name of the
+    dataset in the HDF5 file for which the dimnames should be written or
+    read.
+
+    For \code{set_h5dimnames} and \code{get_h5dimnames}: The name of the
+    dataset in the HDF5 file for which to set or get the \emph{h5dimnames}.
   }
   \item{group}{
     \code{NA} (the default) or the name of the HDF5 group where to write
@@ -47,38 +60,52 @@ read_h5dimnames(filepath, name, as.character=FALSE)
     If set to the empty string (\code{""}) then no group will be used.
 
     Except when \code{group} is set to the empty string, the names in
-    \code{dimscales} (see below) must be relative to the group.
+    \code{h5dimnames} (see below) must be relative to the group.
   }
-  \item{dimscales}{
-    \code{NULL} (the default) or a character vector containing the names
-    of the HDF5 datasets (one per list element in \code{dimnames}) where
-    to write the dimnames. Names associated with \code{NULL} list elements
-    in \code{dimnames} are ignored and should typically be NAs.
+  \item{h5dimnames}{
+    For \code{h5writeDimnames}: \code{NULL} (the default) or a character
+    vector containing the names of the HDF5 datasets (one per list
+    element in \code{dimnames}) where to write the dimnames.
+    Names associated with \code{NULL} list elements in \code{dimnames}
+    are ignored and should typically be NAs.
 
     If set to \code{NULL} then the names are automatically set to numbers
     indicating the associated dimensions (\code{"1"} for the first dimension,
     \code{"2"} for the second, etc...)
 
-    Note that in HDF5 jargon datasets that represent attributes along the
-    dimensions of other datasets are called \emph{Dimension Scales dataset},
-    hence the name of this argument.
+    For \code{set_h5dimnames}: A character vector containing the names
+    of the HDF5 datasets to set as the dimnames of the dataset specified
+    in \code{name}. The vector must have one element per dimension in
+    dataset \code{name}. NAs are allowed and indicate dimensions along
+    which nothing should be set.
   }
   \item{as.character}{
     Even though the dimnames of an HDF5 dataset are usually stored as
     datasets of type \code{"character"} (H5 datatype \code{"H5T_STRING"})
     in the HDF5 file, this is not a requirement.
-    By default \code{read_h5dimnames} will return them \emph{as-is}.
+    By default \code{h5readDimnames} will return them \emph{as-is}.
     Set \code{as.character} to \code{TRUE} to make sure that they are
     returned as character vectors. See example below.
+  }
+  \item{dry.run}{
+    When set to \code{TRUE}, \code{set_h5dimnames} doesn't make any
+    change to the HDF5 file but will still raise errors if the operation
+    cannot be done.
   }
 }
 
 \value{
-  \code{write_h5dimnames} returns nothing.
+  \code{h5writeDimnames} and \code{set_h5dimnames} return nothing.
 
-  \code{read_h5dimnames} returns a list (possibly named) with one list
+  \code{h5readDimnames} returns a list (possibly named) with one list
   element per dimension in HDF5 dataset \code{name} and containing its
   dimnames retrieved from the file.
+
+  \code{get_h5dimnames} returns a character vector containing the names
+  of the HDF5 datasets that are currently set as the dimnames of the
+  dataset specified in \code{name}. The vector has one element per
+  dimension in dataset \code{name}. NAs in the vector indicate dimensions
+  along which nothing is set.
 }
 
 \seealso{
@@ -87,11 +114,11 @@ read_h5dimnames(filepath, name, as.character=FALSE)
           an array-like object and its dimnames to an HDF5 file.
 
     \item \code{\link[rhdf5]{h5write}} in the \pkg{rhdf5} package that
-          \code{write_h5dimnames} uses internally to write the dimnames
+          \code{h5writeDimnames} uses internally to write the dimnames
           to the HDF5 file.
 
     \item \code{\link{h5mread}} in this package (\pkg{HDF5Array}) that
-          \code{read_h5dimnames} uses internally to read the dimnames
+          \code{h5readDimnames} uses internally to read the dimnames
           from the HDF5 file.
 
     \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
@@ -113,18 +140,19 @@ h5file <- tempfile(fileext=".h5")
 h5write(m0, h5file, "m0")  # h5write() ignores the dimnames
 h5ls(h5file)
 
-write_h5dimnames(dimnames(m0), h5file, "m0")
+h5writeDimnames(dimnames(m0), h5file, "m0")
 h5ls(h5file)
 
-read_h5dimnames(h5file, "m0")
+get_h5dimnames(h5file, "m0")
+h5readDimnames(h5file, "m0")
 
 ## Reconstruct 'm0' from HDF5 file.
 m1 <- h5mread(h5file, "m0")
-dimnames(m1) <- read_h5dimnames(h5file, "m0")
+dimnames(m1) <- h5readDimnames(h5file, "m0")
 stopifnot(identical(m0, m1))
 
 ## ---------------------------------------------------------------------
-## USE write_h5dimnames() AFTER A CALL TO writeHDF5Array()
+## USE h5writeDimnames() AFTER A CALL TO writeHDF5Array()
 ## ---------------------------------------------------------------------
 
 ## After calling writeHDF5Array(x, ..., with.dimnames=FALSE) the
@@ -134,27 +162,27 @@ stopifnot(identical(m0, m1))
 ## 1. Write 'm0' to the HDF5 file and ignore the dimnames (for now):
 writeHDF5Array(m0, h5file, "m2")
 
-## 2. Use write_h5dimnames() to write 'dimnames(m0)' to the file and
+## 2. Use h5writeDimnames() to write 'dimnames(m0)' to the file and
 ##    associate them with the "m2" dataset:
-write_h5dimnames(dimnames(m0), h5file, "m2")
+h5writeDimnames(dimnames(m0), h5file, "m2")
 
 ## 3. Use the HDF5Array() constructor to make an HDF5Array object that
 ##    points to the "m2" dataset:
 HDF5Array(h5file, "m2")
 
 ## Note that at step 2. you can use the extra arguments of
-## write_h5dimnames() to take full control of where the dimnames
+## h5writeDimnames() to take full control of where the dimnames
 ## should be stored in the file:
 writeHDF5Array(m0, h5file, "m3")
-write_h5dimnames(dimnames(m0), h5file, "m3",
-                 group="a_secret_place", dimscales=c("NA", "m3_dim2"))
+h5writeDimnames(dimnames(m0), h5file, "m3",
+                 group="a_secret_place", h5dimnames=c("NA", "m3_dim2"))
 h5ls(h5file)
-## read_h5dimnames() and HDF5Array() still "finds" the dimnames:
-read_h5dimnames(h5file, "m3")
+## h5readDimnames() and HDF5Array() still "finds" the dimnames:
+h5readDimnames(h5file, "m3")
 HDF5Array(h5file, "m3")
 
 ## Sanity checks:
-stopifnot(identical(dimnames(m0), read_h5dimnames(h5file, "m3")))
+stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "m3")))
 stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "m3"))))
 
 ## ---------------------------------------------------------------------
@@ -163,18 +191,18 @@ stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "m3"))))
 
 writeHDF5Array(m0, h5file, "m4")
 dimnames <- list(1001:1012, as.raw(11:15))
-write_h5dimnames(dimnames, h5file, "m4")
+h5writeDimnames(dimnames, h5file, "m4")
 h5ls(h5file)
 
-read_h5dimnames(h5file, "m4")
-read_h5dimnames(h5file, "m4", as.character=TRUE)
+h5readDimnames(h5file, "m4")
+h5readDimnames(h5file, "m4", as.character=TRUE)
 
 ## Sanity checks:
-stopifnot(identical(dimnames, read_h5dimnames(h5file, "m4")))
+stopifnot(identical(dimnames, h5readDimnames(h5file, "m4")))
 dimnames(m0) <- dimnames
 stopifnot(identical(
     dimnames(m0),
-    read_h5dimnames(h5file, "m4", as.character=TRUE)
+    h5readDimnames(h5file, "m4", as.character=TRUE)
 ))
 }
 \keyword{methods}

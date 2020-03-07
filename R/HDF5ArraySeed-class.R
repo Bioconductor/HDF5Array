@@ -212,7 +212,7 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 ### Does access the file!
 setMethod("dimnames", "HDF5ArraySeed",
-    function(x) read_h5dimnames(path(x), x@name, as.character=TRUE)
+    function(x) h5readDimnames(path(x), x@name, as.character=TRUE)
 )
 
 

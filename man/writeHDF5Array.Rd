@@ -90,11 +90,11 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     By default the dimnames on \code{x} are not written to the HDF5 file.
     Set \code{with.dimnames} to \code{TRUE} to also have them written.
 
-    Note that low-level function \code{\link{write_h5dimnames}} is used
+    Note that low-level function \code{\link{h5writeDimnames}} is used
     internally to write the dimnames to disk. Setting \code{with.dimnames}
-    to \code{FALSE} and calling \code{\link{write_h5dimnames}} is another
+    to \code{FALSE} and calling \code{\link{h5writeDimnames}} is another
     way to write the dimnames on \code{x} to disk that gives more control.
-    See \code{?\link{write_h5dimnames}} for more information.
+    See \code{?\link{h5writeDimnames}} for more information.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
@@ -145,7 +145,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   \itemize{
     \item \link{HDF5Array} objects.
 
-    \item \code{\link{write_h5dimnames}} for writing the dimnames of an
+    \item \code{\link{h5writeDimnames}} for writing the dimnames of an
           HDF5 dataset to disk.
 
     \item \code{\link{saveHDF5SummarizedExperiment}} and

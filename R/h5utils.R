@@ -154,34 +154,94 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### write_h5dimnames() / read_h5dimnames()
+### get_h5dimnames() / set_h5dimnames()
 ###
 
+### Exported!
+get_h5dimnames <- function(filepath, name)
+{
+    h5getdimscales(filepath, name, scalename="dimnames")
+}
+
+### Fail if 'name' is a Dimension Scale dataset or has Dimension Scales on it.
 .check_filepath_and_name <- function(filepath, name)
 {
-    ## Fail if 'name' is a Dimension Scale dataset or has Dimension Scales
-    ## on it.
     if (h5isdimscale(filepath, name))
-        stop(wmsg("cannot write dimnames for an HDF5 dataset '", name, "' ",
-                  "that contains the dimnames for another dataset in ",
-                  "the HDF5 file"))
-    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
-    if (!all(is.na(dimscales))) {
-        dimscales <- dimscales[!is.na(dimscales)]
+        stop(wmsg("HDF5 dataset '", name, "' contains the dimnames for ",
+                  "another dataset in the HDF5 file so dimnames cannot ",
+                  "be set on it"))
+    current_h5dimnames <- get_h5dimnames(filepath, name)
+    if (!all(is.na(current_h5dimnames))) {
+        ds <- current_h5dimnames[!is.na(current_h5dimnames)]
         stop(wmsg("the dimnames for HDF5 dataset '", name, "' are already ",
                   "stored in HDF5 file '", filepath, "' (in dataset(s): ",
-                  paste(paste0("'", dimscales, "'"), collapse=", "), ")"))
+                  paste(paste0("'", ds, "'"), collapse=", "), ")"))
     }
     dimlabels <- h5getdimlabels(filepath, name)
     if (!is.null(dimlabels))
         stop(wmsg("HDF5 dataset '", name, "' already has dimension labels"))
 }
 
-.check_dimnames <- function(dimnames, filepath, name)
+.validate_h5dimnames_lengths <- function(filepath, name, h5dimnames)
+{
+    dim <- h5dim(filepath, name)
+    for (along in which(!is.na(h5dimnames))) {
+        h5dn <- h5dimnames[[along]]
+        h5dn_len <- prod(h5dim(filepath, h5dn))
+        if (h5dn_len != dim[[along]])
+            return(paste0("HDF5 dataset '", name, "' has invalid ",
+                          "dimnames: length of dataset '", h5dn, "' ",
+                          "(", h5dn_len, ") is not equal to ",
+                          "the extent of dimension ", along, " in ",
+                          "dataset '", name, "' (", dim[[along]], ")"))
+    }
+    TRUE
+}
+
+.check_h5dimnames <- function(filepath, name, h5dimnames)
 {
     dim <- h5dim(filepath, name)
     ndim <- length(dim)
-    stopifnot(is.list(dimnames), length(dimnames) <= ndim)
+    if (!is.character(h5dimnames) || length(h5dimnames) != ndim)
+        stop(wmsg("'h5dimnames' must be a character vector containing ",
+                  "the names of the HDF5 datasets to set as the ",
+                  "dimnames of dataset '", name, "' (one per dimension ",
+                  "in '", name, "')"))
+    msg <- .validate_h5dimnames_lengths(filepath, name, h5dimnames)
+    if (!isTRUE(msg))
+        stop(wmsg(msg))
+}
+
+### Exported!
+set_h5dimnames <- function(filepath, name, h5dimnames, dry.run=FALSE)
+{
+    .check_filepath_and_name(filepath, name)
+    .check_h5dimnames(filepath, name, h5dimnames)
+    h5setdimscales(filepath, name, dimscales=h5dimnames,
+                   scalename="dimnames", dry.run=dry.run)
+    invisible(NULL)
+}
+
+validate_lengths_of_h5dimnames <- function(filepath, name)
+{
+    h5dimnames <- get_h5dimnames(filepath, name)
+    .validate_h5dimnames_lengths(filepath, name, h5dimnames)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### h5writeDimnames() / h5readDimnames()
+###
+
+.check_dimnames <- function(dimnames, filepath, name)
+{
+    if (!is.list(dimnames))
+        stop(wmsg("'dimnames' must be a list"))
+    dim <- h5dim(filepath, name)
+    ndim <- length(dim)
+    if (length(dimnames) > ndim)
+        stop(wmsg("'dimnames' cannot have more list elements than ",
+                  "the number of dimensions in dataset '", name,"'"))
     not_is_NULL <- !S4Vectors:::sapply_isNULL(dimnames)
     for (along in which(not_is_NULL)) {
         dn <- dimnames[[along]]
@@ -209,48 +269,49 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
     group
 }
 
-.normarg_dimscales <- function(dimscales, group, not_is_NULL, filepath, name)
+.normarg_h5dimnames <- function(h5dimnames, group, not_is_NULL, filepath, name)
 {
     ndim <- length(not_is_NULL)
-    if (is.null(dimscales)) {
+    if (is.null(h5dimnames)) {
         ## Generate automatic dataset names.
         digits <- as.integer(log10(ndim + 0.5)) + 1L
         fmt <- paste0("%0", digits, "d")
-        dimscales <- sprintf(fmt, seq_len(ndim))
+        h5dimnames <- sprintf(fmt, seq_len(ndim))
     } else {
-        if (!is.character(dimscales) || length(dimscales) != ndim)
-            stop(wmsg("'dimscales' must be a character vector containing ",
-                      "the names of the HDF5 datasets (1 per list element ",
-                      "in 'dimnames') where to write the dimnames"))
-        if (any(not_is_NULL & is.na(dimscales)))
-            stop(wmsg("'dimscales' cannot have NAs associated with ",
+        if (!is.character(h5dimnames) || length(h5dimnames) != ndim)
+            stop(wmsg("'h5dimnames' must be a character vector containing ",
+                      "the names of the HDF5 datasets where to write the ",
+                      "dimnames of dataset '", name, "' (one per dimension ",
+                      "in '", name, "')"))
+        if (any(not_is_NULL & is.na(h5dimnames)))
+            stop(wmsg("'h5dimnames' cannot have NAs associated with ",
                       "list elements in 'dimnames' that are not NULL"))
     }
     if (nzchar(group))
-        dimscales <- paste0(group, "/", dimscales)
-    dimscales[!not_is_NULL] <- NA_character_
+        h5dimnames <- paste0(group, "/", h5dimnames)
+    h5dimnames[!not_is_NULL] <- NA_character_
     for (along in which(not_is_NULL)) {
-        dimscale <- dimscales[[along]]
-        if (h5exists(filepath, dimscale))
-            stop(wmsg("dataset '", dimscale, "' already exists"))
+        h5dn <- h5dimnames[[along]]
+        if (h5exists(filepath, h5dn))
+            stop(wmsg("dataset '", h5dn, "' already exists"))
     }
-    dimscales
+    h5dimnames
 }
 
 ### Exported!
-### dimnames:  A list (possibly named) with 1 list element per dimension in
-###            dataset 'name'.
-### name:      The name of the HDF5 dataset on which to set the dimnames.
-### group:     The name of the HDF5 group where to write the dimnames.
-###            If NA, the group name is automatically generated from 'name'.
-###            An empty string ("") means that no group should be used.
-###            Otherwise, the names in 'dimscales' must be relative to the
-###            specified group name.
-### dimscales: A character vector containing the names of the HDF5 datasets
-###            (1 per list element in 'dimnames') where to write the dimnames.
-###            Names associated with NULL list elements in 'dimnames' are
-###            ignored.
-write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
+### dimnames:   A list (possibly named) with 1 list element per dimension in
+###             dataset 'name'.
+### name:       The name of the HDF5 dataset on which to set the dimnames.
+### group:      The name of the HDF5 group where to write the dimnames.
+###             If NA, the group name is automatically generated from 'name'.
+###             An empty string ("") means that no group should be used.
+###             Otherwise, the names in 'h5dimnames' must be relative to the
+###             specified group name.
+### h5dimnames: A character vector containing the names of the HDF5 datasets
+###             (1 per list element in 'dimnames') where to write the dimnames.
+###             Names associated with NULL list elements in 'dimnames' are
+###             ignored.
+h5writeDimnames <- function(dimnames, filepath, name, group=NA, h5dimnames=NULL)
 {
     ## 1. Lots of checks.
 
@@ -263,8 +324,8 @@ write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
 
     group <- .normarg_group(group, name)
 
-    dimscales <- .normarg_dimscales(dimscales, group, not_is_NULL,
-                                    filepath, name)
+    h5dimnames <- .normarg_h5dimnames(h5dimnames, group, not_is_NULL,
+                                      filepath, name)
 
     ## 2. Write to the HDF5 file.
 
@@ -275,12 +336,12 @@ write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
     ## Write dimnames.
     for (along in which(not_is_NULL)) {
         dn <- dimnames[[along]]
-        dimscale <- dimscales[[along]]
-        h5write(dn, filepath, dimscale)
+        h5dn <- h5dimnames[[along]]
+        h5write(dn, filepath, h5dn)
     }
 
     ## Attach new datasets to dimensions of dataset 'name'.
-    h5setdimscales(filepath, name, dimscales, scalename="dimnames")
+    set_h5dimnames(filepath, name, h5dimnames)
 
     ## Set the dimension labels.
     dimlabels <- names(dimnames)
@@ -289,19 +350,19 @@ write_h5dimnames <- function(dimnames, filepath, name, group=NA, dimscales=NULL)
 }
 
 ### Exported!
-read_h5dimnames <- function(filepath, name, as.character=FALSE)
+h5readDimnames <- function(filepath, name, as.character=FALSE)
 {
     if (!isTRUEorFALSE(as.character))
         stop(wmsg("'as.character' must be TRUE or FALSE"))
-    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
+    h5dimnames <- get_h5dimnames(filepath, name)
     dimlabels <- h5getdimlabels(filepath, name)
-    if (all(is.na(dimscales)) && is.null(dimlabels))
+    if (all(is.na(h5dimnames)) && is.null(dimlabels))
         return(NULL)
-    lapply(setNames(dimscales, dimlabels),
-           function(dimscale) {
-               if (is.na(dimscale))
+    lapply(setNames(h5dimnames, dimlabels),
+           function(h5dn) {
+               if (is.na(h5dn))
                    return(NULL)
-               dn <- h5mread(filepath, dimscale)
+               dn <- h5mread(filepath, h5dn)
                if (as.character) {
                    ## as.character() drops all attributes so no need to
                    ## explicitly drop the "dim" attribute.
@@ -316,21 +377,4 @@ read_h5dimnames <- function(filepath, name, as.character=FALSE)
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### validate_lengths_of_h5dimnames()
 ###
-
-validate_lengths_of_h5dimnames <- function(filepath, name)
-{
-    dimscales <- h5getdimscales(filepath, name, scalename="dimnames")
-    dim <- h5dim(filepath, name)
-    for (along in which(!is.na(dimscales))) {
-        dimscale <- dimscales[[along]]
-        dimscale_len <- prod(h5dim(filepath, dimscale))
-        if (dimscale_len != dim[[along]])
-            return(paste0("HDF5 dataset '", name, "' has invalid ",
-                          "dimnames: length of dataset '", dimscale, "' ",
-                          "(", dimscale_len, ") is not equal to ",
-                          "the extent of dimension ", along, " in ",
-                          "dataset '", name, "' (", dim[[along]], ")"))
-    }
-    TRUE
-}
 

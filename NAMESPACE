@@ -61,7 +61,7 @@ export(
     H5DSetDescriptor, destroy_H5DSetDescriptor, get_h5mread_returned_type,
     h5mread,
     h5mread_from_reshaped,
-    write_h5dimnames, read_h5dimnames,
+    set_h5dimnames, get_h5dimnames, h5writeDimnames, h5readDimnames,
     HDF5ArraySeed,
     HDF5Array,
     ReshapedHDF5ArraySeed,
