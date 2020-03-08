@@ -1,8 +1,18 @@
-test_h5writeDimnames_h5readDimnames <- function()
+test_get_h5dimnames_set_h5dimnames <- function()
 {
-    h5writeDimnames <- HDF5Array:::h5writeDimnames
-    h5readDimnames <- HDF5Array:::h5readDimnames
+    h5file <- tempfile(fileext=".h5")
+    A <- h5write(array(1:60, 5:3), h5file, "A")
+    A2 <- h5write(letters[1:4], h5file, "A2")
+    A3 <- h5write(LETTERS[1:3], h5file, "A3")
+    set_h5dimnames(h5file, "A", c(NA, "A2", NA), dry.run=TRUE)
+    set_h5dimnames(h5file, "A", c(NA, "A2", "A3"))
+    target <- c(NA, "/A2", "/A3")
+    current <- get_h5dimnames(h5file, "A")
+    checkIdentical(target, current)
+}
 
+test_h5readDimnames_h5writeDimnames <- function()
+{
     h5file <- tempfile(fileext=".h5")
     h5createFile(h5file)
     h5createGroup(h5file, "stuff")

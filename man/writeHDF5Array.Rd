@@ -90,10 +90,10 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     By default the dimnames on \code{x} are not written to the HDF5 file.
     Set \code{with.dimnames} to \code{TRUE} to also have them written.
 
-    Note that low-level function \code{\link{h5writeDimnames}} is used
-    internally to write the dimnames to disk. Setting \code{with.dimnames}
-    to \code{FALSE} and calling \code{\link{h5writeDimnames}} is another
-    way to write the dimnames on \code{x} to disk that gives more control.
+    Note that \code{\link{h5writeDimnames}} is used internally to write
+    the dimnames to disk. Setting \code{with.dimnames} to \code{FALSE}
+    and calling \code{\link{h5writeDimnames}} is another way to write
+    the dimnames on \code{x} to disk that gives more control.
     See \code{?\link{h5writeDimnames}} for more information.
   }
   \item{verbose}{

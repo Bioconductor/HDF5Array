@@ -8,14 +8,19 @@
 \title{Write/read the dimnames of an HDF5 dataset}
 
 \description{
-  Low-level functions \code{h5writeDimnames} and \code{h5readDimnames}
-  can be used to write/read the dimnames of an HDF5 dataset to/from
-  the HDF5 file.
+  \code{h5writeDimnames} and \code{h5readDimnames} can be used to
+  write/read the dimnames of an HDF5 dataset to/from the HDF5 file.
 
   Note that \code{h5writeDimnames} is used internally by
   \code{\link{writeHDF5Array}(x, ..., with.dimnames=TRUE)}
-  to write the dimnames of \code{x} together with the array
-  data to the HDF5 file.
+  to write the dimnames of \code{x} to the HDF5 file together
+  with the array data.
+
+  \code{set_h5dimnames} and \code{get_h5dimnames} are low-level
+  utilities that can be used to attach existing HDF5 datasets
+  along the dimensions of a given HDF5 dataset, or to retrieve
+  the names of the HDF5 datasets that are attached along the
+  dimensions of a given HDF5 dataset.
 }
 
 \usage{
@@ -74,7 +79,7 @@ get_h5dimnames(filepath, name)
     \code{"2"} for the second, etc...)
 
     For \code{set_h5dimnames}: A character vector containing the names
-    of the HDF5 datasets to set as the dimnames of the dataset specified
+    of the HDF5 datasets to attach as dimnames of the dataset specified
     in \code{name}. The vector must have one element per dimension in
     dataset \code{name}. NAs are allowed and indicate dimensions along
     which nothing should be set.
