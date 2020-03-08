@@ -275,8 +275,11 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
 {
     if (!isSingleStringOrNA(group))
         stop(wmsg("'group' must be a single string or NA"))
-    if (is.na(group))
-        group <- sprintf("%s/.%s_dimnames", dirname(name), basename(name))
+    if (is.na(group)) {
+        dname <- dirname(paste0("/", name))
+        bname <- basename(name)
+        group <- sprintf("%s/.%s_dimnames", dname, bname)
+    }
     group
 }
 
