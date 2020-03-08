@@ -82,7 +82,7 @@ get_h5dimnames(filepath, name)
     of the HDF5 datasets to attach as dimnames of the dataset specified
     in \code{name}. The vector must have one element per dimension in
     dataset \code{name}. NAs are allowed and indicate dimensions along
-    which nothing should be set.
+    which nothing should be attached.
   }
   \item{as.character}{
     Even though the dimnames of an HDF5 dataset are usually stored as
@@ -142,72 +142,100 @@ m0 <- matrix(1:60, ncol=5)
 colnames(m0) <- LETTERS[1:5]
 
 h5file <- tempfile(fileext=".h5")
-h5write(m0, h5file, "m0")  # h5write() ignores the dimnames
+h5write(m0, h5file, "M0")  # h5write() ignores the dimnames
 h5ls(h5file)
 
-h5writeDimnames(dimnames(m0), h5file, "m0")
+h5writeDimnames(dimnames(m0), h5file, "M0")
 h5ls(h5file)
 
-get_h5dimnames(h5file, "m0")
-h5readDimnames(h5file, "m0")
+get_h5dimnames(h5file, "M0")
+h5readDimnames(h5file, "M0")
 
-## Reconstruct 'm0' from HDF5 file.
-m1 <- h5mread(h5file, "m0")
-dimnames(m1) <- h5readDimnames(h5file, "m0")
+## Reconstruct 'm0' from HDF5 file:
+m1 <- h5mread(h5file, "M0")
+dimnames(m1) <- h5readDimnames(h5file, "M0")
 stopifnot(identical(m0, m1))
+
+## Create an HDF5Array object that points to HDF5 dataset M0:
+HDF5Array(h5file, "M0")
+
+## Sanity checks:
+stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "M0")))
+stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "M0"))))
+
+## ---------------------------------------------------------------------
+## SHARED DIMNAMES
+## ---------------------------------------------------------------------
+## If a collection of HDF5 datasets share the same dimnames, the
+## dimnames only need to be written once in the HDF5 file. Then they
+## can be attached to the individual datasets with set_h5dimnames():
+
+h5write(array(runif(240), c(12, 5:4)), h5file, "A1")
+set_h5dimnames(h5file, "A1", get_h5dimnames(h5file, "M0"))
+get_h5dimnames(h5file, "A1")
+h5readDimnames(h5file, "A1")
+HDF5Array(h5file, "A1")
+
+h5write(matrix(sample(letters, 60, replace=TRUE), ncol=5), h5file, "A2")
+set_h5dimnames(h5file, "A2", get_h5dimnames(h5file, "M0"))
+get_h5dimnames(h5file, "A2")
+h5readDimnames(h5file, "A2")
+HDF5Array(h5file, "A2")
+
+## Sanity checks:
+stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "A1")[1:2]))
+stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "A2")))
 
 ## ---------------------------------------------------------------------
 ## USE h5writeDimnames() AFTER A CALL TO writeHDF5Array()
 ## ---------------------------------------------------------------------
-
 ## After calling writeHDF5Array(x, ..., with.dimnames=FALSE) the
 ## dimnames on 'x' can still be written to the HDF5 file by doing the
 ## following:
 
 ## 1. Write 'm0' to the HDF5 file and ignore the dimnames (for now):
-writeHDF5Array(m0, h5file, "m2")
+writeHDF5Array(m0, h5file, "M2")
 
 ## 2. Use h5writeDimnames() to write 'dimnames(m0)' to the file and
-##    associate them with the "m2" dataset:
-h5writeDimnames(dimnames(m0), h5file, "m2")
+##    associate them with the "M2" dataset:
+h5writeDimnames(dimnames(m0), h5file, "M2")
 
 ## 3. Use the HDF5Array() constructor to make an HDF5Array object that
-##    points to the "m2" dataset:
-HDF5Array(h5file, "m2")
+##    points to the "M2" dataset:
+HDF5Array(h5file, "M2")
 
 ## Note that at step 2. you can use the extra arguments of
 ## h5writeDimnames() to take full control of where the dimnames
 ## should be stored in the file:
-writeHDF5Array(m0, h5file, "m3")
-h5writeDimnames(dimnames(m0), h5file, "m3",
-                 group="a_secret_place", h5dimnames=c("NA", "m3_dim2"))
+writeHDF5Array(m0, h5file, "M3")
+h5writeDimnames(dimnames(m0), h5file, "M3",
+                 group="a_secret_place", h5dimnames=c("NA", "M3_dim2"))
 h5ls(h5file)
 ## h5readDimnames() and HDF5Array() still "finds" the dimnames:
-h5readDimnames(h5file, "m3")
-HDF5Array(h5file, "m3")
+h5readDimnames(h5file, "M3")
+HDF5Array(h5file, "M3")
 
 ## Sanity checks:
-stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "m3")))
-stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "m3"))))
+stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "M3")))
+stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "M3"))))
 
 ## ---------------------------------------------------------------------
 ## STORE THE DIMNAMES AS NON-CHARACTER TYPES
 ## ---------------------------------------------------------------------
-
-writeHDF5Array(m0, h5file, "m4")
+writeHDF5Array(m0, h5file, "M4")
 dimnames <- list(1001:1012, as.raw(11:15))
-h5writeDimnames(dimnames, h5file, "m4")
+h5writeDimnames(dimnames, h5file, "M4")
 h5ls(h5file)
 
-h5readDimnames(h5file, "m4")
-h5readDimnames(h5file, "m4", as.character=TRUE)
+h5readDimnames(h5file, "M4")
+h5readDimnames(h5file, "M4", as.character=TRUE)
 
 ## Sanity checks:
-stopifnot(identical(dimnames, h5readDimnames(h5file, "m4")))
+stopifnot(identical(dimnames, h5readDimnames(h5file, "M4")))
 dimnames(m0) <- dimnames
 stopifnot(identical(
     dimnames(m0),
-    h5readDimnames(h5file, "m4", as.character=TRUE)
+    h5readDimnames(h5file, "M4", as.character=TRUE)
 ))
 }
 \keyword{methods}

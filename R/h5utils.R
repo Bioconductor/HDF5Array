@@ -206,7 +206,7 @@ get_h5dimnames <- function(filepath, name)
                   "the names of the HDF5 datasets to set as the ",
                   "dimnames of dataset '", name, "' (one per dimension ",
                   "in '", name, "')"))
-    if (length(h5dimnames) != ndim)
+    if (length(h5dimnames) > ndim)
         stop(wmsg("length of 'h5dimnames' must equal the number of ",
                   "dimensions (", ndim, ") in HDF5 dataset '", name, "'"))
     for (along in which(!is.na(h5dimnames))) {
