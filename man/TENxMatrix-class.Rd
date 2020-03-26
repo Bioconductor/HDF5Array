@@ -215,7 +215,7 @@ stopifnot(all.equal(lib_sizes, lib_sizes2))
 stopifnot(all.equal(n_exprs, n_exprs2))
 stopifnot(all.equal(ave_exprs, ave_exprs2))
 
-## Reset automatic number of workers and automatic block size to factory
+## Turn off parallel evaluation and reset automatic block size to factory
 ## settings:
 setAutoBPPARAM()
 setAutoBlockSize()
