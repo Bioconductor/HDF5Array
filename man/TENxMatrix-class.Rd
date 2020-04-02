@@ -162,6 +162,7 @@ oneM50k <- oneM[ , 1:50000]
 ## by parallel::detectCores()) and 16 Gb of RAM, reasonably good
 ## performance is achieved by setting the automatic number of workers
 ## to 6 and automatic block size to 500 Mb:
+library(BiocParallel)
 workers <- 6
 block_size <- 5e8  # 500 Mb
 if (.Platform$OS.type != "windows") {

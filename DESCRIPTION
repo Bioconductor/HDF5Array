@@ -9,7 +9,7 @@ Description: Implements the HDF5Array and TENxMatrix classes, 2 convenient
 	DelayedArray extensions, they support all operations supported by
 	DelayedArray objects. These operations can be either delayed or
 	block-processed.
-Version: 1.15.13
+Version: 1.15.14
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages@fredhutch.org>
@@ -20,8 +20,8 @@ Imports: utils, stats, tools, Matrix,
 	BiocGenerics (>= 0.31.5), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.21.6), Rhdf5lib
 SystemRequirements: GNU make
-Suggests: h5vcData, SummarizedExperiment (>= 1.15.1), GenomicRanges,
-	ExperimentHub, TENxBrainData, BiocParallel, GenomicFeatures, BiocStyle
+Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
+	h5vcData, ExperimentHub, TENxBrainData, GenomicFeatures, BiocStyle
 License: Artistic-2.0
 Collate: utils.R
 	H5DSetDescriptor-class.R
