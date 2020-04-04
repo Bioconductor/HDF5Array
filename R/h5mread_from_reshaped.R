@@ -62,12 +62,12 @@ collapse_dims <- function(dim0, collapse_along)
     ans
 }
 
-.aind_as_index_list <- function(aind)
+.Mindex_as_index_list <- function(Mindex)
 {
-    args <- c(lapply(2:ncol(aind), function(j) aind[ , j]), list(sep=","))
+    args <- c(lapply(2:ncol(Mindex), function(j) Mindex[ , j]), list(sep=","))
     rle <- Rle(do.call(paste, args))
     skeleton <- PartitioningByWidth(runLength(rle), names=runValue(rle))
-    tmp1 <- relist(aind[ , 1L], skeleton)
+    tmp1 <- relist(Mindex[ , 1L], skeleton)
     tmp2 <- strsplit(names(tmp1), ",", fixed=TRUE)
     lapply(seq_along(tmp1),
         function(i) c(list(tmp1[[i]]), as.list(as.integer(tmp2[[i]]))))
@@ -123,8 +123,8 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
         return(ans)
     }
 
-    aind <- arrayInd(start1, dim0[idx0])
-    index_list <- .aind_as_index_list(aind)
+    Mindex <- Lindex2Mindex(start1, dim0[idx0])
+    index_list <- .Mindex_as_index_list(Mindex)
     tmp <- lapply(seq_along(index_list),
         function(i) {
             starts0[idx0] <- index_list[[i]]

@@ -170,8 +170,8 @@ setMethod("dimnames", "TENxMatrixSeed",
     row_indices <- .get_tenx_row_indices(x@filepath, x@group,
                                          start=start, count=count)
     col_indices <- rep.int(j12, count_per_col)
-    ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
-    SparseArraySeed(dim(x), ans_aind, ans_nzdata, check=FALSE)
+    ans_nzindex <- cbind(row_indices, col_indices, deparse.level=0L)
+    SparseArraySeed(dim(x), ans_nzindex, ans_nzdata, check=FALSE)
 }
 
 
@@ -278,9 +278,9 @@ setMethod("dimnames", "TENxMatrixSeed",
         row_indices <- row_indices[keep_idx]
         col_indices <- col_indices[keep_idx]
     }
-    ans_aind <- cbind(row_indices, col_indices, deparse.level=0L)
+    ans_nzindex <- cbind(row_indices, col_indices, deparse.level=0L)
     ans_nzdata <- .get_tenx_data(x@filepath, x@group, start=idx2)
-    SparseArraySeed(dim(x), ans_aind, ans_nzdata, check=FALSE)
+    SparseArraySeed(dim(x), ans_nzindex, ans_nzdata, check=FALSE)
 }
 
 ### Load sparse data using the "linear" method.
