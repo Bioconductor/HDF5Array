@@ -137,6 +137,22 @@ h5append <- function(data, filepath, name)
 ### A simple wrapper around rhdf5::h5createDataset()
 ###
 
+### Compute the value to pass to the 'size' argument of HDF5RealizationSink(),
+### which will be passed all the way down to h5createDataset2() below, and
+### finally to rhdf5::h5createDataset().
+compute_max_string_size <- function(x)
+{
+    ## We want this to work on any array-like object, not just ordinary
+    ## arrays, so we must use type() instead of is.character().
+    if (type(x) != "character")
+        return(NULL)
+    if (length(x) == 0L)
+        return(0L)
+    ## Calling nchar() on 'x' will trigger block processing if 'x' is a
+    ## DelayedArray object, so it could take a while.
+    max(nchar(x, type="bytes", keepNA=FALSE))
+}
+
 h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
                              type="double", H5type=NULL, size=NULL,
                              chunkdim=dim, level=6L)

@@ -165,19 +165,10 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
     sink_dimnames <- if (with.dimnames) dimnames(x) else NULL
-    x_type <- type(x)
-    if (x_type == "character") {
-        ## Calling 'max(nchar(x), na.rm=TRUE)' will trigger block processing
-        ## if 'x' is a DelayedArray object so it might take a while.
-        ## TODO: Adding 1L will no longer be needed once rhdf5 writes character
-        ## data as NULL-padded strings instead of NULL-terminated strings.
-        ## This change is implemented in the "string-padding" branch of rhdf5.
-        ## See https://github.com/grimbough/rhdf5/pull/57 (not merged yet).
-        size <- max(nchar(x), na.rm=TRUE) + 1L
-    } else {
-        size <- NULL
-    }
-    sink <- HDF5RealizationSink(dim(x), sink_dimnames, x_type,
+    ## compute_max_string_size() will trigger block processing if 'x' is a
+    ## DelayedArray object of type "character", so it could take a while.
+    size <- compute_max_string_size(x)
+    sink <- HDF5RealizationSink(dim(x), sink_dimnames, type(x),
                                 filepath=filepath, name=name,
                                 H5type=H5type, size=size,
                                 chunkdim=chunkdim, level=level)
