@@ -119,8 +119,10 @@ extractNonzeroDataByCol(x, j)
 ## ---------------------------------------------------------------------
 ## THE "1.3 Million Brain Cell Dataset" AS A DelayedMatrix OBJECT
 ## ---------------------------------------------------------------------
+
 ## The 1.3 Million Brain Cell Dataset from 10x Genomics is available
 ## via ExperimentHub:
+
 library(ExperimentHub)
 hub <- ExperimentHub()
 query(hub, "TENxBrainData")
@@ -149,44 +151,46 @@ oneM^2
 ## ---------------------------------------------------------------------
 ## SOME EXAMPLES OF ROW/COL SUMMARIZATION
 ## ---------------------------------------------------------------------
+
 ## In order to reduce computation times, we'll use only the first
-## 50000 columns of the 1.3 Million Brain Cell Dataset:
-oneM50k <- oneM[ , 1:50000]
+## 25000 columns of the 1.3 Million Brain Cell Dataset:
+oneM25k <- oneM[ , 1:25000]
 
 ## Row/col summarization methods like rowSums() use a block-processing
 ## mechanism behind the scene that can be controlled via global
 ## settings. 2 important settings that can have a strong impact on
 ## performance are the automatic number of workers and automatic block
 ## size, controlled by setAutoBPPARAM() and setAutoBlockSize()
-## respectively. On a modern Linux laptop with 8 core (as reported
-## by parallel::detectCores()) and 16 Gb of RAM, reasonably good
-## performance is achieved by setting the automatic number of workers
-## to 6 and automatic block size to 500 Mb:
+## respectively.
 library(BiocParallel)
-workers <- 6
-block_size <- 5e8  # 500 Mb
 if (.Platform$OS.type != "windows") {
+    ## On a modern Linux laptop with 8 cores (as reported by
+    ## parallel::detectCores()) and 16 Gb of RAM, reasonably good
+    ## performance is achieved by setting the automatic number of workers
+    ## to 5 or 6 and the automatic block size between 300 Mb and 400 Mb:
+    workers <- 5
+    block_size <- 3e8  # 300 Mb
     setAutoBPPARAM(MulticoreParam(workers))
 } else {
     ## MulticoreParam() is not supported on Windows so we use SnowParam()
-    ## on this platform. Also we reduce the block size to 250 Mb on
+    ## on this platform. Also we reduce the block size to 200 Mb on
     ## 32-bit Windows to avoid memory allocation problems (they tend to
-    ## be common there because a process cannot use more than 2 Gb of
+    ## be common there because a process cannot use more than 3 Gb of
     ## memory).
+    workers <- 4
     setAutoBPPARAM(SnowParam(workers))
-    if (.Platform$r_arch == "i386")
-        block_size <- 2.5e8  # 250 Mb
+    block_size <- if (.Platform$r_arch == "i386") 2e8 else 3e8
 }
 setAutoBlockSize(block_size)
 DelayedArray:::set_verbose_block_processing(TRUE)
 
 ## We're ready to compute the library sizes, number of genes expressed
 ## per cell, and average expression across cells:
-system.time(lib_sizes <- colSums(oneM50k))
-system.time(n_exprs <- colSums(oneM50k != 0))
-system.time(ave_exprs <- rowMeans(oneM50k))
+system.time(lib_sizes <- colSums(oneM25k))
+system.time(n_exprs <- colSums(oneM25k != 0))
+system.time(ave_exprs <- rowMeans(oneM25k))
 
-## Note that the 3 computations above load the data in oneM50k 3 times
+## Note that the 3 computations above load the data in oneM25k 3 times
 ## in memory. This can be avoided by computing the 3 summarizations in
 ## a single pass with blockApply(). First we define the function that
 ## we're going to apply to each block of data:
@@ -198,18 +202,18 @@ FUN <- function(block)
 ## we supply a grid made with colGrid() to generate blocks of full
 ## columns (see ?colGrid for more information):
 system.time({
-  block_results <- blockApply(oneM50k, FUN, grid=colGrid(oneM50k))
+  block_results <- blockApply(oneM25k, FUN, grid=colGrid(oneM25k))
 })
 
 ## 'block_results' is a list with 1 list element per block in
-## colGrid(oneM50k). Each list element is the result that was obtained
+## colGrid(oneM25k). Each list element is the result that was obtained
 ## by applying FUN() on the block so is itself a list of length 3.
 ## Let's combine the results:
 lib_sizes2 <- unlist(lapply(block_results, `[[`, 1L))
 n_exprs2 <- unlist(lapply(block_results, `[[`, 2L))
 block_rowsums <- unlist(lapply(block_results, `[[`, 3L), use.names=FALSE)
-tot_exprs <- rowSums(matrix(block_rowsums, nrow=nrow(oneM50k)))
-ave_exprs2 <- setNames(tot_exprs / ncol(oneM50k), rownames(oneM50k))
+tot_exprs <- rowSums(matrix(block_rowsums, nrow=nrow(oneM25k)))
+ave_exprs2 <- setNames(tot_exprs / ncol(oneM25k), rownames(oneM25k))
 
 ## Sanity checks:
 stopifnot(all.equal(lib_sizes, lib_sizes2))
@@ -225,9 +229,10 @@ DelayedArray:::set_verbose_block_processing(FALSE)
 ## ---------------------------------------------------------------------
 ## extractNonzeroDataByCol()
 ## ---------------------------------------------------------------------
+
 ## extractNonzeroDataByCol() provides a convenient and very efficient
 ## way to extract the nonzero data in a compact form:
-nonzeroes <- extractNonzeroDataByCol(oneM, 1:50000)  # takes < 5 sec.
+nonzeroes <- extractNonzeroDataByCol(oneM, 1:25000)  # takes < 5 sec.
 
 ## The data is returned as an IntegerList object with one list element
 ## per column and no row indices associated to the values in the object.
@@ -235,12 +240,12 @@ nonzeroes <- extractNonzeroDataByCol(oneM, 1:50000)  # takes < 5 sec.
 ## in any order:
 nonzeroes
 
-names(nonzeroes) <- colnames(oneM50k)
+names(nonzeroes) <- colnames(oneM25k)
 
 ## This can be used to compute some simple summaries like the library
 ## sizes and the number of genes expressed per cell. For these use
-## cases, it is a lot more efficient than using colSums(oneM50k) and
-## colSums(oneM50k != 0):
+## cases, it is a lot more efficient than using colSums(oneM25k) and
+## colSums(oneM25k != 0):
 lib_sizes3 <- sum(nonzeroes)
 n_exprs3 <- lengths(nonzeroes)
 
