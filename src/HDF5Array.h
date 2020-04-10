@@ -19,7 +19,7 @@ typedef struct {
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
-	int ndim, *h5nchunk;
+	int as_na_attr, ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunkdim;
 	H5D_layout_t H5layout;
 } H5DSetDescriptor;
@@ -120,7 +120,7 @@ hsize_t *_alloc_hsize_t_buf(
 	const char *what
 );
 
-int _get_h5attrib_str(
+int _get_h5attrib_strval(
 	hid_t dset_id,
 	const char *attr_name,
 	CharAE *buf

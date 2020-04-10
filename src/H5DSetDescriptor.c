@@ -98,9 +98,9 @@ static char *get_h5name(hid_t obj_id)
      2: if dataset 'dset_id' has an attribute with the name specified
         in 'attr_name' and the attribute is of class H5T_STRING (in which
         case, and only in this case, the value of the attribute is copied
-        to 'buf').
+        to 'val').
  */
-int _get_h5attrib_str(hid_t dset_id, const char *attr_name, CharAE *buf)
+int _get_h5attrib_strval(hid_t dset_id, const char *attr_name, CharAE *val)
 {
 	int ret;
 	hid_t attr_id, attr_type_id;
@@ -144,10 +144,76 @@ int _get_h5attrib_str(hid_t dset_id, const char *attr_name, CharAE *buf)
 		PRINT_TO_ERRMSG_BUF("H5Aget_storage_size() returned 0");
 		return -1;
 	}
-	if ((size_t) attr_size > buf->_buflength)
-		CharAE_extend(buf, (size_t) attr_size);
-	CharAE_set_nelt(buf, (size_t) attr_size);
-	ret = H5Aread(attr_id, attr_type_id, buf->elts);
+	if ((size_t) attr_size > val->_buflength)
+		CharAE_extend(val, (size_t) attr_size);
+	CharAE_set_nelt(val, (size_t) attr_size);
+	ret = H5Aread(attr_id, attr_type_id, val->elts);
+	H5Tclose(attr_type_id);
+	H5Aclose(attr_id);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aread() returned an error");
+		return -1;
+	}
+	return 2;
+}
+
+/* Get the value (expected to be a single int) of a given attribute of
+   class H5T_INTEGER. Return:
+    -1: if an error occurs;
+     0: if dataset 'dset_id' has no attribute with the name specified
+        in 'attr_name';
+     1: if dataset 'dset_id' has an attribute with the name specified
+        in 'attr_name' but the attribute is not of class H5T_INTEGER
+        or its value is not a single int;
+     2: if dataset 'dset_id' has an attribute with the name specified
+        in 'attr_name' and the attribute is of class H5T_INTEGER and
+        its value is a single int (in which case, and only in this case,
+        the value of the attribute is copied to 'val').
+ */
+static int get_h5attrib_intval(hid_t dset_id, const char *attr_name, int *val)
+{
+	int ret;
+	hid_t attr_id, attr_type_id;
+	H5T_class_t attr_H5class;
+	hsize_t attr_size;
+
+	ret = H5Aexists(dset_id, attr_name);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aexists() returned an error");
+		return -1;
+	}
+	if (ret == 0)
+		return 0;
+	attr_id = H5Aopen(dset_id, attr_name, H5P_DEFAULT);
+	if (attr_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Aopen() returned an error");
+		return -1;
+	}
+	attr_type_id = H5Aget_type(attr_id);
+	if (attr_type_id < 0) {
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Aget_type() returned an error");
+		return -1;
+	}
+	attr_H5class = H5Tget_class(attr_type_id);
+	if (attr_H5class == H5T_NO_CLASS) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
+		return -1;
+	}
+	if (attr_H5class != H5T_INTEGER) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		return 1;
+	}
+	attr_size = H5Aget_storage_size(attr_id);
+	if (attr_size != sizeof(int)) {
+		H5Tclose(attr_type_id);
+		H5Aclose(attr_id);
+		return 1;
+	}
+	ret = H5Aread(attr_id, attr_type_id, val);
 	H5Tclose(attr_type_id);
 	H5Aclose(attr_id);
 	if (ret < 0) {
@@ -285,7 +351,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size, chunk_data_buf_size;
 	SEXPTYPE Rtype;
-	int ndim, *h5nchunk, h5along;
+	int as_na_attr, ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
 	htri_t ret;
 	CharAE *buf;
@@ -311,12 +377,12 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 
 	/* Set 'h5dset->storage_mode_attr'. */
 	buf = new_CharAE(0);
-	ret = _get_h5attrib_str(dset_id, "storage.mode", buf);
+	ret = _get_h5attrib_strval(dset_id, "storage.mode", buf);
 	if (ret < 0)
 		goto on_error;
 	if (ret == 1) {
 		PRINT_TO_ERRMSG_BUF("attribute \"storage.mode\" is "
-				    "not of expected type H5T_STRING");
+				    "not of expected class H5T_STRING");
 		goto on_error;
 	}
 	if (ret == 2) {
@@ -372,6 +438,18 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 
 	if (get_Rtype_only)
 		return 0;
+
+	/* Set 'h5dset->as_na_attr'. */
+	ret = get_h5attrib_intval(dset_id, "as.na", &as_na_attr);
+	if (ret < 0)
+		goto on_error;
+	if (ret == 1) {
+		PRINT_TO_ERRMSG_BUF("attribute \"as.na\" is "
+				    "not of expected class H5T_INTEGER"
+				    "or its value is not a single int");
+		goto on_error;
+	}
+	h5dset->as_na_attr = ret == 2 ? as_na_attr : 0;
 
 	/* Set 'h5dset->space_id'. */
 	space_id = H5Dget_space(dset_id);
@@ -627,6 +705,8 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	Rprintf("- H5size = %lu\n", h5dset->H5size);
 
 	Rprintf("- Rtype = \"%s\"\n", CHAR(type2str(h5dset->Rtype)));
+
+	Rprintf("- as_na_attr = %d\n", h5dset->as_na_attr);
 
 	Rprintf("- space_id = %lu\n", h5dset->space_id);
 

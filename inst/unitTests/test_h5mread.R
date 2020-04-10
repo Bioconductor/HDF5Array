@@ -334,6 +334,12 @@ test_h5mread_2D <- function()
         do_2D_tests(m3, M3, method=4L)
     }
 
+    m3[cbind(5:10, 6:1)] <- NA_character_
+    for (chunkdim in chunkdims) {
+        M3 <- writeHDF5Array(m3, chunkdim=chunkdim)
+        do_2D_tests(m3, M3, method=4L)
+    }
+
     ## with a raw matrix
 
     m4 <- m0

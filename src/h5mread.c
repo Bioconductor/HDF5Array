@@ -966,7 +966,7 @@ static int gather_chunk_data(const H5DSetDescriptor *h5dset,
 			const Viewport *destvp,
 			int *inner_midx_buf)
 {
-	int ndim, inner_moved_along;
+	int ndim, is_na, inner_moved_along;
 	size_t in_offset, out_offset, s_len;
 	long long int num_elts;
 	const char *s;
@@ -997,9 +997,15 @@ static int gather_chunk_data(const H5DSetDescriptor *h5dset,
 			for (s_len = 0; s_len < h5dset->H5size; s_len++)
 				if (s[s_len] == 0)
 					break;
-			ans_elt = PROTECT(mkCharLen(s, s_len));
-			SET_STRING_ELT(ans, out_offset, ans_elt);
-			UNPROTECT(1);
+			is_na = h5dset->as_na_attr &&
+				s_len == 2 && s[0] == 'N' && s[1] == 'A';
+			if (is_na) {
+				SET_STRING_ELT(ans, out_offset, NA_STRING);
+			} else {
+				ans_elt = PROTECT(mkCharLen(s, s_len));
+				SET_STRING_ELT(ans, out_offset, ans_elt);
+				UNPROTECT(1);
+			}
 		    break;
 		    case RAWSXP:
 			RAW(ans)[out_offset] = ((char *) in)[in_offset];
