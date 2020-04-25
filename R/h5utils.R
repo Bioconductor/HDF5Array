@@ -269,8 +269,8 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     if (length(dimnames) > ndim)
         stop(wmsg("'dimnames' cannot have more list elements than ",
                   "the number of dimensions in dataset '", name,"'"))
-    not_is_NULL <- !S4Vectors:::sapply_isNULL(dimnames)
-    for (along in which(not_is_NULL)) {
+    not_NULL <- !S4Vectors:::sapply_isNULL(dimnames)
+    for (along in which(not_NULL)) {
         dn <- dimnames[[along]]
         if (!(is.vector(dn) && is.atomic(dn)))
             stop(wmsg("each list element in the supplied 'dimnames' ",
@@ -284,7 +284,7 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     dimlabels <- names(dimnames)
     if (!is.null(dimlabels) && any(is.na(dimlabels)))
         stop(wmsg("'names(dimnames)' cannot contain NAs"))
-    not_is_NULL
+    not_NULL
 }
 
 .normarg_group <- function(group, name)
@@ -292,16 +292,15 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     if (!isSingleStringOrNA(group))
         stop(wmsg("'group' must be a single string or NA"))
     if (is.na(group)) {
-        dname <- dirname(paste0("/", name))
-        bname <- basename(name)
-        group <- sprintf("%s/.%s_dimnames", dname, bname)
+        group <- add_prefix_to_basename(name, prefix=".")
+        group <- paste0(group, "_dimnames")
     }
     group
 }
 
-.normarg_h5dimnames <- function(h5dimnames, group, not_is_NULL, filepath, name)
+.normarg_h5dimnames <- function(h5dimnames, group, not_NULL, filepath, name)
 {
-    ndim <- length(not_is_NULL)
+    ndim <- length(not_NULL)
     if (is.null(h5dimnames)) {
         ## Generate automatic dataset names.
         digits <- as.integer(log10(ndim + 0.5)) + 1L
@@ -313,14 +312,14 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
                       "the names of the HDF5 datasets where to write the ",
                       "dimnames of dataset '", name, "' (one per dimension ",
                       "in '", name, "')"))
-        if (any(not_is_NULL & is.na(h5dimnames)))
+        if (any(not_NULL & is.na(h5dimnames)))
             stop(wmsg("'h5dimnames' cannot have NAs associated with ",
                       "list elements in 'dimnames' that are not NULL"))
     }
     if (nzchar(group))
         h5dimnames <- paste0(group, "/", h5dimnames)
-    h5dimnames[!not_is_NULL] <- NA_character_
-    for (along in which(not_is_NULL)) {
+    h5dimnames[!not_NULL] <- NA_character_
+    for (along in which(not_NULL)) {
         h5dn <- h5dimnames[[along]]
         if (h5exists(filepath, h5dn))
             stop(wmsg("HDF5 dataset '", h5dn, "' already exists"))
@@ -350,11 +349,11 @@ h5writeDimnames <- function(dimnames, filepath, name, group=NA, h5dimnames=NULL)
     ## in read-only mode.
     .check_filepath_and_name(filepath, name)
 
-    not_is_NULL <- .check_dimnames(dimnames, filepath, name)
+    not_NULL <- .check_dimnames(dimnames, filepath, name)
 
     group <- .normarg_group(group, name)
 
-    h5dimnames <- .normarg_h5dimnames(h5dimnames, group, not_is_NULL,
+    h5dimnames <- .normarg_h5dimnames(h5dimnames, group, not_NULL,
                                       filepath, name)
 
     ## 2. Write to the HDF5 file.
@@ -364,7 +363,7 @@ h5writeDimnames <- function(dimnames, filepath, name, group=NA, h5dimnames=NULL)
         h5createGroup(filepath, group)
 
     ## Write dimnames.
-    for (along in which(not_is_NULL)) {
+    for (along in which(not_NULL)) {
         dn <- dimnames[[along]]
         h5dn <- h5dimnames[[along]]
         h5write(dn, filepath, h5dn)
