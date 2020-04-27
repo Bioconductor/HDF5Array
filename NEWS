@@ -1,3 +1,42 @@
+CHANGES IN VERSION 1.16.0
+-------------------------
+
+NEW FEATURES
+
+    o New h5writeDimnames()/h5readDimnames() functions for writing/reading
+      the dimnames of an HDF5 dataset to/from the HDF5 file.
+      See ?h5writeDimnames for more information.
+
+    o Add full support for HDF5Array objects of type "raw":
+      - writeHDF5Array() now works on a DelayedArray object of type "raw" (it
+        creates an H5 dataset of type H5T_STD_U8LE).
+      - The HDF5Array() constructor now should return an HDF5Array object of
+        type "raw" when pointed to an H5 dataset with an 8-bit width type (e.g.
+        H5T_STD_U8LE, H5T_STD_U8BE, H5T_STD_I8LE, H5T_STD_I8BE, H5T_STD_B8LE,
+        H5T_STD_B8BE, etc...)
+
+    o Add 'H5type' argument to writeHDF5Array().
+
+    o h5mread() now supports contiguous (i.e. unchunked) string data.
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o HDF5Array objects now find their dimnames in the HDF5 file.
+      writeHDF5Array() and as(x, "HDF5Array") know how to write the dimnames
+      to the HDF5 file, and the HDF5Array() constructor knows how to find
+      them. See ?writeHDF5Array for more information.
+
+BUG FIXES
+
+    o Fix bug causing character data to be truncated when written to HDF5 file.
+
+    o Fix h5mread() inefficiency when the user selection covers full chunks.
+
+    o h5mread() now handles character NAs consistently with rhdf5::h5read().
+
+    o Fix writeHDF5Array() error on character array filled with NAs.
+
+
 CHANGES IN VERSION 1.14.0
 -------------------------
 
