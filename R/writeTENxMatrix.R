@@ -187,6 +187,12 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=filepath, group=group)
 }
 
+### Defining this method will force writeTENxMatrix() (thru
+### BLOCK_write_to_sink() thru blockGrid()) to write blocks that
+### span full columns which is a requirement of the write_block()
+### method for TENxRealizationSink objects. See below.
+setMethod("chunkdim", "TENxRealizationSink", function(x) c(nrow(x), 1L))
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Writing data to a TENxRealizationSink object
@@ -195,52 +201,45 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
 .check_viewport <- function(viewport, x)
 {
     if (!identical(nrow(viewport), nrow(x)))
-        stop(wmsg("The \"write_block\" and \"write_sparse_block\" methods ",
-                  "for ", class(x), " objects can only be used to write ",
-                  "a block to a viewport that spans full columns i.e. to ",
-                  "a viewport such that 'nrow(viewport) == nrow(x)'."))
+        stop(wmsg("The \"write_block\" method for ", class(x), " objects ",
+                  "can only be used to write a block to a viewport that ",
+                  "spans full columns i.e. to a viewport such that ",
+                  "'nrow(viewport) == nrow(x)'."))
 
     current_col_idx <- .get_current_col_index(x@filepath, x@group)
     if (!identical(start(viewport)[[2L]], current_col_idx))
         stop(wmsg("The block to write is not adjacent to the last ",
                   "written block.\n\n",
-                  "The \"write_block\" and \"write_sparse_block\" methods ",
-                  "for ", class(x), " objects can only be used ",
-                  "in \"appending mode\", that is, each block must be ",
-                  "written to a viewport that is adjacent to the viewport ",
-                  "where the previous block was written (with the exception ",
-                  "of the 1st written block which must be written to a ",
-                  "viewport that starts at the beginning of the sink)."))
+                  "The \"write_block\" method for ", class(x), " objects ",
+                  "can only be used in \"appending mode\", that is, each ",
+                  "block must be written to a viewport that is adjacent to ",
+                  "the viewport where the previous block was written (with ",
+                  "the exception of the 1st written block which must be ",
+                  "written to a viewport that starts at the beginning of ",
+                  "the sink)."))
 }
 
 ### Support "appending mode" only.
-setMethod("write_sparse_block", "TENxRealizationSink",
-    function(x, viewport, sparse_block)
+setMethod("write_block", "TENxRealizationSink",
+    function(x, viewport, block)
     {
         .check_viewport(viewport, x)
+        if (!is(block, "SparseArraySeed"))
+            block <- as(block, "SparseArraySeed")
 
         ## Append the nonzero data.
-        new_data_len1 <- .append_data(x@filepath, x@group,
-                                      sparse_block@nzdata)
+        new_data_len1 <- .append_data(x@filepath, x@group, block@nzdata)
 
         ## Append the 0-based row indices of the nonzero data.
         new_data_len2 <- .append_row_indices(x@filepath, x@group,
-                                             sparse_block@nzindex[ , 1L] - 1L)
+                                             block@nzindex[ , 1L] - 1L)
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
         new_data_len3 <- .append_indptr(x@filepath, x@group,
-                                        sparse_block@nzindex[ , 2L],
+                                        block@nzindex[ , 2L],
                                         ncol(viewport))
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
-    }
-)
-
-setMethod("write_block", "TENxRealizationSink",
-    function(x, viewport, block)
-    {
-        sparse_block <- dense2sparse(block)
-        write_sparse_block(x, viewport, sparse_block)
     }
 )
 
