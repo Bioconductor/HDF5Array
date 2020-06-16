@@ -1815,6 +1815,24 @@ static SEXP h5mread_4_5_6_7(const H5DSetDescriptor *h5dset, SEXP starts,
 	return R_NilValue;
 }
 
+/* If the H5 datatype that was used to store the logical data is an 8-bit
+   or 16-bit signed integer type (e.g. H5T_STD_I8LE or H5T_STD_I16BE) then
+   NA values got loaded as negative values that are not equal to NA_LOGICAL
+   (e.g. as -128 for H5T_STD_I8LE and -2^16 for H5T_STD_I16BE).
+   These values must be replaced with NA_LOGICAL. */
+static void fix_logical_NAs(SEXP x)
+{
+	R_xlen_t x_len, i;
+	int *x_p;
+
+	x_len = XLENGTH(x);
+	for (i = 0, x_p = LOGICAL(x); i < x_len; i++, x_p++) {
+		if (*x_p < 0)
+			*x_p = NA_LOGICAL;
+	}
+	return;
+}
+
 /* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		    int as_int, int method)
@@ -1902,6 +1920,8 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	}
 	if (ans != R_NilValue) {
 		PROTECT(ans);
+		if (TYPEOF(ans) == LGLSXP)
+			fix_logical_NAs(ans);
 		SET_DIM(ans, ans_dim);
 		UNPROTECT(1);
 	}
