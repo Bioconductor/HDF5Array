@@ -122,6 +122,8 @@ setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 setMethod("write_block", "HDF5RealizationSink",
     function(x, viewport, block)
     {
+        if (!is.array(block))
+            block <- as.array(block)
         h5write(block, x@filepath, x@name,
                 start=start(viewport), count=width(viewport))
     }
