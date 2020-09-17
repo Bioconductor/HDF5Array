@@ -20,7 +20,7 @@
 
 \usage{
 h5mread(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
-        as.integer=FALSE, method=0L)
+        as.integer=FALSE, as.sparse=FALSE, method=0L)
 
 get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 }
@@ -72,6 +72,9 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
     TODO
   }
   \item{as.integer}{
+    TODO
+  }
+  \item{as.sparse}{
     TODO
   }
   \item{method}{
@@ -141,6 +144,18 @@ a <- h5mread(path(A0), "A0", starts=list(c(2, 7), NULL, 6),
                              counts=list(c(4, 2), NULL, NULL))
 stopifnot(identical(a0[c(2:5, 7:8), , 6, drop=FALSE], a))
 
+## Load the data in a sparse array representation:
+
+m1 <- matrix(c(5:-2, rep.int(c(0L, 99L), 11)), ncol=6)
+M1 <- writeHDF5Array(m1, name="M1", chunkdim=c(3L, 2L))
+
+index <- list(5:3, NULL)
+m <- h5mread(path(M1), "M1", starts=index)
+sas <- h5mread(path(M1), "M1", starts=index, as.sparse=TRUE)
+class(sas)  # SparseArraySeed object (see ?SparseArraySeed)
+as(sas, "dgCMatrix")
+stopifnot(identical(m, sparse2dense(sas)))
+
 ## ---------------------------------------------------------------------
 ## PERFORMANCE
 ## ---------------------------------------------------------------------
@@ -165,26 +180,34 @@ system.time(b <- h5read(fname0, "mm10/barcodes", index=index))
 stopifnot(identical(a, b))
 
 ## With the "dense" TENxBrainData dataset
-## ---------------------------------------
+## --------------------------------------
 fname1 <- hub[["EH1040"]]
 h5ls(fname1)  # "counts" is a 2D dataset
 
-index <- list(sample(  27998, 250, replace=TRUE),
-              sample(1306127, 250, replace=TRUE))
+index <- list(sample(  27998, 250),
+              sample(1306127, 250))
 ## h5mread() is about 2x faster than h5read():
 system.time(a <- h5mread(fname1, "counts", index))
 system.time(b <- h5read(fname1, "counts", index=index))
 stopifnot(identical(a, b))
 
+## Alternatively 'as.sparse=TRUE' can be used to reduce memory usage:
+system.time(sas <- h5mread(fname1, "counts", index, as.sparse=TRUE))
+stopifnot(identical(a, sparse2dense(sas)))
+
 ## The bigger the selection, the greater the speedup between
 ## h5read() and h5mread():
 \dontrun{
-  index <- list(sample(  27998, 1000, replace=TRUE),
-                sample(1306127, 1000, replace=TRUE))
-  ## h5mread() about 8x faster than h5read() (22s vs 3min):
+  index <- list(sample(  27998, 1000),
+                sample(1306127, 1000))
+  ## h5mread() about 8x faster than h5read() (20s vs 2m30s):
   system.time(a <- h5mread(fname1, "counts", index))
   system.time(b <- h5read(fname1, "counts", index=index))
   stopifnot(identical(a, b))
+
+  ## With 'as.sparse=TRUE' (about the same speed as with 'as.sparse=FALSE'):
+  system.time(sas <- h5mread(fname1, "counts", index, as.sparse=TRUE))
+  stopifnot(identical(a, sparse2dense(sas)))
 }
 }
 \keyword{methods}

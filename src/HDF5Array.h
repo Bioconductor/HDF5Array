@@ -102,7 +102,7 @@ int _map_starts_to_chunks(
 	SEXP starts,
 	int *nstart_buf,
 	IntAEAE *breakpoint_bufs,
-	LLongAEAE *chunkidx_bufs
+	LLongAEAE *tchunkidx_bufs
 );
 
 SEXP C_map_starts_to_chunks(
@@ -174,6 +174,7 @@ SEXP C_h5mread(
 	SEXP counts,
 	SEXP noreduce,
 	SEXP as_integer,
+	SEXP as_sparse,
 	SEXP method
 );
 

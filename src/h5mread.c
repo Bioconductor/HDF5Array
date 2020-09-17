@@ -256,7 +256,7 @@ static int map_starts_to_chunks(const H5DSetDescriptor *h5dset,
 				SEXP starts,
 				int *nstart_buf,
 				IntAEAE *breakpoint_bufs,
-				LLongAEAE *chunkidx_bufs)
+				LLongAEAE *tchunkidx_bufs)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf, *chunkdim_buf;
@@ -273,7 +273,30 @@ static int map_starts_to_chunks(const H5DSetDescriptor *h5dset,
 	return _map_starts_to_chunks(ndim, dim_buf->elts, chunkdim_buf->elts,
 				     starts,
 				     nstart_buf,
-				     breakpoint_bufs, chunkidx_bufs);
+				     breakpoint_bufs, tchunkidx_bufs);
+}
+
+static long long int set_ntchunks(const H5DSetDescriptor *h5dset,
+				  const SEXP starts,
+				  const LLongAEAE *tchunkidx_bufs,
+				  int *ntchunks)
+{
+	int ndim, along, h5along, ntchunk;
+	long long int total_num_tchunks;  /* total nb of touched chunks */
+	SEXP start;
+
+	ndim = h5dset->ndim;
+	total_num_tchunks = 1;
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue) {
+			ntchunk = LLongAE_get_nelt(tchunkidx_bufs->elts[along]);
+		} else {
+			ntchunk = h5dset->h5nchunk[h5along];
+		}
+		total_num_tchunks *= ntchunks[along] = ntchunk;
+	}
+	return total_num_tchunks;
 }
 
 static inline int next_midx(int ndim, const int *max_idx_plus_one,
@@ -647,34 +670,14 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
  * NULL. This is NOT checked!
  */
 
-static void set_nchunk_buf(const H5DSetDescriptor *h5dset,
-			   const SEXP starts, const LLongAEAE *chunkidx_bufs,
-			   IntAE *nchunk_buf)
-{
-	int ndim, along, h5along, nchunk;
-	SEXP start;
-
-	ndim = h5dset->ndim;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue) {
-			nchunk = LLongAE_get_nelt(chunkidx_bufs->elts[along]);
-		} else {
-			nchunk = h5dset->h5nchunk[h5along];
-		}
-		nchunk_buf->elts[along] = nchunk;
-	}
-	return;
-}
-
 static void update_chunkvp_buf(const H5DSetDescriptor *h5dset,
 			const int *chunk_midx, int moved_along,
-			SEXP starts, const LLongAEAE *chunkidx_bufs,
+			SEXP starts, const LLongAEAE *tchunkidx_bufs,
 			Viewport *chunkvp_buf)
 {
 	int ndim, along, h5along, i;
 	SEXP start;
-	long long int chunkidx;
+	long long int tchunkidx;
 	hsize_t chunkd, off, d;
 
 	ndim = h5dset->ndim;
@@ -684,12 +687,12 @@ static void update_chunkvp_buf(const H5DSetDescriptor *h5dset,
 		i = chunk_midx[along];
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue) {
-			chunkidx = chunkidx_bufs->elts[along]->elts[i];
+			tchunkidx = tchunkidx_bufs->elts[along]->elts[i];
 		} else {
-			chunkidx = i;
+			tchunkidx = i;
 		}
 		chunkd = h5dset->h5chunkdim[h5along];
-		off = chunkidx * chunkd;
+		off = tchunkidx * chunkd;
 		d = h5dset->h5dim[h5along] - off;
 		if (d > chunkd)
 			d = chunkd;
@@ -752,12 +755,12 @@ static void update_chunkvp_destvp_bufs(const H5DSetDescriptor *h5dset,
 			const int *chunk_midx, int moved_along,
 			SEXP starts,
 			const IntAEAE *breakpoint_bufs,
-			const LLongAEAE *chunkidx_bufs,
+			const LLongAEAE *tchunkidx_bufs,
 			Viewport *chunkvp_buf, Viewport *destvp_buf)
 {
 	update_chunkvp_buf(h5dset,
 			chunk_midx, moved_along,
-			starts, chunkidx_bufs,
+			starts, tchunkidx_bufs,
 			chunkvp_buf);
 	update_destvp_buf(h5dset,
 			chunk_midx, moved_along,
@@ -880,6 +883,29 @@ static int load_chunk(const H5DSetDescriptor *h5dset,
 				     h5dset->chunk_data_buf_size);
 }
 
+static void init_in_offset(int ndim, SEXP starts,
+			   const Viewport *destvp,
+			   const Viewport *chunkvp,
+			   const hsize_t *h5chunkdim,
+			   size_t *in_offset)
+{
+	size_t in_off;
+	int along, h5along, i;
+	SEXP start;
+
+	in_off = 0;
+	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
+		in_off *= h5chunkdim[h5along];
+		i = destvp->off[along];
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue)
+			in_off += _get_trusted_elt(start, i) - 1 -
+				  chunkvp->h5off[h5along];
+	}
+	*in_offset = in_off;
+	return;
+}
+
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 			const int *out_dim, const Viewport *destvp,
 			const Viewport *chunkvp,
@@ -905,6 +931,50 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 	*out_offset = out_off;
 	//printf("# in_offset = %lu out_offset = %lu\n",
 	//       *in_offset, *out_offset);
+	return;
+}
+
+static inline void update_in_offset(int ndim,
+			const int *inner_midx, int inner_moved_along,
+			SEXP starts,
+			const Viewport *destvp,
+			const hsize_t *h5chunkdim,
+			size_t *in_offset)
+{
+	SEXP start;
+	int i1, i0, along, h5along, di;
+	long long int in_off_inc;
+
+	start = GET_LIST_ELT(starts, inner_moved_along);
+	if (start != R_NilValue) {
+		i1 = destvp->off[inner_moved_along] +
+		     inner_midx[inner_moved_along];
+		i0 = i1 - 1;
+		in_off_inc = _get_trusted_elt(start, i1) -
+			     _get_trusted_elt(start, i0);
+	} else {
+		in_off_inc = 1;
+	}
+	if (inner_moved_along >= 1) {
+		along = inner_moved_along - 1;
+		h5along = ndim - inner_moved_along;
+		do {
+			in_off_inc *= h5chunkdim[h5along];
+			di = 1 - destvp->dim[along];
+			start = GET_LIST_ELT(starts, along);
+			if (start != R_NilValue) {
+				i1 = destvp->off[along];
+				i0 = i1 - di;
+				in_off_inc += _get_trusted_elt(start, i1) -
+					      _get_trusted_elt(start, i0);
+			} else {
+				in_off_inc += di;
+			}
+			along--;
+			h5along++;
+		} while (along >= 0);
+	}
+	*in_offset += in_off_inc;
 	return;
 }
 
@@ -958,7 +1028,206 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
-static int gather_chunk_data(const H5DSetDescriptor *h5dset,
+static int load_val_to_nzdata(const H5DSetDescriptor *h5dset,
+		const void *in, size_t in_offset,
+		SEXP nzdata, R_xlen_t nzdata_offset)
+{
+	switch (h5dset->Rtype) {
+	    case LGLSXP: {
+		int val = ((int *) in)[in_offset];
+		if (val == 0)
+			return 0;
+		if (nzdata != R_NilValue)
+			LOGICAL(nzdata)[nzdata_offset] = val;
+	    } break;
+	    case INTSXP: {
+		int val = ((int *) in)[in_offset];
+		if (val == 0)
+			return 0;
+		if (nzdata != R_NilValue)
+			INTEGER(nzdata)[nzdata_offset] = val;
+	    } break;
+	    case REALSXP: {
+		double val = ((double *) in)[in_offset];
+		if (val == 0.0)
+			return 0;
+		if (nzdata != R_NilValue)
+			REAL(nzdata)[nzdata_offset] = val;
+	    } break;
+	    case STRSXP: {
+		const char *val = ((char *) in) + in_offset * h5dset->H5size;
+		int val_len;
+		for (val_len = 0; val_len < h5dset->H5size; val_len++)
+			if (val[val_len] == 0)
+				break;
+		if (val_len == 0)
+			return 0;
+		if (nzdata != R_NilValue) {
+			int is_na = h5dset->as_na_attr &&
+				    val_len == 2 &&
+				    val[0] == 'N' && val[1] == 'A';
+			if (is_na) {
+			    SET_STRING_ELT(nzdata, nzdata_offset, NA_STRING);
+			} else {
+			    SEXP nzdata_elt = PROTECT(mkCharLen(val, val_len));
+			    SET_STRING_ELT(nzdata, nzdata_offset, nzdata_elt);
+			    UNPROTECT(1);
+			}
+		}
+	    } break;
+	    case RAWSXP: {
+		char val = ((char *) in)[in_offset];
+		if (val == 0)
+			return 0;
+		if (nzdata != R_NilValue)
+			RAW(nzdata)[nzdata_offset] = val;
+	    } break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
+				    CHAR(type2str(h5dset->Rtype)));
+		return -1;
+	}
+	return 1;
+}
+
+static void load_midx_to_nzindex(const Viewport *destvp,
+		const int *inner_midx_buf,
+		SEXP nzindex, R_xlen_t nzindex_nrow, int ndim,
+		R_xlen_t nzdata_offset)
+{
+	int along;
+
+	for (along = 0; along < ndim; along++) {
+		INTEGER(nzindex)[nzdata_offset + nzindex_nrow * along] =
+			destvp->off[along] + inner_midx_buf[along] + 1;
+	}
+	return;
+}
+
+static int load_val_to_array(const H5DSetDescriptor *h5dset,
+		const void *in, size_t in_offset,
+		void *out, size_t out_offset)
+{
+	switch (h5dset->Rtype) {
+	    case LGLSXP: {
+		int val = ((int *) in)[in_offset];
+		LOGICAL(out)[out_offset] = val;
+	    } break;
+	    case INTSXP: {
+		int val = ((int *) in)[in_offset];
+		INTEGER(out)[out_offset] = val;
+	    } break;
+	    case REALSXP: {
+		double val = ((double *) in)[in_offset];
+		REAL(out)[out_offset] = val;
+	    } break;
+	    case STRSXP: {
+		const char *val = ((char *) in) + in_offset * h5dset->H5size;
+		int val_len;
+		for (val_len = 0; val_len < h5dset->H5size; val_len++)
+			if (val[val_len] == 0)
+				break;
+		int is_na = h5dset->as_na_attr &&
+			    val_len == 2 && val[0] == 'N' && val[1] == 'A';
+		if (is_na) {
+			SET_STRING_ELT(out, out_offset, NA_STRING);
+		} else {
+			SEXP out_elt = PROTECT(mkCharLen(val, val_len));
+			SET_STRING_ELT(out, out_offset, out_elt);
+			UNPROTECT(1);
+		}
+	    } break;
+	    case RAWSXP: {
+		char val = ((char *) in)[in_offset];
+		RAW(out)[out_offset] = val;
+	    } break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
+				    CHAR(type2str(h5dset->Rtype)));
+		return -1;
+	}
+	return 0;
+}
+
+static int gather_selected_chunk_data_as_sparse(const H5DSetDescriptor *h5dset,
+			SEXP starts,
+			const void *in,
+			const Viewport *chunkvp,
+			long long int current_chunk_Lidx,
+			SEXP ans,
+			const Viewport *destvp,
+			int *inner_midx_buf)
+{
+	int ndim, inner_moved_along, ret;
+	size_t in_offset;
+	R_xlen_t nzdata_len, nzdata_offset;
+	SEXP chunk_data, nzindex, nzdata;
+
+	ndim = h5dset->ndim;
+
+	/* Walk on the selected elements in current chunk and count the
+	   non-zero ones. */
+	init_in_offset(ndim, starts, destvp, chunkvp,
+		       h5dset->h5chunkdim, &in_offset);
+	nzdata_len = 0;
+	while (1) {
+		ret = load_val_to_nzdata(h5dset, in, in_offset, R_NilValue, 0);
+		if (ret < 0)
+			return ret;
+		if (ret > 0)
+			nzdata_len++;
+		inner_moved_along = next_midx(ndim, destvp->dim,
+					      inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		update_in_offset(ndim,
+				 inner_midx_buf, inner_moved_along,
+				 starts,
+				 destvp,
+				 h5dset->h5chunkdim,
+				 &in_offset);
+	};
+
+	/* Alloc 'chunk_data', 'nzindex' and 'nzdata'. */
+	chunk_data = PROTECT(NEW_LIST(2));
+	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
+	nzdata = PROTECT(allocVector(h5dset->Rtype, nzdata_len));
+	SET_VECTOR_ELT(chunk_data, 0, nzindex);
+	SET_VECTOR_ELT(chunk_data, 1, nzdata);
+	SET_VECTOR_ELT(VECTOR_ELT(ans, 1), current_chunk_Lidx, chunk_data);
+	UNPROTECT(3);
+
+	/* Walk again on the selected elements in current chunk and load the
+	   non-zero ones in 'chunk_data'. */
+	init_in_offset(ndim, starts, destvp, chunkvp,
+		       h5dset->h5chunkdim, &in_offset);
+	nzdata_offset = 0;
+	while (1) {
+		ret = load_val_to_nzdata(h5dset, in, in_offset,
+					 nzdata, nzdata_offset);
+		if (ret < 0)
+			return ret;
+		if (ret > 0) {
+			load_midx_to_nzindex(destvp, inner_midx_buf,
+					     nzindex, nzdata_len, ndim,
+					     nzdata_offset);
+			nzdata_offset++;
+		}
+		inner_moved_along = next_midx(ndim, destvp->dim,
+					      inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		update_in_offset(ndim,
+				 inner_midx_buf, inner_moved_along,
+				 starts,
+				 destvp,
+				 h5dset->h5chunkdim,
+				 &in_offset);
+	};
+	return 0;
+}
+
+static int gather_selected_chunk_data_as_dense(const H5DSetDescriptor *h5dset,
 			SEXP starts,
 			const void *in,
 			const Viewport *chunkvp,
@@ -966,55 +1235,23 @@ static int gather_chunk_data(const H5DSetDescriptor *h5dset,
 			const Viewport *destvp,
 			int *inner_midx_buf)
 {
-	int ndim, is_na, inner_moved_along;
-	size_t in_offset, out_offset, s_len;
+	int ndim, inner_moved_along, ret;
+	size_t in_offset, out_offset;
 	long long int num_elts;
-	const char *s;
-	SEXP ans_elt;
 
 	ndim = h5dset->ndim;
+
+	/* Walk on the selected elements in current chunk. */
 	init_in_offset_and_out_offset(ndim, starts,
 			out_dim, destvp,
 			chunkvp, h5dset->h5chunkdim,
 			&in_offset, &out_offset);
-
-	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
 	while (1) {
+		ret = load_val_to_array(h5dset, in, in_offset, ans, out_offset);
+		if (ret < 0)
+			return ret;
 		num_elts++;
-		switch (h5dset->Rtype) {
-		    case LGLSXP:
-			LOGICAL(ans)[out_offset] = ((int *) in)[in_offset];
-		    break;
-		    case INTSXP:
-			INTEGER(ans)[out_offset] = ((int *) in)[in_offset];
-		    break;
-		    case REALSXP:
-			REAL(ans)[out_offset] = ((double *) in)[in_offset];
-		    break;
-		    case STRSXP:
-			s = (char *) in + in_offset * h5dset->H5size;
-			for (s_len = 0; s_len < h5dset->H5size; s_len++)
-				if (s[s_len] == 0)
-					break;
-			is_na = h5dset->as_na_attr &&
-				s_len == 2 && s[0] == 'N' && s[1] == 'A';
-			if (is_na) {
-				SET_STRING_ELT(ans, out_offset, NA_STRING);
-			} else {
-				ans_elt = PROTECT(mkCharLen(s, s_len));
-				SET_STRING_ELT(ans, out_offset, ans_elt);
-				UNPROTECT(1);
-			}
-		    break;
-		    case RAWSXP:
-			RAW(ans)[out_offset] = ((char *) in)[in_offset];
-		    break;
-		    default:
-			PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-					    CHAR(type2str(h5dset->Rtype)));
-			return -1;
-		}
 		inner_moved_along = next_midx(ndim, destvp->dim,
 					      inner_midx_buf);
 		if (inner_moved_along == ndim)
@@ -1035,7 +1272,8 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 			const int *chunk_midx, int moved_along,
 			SEXP starts,
 			const IntAEAE *breakpoint_bufs,
-			const LLongAEAE *chunkidx_bufs,
+			const LLongAEAE *tchunkidx_bufs,
+			int sparse, long long int current_chunk_Lidx,
 			SEXP ans, const int *ans_dim,
 			int *inner_midx_buf,
 			Viewport *chunkvp_buf,
@@ -1062,12 +1300,22 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 	}
 	if (ret < 0)
 		return ret;
-	ret = gather_chunk_data(h5dset,
-			starts,
-			chunk_data_buf,
-			chunkvp_buf,
-			ans, ans_dim, destvp_buf,
-			inner_midx_buf);
+	if (sparse) {
+		ret = gather_selected_chunk_data_as_sparse(h5dset,
+				starts,
+				chunk_data_buf,
+				chunkvp_buf,
+				current_chunk_Lidx,
+				ans, destvp_buf,
+				inner_midx_buf);
+	} else {
+		ret = gather_selected_chunk_data_as_dense(h5dset,
+				starts,
+				chunk_data_buf,
+				chunkvp_buf,
+				ans, ans_dim, destvp_buf,
+				inner_midx_buf);
+	}
 	return ret;
 }
 
@@ -1092,15 +1340,16 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
-			 const LLongAEAE *chunkidx_bufs,
-			 SEXP ans, const int *ans_dim)
+			 const LLongAEAE *tchunkidx_bufs,
+			 const int *ntchunks,
+			 int sparse, SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
 	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
 	Viewport chunkvp_buf, middlevp_buf, destvp_buf;
-	IntAE *nchunk_buf, *chunk_midx_buf, *inner_midx_buf;
-	long long int num_chunks, ndot;
+	IntAE *tchunk_midx_buf, *inner_midx_buf;
+	long long int current_chunk_Lidx;
 
 	ndim = h5dset->ndim;
 	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
@@ -1140,30 +1389,21 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 					    h5dset->chunk_data_buf_size;
 
 	/* Prepare buffers. */
-	nchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_nchunk_buf(h5dset, starts, chunkidx_bufs, nchunk_buf);
-	chunk_midx_buf = new_IntAE(ndim, ndim, 0);
+	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
 	/* Walk over the chunks touched by the user selection. */
-	num_chunks = ndot = 0;
+	current_chunk_Lidx = 0;
 	moved_along = ndim;
 	do {
-		num_chunks++;
-		//if (num_chunks % 20000 == 0) {
-		//	printf(".");
-		//	if (++ndot % 50 == 0)
-		//		printf(" [%lld chunks processed]\n",
-		//		       num_chunks);
-		//	fflush(stdout);
-		//}
 		update_chunkvp_destvp_bufs(h5dset,
-			chunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, chunkidx_bufs,
+			tchunk_midx_buf->elts, moved_along,
+			starts, breakpoint_bufs, tchunkidx_bufs,
 			&chunkvp_buf, &destvp_buf);
 		ret = read_data_from_chunk_4_5(h5dset, method,
-			chunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, chunkidx_bufs,
+			tchunk_midx_buf->elts, moved_along,
+			starts, breakpoint_bufs, tchunkidx_bufs,
+			sparse, current_chunk_Lidx,
 			ans, ans_dim,
 			inner_midx_buf->elts,
 			&chunkvp_buf, &middlevp_buf, &destvp_buf,
@@ -1171,8 +1411,8 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 			compressed_chunk_data_buf);
 		if (ret < 0)
 			break;
-		moved_along = next_midx(ndim, nchunk_buf->elts,
-					chunk_midx_buf->elts);
+		current_chunk_Lidx++;
+		moved_along = next_midx(ndim, ntchunks, tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
 	free_chunkvp_middlevp_destvp_bufs(&chunkvp_buf,
@@ -1420,7 +1660,7 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 			const int *chunk_midx, int moved_along,
 			SEXP starts,
 			const IntAEAE *breakpoint_bufs,
-			const LLongAEAE *chunkidx_bufs,
+			const LLongAEAE *tchunkidx_bufs,
 			void *mem, hid_t mem_space_id,
 			int *inner_midx_buf,
 			Viewport *chunkvp_buf,
@@ -1443,7 +1683,7 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 	   NO IT'S NOT FASTER! */
 	//ret = memcmp(inner_nblock_buf->elts, destvp_buf->dim,
 	//	     ndim * sizeof(int));
-	//printf("# chunk %lld: %s\n", num_chunks,
+	//printf("# chunk %lld: %s\n", current_chunk_Lidx,
 	//       ret == 0 ? "select_elements" : "select_hyperslabs");
 	//if (ret == 0) {
 	//	ret = select_elements_from_chunk(h5dset,
@@ -1469,7 +1709,8 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 static int read_data_6(const H5DSetDescriptor *h5dset,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
-		       const LLongAEAE *chunkidx_bufs,
+		       const LLongAEAE *tchunkidx_bufs,
+		       const int *ntchunks,
 		       SEXP ans, const int *ans_dim)
 {
 	void *mem;
@@ -1477,10 +1718,9 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
 	hid_t mem_space_id;
 	Viewport chunkvp_buf, innervp_buf, destvp_buf;
 	//hsize_t *coord_buf;
-	IntAE *nchunk_buf, *chunk_midx_buf,
-	      *inner_nblock_buf, *inner_midx_buf;
+	IntAE *tchunk_midx_buf, *inner_nblock_buf, *inner_midx_buf;
 	IntAEAE *inner_breakpoint_bufs;
-	long long int num_chunks, ndot;
+	long long int current_chunk_Lidx;
 
 	mem = get_dataptr(ans);
 	if (mem == NULL)
@@ -1499,33 +1739,23 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
 	}
 
 	/* Prepare buffers. */
-	nchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_nchunk_buf(h5dset, starts, chunkidx_bufs, nchunk_buf);
-	chunk_midx_buf = new_IntAE(ndim, ndim, 0);
+	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_nblock_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_breakpoint_bufs = new_IntAEAE(ndim, ndim);
 
 	/* Walk over the chunks touched by the user selection. */
-	num_chunks = ndot = 0;
+	current_chunk_Lidx = 0;
 	moved_along = ndim;
 	//clock_t t_select_elements = 0, t_read_selection = 0, t0;
 	do {
-		num_chunks++;
-		//if (num_chunks % 20000 == 0) {
-		//	printf(".");
-		//	if (++ndot % 50 == 0)
-		//		printf(" [%lld chunks processed]\n",
-		//		       num_chunks);
-		//	fflush(stdout);
-		//}
 		update_chunkvp_destvp_bufs(h5dset,
-			chunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, chunkidx_bufs,
+			tchunk_midx_buf->elts, moved_along,
+			starts, breakpoint_bufs, tchunkidx_bufs,
 			&chunkvp_buf, &destvp_buf);
 		ret = read_data_from_chunk_6(h5dset,
-			chunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, chunkidx_bufs,
+			tchunk_midx_buf->elts, moved_along,
+			starts, breakpoint_bufs, tchunkidx_bufs,
 			mem, mem_space_id,
 			inner_midx_buf->elts,
 			&chunkvp_buf, &innervp_buf, &destvp_buf,
@@ -1533,8 +1763,8 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
 			//coord_buf);
 		if (ret < 0)
 			break;
-		moved_along = next_midx(ndim, nchunk_buf->elts,
-					chunk_midx_buf->elts);
+		current_chunk_Lidx++;
+		moved_along = next_midx(ndim, ntchunks, tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	//free(coord_buf);
 	free_chunkvp_innervp_destvp_bufs(&chunkvp_buf,
@@ -1578,15 +1808,16 @@ static int chunk_is_fully_selected(int ndim,
 static int read_data_7(const H5DSetDescriptor *h5dset,
 		       SEXP starts,
 		       const IntAEAE *breakpoint_bufs,
-		       const LLongAEAE *chunkidx_bufs,
+		       const LLongAEAE *tchunkidx_bufs,
+		       const int *ntchunks,
 		       SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ok, ret;
 	hid_t chunk_space_id, mem_space_id;
 	void *mem, *chunk_data_buf;
 	Viewport chunkvp_buf, middlevp_buf, destvp_buf;
-	IntAE *nchunk_buf, *chunk_midx_buf, *inner_midx_buf;
-	long long int num_chunks;
+	IntAE *tchunk_midx_buf, *inner_midx_buf;
+	long long int current_chunk_Lidx;
 
 	ndim = h5dset->ndim;
 	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
@@ -1630,19 +1861,16 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 	}
 
 	/* Prepare buffers. */
-	nchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_nchunk_buf(h5dset, starts, chunkidx_bufs, nchunk_buf);
-	chunk_midx_buf = new_IntAE(ndim, ndim, 0);
+	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
 	/* Walk over the chunks touched by the user selection. */
-	num_chunks = 0;
+	current_chunk_Lidx = 0;
 	moved_along = ndim;
 	do {
-		num_chunks++;
 		update_chunkvp_destvp_bufs(h5dset,
-			chunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, chunkidx_bufs,
+			tchunk_midx_buf->elts, moved_along,
+			starts, breakpoint_bufs, tchunkidx_bufs,
 			&chunkvp_buf, &destvp_buf);
 		ok = chunk_is_fully_selected(h5dset->ndim,
 					     &chunkvp_buf, &destvp_buf);
@@ -1657,8 +1885,9 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 			   buffer then copy the user-selected data from
 			   the intermediate buffer to 'ans'. */
 			ret = read_data_from_chunk_4_5(h5dset, 4,
-				chunk_midx_buf->elts, moved_along,
-				starts, breakpoint_bufs, chunkidx_bufs,
+				tchunk_midx_buf->elts, moved_along,
+				starts, breakpoint_bufs, tchunkidx_bufs,
+				0, current_chunk_Lidx,
 				ans, ans_dim,
 				inner_midx_buf->elts,
 				&chunkvp_buf, &middlevp_buf, &destvp_buf,
@@ -1666,8 +1895,8 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 		}
 		if (ret < 0)
 			break;
-		moved_along = next_midx(ndim, nchunk_buf->elts,
-					chunk_midx_buf->elts);
+		current_chunk_Lidx++;
+		moved_along = next_midx(ndim, ntchunks, tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
 	free_chunkvp_middlevp_destvp_bufs(&chunkvp_buf,
@@ -1762,45 +1991,67 @@ static SEXP h5mread_1_2_3(const H5DSetDescriptor *h5dset,
 
 /* Return R_NilValue on error. */
 static SEXP h5mread_4_5_6_7(const H5DSetDescriptor *h5dset, SEXP starts,
-			    int method, int *ans_dim)
+			    int sparse, int method, int *ans_dim)
 {
 	int ndim, ret, along;
 	IntAEAE *breakpoint_bufs;
-	LLongAEAE *chunkidx_bufs;
+	LLongAEAE *tchunkidx_bufs;  /* touched chunk ids along each dim */
+	IntAE *ntchunk_buf;  /* nb of touched chunks along each dim */
+	long long int total_num_tchunks;  /* total nb of touched chunks */
 	R_xlen_t ans_len;
-	SEXP ans;
+	SEXP ans, nzdata0, sparse_data_list;
 
 	ndim = h5dset->ndim;
-	breakpoint_bufs = new_IntAEAE(ndim, ndim);
-	chunkidx_bufs = new_LLongAEAE(ndim, ndim);
 
 	/* This call will populate 'ans_dim', 'breakpoint_bufs',
-	   and 'chunkidx_bufs'. */
+	   and 'tchunkidx_bufs'. */
+	breakpoint_bufs = new_IntAEAE(ndim, ndim);
+	tchunkidx_bufs = new_LLongAEAE(ndim, ndim);
 	ret = map_starts_to_chunks(h5dset, starts,
-				   ans_dim, breakpoint_bufs, chunkidx_bufs);
+				   ans_dim, breakpoint_bufs, tchunkidx_bufs);
 	if (ret < 0)
 		return R_NilValue;
+
+	ntchunk_buf = new_IntAE(ndim, ndim, 0);
+	total_num_tchunks = set_ntchunks(h5dset, starts,
+					 tchunkidx_bufs, ntchunk_buf->elts);
 
 	ans_len = 1;
 	for (along = 0; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(h5dset->Rtype, ans_len));
+	if (sparse) {
+		ans = PROTECT(NEW_LIST(3));
+		nzdata0 = PROTECT(allocVector(h5dset->Rtype, 0));
+		SET_VECTOR_ELT(ans, 0, nzdata0);
+		sparse_data_list =
+			PROTECT(NEW_LIST((R_xlen_t) total_num_tchunks));
+		SET_VECTOR_ELT(ans, 1, sparse_data_list);
+		UNPROTECT(2);
+	} else {
+		ans = PROTECT(allocVector(h5dset->Rtype, ans_len));
+	}
 
+	/* Note that ans_len == 0 is equivalent to total_num_tchunks == 0.
+	   Both mean that the selection is empty i.e. that at least one of
+	   its dimensions is 0. */
 	if (ans_len != 0) {
 		if (method <= 5) {
 			/* methods 4 and 5 */
-			ret = read_data_4_5(h5dset, method,
-					starts, breakpoint_bufs, chunkidx_bufs,
-					ans, ans_dim);
+			ret = read_data_4_5(h5dset, method, starts,
+					breakpoint_bufs, tchunkidx_bufs,
+					ntchunk_buf->elts,
+					sparse, ans, ans_dim);
 		} else if (method == 6) {
 			/* method 6 */
-			ret = read_data_6(h5dset,
-					starts, breakpoint_bufs, chunkidx_bufs,
+			ret = read_data_6(h5dset, starts,
+					breakpoint_bufs, tchunkidx_bufs,
+					ntchunk_buf->elts,
 					ans, ans_dim);
 		} else {
 			/* method 7 */
-			ret = read_data_7(h5dset,
-					starts, breakpoint_bufs, chunkidx_bufs,
+			ret = read_data_7(h5dset, starts,
+					breakpoint_bufs, tchunkidx_bufs,
+					ntchunk_buf->elts,
 					ans, ans_dim);
 		}
 		if (ret < 0)
@@ -1820,7 +2071,7 @@ static SEXP h5mread_4_5_6_7(const H5DSetDescriptor *h5dset, SEXP starts,
    NA values got loaded as negative values that are not equal to NA_LOGICAL
    (e.g. as -128 for H5T_STD_I8LE and -2^16 for H5T_STD_I16BE).
    These values must be replaced with NA_LOGICAL. */
-static void fix_logical_NAs(SEXP x)
+static void fix_logical_NAs_in_atomic_vector(SEXP x)
 {
 	R_xlen_t x_len, i;
 	int *x_p;
@@ -1833,9 +2084,22 @@ static void fix_logical_NAs(SEXP x)
 	return;
 }
 
+static void fix_logical_NAs_in_sparse_data(SEXP sparse_data_list)
+{
+	R_xlen_t total_num_tchunks, i;
+	SEXP nzdata;
+
+	total_num_tchunks = XLENGTH(sparse_data_list);
+	for (i = 0; i < total_num_tchunks; i++) {
+		nzdata = VECTOR_ELT(VECTOR_ELT(sparse_data_list, i), 1);
+		fix_logical_NAs_in_atomic_vector(nzdata);
+	}
+	return;
+}
+
 /* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
-		    int as_int, int method)
+		    int as_int, int sparse, int method)
 {
 	SEXP ans, ans_dim;
 	H5DSetDescriptor h5dset;
@@ -1854,17 +2118,20 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 7");
 		goto on_error;
 	}
-	if (h5dset.Rtype == STRSXP) {
+	if (h5dset.Rtype == STRSXP || sparse) {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
-					    "reading string data");
+					    "reading string data\n  or "
+					    "'as.sparse' is set to TRUE");
 			goto on_error;
 		}
 		if (method == 0) {
 			method = 4;
 		} else if (method != 4 && method != 5) {
-			PRINT_TO_ERRMSG_BUF("only methods 4 and 5 support "
-					    "reading string data");
+			PRINT_TO_ERRMSG_BUF("only methods 4 and 5 are "
+					    "supported when reading "
+					    "string data\n  or 'as.sparse' "
+					    "is set to TRUE");
 			goto on_error;
 		}
 	} else if (method == 0) {
@@ -1909,20 +2176,43 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	} else if (h5dset.h5chunkdim == NULL) {
 		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 cannot be used "
 				    "on a contiguous dataset (unless\n"
-				    "  it contains string data in which "
-				    "case methods 4 and 5 can be used)");
+				    "  it contains string data or 'as.sparse' "
+				    "is set to TRUE, in which case\n"
+				    "  methods 4 and 5 can be used)");
 	} else if (counts != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can only be used "
 				    "when 'counts' is NULL");
 	} else {
+		/* h5mread_4_5_6_7() will return an ordinary array if
+		   'as.sparse' is FALSE, or a list of length 3 if it's TRUE.
+		   If the latter:
+		     - The first list element in 'ans' will be an atomic
+		       vector of length 0 of type 'h5dset.Rtype'.
+		     - The second list element in 'ans' will be a list of
+		       length the total nb of touched chunks where each
+		       list element is itself a list of length 2. This list of
+		       length 2 is a sparse representation of the data loaded
+		       from the corresponding touched chunk i.e. its 1st
+		       element is the "nzindex" (matrix) and its 2nd element
+		       the "nzdata" (atomic vector).
+		     - The third list element in 'ans' will be NULL.
+		*/
 		ans = h5mread_4_5_6_7(&h5dset, starts,
-				      method, INTEGER(ans_dim));
+				      sparse, method, INTEGER(ans_dim));
 	}
 	if (ans != R_NilValue) {
 		PROTECT(ans);
-		if (TYPEOF(ans) == LGLSXP)
-			fix_logical_NAs(ans);
-		SET_DIM(ans, ans_dim);
+		if (sparse) {
+			if (h5dset.Rtype == LGLSXP) {
+			    SEXP sparse_data_list = VECTOR_ELT(ans, 1);
+			    fix_logical_NAs_in_sparse_data(sparse_data_list);
+			}
+			SET_VECTOR_ELT(ans, 2, ans_dim);
+		} else {
+			if (h5dset.Rtype == LGLSXP)
+			    fix_logical_NAs_in_atomic_vector(ans);
+			SET_DIM(ans, ans_dim);
+		}
 		UNPROTECT(1);
 	}
 
@@ -1936,9 +2226,9 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5mread(SEXP filepath, SEXP name,
 	       SEXP starts, SEXP counts, SEXP noreduce,
-	       SEXP as_integer, SEXP method)
+	       SEXP as_integer, SEXP as_sparse, SEXP method)
 {
-	int noreduce0, as_int, method0;
+	int noreduce0, as_int, sparse, method0;
 	hid_t file_id, dset_id;
 	SEXP ans;
 
@@ -1952,6 +2242,11 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'as_integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
+	/* Check 'as_sparse'. */
+	if (!(IS_LOGICAL(as_sparse) && LENGTH(as_sparse) == 1))
+		error("'as_sparse' must be TRUE or FALSE");
+	sparse = LOGICAL(as_sparse)[0];
+
 	/* Check 'method'. */
 	if (!(IS_INTEGER(method) && LENGTH(method) == 1))
 		error("'method' must be a single integer");
@@ -1960,7 +2255,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
-			      as_int, method0));
+			      as_int, sparse, method0));
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	UNPROTECT(1);
