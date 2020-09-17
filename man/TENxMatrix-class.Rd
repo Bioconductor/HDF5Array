@@ -102,7 +102,7 @@ extractNonzeroDataByCol(x, j)
           \code{\link[DelayedArray]{setAutoBlockSize}} in the
           \pkg{DelayedArray} package.
 
-    \item \code{\link[DelayedArray]{colGrid}} and
+    \item \code{\link[DelayedArray]{colAutoGrid}} and
           \code{\link[DelayedArray]{blockApply}} in the
           \pkg{DelayedArray} package.
 
@@ -199,15 +199,16 @@ FUN <- function(block)
 
 ## Then we call blockApply() to apply FUN() to each block. The blocks
 ## are defined by the grid passed to the 'grid' argument. In this case
-## we supply a grid made with colGrid() to generate blocks of full
-## columns (see ?colGrid for more information):
+## we supply a grid made with colAutoGrid() to generate blocks of full
+## columns (see ?colAutoGrid for more information):
 system.time({
-  block_results <- blockApply(oneM25k, FUN, grid=colGrid(oneM25k))
+  block_results <- blockApply(oneM25k, FUN, grid=colAutoGrid(oneM25k))
 })
 
 ## 'block_results' is a list with 1 list element per block in
-## colGrid(oneM25k). Each list element is the result that was obtained
-## by applying FUN() on the block so is itself a list of length 3.
+## colAutoGrid(oneM25k). Each list element is the result that was
+## obtained by applying FUN() on the block so is itself a list of
+## length 3.
 ## Let's combine the results:
 lib_sizes2 <- unlist(lapply(block_results, `[[`, 1L))
 n_exprs2 <- unlist(lapply(block_results, `[[`, 2L))
