@@ -2,7 +2,10 @@
  *         Low-level manipulation of HDF5 Dimension Scale datasets          *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
-#include "HDF5Array.h"
+#include "h5dimscales.h"
+
+#include "global_errmsg_buf.h"
+#include "H5DSetDescriptor.h"
 
 #include "hdf5_hl.h"
 
@@ -109,7 +112,7 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	}
 
 	ans = PROTECT(NEW_CHARACTER(h5dset.ndim));
@@ -122,7 +125,7 @@ SEXP C_h5getdimscales(SEXP filepath, SEXP name, SEXP scalename)
 			_destroy_H5DSetDescriptor(&h5dset);
 			H5Dclose(dset_id);
 			H5Fclose(file_id);
-			error(_HDF5Array_errmsg_buf());
+			error(_HDF5Array_global_errmsg_buf());
 		}
 		if (ret == 0) {
 			SET_STRING_ELT(ans, along, NA_STRING);
@@ -309,7 +312,7 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	}
 
 	if (LENGTH(dimscales) > h5dset.ndim) {
@@ -356,7 +359,7 @@ static SEXP check_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	H5Fclose(file_id);
 	UNPROTECT(1);
 	if (ret < 0)
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	return ans;
 }
 
@@ -423,7 +426,7 @@ static void set_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	}
 
 	for (along = 0; along < LENGTH(dimscales); along++) {
@@ -441,7 +444,7 @@ static void set_scales(SEXP filepath, SEXP name, SEXP dimscales,
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ret < 0)
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	return;
 }
 
@@ -513,7 +516,7 @@ SEXP C_h5getdimlabels(SEXP filepath, SEXP name)
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, 0, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	}
 
 	/* First pass */
@@ -603,7 +606,7 @@ SEXP C_h5setdimlabels(SEXP filepath, SEXP name, SEXP dimlabels)
 			H5Fclose(file_id);
 			PRINT_TO_ERRMSG_BUF("H5DSset_label() failed on "
 					    "label %d", along + 1);
-			error(_HDF5Array_errmsg_buf());
+			error(_HDF5Array_global_errmsg_buf());
 		}
 	}
 

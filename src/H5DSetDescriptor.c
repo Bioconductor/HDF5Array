@@ -2,12 +2,13 @@
  *              Basic manipulation of a H5DSetDescriptor struct             *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
-#include "HDF5Array.h"
+#include "H5DSetDescriptor.h"
+
+#include "global_errmsg_buf.h"
 
 #include <stdlib.h>  /* for malloc, free */
 #include <string.h>  /* for strcmp */
 #include <limits.h>  /* for INT_MAX */
-
 
 static const char *H5class2str(H5T_class_t H5class)
 {
@@ -665,7 +666,7 @@ SEXP C_new_H5DSetDescriptor_xp(SEXP filepath, SEXP name, SEXP as_integer)
 	if (_init_H5DSetDescriptor(h5dset, dset_id, as_int, 0) < 0) {
 		H5Dclose(dset_id);
 		H5Fclose(file_id);
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	}
 	H5Fclose(file_id);
 	//printf("H5DSetDescriptor struct created at address %p\n", h5dset);
@@ -774,7 +775,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	if (ret < 0)
-		error(_HDF5Array_errmsg_buf());
+		error(_HDF5Array_global_errmsg_buf());
 	_destroy_H5DSetDescriptor(&h5dset);
 	return ScalarString(type2str(h5dset.Rtype));
 }

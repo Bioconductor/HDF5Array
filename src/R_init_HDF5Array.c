@@ -1,5 +1,13 @@
-#include "HDF5Array.h"
 #include <R_ext/Rdynload.h>
+
+#include "global_errmsg_buf.h"
+#include "array_selection.h"
+#include "H5DSetDescriptor.h"
+#include "h5mread_helpers.h"
+#include "h5mread_startscounts.h"
+#include "h5mread_starts.h"
+#include "h5mread.h"
+#include "h5dimscales.h"
 
 #define CALLMETHOD_DEF(fun, numArgs) {#fun, (DL_FUNC) &fun, numArgs}
 
