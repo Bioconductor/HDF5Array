@@ -114,53 +114,6 @@ static int read_H5Viewport(const H5DSetDescriptor *h5dset,
 	return ret;
 }
 
-static int map_starts_to_chunks(const H5DSetDescriptor *h5dset,
-				SEXP starts,
-				int *nstart_buf,
-				IntAEAE *breakpoint_bufs,
-				LLongAEAE *tchunkidx_bufs)
-{
-	int ndim, along, h5along;
-	LLongAE *dim_buf, *chunkdim_buf;
-
-	ndim = h5dset->ndim;
-	dim_buf = new_LLongAE(ndim, ndim, 0);
-	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		dim_buf->elts[along] =
-			(long long int) h5dset->h5dim[h5along];
-		chunkdim_buf->elts[along] =
-			(long long int) h5dset->h5chunkdim[h5along];
-	}
-	return _map_starts_to_chunks(ndim, dim_buf->elts, chunkdim_buf->elts,
-				     starts,
-				     nstart_buf,
-				     breakpoint_bufs, tchunkidx_bufs);
-}
-
-static long long int set_ntchunks(const H5DSetDescriptor *h5dset,
-				  const SEXP starts,
-				  const LLongAEAE *tchunkidx_bufs,
-				  int *ntchunks)
-{
-	int ndim, along, h5along, ntchunk;
-	long long int total_num_tchunks;  /* total nb of touched chunks */
-	SEXP start;
-
-	ndim = h5dset->ndim;
-	total_num_tchunks = 1;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue) {
-			ntchunk = LLongAE_get_nelt(tchunkidx_bufs->elts[along]);
-		} else {
-			ntchunk = h5dset->h5nchunk[h5along];
-		}
-		total_num_tchunks *= ntchunks[along] = ntchunk;
-	}
-	return total_num_tchunks;
-}
-
 
 /****************************************************************************
  * read_data_4_5()
@@ -1418,7 +1371,56 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 
 /****************************************************************************
  * _h5mread_starts()
- *
+ */
+
+static int map_starts_to_chunks(const H5DSetDescriptor *h5dset,
+				SEXP starts,
+				int *nstart_buf,
+				IntAEAE *breakpoint_bufs,
+				LLongAEAE *tchunkidx_bufs)
+{
+	int ndim, along, h5along;
+	LLongAE *dim_buf, *chunkdim_buf;
+
+	ndim = h5dset->ndim;
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	chunkdim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		dim_buf->elts[along] =
+			(long long int) h5dset->h5dim[h5along];
+		chunkdim_buf->elts[along] =
+			(long long int) h5dset->h5chunkdim[h5along];
+	}
+	return _map_starts_to_chunks(ndim, dim_buf->elts, chunkdim_buf->elts,
+				     starts,
+				     nstart_buf,
+				     breakpoint_bufs, tchunkidx_bufs);
+}
+
+static long long int set_ntchunks(const H5DSetDescriptor *h5dset,
+				  const SEXP starts,
+				  const LLongAEAE *tchunkidx_bufs,
+				  int *ntchunks)
+{
+	int ndim, along, h5along, ntchunk;
+	long long int total_num_tchunks;  /* total nb of touched chunks */
+	SEXP start;
+
+	ndim = h5dset->ndim;
+	total_num_tchunks = 1;
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue) {
+			ntchunk = LLongAE_get_nelt(tchunkidx_bufs->elts[along]);
+		} else {
+			ntchunk = h5dset->h5nchunk[h5along];
+		}
+		total_num_tchunks *= ntchunks[along] = ntchunk;
+	}
+	return total_num_tchunks;
+}
+
+/*
  * Return an ordinary array if 'as.sparse' is FALSE, or a list of length 3
  * if it's TRUE. If the latter:
  *   - The first list element in 'ans' will be an atomic vector of length 0

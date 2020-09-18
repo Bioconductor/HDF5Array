@@ -26,44 +26,8 @@
  * Low-level helpers
  */
 
-static long long int check_selection_against_h5dset(
-		const H5DSetDescriptor *h5dset,
-		SEXP starts, SEXP counts, int *selection_dim_buf)
-{
-	int ndim, along, h5along;
-	LLongAE *dim_buf;
-
-	ndim = h5dset->ndim;
-	dim_buf = new_LLongAE(ndim, ndim, 0);
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] =
-			(long long int) h5dset->h5dim[h5along];
-	return _check_selection(ndim, dim_buf->elts, starts, counts,
-				selection_dim_buf);
-}
-
-static long long int check_ordered_selection_against_h5dset(
-		const H5DSetDescriptor *h5dset,
-		SEXP starts, SEXP counts, int *selection_dim_buf,
-		int *nstart_buf, int *nblock_buf,
-		long long int *last_block_start_buf)
-{
-	int ndim, along, h5along;
-	LLongAE *dim_buf;
-
-	ndim = h5dset->ndim;
-	dim_buf = new_LLongAE(ndim, ndim, 0);
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		dim_buf->elts[along] =
-			(long long int) h5dset->h5dim[h5along];
-	return _check_ordered_selection(ndim, dim_buf->elts, starts, counts,
-					selection_dim_buf,
-					nstart_buf, nblock_buf,
-					last_block_start_buf);
-}
-
 static size_t set_nblocks(int ndim, SEXP starts,
-			  int expand, const int *ans_dim, int *nblocks)
+			  const int *ans_dim, int expand, int *nblocks)
 {
 	size_t total_num_blocks;
 	int along, nblock;
@@ -160,7 +124,7 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 	}
 
 	ndim = h5dset->ndim;
-	set_nblocks(ndim, starts, 0, ans_dim, nblocks);
+	set_nblocks(ndim, starts, ans_dim, 0, nblocks);
 
 	/* Allocate 'srcvp_buf'. */
 	if (_alloc_H5Viewport(&srcvp_buf, ndim, 0) < 0)
@@ -218,7 +182,7 @@ static long long int select_elements(const H5DSetDescriptor *h5dset,
 	hsize_t *coord_buf, *coord_p;
 
 	ndim = h5dset->ndim;
-	num_elements = set_nblocks(ndim, starts, 1, ans_dim, nblocks);
+	num_elements = set_nblocks(ndim, starts, ans_dim, 1, nblocks);
 
 	/* Allocate 'coord_buf'. */
 	coord_buf = _alloc_hsize_t_buf(num_elements * ndim, 0, "'coord_buf'");
@@ -368,7 +332,7 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 	nblock_buf = new_IntAE(ndim, ndim, 0);
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
-	set_nblocks(ndim, starts, 0, ans_dim, nblock_buf->elts);
+	set_nblocks(ndim, starts, ans_dim, 0, nblock_buf->elts);
 
 	/* Allocate 'srcvp_buf' and 'destvp_buf'. */
 	if (_alloc_H5Viewport(&srcvp_buf, ndim, 0) < 0)
@@ -407,9 +371,45 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 
 /****************************************************************************
  * _h5mread_startscounts()
- *
- * Return an ordinary array of R_NilValue if an error occured.
  */
+
+static long long int check_selection_against_h5dset(
+		const H5DSetDescriptor *h5dset,
+		SEXP starts, SEXP counts, int *selection_dim_buf)
+{
+	int ndim, along, h5along;
+	LLongAE *dim_buf;
+
+	ndim = h5dset->ndim;
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
+		dim_buf->elts[along] =
+			(long long int) h5dset->h5dim[h5along];
+	return _check_selection(ndim, dim_buf->elts, starts, counts,
+				selection_dim_buf);
+}
+
+static long long int check_ordered_selection_against_h5dset(
+		const H5DSetDescriptor *h5dset,
+		SEXP starts, SEXP counts, int *selection_dim_buf,
+		int *nstart_buf, int *nblock_buf,
+		long long int *last_block_start_buf)
+{
+	int ndim, along, h5along;
+	LLongAE *dim_buf;
+
+	ndim = h5dset->ndim;
+	dim_buf = new_LLongAE(ndim, ndim, 0);
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
+		dim_buf->elts[along] =
+			(long long int) h5dset->h5dim[h5along];
+	return _check_ordered_selection(ndim, dim_buf->elts, starts, counts,
+					selection_dim_buf,
+					nstart_buf, nblock_buf,
+					last_block_start_buf);
+}
+
+/* Return an ordinary array or R_NilValue if an error occured. */
 SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 			   SEXP starts, SEXP counts, int noreduce,
 			   int method, int *ans_dim)
