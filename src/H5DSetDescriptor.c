@@ -299,11 +299,10 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t H5size,
 static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t H5size)
 {
 	switch (Rtype) {
-	    case LGLSXP:
-	    case INTSXP:  return sizeof(int);
-	    case REALSXP: return sizeof(double);
-	    case STRSXP:  return H5size;
-	    case RAWSXP:  return sizeof(char);
+	    case LGLSXP: case INTSXP: return sizeof(int);
+	    case REALSXP:             return sizeof(double);
+	    case STRSXP:              return H5size;
+	    case RAWSXP:              return sizeof(char);
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return 0;

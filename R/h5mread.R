@@ -92,32 +92,13 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
     } else {
         stop(wmsg("'starts' must be a list (or NULL)"))
     }
-    ## C_h5mread will return an ordinary array if 'as.sparse' is FALSE,
-    ## or a list of length 2 if it's TRUE. If the latter:
-    ## - 'ans[[1L]]' will be an atomic vector of length 0 with the type of
-    ##   the sparse data.
-    ## - 'ans[[2L]]' will be a list of length the total nb of chunks touched
-    ##   by the selection where each list element is itself a list of length 2.
-    ##   This list of length 2 is a sparse representation of the data loaded
-    ##   from the corresponding touched chunk i.e. its 1st element is the
-    ##   "nzindex" (matrix) and its 2nd element the "nzdata" (atomic vector).
-    ## - 'ans[[3L]]' will be an integer vector containing the dimensions of
-    ##   the returned sparse data.
+    ## C_h5mread() will return an ordinary array if 'as.sparse' is FALSE,
+    ## or 'list(nzindex, nzdata, ans_dim)' if it's TRUE.
     ans <- .Call2("C_h5mread", filepath, name, starts, counts, noreduce,
                                as.integer, as.sparse, method,
                                PACKAGE="HDF5Array")
-    if (as.sparse) {
-        sparse_data_list <- ans[[2L]]
-        if (length(sparse_data_list) == 0L) {
-            nzindex <- NULL
-            nzdata <- ans[[1L]]
-        } else {
-            ## Concatenate all the sparse data in 'sparse_data_list'.
-            nzindex <- do.call(rbind, lapply(sparse_data_list, `[[`, 1L))
-            nzdata <- unlist(lapply(sparse_data_list, `[[`, 2L))
-        }
-        ans <- SparseArraySeed(ans[[3L]], nzindex, nzdata, check=FALSE)
-    }
+    if (as.sparse)
+        ans <- SparseArraySeed(ans[[3L]], ans[[1L]], ans[[2L]], check=FALSE)
     if (is.null(starts) || !order_starts)
         return(ans)
     index <- lapply(seq_along(starts0),

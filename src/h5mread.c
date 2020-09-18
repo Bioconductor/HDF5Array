@@ -17,7 +17,7 @@
    NA values got loaded as negative values that are not equal to NA_LOGICAL
    (e.g. as -128 for H5T_STD_I8LE and -2^16 for H5T_STD_I16BE).
    These values must be replaced with NA_LOGICAL. */
-static void fix_logical_NAs_in_atomic_vector(SEXP x)
+static void fix_logical_NAs(SEXP x)
 {
 	R_xlen_t x_len, i;
 	int *x_p;
@@ -30,15 +30,23 @@ static void fix_logical_NAs_in_atomic_vector(SEXP x)
 	return;
 }
 
-static void fix_logical_NAs_in_sparse_data(SEXP sparse_data_list)
+/* Replace "NA" strings in 'x' with character NAs (NA_character_).
+   'x' is assumed to be NA-free. */
+static void set_character_NAs(SEXP x)
 {
-	R_xlen_t total_num_tchunks, i;
-	SEXP nzdata;
+	R_xlen_t x_len, i;
+	int x_elt_len;
+	SEXP x_elt;
 
-	total_num_tchunks = XLENGTH(sparse_data_list);
-	for (i = 0; i < total_num_tchunks; i++) {
-		nzdata = VECTOR_ELT(VECTOR_ELT(sparse_data_list, i), 1);
-		fix_logical_NAs_in_atomic_vector(nzdata);
+	x_len = XLENGTH(x);
+	for (i = 0; i < x_len; i++) {
+		x_elt = STRING_ELT(x, i);
+		x_elt_len = LENGTH(x_elt);
+		if (x_elt_len == 2) {
+			const char *s = CHAR(x_elt);
+			if (s[0] == 'N' && s[1] == 'A')
+				SET_STRING_ELT(x, i, NA_STRING);
+		}
 	}
 	return;
 }
@@ -129,40 +137,32 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can only be used "
 				    "when 'counts' is NULL");
 	} else {
-		/* _h5mread_starts() will return an ordinary array if
-		   'as.sparse' is FALSE, or a list of length 3 if it's TRUE.
-		   If the latter:
-		     - The first list element in 'ans' will be an atomic
-		       vector of length 0 of type 'h5dset.Rtype'.
-		     - The second list element in 'ans' will be a list of
-		       length the total nb of touched chunks where each
-		       list element is itself a list of length 2. This list of
-		       length 2 is a sparse representation of the data loaded
-		       from the corresponding touched chunk i.e. its 1st
-		       element is the "nzindex" (matrix) and its 2nd element
-		       the "nzdata" (atomic vector).
-		     - The third list element in 'ans' will be NULL.
+		/* _h5mread_starts() will return an ordinary array
+		   if 'as.sparse' is FALSE, or 'list(nzindex, nzdata, NULL)'
+		   if it's TRUE.
 		*/
 		ans = _h5mread_starts(&h5dset, starts,
 				      sparse, method, INTEGER(ans_dim));
 	}
+
 	if (ans != R_NilValue) {
 		PROTECT(ans);
 		if (sparse) {
-			if (h5dset.Rtype == LGLSXP) {
-			    SEXP sparse_data_list = VECTOR_ELT(ans, 1);
-			    fix_logical_NAs_in_sparse_data(sparse_data_list);
-			}
+			if (h5dset.Rtype == LGLSXP)
+				fix_logical_NAs(VECTOR_ELT(ans, 1));
+			else if (h5dset.Rtype == STRSXP && h5dset.as_na_attr)
+				set_character_NAs(VECTOR_ELT(ans, 1));
+			/* Final 'ans' is 'list(nzindex, nzdata, ans_dim)'. */
 			SET_VECTOR_ELT(ans, 2, ans_dim);
 		} else {
 			if (h5dset.Rtype == LGLSXP)
-			    fix_logical_NAs_in_atomic_vector(ans);
+				fix_logical_NAs(ans);
 			SET_DIM(ans, ans_dim);
 		}
-		UNPROTECT(1);
+		UNPROTECT(1);  /* 'ans' */
 	}
 
-	UNPROTECT(1);
+	UNPROTECT(1);  /* 'ans_dim' */
 
     on_error:
 	_destroy_H5DSetDescriptor(&h5dset);
