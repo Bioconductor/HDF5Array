@@ -25,44 +25,6 @@
 
 
 /****************************************************************************
- * Help manage memory of 'chunkvp', 'middlevp', and 'destvp' buffers
- */
-
-static int alloc_chunkvp_middlevp_destvp_bufs(int ndim,
-			H5Viewport *chunkvp_buf,
-			H5Viewport *middlevp_buf,
-			H5Viewport *destvp_buf, int destvp_mode)
-{
-	if (_alloc_H5Viewport(chunkvp_buf, ndim, 0) < 0)
-		return -1;
-	middlevp_buf->h5off =
-		_alloc_hsize_t_buf(ndim, 1, "'middlevp_buf->h5off'");
-	middlevp_buf->h5dim = chunkvp_buf->h5dim;
-	if (middlevp_buf->h5off == NULL) {
-		_free_H5Viewport(chunkvp_buf);
-		return -1;
-	}
-	if (_alloc_H5Viewport(destvp_buf, ndim, destvp_mode) < 0) {
-		free(middlevp_buf->h5off);
-		_free_H5Viewport(chunkvp_buf);
-		return -1;
-	}
-	return 0;
-}
-
-static void free_chunkvp_middlevp_destvp_bufs(
-			H5Viewport *chunkvp_buf,
-			H5Viewport *middlevp_buf,
-			H5Viewport *destvp_buf)
-{
-	_free_H5Viewport(destvp_buf);
-	free(middlevp_buf->h5off);
-	_free_H5Viewport(chunkvp_buf);
-	return;
-}
-
-
-/****************************************************************************
  * Manipulation of 'nzdata' and 'nzindex' buffers
  */
 
@@ -202,108 +164,9 @@ static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
  * NULL. This is NOT checked!
  */
 
-static void update_chunkvp_buf(const H5DSetDescriptor *h5dset,
-			const int *chunk_midx, int moved_along,
-			SEXP starts, const LLongAEAE *tchunkidx_bufs,
-			H5Viewport *chunkvp_buf)
-{
-	int ndim, along, h5along, i;
-	SEXP start;
-	long long int tchunkidx;
-	hsize_t chunkd, off, d;
-
-	ndim = h5dset->ndim;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (along > moved_along)
-			break;
-		i = chunk_midx[along];
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue) {
-			tchunkidx = tchunkidx_bufs->elts[along]->elts[i];
-		} else {
-			tchunkidx = i;
-		}
-		chunkd = h5dset->h5chunkdim[h5along];
-		off = tchunkidx * chunkd;
-		d = h5dset->h5dim[h5along] - off;
-		if (d > chunkd)
-			d = chunkd;
-		chunkvp_buf->h5off[h5along] = off;
-		chunkvp_buf->h5dim[h5along] = d;
-	}
-	//printf("# chunkvp_buf->h5off:");
-	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//	printf(" %llu", chunkvp_buf->h5off[h5along]);
-	//printf("\n");
-	//printf("# chunkvp_buf->h5dim:");
-	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//	printf(" %llu", chunkvp_buf->h5dim[h5along]);
-	//printf("\n");
-	return;
-}
-
-static void update_destvp_buf(const H5DSetDescriptor *h5dset,
-			const int *chunk_midx, int moved_along,
-			SEXP starts, const IntAEAE *breakpoint_bufs,
-			const H5Viewport *chunkvp, H5Viewport *destvp_buf)
-{
-	int ndim, along, h5along, i, off, d;
-	SEXP start;
-	const int *breakpoint;
-
-	ndim = h5dset->ndim;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		if (along > moved_along)
-			break;
-		i = chunk_midx[along];
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue ) {
-			breakpoint = breakpoint_bufs->elts[along]->elts;
-			off = i == 0 ? 0 : breakpoint[i - 1];
-			d = breakpoint[i] - off;
-		} else {
-			off = chunkvp->h5off[h5along];
-			d = chunkvp->h5dim[h5along];
-		}
-		if (destvp_buf->h5off != NULL) {
-			destvp_buf->h5off[h5along] = off;
-			destvp_buf->h5dim[h5along] = d;
-		}
-		destvp_buf->off[along] = off;
-		destvp_buf->dim[along] = d;
-	}
-	//printf("# destvp_buf (offsets):");
-	//for (along = 0; along < ndim; along++)
-	//	printf(" %d", destvp_buf->off[along]);
-	//printf("\n");
-	//printf("# destvp_buf (dims):");
-	//for (along = 0; along < ndim; along++)
-	//	printf(" %d", destvp_buf->dim[along]);
-	//printf("\n");
-	return;
-}
-
-static void update_chunkvp_destvp_bufs(const H5DSetDescriptor *h5dset,
-			const int *chunk_midx, int moved_along,
-			SEXP starts,
-			const IntAEAE *breakpoint_bufs,
-			const LLongAEAE *tchunkidx_bufs,
-			H5Viewport *chunkvp_buf, H5Viewport *destvp_buf)
-{
-	update_chunkvp_buf(h5dset,
-			chunk_midx, moved_along,
-			starts, tchunkidx_bufs,
-			chunkvp_buf);
-	update_destvp_buf(h5dset,
-			chunk_midx, moved_along,
-			starts, breakpoint_bufs,
-			chunkvp_buf, destvp_buf);
-	return;
-}
-
 static void init_in_offset(int ndim, SEXP starts,
 			   const H5Viewport *destvp,
-			   const H5Viewport *chunkvp,
+			   const H5Viewport *h5chunkvp,
 			   const hsize_t *h5chunkdim,
 			   size_t *in_offset)
 {
@@ -318,7 +181,7 @@ static void init_in_offset(int ndim, SEXP starts,
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue)
 			in_off += _get_trusted_elt(start, i) - 1 -
-				  chunkvp->h5off[h5along];
+				  h5chunkvp->h5off[h5along];
 	}
 	*in_offset = in_off;
 	return;
@@ -462,7 +325,7 @@ static inline void load_midx_to_nzindex_buf(int ndim, const H5Viewport *destvp,
 
 static int gather_selected_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *chunkvp,
+		SEXP starts, const void *in, const H5Viewport *h5chunkvp,
 		IntAE *nzindex_buf, void *nzdata_buf,
 		const H5Viewport *destvp, int *inner_midx_buf)
 {
@@ -473,7 +336,7 @@ static int gather_selected_chunk_data_as_sparse(
 
 	/* Walk on the selected elements in current chunk and count the
 	   non-zero ones. */
-	init_in_offset(ndim, starts, destvp, chunkvp,
+	init_in_offset(ndim, starts, destvp, h5chunkvp,
 		       h5dset->h5chunkdim, &in_offset);
 	while (1) {
 		ret = load_nonzero_val_to_nzdata_buf(h5dset,
@@ -501,22 +364,23 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 			SEXP starts,
 			IntAE *nzindex_buf, void *nzdata_buf,
 			int *inner_midx_buf,
-			H5Viewport *chunkvp_buf,
+			H5Viewport *h5chunkvp_buf,
 			const H5Viewport *middlevp,
 			H5Viewport *destvp_buf,
 			void *chunk_data_buf, hid_t chunk_space_id)
 {
 	int ret;
 
-	ret = _read_H5Viewport(h5dset, chunkvp_buf, middlevp,
+	ret = _read_H5Viewport(h5dset, h5chunkvp_buf, middlevp,
 			       chunk_data_buf, chunk_space_id);
 	if (ret < 0)
 		return ret;
-	return gather_selected_chunk_data_as_sparse(
+	ret = gather_selected_chunk_data_as_sparse(
 			h5dset,
-			starts, chunk_data_buf, chunkvp_buf,
+			starts, chunk_data_buf, h5chunkvp_buf,
 			nzindex_buf, nzdata_buf,
 			destvp_buf, inner_midx_buf);
+	return ret;
 }
 
 static int read_data_8(const H5DSetDescriptor *h5dset,
@@ -529,7 +393,7 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
 	void *chunk_data_buf;
-	H5Viewport chunkvp_buf, middlevp_buf, destvp_buf;
+	H5Viewport h5chunkvp_buf, middlevp_buf, destvp_buf;
 	IntAE *tchunk_midx_buf, *inner_midx_buf, *nzindex_buf;
 	void *nzdata_buf;
 	long long int tchunk_rank;
@@ -551,11 +415,11 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		return -1;
 	}
 
-	/* Allocate 'chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
+	/* Allocate 'h5chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
 	   We set 'destvp_mode' to 1 because in the context of read_data_8()
 	   we won't use 'destvp_buf.h5off' or 'destvp_buf.h5dim'. */
-	if (alloc_chunkvp_middlevp_destvp_bufs(ndim,
-		&chunkvp_buf, &middlevp_buf, &destvp_buf, 1) < 0)
+	if (_alloc_h5chunkvp_middlevp_destvp_bufs(ndim,
+		&h5chunkvp_buf, &middlevp_buf, &destvp_buf, 1) < 0)
 	{
 		H5Sclose(chunk_space_id);
 		return -1;
@@ -563,9 +427,9 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 
 	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
 	if (chunk_data_buf == NULL) {
-		free_chunkvp_middlevp_destvp_bufs(&chunkvp_buf,
-						  &middlevp_buf,
-						  &destvp_buf);
+		_free_h5chunkvp_middlevp_destvp_bufs(&h5chunkvp_buf,
+						     &middlevp_buf,
+						     &destvp_buf);
 		H5Sclose(chunk_space_id);
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 				    "for 'chunk_data_buf'");
@@ -576,26 +440,25 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
-		update_chunkvp_destvp_bufs(h5dset,
+		_update_h5chunkvp_destvp_bufs(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			&chunkvp_buf, &destvp_buf);
+			&h5chunkvp_buf, &destvp_buf);
 		ret = read_data_from_chunk_8(h5dset,
 			starts,
 			nzindex_buf, nzdata_buf,
 			inner_midx_buf->elts,
-			&chunkvp_buf, &middlevp_buf, &destvp_buf,
+			&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
 			chunk_data_buf, chunk_space_id);
 		if (ret < 0)
 			break;
 		tchunk_rank++;
-		moved_along = _next_midx(ndim, ntchunks,
-					 tchunk_midx_buf->elts);
+		moved_along = _next_midx(ndim, ntchunks, tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
-	free_chunkvp_middlevp_destvp_bufs(&chunkvp_buf,
-					  &middlevp_buf,
-					  &destvp_buf);
+	_free_h5chunkvp_middlevp_destvp_bufs(&h5chunkvp_buf,
+					     &middlevp_buf,
+					     &destvp_buf);
 	H5Sclose(chunk_space_id);
 
 	if (ret < 0)
