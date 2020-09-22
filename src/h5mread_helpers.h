@@ -1,6 +1,7 @@
 #ifndef _H5MREAD_HELPERS_H_
 #define _H5MREAD_HELPERS_H_
 
+#include "H5DSetDescriptor.h"
 #include "hdf5.h"
 
 static inline int _next_midx(int ndim, const int *max_idx_plus_one,
@@ -33,6 +34,14 @@ int _alloc_H5Viewport(
 
 void _free_H5Viewport(H5Viewport *vp);
 
+int _map_starts_to_h5chunks(
+	const H5DSetDescriptor *h5dset,
+	SEXP starts,
+	int *nstart_buf,
+	IntAEAE *breakpoint_bufs,
+	LLongAEAE *tchunkidx_bufs
+);
+
 int _select_H5Viewport(
 	hid_t space_id,
 	const H5Viewport *vp
@@ -46,6 +55,14 @@ int _add_H5Viewport_to_selection(
 hid_t _create_mem_space(
 	int ndim,
 	const int *dim
+);
+
+int _read_H5Viewport(
+	const H5DSetDescriptor *h5dset,
+	const H5Viewport *dsetvp,
+	const H5Viewport *memvp,
+	void *mem,
+	hid_t mem_space_id
 );
 
 #endif  /* _H5MREAD_HELPERS_H_ */

@@ -1,11 +1,7 @@
 #include <R_ext/Rdynload.h>
 
-#include "global_errmsg_buf.h"
 #include "array_selection.h"
 #include "H5DSetDescriptor.h"
-#include "h5mread_helpers.h"
-#include "h5mread_startscounts.h"
-#include "h5mread_starts.h"
 #include "h5mread.h"
 #include "h5dimscales.h"
 
@@ -37,7 +33,6 @@ static const R_CallMethodDef callMethods[] = {
 
 	{NULL, NULL, 0}
 };
-
 
 void R_init_HDF5Array(DllInfo *info)
 {

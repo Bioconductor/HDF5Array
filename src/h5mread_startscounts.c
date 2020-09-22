@@ -409,7 +409,8 @@ static long long int check_ordered_selection_against_h5dset(
 					last_block_start_buf);
 }
 
-/* Return an ordinary array or R_NilValue if an error occured. */
+/* Implements methods 1 to 3.
+   Return an ordinary array or R_NilValue if an error occured. */
 SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 			   SEXP starts, SEXP counts, int noreduce,
 			   int method, int *ans_dim)

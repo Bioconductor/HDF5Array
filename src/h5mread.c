@@ -9,8 +9,104 @@
 #include "H5DSetDescriptor.h"
 #include "h5mread_startscounts.h"
 #include "h5mread_starts.h"
+#include "h5mread_sparse.h"
 
 #include "hdf5.h"
+
+/* Return -1 on error. */
+static int select_method(const H5DSetDescriptor *h5dset,
+			 SEXP starts, SEXP counts, int sparse, int method)
+{
+	int along;
+
+	if (sparse) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
+					    "'as.sparse' is set to TRUE");
+			return -1;
+		}
+		if (h5dset->h5chunkdim == NULL) {
+			PRINT_TO_ERRMSG_BUF("'as.sparse=TRUE' is not supported "
+					    "on a contiguous dataset");
+			return -1;
+		}
+		if (method == 0) {
+			method = 8;
+		} else if (method != 8) {
+			PRINT_TO_ERRMSG_BUF("only method 8 is supported "
+					    "when 'as.sparse' is set to TRUE");
+			return -1;
+		}
+		return method;
+	}
+	if (h5dset->Rtype == STRSXP) {
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
+					    "reading string data");
+			return -1;
+		}
+		if (method == 0) {
+			method = 4;
+		} else if (method != 4 && method != 5) {
+			PRINT_TO_ERRMSG_BUF("only methods 4 and 5 are "
+					    "supported when reading "
+					    "string data");
+			return -1;
+		}
+		return method;
+	}
+	if (method == 0) {
+		method = 1;
+		/* March 27, 2019: My early testing (from Nov 2018) seemed
+		   to indicate that method 6 was a better choice over method 4
+		   when the layout is chunked and 'counts' is NULL. Turns out
+		   that doing more testing today seems to indicate the opposite
+		   i.e. method 4 now seems to perform better than method 6 on
+		   all the datasets I've tested so far, including those used
+		   by Pete Hickey here:
+		     https://github.com/Bioconductor/DelayedArray/issues/13
+		   and those used in the examples in man/h5mread.Rd.
+		   Note sure what happened between Nov 2018 and today. Did I
+		   do something stupid in my early testing? Did something
+		   change in Rhdf5lib?
+		   Anyway thanks to Pete for providing such a useful report.
+
+		   Nov 26, 2019: I added method 7. Is like method 4 but
+		   bypasses the intermediate buffer if a chunk is fully
+		   selected. This is now preferred over methods 4 or 6. */
+		if (h5dset->h5chunkdim != NULL &&
+		    counts == R_NilValue &&
+		    starts != R_NilValue)
+		{
+			for (along = 0; along < h5dset->ndim; along++) {
+				if (VECTOR_ELT(starts, along) != R_NilValue) {
+					//method = 6;
+					//method = 4;
+					method = 7;
+					break;
+				}
+			}
+		}
+	} else if (method < 0 || method > 7) {
+		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 7");
+		return -1;
+	} else if (method >= 4) {
+		/* Make sure the data is chunked and 'counts' is NULL. */
+		if (h5dset->h5chunkdim == NULL) {
+			PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 cannot "
+				"be used on a contiguous dataset (unless\n  "
+				"it contains string data in which case "
+				"methods 4 and 5 can be used)");
+			return -1;
+		}
+		if (counts != R_NilValue) {
+			PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can "
+				"only be used when 'counts' is NULL");
+			return -1;
+		}
+	}
+	return method;
+}
 
 /* If the H5 datatype that was used to store the logical data is an 8-bit
    or 16-bit signed integer type (e.g. H5T_STD_I8LE or H5T_STD_I16BE) then
@@ -57,7 +153,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 {
 	SEXP ans, ans_dim;
 	H5DSetDescriptor h5dset;
-	int ret, along;
+	int ret;
 
 	ans = R_NilValue;
 
@@ -68,81 +164,25 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ret < 0)
 		goto on_error;
 
-	if (method < 0 || method > 7) {
-		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 7");
+	method = select_method(&h5dset, starts, counts, sparse, method);
+	if (method < 0)
 		goto on_error;
-	}
-	if (h5dset.Rtype == STRSXP || sparse) {
-		if (counts != R_NilValue) {
-			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
-					    "reading string data\n  or "
-					    "'as.sparse' is set to TRUE");
-			goto on_error;
-		}
-		if (method == 0) {
-			method = 4;
-		} else if (method != 4 && method != 5) {
-			PRINT_TO_ERRMSG_BUF("only methods 4 and 5 are "
-					    "supported when reading "
-					    "string data\n  or 'as.sparse' "
-					    "is set to TRUE");
-			goto on_error;
-		}
-	} else if (method == 0) {
-		method = 1;
-		/* March 27, 2019: My early testing (from Nov 2018) seemed
-		   to indicate that method 6 was a better choice over method 4
-		   when the layout is chunked and 'counts' is NULL. Turns out
-		   that doing more testing today seems to indicate the opposite
-		   i.e. method 4 now seems to perform better than method 6 on
-		   all the datasets I've tested so far, including those used
-		   by Pete Hickey here:
-		     https://github.com/Bioconductor/DelayedArray/issues/13
-		   and those used in the examples in man/h5mread.Rd.
-		   Note sure what happened between Nov 2018 and today. Did I
-		   do something stupid in my early testing? Did something
-		   change in Rhdf5lib?
-		   Anyway thanks to Pete for providing such a useful report.
-
-		   Nov 26, 2019: I added method 7. Is like method 4 but
-		   bypasses the intermediate buffer if a chunk is fully
-		   selected. This is now preferred over methods 4 or 6. */
-		if (h5dset.h5chunkdim != NULL &&
-		    counts == R_NilValue &&
-		    starts != R_NilValue)
-		{
-			for (along = 0; along < h5dset.ndim; along++) {
-				if (VECTOR_ELT(starts, along) != R_NilValue) {
-					//method = 6;
-					//method = 4;
-					method = 7;
-					break;
-				}
-			}
-		}
-	}
 
 	ans_dim = PROTECT(NEW_INTEGER(h5dset.ndim));
 
 	if (method <= 3) {
+		/* Implements methods 1 to 3. */
 		ans = _h5mread_startscounts(&h5dset, starts, counts, noreduce,
 					    method, INTEGER(ans_dim));
-	} else if (h5dset.h5chunkdim == NULL) {
-		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 cannot be used "
-				    "on a contiguous dataset (unless\n"
-				    "  it contains string data or 'as.sparse' "
-				    "is set to TRUE, in which case\n"
-				    "  methods 4 and 5 can be used)");
-	} else if (counts != R_NilValue) {
-		PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can only be used "
-				    "when 'counts' is NULL");
-	} else {
-		/* _h5mread_starts() will return an ordinary array
-		   if 'as.sparse' is FALSE, or 'list(nzindex, nzdata, NULL)'
-		   if it's TRUE.
-		*/
+	} else if (method <= 7) {
+		/* Implements methods 4 to 7. */
 		ans = _h5mread_starts(&h5dset, starts,
-				      sparse, method, INTEGER(ans_dim));
+				      method, INTEGER(ans_dim));
+	} else {
+		/* Implements method 8.
+		   Return 'list(nzindex, nzdata, NULL)' or R_NilValue if
+		   an error occured. */
+		ans = _h5mread_sparse(&h5dset, starts, INTEGER(ans_dim));
 	}
 
 	if (ans != R_NilValue) {
