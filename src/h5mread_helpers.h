@@ -108,5 +108,14 @@ int _tchunk_is_fully_selected(
 	const H5Viewport *destvp
 );
 
+#define CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
+
+int _read_h5chunk(
+	const H5DSetDescriptor *h5dset,
+	const H5Viewport *h5chunkvp,
+	void *chunk_data_out,
+	void *compressed_chunk_data_buf
+);
+
 #endif  /* _H5MREAD_HELPERS_H_ */
 

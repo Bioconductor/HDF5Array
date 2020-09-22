@@ -9,6 +9,7 @@
 #include "H5DSetDescriptor.h"
 
 #include <stdlib.h>  /* for malloc, free */
+#include <zlib.h>  /* for uncompress(), Z_OK, Z_MEM_ERROR, etc.. */
 
 
 /****************************************************************************
@@ -333,5 +334,124 @@ int _tchunk_is_fully_selected(int ndim,
 	}
 	//printf("ok=%d\n", ok);
 	return ok;
+}
+
+
+/****************************************************************************
+ * _read_h5chunk()
+ */
+
+static int uncompress_chunk_data(const void *compressed_chunk_data,
+				 hsize_t compressed_size,
+				 void *uncompressed_chunk_data,
+				 size_t uncompressed_size)
+{
+	int ret;
+	uLong destLen;
+
+	destLen = uncompressed_size;
+	ret = uncompress((Bytef *) uncompressed_chunk_data, &destLen,
+			 compressed_chunk_data, (uLong) compressed_size);
+	if (ret == Z_OK) {
+		if (destLen == uncompressed_size)
+			return 0;
+		PRINT_TO_ERRMSG_BUF("error in uncompress_chunk_data(): "
+				    "chunk data smaller than expected "
+				    "after decompression");
+		return -1;
+	}
+	switch (ret) {
+	    case Z_MEM_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "not enough memory to uncompress chunk");
+	    break;
+	    case Z_BUF_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "not enough room in output buffer");
+	    break;
+	    case Z_DATA_ERROR:
+		PRINT_TO_ERRMSG_BUF("error in uncompress(): "
+				    "chunk data corrupted or incomplete");
+	    break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unknown error in uncompress()");
+	}
+	return -1;
+}
+
+/*
+ * Unfortunately H5Dread_chunk() is NOT listed here:
+ *   https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html
+ * Header file for declaration:
+ *   hdf5-1.10.3/src/H5Dpublic.h
+ * See hdf5-1.10.3/test/direct_chunk.c for plenty of examples.
+ *
+ * Call stack for H5Dread_chunk()
+ *   H5Dread_chunk                (H5Dio.c)
+ *     H5D__chunk_direct_read     (H5Dchunk.c)
+ *       H5F_block_read           (H5Fio.c)
+ *         H5PB_read              (H5PB.c)
+ *           H5F__accum_read      (H5Faccum.c)
+ *             or
+ *           H5FD_read            (H5FDint.c)
+ *            ??
+ *
+ * Call stack for H5Dread()
+ *   H5Dread                      (H5Dio.c)
+ *     H5D__read                  (H5Dio.c)
+ *       H5D__chunk_read          (H5Dchunk.c)
+ *         H5D__select_read
+ *           or
+ *         H5D__scatgath_read     (H5Dscatgath.c)
+ *           H5D__gather_file     (H5Dscatgath.c)
+ *       call ser_read member of a H5D_layout_ops_t object
+ *            ??
+ */
+#define CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
+
+int _read_h5chunk(const H5DSetDescriptor *h5dset,
+		const H5Viewport *h5chunkvp,
+		void *chunk_data_out,
+		void *compressed_chunk_data_buf)
+{
+	int ret;
+	hsize_t chunk_storage_size;
+	uint32_t filters;
+
+	ret = H5Dget_chunk_storage_size(h5dset->dset_id,
+					h5chunkvp->h5off,
+					&chunk_storage_size);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Dget_chunk_storage_size() "
+				    "returned an error");
+		return -1;
+	}
+	if (chunk_storage_size > h5dset->chunk_data_buf_size +
+				 CHUNK_COMPRESSION_OVERHEAD)
+	{
+		PRINT_TO_ERRMSG_BUF("chunk storage size (%llu) bigger "
+				    "than expected (%lu + %d)",
+				    chunk_storage_size,
+				    h5dset->chunk_data_buf_size,
+				    CHUNK_COMPRESSION_OVERHEAD);
+		return -1;
+	}
+	ret = H5Dread_chunk(h5dset->dset_id, H5P_DEFAULT,
+			    h5chunkvp->h5off, &filters,
+			    compressed_chunk_data_buf);
+	if (ret < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Dread_chunk() returned an error");
+		return -1;
+	}
+
+	//printf("filters = %u\n", filters);
+
+	//FIXME: This will error if chunk data is not compressed!
+	//TODO: Decompress only if chunk data is compressed. There should be
+	// a bit in the returned 'filters' that indicates this.
+	return uncompress_chunk_data(compressed_chunk_data_buf,
+				     chunk_storage_size,
+				     chunk_data_out,
+				     h5dset->chunk_data_buf_size);
 }
 
