@@ -127,7 +127,7 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 	set_nblocks(ndim, starts, ans_dim, 0, nblocks);
 
 	/* Allocate 'srcvp_buf'. */
-	if (_alloc_H5Viewport(&srcvp_buf, ndim, 0) < 0)
+	if (_alloc_H5Viewport(&srcvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
 
 	init_srcvp_buf(h5dset, starts, &srcvp_buf);
@@ -335,7 +335,7 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 	set_nblocks(ndim, starts, ans_dim, 0, nblock_buf->elts);
 
 	/* Allocate 'srcvp_buf' and 'destvp_buf'. */
-	if (_alloc_H5Viewport(&srcvp_buf, ndim, 0) < 0)
+	if (_alloc_H5Viewport(&srcvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
 	destvp_buf.h5off = _alloc_hsize_t_buf(ndim, 1, "'destvp_buf.h5off'");
 	destvp_buf.h5dim = srcvp_buf.h5dim;

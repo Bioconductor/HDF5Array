@@ -323,6 +323,36 @@ static inline void load_midx_to_nzindex_buf(int ndim, const H5Viewport *destvp,
 	return;
 }
 
+static int gather_full_chunk_data_as_sparse(
+		const H5DSetDescriptor *h5dset,
+		SEXP starts, const void *in, const H5Viewport *h5chunkvp,
+		IntAE *nzindex_buf, void *nzdata_buf,
+		const H5Viewport *destvp, int *inner_midx_buf)
+{
+	int ndim, inner_moved_along, ret;
+	size_t in_offset;
+
+	ndim = h5dset->ndim;
+	in_offset = 0;
+	/* Walk on **all** the elements in current chunk and load
+	   the non-zero ones into 'nzindex_buf' and 'nzdata_buf'. */
+	while (1) {
+		ret = load_nonzero_val_to_nzdata_buf(h5dset,
+					in, in_offset, nzdata_buf);
+		if (ret < 0)
+			return ret;
+		if (ret > 0)
+			load_midx_to_nzindex_buf(ndim, destvp, inner_midx_buf,
+						 nzindex_buf);
+		inner_moved_along = _next_midx(ndim, destvp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		in_offset++;
+	};
+	return 0;
+}
+
 static int gather_selected_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts, const void *in, const H5Viewport *h5chunkvp,
@@ -333,11 +363,10 @@ static int gather_selected_chunk_data_as_sparse(
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-
-	/* Walk on the selected elements in current chunk and count the
-	   non-zero ones. */
 	init_in_offset(ndim, starts, destvp, h5chunkvp,
 		       h5dset->h5chunkdim, &in_offset);
+	/* Walk on the **selected** elements in current chunk and load
+	   the non-zero ones into 'nzindex_buf' and 'nzdata_buf'. */
 	while (1) {
 		ret = load_nonzero_val_to_nzdata_buf(h5dset,
 					in, in_offset, nzdata_buf);
@@ -364,22 +393,31 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 			SEXP starts,
 			IntAE *nzindex_buf, void *nzdata_buf,
 			int *inner_midx_buf,
-			H5Viewport *h5chunkvp_buf,
+			const H5Viewport *h5chunkvp,
 			const H5Viewport *middlevp,
-			H5Viewport *destvp_buf,
+			const H5Viewport *destvp,
 			void *chunk_data_buf, hid_t chunk_space_id)
 {
-	int ret;
+	int ret, ok;
 
-	ret = _read_H5Viewport(h5dset, h5chunkvp_buf, middlevp,
+	ret = _read_H5Viewport(h5dset, h5chunkvp, middlevp,
 			       chunk_data_buf, chunk_space_id);
 	if (ret < 0)
 		return ret;
-	ret = gather_selected_chunk_data_as_sparse(
+	ok = _tchunk_is_fully_selected(h5dset->ndim, h5chunkvp, destvp);
+	if (ok) {
+		ret = gather_full_chunk_data_as_sparse(
 			h5dset,
-			starts, chunk_data_buf, h5chunkvp_buf,
+			starts, chunk_data_buf, h5chunkvp,
 			nzindex_buf, nzdata_buf,
-			destvp_buf, inner_midx_buf);
+			destvp, inner_midx_buf);
+	} else {
+		ret = gather_selected_chunk_data_as_sparse(
+			h5dset,
+			starts, chunk_data_buf, h5chunkvp,
+			nzindex_buf, nzdata_buf,
+			destvp, inner_midx_buf);
+	}
 	return ret;
 }
 
@@ -416,10 +454,12 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	}
 
 	/* Allocate 'h5chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
-	   We set 'destvp_mode' to 1 because in the context of read_data_8()
-	   we won't use 'destvp_buf.h5off' or 'destvp_buf.h5dim'. */
+	   We set 'destvp_mode' to ALLOC_OFF_AND_DIM because, in the
+	   context of read_data_8(), we won't use 'destvp_buf.h5off' or
+	   'destvp_buf.h5dim', only 'destvp_buf.off' and 'destvp_buf.dim'. */
 	if (_alloc_h5chunkvp_middlevp_destvp_bufs(ndim,
-		&h5chunkvp_buf, &middlevp_buf, &destvp_buf, 1) < 0)
+		&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
+		ALLOC_OFF_AND_DIM) < 0)
 	{
 		H5Sclose(chunk_space_id);
 		return -1;

@@ -26,6 +26,10 @@ typedef struct {
 	int *off, *dim; // same as h5off and h5dim but stored as int
 } H5Viewport;
 
+#define	ALLOC_ALL_FIELDS		0
+#define	ALLOC_H5OFF_AND_H5DIM		1
+#define	ALLOC_OFF_AND_DIM		2
+
 int _alloc_H5Viewport(
 	H5Viewport *vp,
 	int ndim,
@@ -69,6 +73,11 @@ int _map_starts_to_h5chunks(
 	LLongAEAE *tchunkidx_bufs
 );
 
+hid_t _create_mem_space(
+	int ndim,
+	const int *dim
+);
+
 int _select_H5Viewport(
 	hid_t space_id,
 	const H5Viewport *vp
@@ -77,11 +86,6 @@ int _select_H5Viewport(
 int _add_H5Viewport_to_selection(
 	hid_t space_id,
 	const H5Viewport *vp
-);
-
-hid_t _create_mem_space(
-	int ndim,
-	const int *dim
 );
 
 int _read_H5Viewport(

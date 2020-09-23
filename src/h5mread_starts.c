@@ -171,12 +171,11 @@ static int gather_selected_chunk_data(
 	long long int num_elts;
 
 	ndim = h5dset->ndim;
-
-	/* Walk on the selected elements in current chunk. */
 	init_in_offset_and_out_offset(ndim, starts,
 			out_dim, destvp,
 			h5chunkvp, h5dset->h5chunkdim,
 			&in_offset, &out_offset);
+	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
 	while (1) {
 		ret = load_val_to_array(h5dset, in, in_offset, ans, out_offset);
@@ -203,9 +202,9 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 			SEXP starts,
 			SEXP ans, const int *ans_dim,
 			int *inner_midx_buf,
-			H5Viewport *h5chunkvp_buf,
+			const H5Viewport *h5chunkvp,
 			const H5Viewport *middlevp,
-			H5Viewport *destvp_buf,
+			const H5Viewport *destvp,
 			void *chunk_data_buf, hid_t chunk_space_id,
 			void *compressed_chunk_data_buf)
 {
@@ -217,11 +216,11 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 		   in dense format, chunks of 100x100, wrapped in the
 		   TENxBrainData package). That's 60 microseconds per chunk! */
 		ret = _read_H5Viewport(h5dset,
-				h5chunkvp_buf, middlevp,
+				h5chunkvp, middlevp,
 				chunk_data_buf, chunk_space_id);
 	} else {
 		ret = _read_h5chunk(h5dset,
-				h5chunkvp_buf,
+				h5chunkvp,
 				chunk_data_buf,
 				compressed_chunk_data_buf);
 	}
@@ -229,9 +228,9 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 		return ret;
 	ret = gather_selected_chunk_data(
 			h5dset,
-			starts, chunk_data_buf, h5chunkvp_buf,
+			starts, chunk_data_buf, h5chunkvp,
 			ans, ans_dim,
-			destvp_buf, inner_midx_buf);
+			destvp, inner_midx_buf);
 	return ret;
 }
 
@@ -281,10 +280,12 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 	}
 
 	/* Allocate 'h5chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
-	   We set 'destvp_mode' to 1 because in the context of read_data_4_5()
-	   we won't use 'destvp_buf.h5off' or 'destvp_buf.h5dim'. */
+	   We set 'destvp_mode' to ALLOC_OFF_AND_DIM because, in the
+	   context of read_data_4_5(), we won't use 'destvp_buf.h5off' or
+	   'destvp_buf.h5dim', only 'destvp_buf.off' and 'destvp_buf.dim'. */
 	if (_alloc_h5chunkvp_middlevp_destvp_bufs(ndim,
-		&h5chunkvp_buf, &middlevp_buf, &destvp_buf, 1) < 0)
+		&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
+		ALLOC_OFF_AND_DIM) < 0)
 	{
 		H5Sclose(chunk_space_id);
 		return -1;
@@ -493,7 +494,7 @@ static long long int select_elements_from_chunk(
 		     along >= 0;
 		     along--, h5along++)
 		{
-			i = destvp->h5off[h5along] + inner_midx_buf[along];
+			i = destvp->off[along] + inner_midx_buf[along];
 			start = GET_LIST_ELT(starts, along);
 			if (start != R_NilValue) {
 				coord = _get_trusted_elt(start, i) - 1;
@@ -558,12 +559,12 @@ static long long int select_intersection_of_blocks_with_chunk(
 }
 
 static int read_selection(const H5DSetDescriptor *h5dset,
-			  const H5Viewport *destvp_buf,
+			  const H5Viewport *destvp,
 			  void *mem, hid_t mem_space_id)
 {
 	int ret;
 
-	ret = _select_H5Viewport(mem_space_id, destvp_buf);
+	ret = _select_H5Viewport(mem_space_id, destvp);
 	if (ret < 0)
 		return -1;
 	ret = H5Dread(h5dset->dset_id,
@@ -581,9 +582,9 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 			const LLongAEAE *tchunkidx_bufs,
 			void *mem, hid_t mem_space_id,
 			int *inner_midx_buf,
-			H5Viewport *h5chunkvp_buf,
+			const H5Viewport *h5chunkvp,
 			H5Viewport *innervp_buf,
-			H5Viewport *destvp_buf,
+			const H5Viewport *destvp,
 			IntAEAE *inner_breakpoint_bufs,
 			const IntAE *inner_nblock_buf)
 			// hsize_t *coord_buf)
@@ -591,25 +592,25 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 	int ret;
 
 	update_inner_breakpoints(h5dset->ndim, moved_along,
-			starts, destvp_buf,
+			starts, destvp,
 			inner_breakpoint_bufs, inner_nblock_buf->elts);
 	//t0 = clock();
-	/* Having 'inner_nblock_buf->elts' identical to 'destvp_buf->dim'
+	/* Having 'inner_nblock_buf->elts' identical to 'destvp->dim'
 	   means that all the inner blocks are single elements so we use
 	   select_elements_from_chunk() which could be faster than
 	   select_intersection_of_blocks_with_chunk() in that case.
 	   NO IT'S NOT FASTER! */
-	//ret = memcmp(inner_nblock_buf->elts, destvp_buf->dim,
+	//ret = memcmp(inner_nblock_buf->elts, destvp->dim,
 	//	     ndim * sizeof(int));
 	//printf("# chunk %lld: %s\n", tchunk_rank,
 	//       ret == 0 ? "select_elements" : "select_hyperslabs");
 	//if (ret == 0) {
 	//	ret = select_elements_from_chunk(h5dset,
-	//		starts, destvp_buf,
+	//		starts, destvp,
 	//		inner_midx_buf, coord_buf);
 	//} else {
 		ret = select_intersection_of_blocks_with_chunk(
-			h5dset, starts, destvp_buf, h5chunkvp_buf,
+			h5dset, starts, destvp, h5chunkvp,
 			inner_breakpoint_bufs, inner_nblock_buf->elts,
 			inner_midx_buf, innervp_buf);
 	//}
@@ -618,8 +619,7 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 	//t_select_elements += clock() - t0;
 
 	//t0 = clock();
-	ret = read_selection(h5dset, destvp_buf,
-			mem, mem_space_id);
+	ret = read_selection(h5dset, destvp, mem, mem_space_id);
 	//t_read_selection += clock() - t0;
 	return ret;
 }
@@ -735,11 +735,13 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 	}
 
 	/* Allocate 'h5chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
-	   Unlike in read_data_4_5(), here we set 'destvp_mode' to 2 because
-	   in the context of read_data_7() we will use 'destvp_buf.h5off'
-	   and 'destvp_buf.h5dim'. */
+	   Unlike in read_data_4_5(), here we set 'destvp_mode' to
+	   ALLOC_ALL_FIELDS because, in the context of read_data_7(),
+	   we will use 'destvp_buf.h5off' and 'destvp_buf.h5dim', not
+	   just 'destvp_buf.off' and 'destvp_buf.dim'. */
 	if (_alloc_h5chunkvp_middlevp_destvp_bufs(ndim,
-		&h5chunkvp_buf, &middlevp_buf, &destvp_buf, 2) < 0)
+		&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
+		ALLOC_ALL_FIELDS) < 0)
 	{
 		H5Sclose(mem_space_id);
 		H5Sclose(chunk_space_id);

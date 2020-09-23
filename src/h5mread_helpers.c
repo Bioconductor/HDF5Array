@@ -16,15 +16,11 @@
  * Memory management of H5Viewport structs
  */
 
-/* 'mode' controls what fields we should allocate memory for:
-     - mode == 0: 'h5off' and 'h5dim' fields only
-     - mode == 1: 'off' and 'dim' fields only
-     - mode == 2: for all the fields */
 int _alloc_H5Viewport(H5Viewport *vp, int ndim, int mode)
 {
 	vp->h5off = NULL;
 	vp->off = NULL;
-	if (mode != 1) {
+	if (mode != ALLOC_OFF_AND_DIM) {
 		/* Allocate memory for the 'h5off' and 'h5dim' fields. */
 		vp->h5off = _alloc_hsize_t_buf(2 * ndim, 0,
 					       "H5Viewport fields");
@@ -32,11 +28,11 @@ int _alloc_H5Viewport(H5Viewport *vp, int ndim, int mode)
 			return -1;
 		vp->h5dim = vp->h5off + ndim;
 	}
-	if (mode != 0) {
+	if (mode != ALLOC_H5OFF_AND_H5DIM) {
 		/* Allocate memory for the 'off' and 'dim' fields. */
 		vp->off = (int *) malloc(2 * ndim * sizeof(int));
 		if (vp->off == NULL) {
-			if (mode != 1)
+			if (mode != ALLOC_OFF_AND_DIM)
 				free(vp->h5off);
 			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 					    "for H5Viewport fields");
@@ -62,15 +58,15 @@ int _alloc_h5chunkvp_middlevp_destvp_bufs(int ndim,
 		H5Viewport *middlevp_buf,
 		H5Viewport *destvp_buf, int destvp_mode)
 {
-	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, 0) < 0)
+	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
 	middlevp_buf->h5off =
 		_alloc_hsize_t_buf(ndim, 1, "'middlevp_buf->h5off'");
-	middlevp_buf->h5dim = h5chunkvp_buf->h5dim;
 	if (middlevp_buf->h5off == NULL) {
 		_free_H5Viewport(h5chunkvp_buf);
 		return -1;
 	}
+	middlevp_buf->h5dim = h5chunkvp_buf->h5dim;
 	if (_alloc_H5Viewport(destvp_buf, ndim, destvp_mode) < 0) {
 		free(middlevp_buf->h5off);
 		_free_H5Viewport(h5chunkvp_buf);
@@ -97,13 +93,13 @@ int _alloc_h5chunkvp_innervp_destvp_bufs(int ndim,
 		H5Viewport *innervp_buf,
 		H5Viewport *destvp_buf)
 {
-	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, 0) < 0)
+	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
-	if (_alloc_H5Viewport(innervp_buf, ndim, 0) < 0) {
+	if (_alloc_H5Viewport(innervp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0) {
 		_free_H5Viewport(h5chunkvp_buf);
 		return -1;
 	}
-	if (_alloc_H5Viewport(destvp_buf, ndim, 2) < 0) {
+	if (_alloc_H5Viewport(destvp_buf, ndim, ALLOC_ALL_FIELDS) < 0) {
 		_free_H5Viewport(innervp_buf);
 		_free_H5Viewport(h5chunkvp_buf);
 		return -1;
@@ -151,6 +147,25 @@ int _map_starts_to_h5chunks(const H5DSetDescriptor *h5dset,
 				     breakpoint_bufs, tchunkidx_bufs);
 }
 
+hid_t _create_mem_space(int ndim, const int *dim)
+{
+	hsize_t *h5dim;
+	int along, h5along;
+	hid_t mem_space_id;
+
+	/* Allocate and set 'h5dim'. */
+	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
+	if (h5dim == NULL)
+		return -1;
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
+		h5dim[h5along] = dim[along];
+	mem_space_id = H5Screate_simple(ndim, h5dim, NULL);
+	if (mem_space_id < 0)
+		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
+	free(h5dim);
+	return mem_space_id;
+}
+
 int _select_H5Viewport(hid_t space_id, const H5Viewport *vp)
 {
 	int ret;
@@ -175,25 +190,6 @@ int _add_H5Viewport_to_selection(hid_t space_id, const H5Viewport *vp)
 		return -1;
 	}
 	return 0;
-}
-
-hid_t _create_mem_space(int ndim, const int *dim)
-{
-	hsize_t *h5dim;
-	int along, h5along;
-	hid_t mem_space_id;
-
-	/* Allocate and set 'h5dim'. */
-	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
-	if (h5dim == NULL)
-		return -1;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
-		h5dim[h5along] = dim[along];
-	mem_space_id = H5Screate_simple(ndim, h5dim, NULL);
-	if (mem_space_id < 0)
-		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
-	free(h5dim);
-	return mem_space_id;
 }
 
 int _read_H5Viewport(const H5DSetDescriptor *h5dset,
@@ -320,20 +316,15 @@ int _tchunk_is_fully_selected(int ndim,
 		const H5Viewport *h5chunkvp,
 		const H5Viewport *destvp)
 {
-	int ok, along, h5along;
+	int along, h5along, not_fully;
 
-	ok = 1;
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		//printf("h5chunkvp[%d]=%llu destvp[%d]=%llu\n",
-		//       along, h5chunkvp->h5dim[h5along],
-		//       along, destvp->h5dim[h5along]);
-		if (h5chunkvp->h5dim[h5along] != destvp->h5dim[h5along]) {
-			ok = 0;
-			break;
-		}
+		not_fully = h5chunkvp->h5dim[h5along] !=
+			    (hsize_t) destvp->dim[along];
+		if (not_fully)
+			return 0;
 	}
-	//printf("ok=%d\n", ok);
-	return ok;
+	return 1;
 }
 
 
