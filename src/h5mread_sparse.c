@@ -74,7 +74,7 @@ static SEXP make_nzindex_from_buf(const IntAE *nzindex_buf,
 		return R_NilValue;
 	}
 	/* 'nzdata_len' is guaranteed to be <= INT_MAX otherwise the
-	   earlier calls to load_nonzero_val_to_nzdata_buf() (see above)
+	   earlier calls to load_nonzero_val_to_nzdata_buf() (see below)
 	   would have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	in_p = nzindex_buf->elts;
@@ -165,8 +165,8 @@ static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
  */
 
 static void init_in_offset(int ndim, SEXP starts,
-			   const H5Viewport *destvp,
-			   const H5Viewport *h5chunkvp,
+			   const H5Viewport *dest_vp,
+			   const H5Viewport *h5chunk_vp,
 			   const hsize_t *h5chunkdim,
 			   size_t *in_offset)
 {
@@ -177,11 +177,11 @@ static void init_in_offset(int ndim, SEXP starts,
 	in_off = 0;
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
 		in_off *= h5chunkdim[h5along];
-		i = destvp->off[along];
+		i = dest_vp->off[along];
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue)
 			in_off += _get_trusted_elt(start, i) - 1 -
-				  h5chunkvp->h5off[h5along];
+				  h5chunk_vp->h5off[h5along];
 	}
 	*in_offset = in_off;
 	return;
@@ -190,7 +190,7 @@ static void init_in_offset(int ndim, SEXP starts,
 static inline void update_in_offset(int ndim,
 			const int *inner_midx, int inner_moved_along,
 			SEXP starts,
-			const H5Viewport *destvp,
+			const H5Viewport *dest_vp,
 			const hsize_t *h5chunkdim,
 			size_t *in_offset)
 {
@@ -200,7 +200,7 @@ static inline void update_in_offset(int ndim,
 
 	start = GET_LIST_ELT(starts, inner_moved_along);
 	if (start != R_NilValue) {
-		i1 = destvp->off[inner_moved_along] +
+		i1 = dest_vp->off[inner_moved_along] +
 		     inner_midx[inner_moved_along];
 		i0 = i1 - 1;
 		in_off_inc = _get_trusted_elt(start, i1) -
@@ -213,10 +213,10 @@ static inline void update_in_offset(int ndim,
 		h5along = ndim - inner_moved_along;
 		do {
 			in_off_inc *= h5chunkdim[h5along];
-			di = 1 - destvp->dim[along];
+			di = 1 - dest_vp->dim[along];
 			start = GET_LIST_ELT(starts, along);
 			if (start != R_NilValue) {
-				i1 = destvp->off[along];
+				i1 = dest_vp->off[along];
 				i0 = i1 - di;
 				in_off_inc += _get_trusted_elt(start, i1) -
 					      _get_trusted_elt(start, i0);
@@ -244,7 +244,7 @@ static inline int load_nonzero_val_to_nzdata_buf(
 	   rows. However R does not support ordinary matrices or arrays
 	   with dimensions >= INT_MAX yet.
 	   The function that will turn 'nzindex_buf' into an ordinary matrix
-	   is make_nzindex_from_buf(). See below.
+	   is make_nzindex_from_buf(). See above.
 	*/
 	switch (h5dset->Rtype) {
 	    case LGLSXP:
@@ -310,14 +310,15 @@ static inline int load_nonzero_val_to_nzdata_buf(
 	return 1;
 }
 
-static inline void load_midx_to_nzindex_buf(int ndim, const H5Viewport *destvp,
+static inline void load_midx_to_nzindex_buf(int ndim,
+		const H5Viewport *dest_vp,
 		const int *inner_midx_buf,
 		IntAE *nzindex_buf)
 {
 	int along, midx;
 
 	for (along = 0; along < ndim; along++) {
-		midx = destvp->off[along] + inner_midx_buf[along] + 1;
+		midx = dest_vp->off[along] + inner_midx_buf[along] + 1;
 		IntAE_insert_at(nzindex_buf, IntAE_get_nelt(nzindex_buf), midx);
 	}
 	return;
@@ -325,9 +326,9 @@ static inline void load_midx_to_nzindex_buf(int ndim, const H5Viewport *destvp,
 
 static int gather_full_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *h5chunkvp,
+		SEXP starts, const void *in, const H5Viewport *h5chunk_vp,
 		IntAE *nzindex_buf, void *nzdata_buf,
-		const H5Viewport *destvp, int *inner_midx_buf)
+		const H5Viewport *dest_vp, int *inner_midx_buf)
 {
 	int ndim, inner_moved_along, ret;
 	size_t in_offset;
@@ -342,9 +343,9 @@ static int gather_full_chunk_data_as_sparse(
 		if (ret < 0)
 			return ret;
 		if (ret > 0)
-			load_midx_to_nzindex_buf(ndim, destvp, inner_midx_buf,
+			load_midx_to_nzindex_buf(ndim, dest_vp, inner_midx_buf,
 						 nzindex_buf);
-		inner_moved_along = _next_midx(ndim, destvp->dim,
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
@@ -355,15 +356,15 @@ static int gather_full_chunk_data_as_sparse(
 
 static int gather_selected_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *h5chunkvp,
+		SEXP starts, const void *in, const H5Viewport *h5chunk_vp,
 		IntAE *nzindex_buf, void *nzdata_buf,
-		const H5Viewport *destvp, int *inner_midx_buf)
+		const H5Viewport *dest_vp, int *inner_midx_buf)
 {
 	int ndim, inner_moved_along, ret;
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-	init_in_offset(ndim, starts, destvp, h5chunkvp,
+	init_in_offset(ndim, starts, dest_vp, h5chunk_vp,
 		       h5dset->h5chunkdim, &in_offset);
 	/* Walk on the **selected** elements in current chunk and load
 	   the non-zero ones into 'nzindex_buf' and 'nzdata_buf'. */
@@ -373,16 +374,16 @@ static int gather_selected_chunk_data_as_sparse(
 		if (ret < 0)
 			return ret;
 		if (ret > 0)
-			load_midx_to_nzindex_buf(ndim, destvp, inner_midx_buf,
+			load_midx_to_nzindex_buf(ndim, dest_vp, inner_midx_buf,
 						 nzindex_buf);
-		inner_moved_along = _next_midx(ndim, destvp->dim,
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
 		update_in_offset(ndim,
 				 inner_midx_buf, inner_moved_along,
 				 starts,
-				 destvp,
+				 dest_vp,
 				 h5dset->h5chunkdim,
 				 &in_offset);
 	};
@@ -393,30 +394,30 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 			SEXP starts,
 			IntAE *nzindex_buf, void *nzdata_buf,
 			int *inner_midx_buf,
-			const H5Viewport *h5chunkvp,
-			const H5Viewport *middlevp,
-			const H5Viewport *destvp,
+			const H5Viewport *h5chunk_vp,
+			const H5Viewport *middle_vp,
+			const H5Viewport *dest_vp,
 			void *chunk_data_buf, hid_t chunk_space_id)
 {
 	int ret, ok;
 
-	ret = _read_H5Viewport(h5dset, h5chunkvp, middlevp,
+	ret = _read_H5Viewport(h5dset, h5chunk_vp, middle_vp,
 			       chunk_data_buf, chunk_space_id);
 	if (ret < 0)
 		return ret;
-	ok = _tchunk_is_fully_selected(h5dset->ndim, h5chunkvp, destvp);
+	ok = _tchunk_is_fully_selected(h5dset->ndim, h5chunk_vp, dest_vp);
 	if (ok) {
 		ret = gather_full_chunk_data_as_sparse(
 			h5dset,
-			starts, chunk_data_buf, h5chunkvp,
+			starts, chunk_data_buf, h5chunk_vp,
 			nzindex_buf, nzdata_buf,
-			destvp, inner_midx_buf);
+			dest_vp, inner_midx_buf);
 	} else {
 		ret = gather_selected_chunk_data_as_sparse(
 			h5dset,
-			starts, chunk_data_buf, h5chunkvp,
+			starts, chunk_data_buf, h5chunk_vp,
 			nzindex_buf, nzdata_buf,
-			destvp, inner_midx_buf);
+			dest_vp, inner_midx_buf);
 	}
 	return ret;
 }
@@ -425,13 +426,13 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 			 SEXP starts,
 			 const IntAEAE *breakpoint_bufs,
 			 const LLongAEAE *tchunkidx_bufs,
-			 const int *ntchunks,
+			 const int *num_tchunks,
 			 SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
 	void *chunk_data_buf;
-	H5Viewport h5chunkvp_buf, middlevp_buf, destvp_buf;
+	H5Viewport h5chunk_vp, middle_vp, dest_vp;
 	IntAE *tchunk_midx_buf, *inner_midx_buf, *nzindex_buf;
 	void *nzdata_buf;
 	long long int tchunk_rank;
@@ -453,12 +454,12 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		return -1;
 	}
 
-	/* Allocate 'h5chunkvp_buf', 'middlevp_buf', and 'destvp_buf'.
-	   We set 'destvp_mode' to ALLOC_OFF_AND_DIM because, in the
-	   context of read_data_8(), we won't use 'destvp_buf.h5off' or
-	   'destvp_buf.h5dim', only 'destvp_buf.off' and 'destvp_buf.dim'. */
-	if (_alloc_h5chunkvp_middlevp_destvp_bufs(ndim,
-		&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
+	/* Allocate 'h5chunk_vp', 'middle_vp', and 'dest_vp'.
+	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the
+	   context of read_data_8(), we won't use 'dest_vp.h5off' or
+	   'dest_vp.h5dim', only 'dest_vp.off' and 'dest_vp.dim'. */
+	if (_alloc_h5chunk_vp_middle_vp_dest_vp(ndim,
+		&h5chunk_vp, &middle_vp, &dest_vp,
 		ALLOC_OFF_AND_DIM) < 0)
 	{
 		H5Sclose(chunk_space_id);
@@ -467,9 +468,9 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 
 	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
 	if (chunk_data_buf == NULL) {
-		_free_h5chunkvp_middlevp_destvp_bufs(&h5chunkvp_buf,
-						     &middlevp_buf,
-						     &destvp_buf);
+		_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp,
+						   &middle_vp,
+						   &dest_vp);
 		H5Sclose(chunk_space_id);
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 				    "for 'chunk_data_buf'");
@@ -480,25 +481,24 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
-		_update_h5chunkvp_destvp_bufs(h5dset,
+		_update_h5chunk_vp_dest_vp(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			&h5chunkvp_buf, &destvp_buf);
+			&h5chunk_vp, &dest_vp);
 		ret = read_data_from_chunk_8(h5dset,
 			starts,
 			nzindex_buf, nzdata_buf,
 			inner_midx_buf->elts,
-			&h5chunkvp_buf, &middlevp_buf, &destvp_buf,
+			&h5chunk_vp, &middle_vp, &dest_vp,
 			chunk_data_buf, chunk_space_id);
 		if (ret < 0)
 			break;
 		tchunk_rank++;
-		moved_along = _next_midx(ndim, ntchunks, tchunk_midx_buf->elts);
+		moved_along = _next_midx(ndim, num_tchunks,
+					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
-	_free_h5chunkvp_middlevp_destvp_bufs(&h5chunkvp_buf,
-					     &middlevp_buf,
-					     &destvp_buf);
+	_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp, &middle_vp, &dest_vp);
 	H5Sclose(chunk_space_id);
 
 	if (ret < 0)
@@ -526,33 +526,11 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 
 /****************************************************************************
  * _h5mread_sparse()
+ *
+ * Implements method 8.
+ * Return 'list(nzindex, nzdata, NULL)' or R_NilValue if an error occured.
  */
 
-static long long int set_ntchunks(const H5DSetDescriptor *h5dset,
-				  const SEXP starts,
-				  const LLongAEAE *tchunkidx_bufs,
-				  int *ntchunks)
-{
-	int ndim, along, h5along, ntchunk;
-	long long int total_num_tchunks;  /* total nb of touched chunks */
-	SEXP start;
-
-	ndim = h5dset->ndim;
-	total_num_tchunks = 1;
-	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue) {
-			ntchunk = LLongAE_get_nelt(tchunkidx_bufs->elts[along]);
-		} else {
-			ntchunk = h5dset->h5nchunk[h5along];
-		}
-		total_num_tchunks *= ntchunks[along] = ntchunk;
-	}
-	return total_num_tchunks;
-}
-
-/* Implements method 8.
-   Return 'list(nzindex, nzdata, NULL)' or R_NilValue if an error occured. */
 SEXP _h5mread_sparse(const H5DSetDescriptor *h5dset, SEXP starts, int *ans_dim)
 {
 	int ndim, ret;
@@ -573,7 +551,7 @@ SEXP _h5mread_sparse(const H5DSetDescriptor *h5dset, SEXP starts, int *ans_dim)
 		return R_NilValue;
 
 	ntchunk_buf = new_IntAE(ndim, ndim, 0);
-	set_ntchunks(h5dset, starts, tchunkidx_bufs, ntchunk_buf->elts);
+	_set_num_tchunks(h5dset, starts, tchunkidx_bufs, ntchunk_buf->elts);
 
 	ans = PROTECT(NEW_LIST(3));
 	ret = read_data_8(h5dset, starts,

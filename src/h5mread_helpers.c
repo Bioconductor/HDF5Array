@@ -53,69 +53,68 @@ void _free_H5Viewport(H5Viewport *vp)
 }
 
 /* Used in read_data_4_5(), read_data_7(), and read_data_8(). */
-int _alloc_h5chunkvp_middlevp_destvp_bufs(int ndim,
-		H5Viewport *h5chunkvp_buf,
-		H5Viewport *middlevp_buf,
-		H5Viewport *destvp_buf, int destvp_mode)
+int _alloc_h5chunk_vp_middle_vp_dest_vp(int ndim,
+		H5Viewport *h5chunk_vp,
+		H5Viewport *middle_vp,
+		H5Viewport *dest_vp, int dest_vp_mode)
 {
-	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
+	if (_alloc_H5Viewport(h5chunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
-	middlevp_buf->h5off =
-		_alloc_hsize_t_buf(ndim, 1, "'middlevp_buf->h5off'");
-	if (middlevp_buf->h5off == NULL) {
-		_free_H5Viewport(h5chunkvp_buf);
+	middle_vp->h5off = _alloc_hsize_t_buf(ndim, 1, "'middle_vp->h5off'");
+	if (middle_vp->h5off == NULL) {
+		_free_H5Viewport(h5chunk_vp);
 		return -1;
 	}
-	middlevp_buf->h5dim = h5chunkvp_buf->h5dim;
-	if (_alloc_H5Viewport(destvp_buf, ndim, destvp_mode) < 0) {
-		free(middlevp_buf->h5off);
-		_free_H5Viewport(h5chunkvp_buf);
+	middle_vp->h5dim = h5chunk_vp->h5dim;
+	if (_alloc_H5Viewport(dest_vp, ndim, dest_vp_mode) < 0) {
+		free(middle_vp->h5off);
+		_free_H5Viewport(h5chunk_vp);
 		return -1;
 	}
 	return 0;
 }
 
 /* Used in read_data_4_5(), read_data_7(), and read_data_8(). */
-void _free_h5chunkvp_middlevp_destvp_bufs(
-		H5Viewport *h5chunkvp_buf,
-		H5Viewport *middlevp_buf,
-		H5Viewport *destvp_buf)
+void _free_h5chunk_vp_middle_vp_dest_vp(
+		H5Viewport *h5chunk_vp,
+		H5Viewport *middle_vp,
+		H5Viewport *dest_vp)
 {
-	_free_H5Viewport(destvp_buf);
-	free(middlevp_buf->h5off);
-	_free_H5Viewport(h5chunkvp_buf);
+	_free_H5Viewport(dest_vp);
+	free(middle_vp->h5off);
+	_free_H5Viewport(h5chunk_vp);
 	return;
 }
 
 /* Used in read_data_6(). */
-int _alloc_h5chunkvp_innervp_destvp_bufs(int ndim,
-		H5Viewport *h5chunkvp_buf,
-		H5Viewport *innervp_buf,
-		H5Viewport *destvp_buf)
+int _alloc_h5chunk_vp_inner_vp_dest_vp(int ndim,
+		H5Viewport *h5chunk_vp,
+		H5Viewport *inner_vp,
+		H5Viewport *dest_vp)
 {
-	if (_alloc_H5Viewport(h5chunkvp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
+	if (_alloc_H5Viewport(h5chunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
-	if (_alloc_H5Viewport(innervp_buf, ndim, ALLOC_H5OFF_AND_H5DIM) < 0) {
-		_free_H5Viewport(h5chunkvp_buf);
+	if (_alloc_H5Viewport(inner_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0) {
+		_free_H5Viewport(h5chunk_vp);
 		return -1;
 	}
-	if (_alloc_H5Viewport(destvp_buf, ndim, ALLOC_ALL_FIELDS) < 0) {
-		_free_H5Viewport(innervp_buf);
-		_free_H5Viewport(h5chunkvp_buf);
+	if (_alloc_H5Viewport(dest_vp, ndim, ALLOC_ALL_FIELDS) < 0) {
+		_free_H5Viewport(inner_vp);
+		_free_H5Viewport(h5chunk_vp);
 		return -1;
 	}
 	return 0;
 }
 
 /* Used in read_data_6(). */
-void _free_h5chunkvp_innervp_destvp_bufs(
-		H5Viewport *h5chunkvp_buf,
-		H5Viewport *innervp_buf,
-		H5Viewport *destvp_buf)
+void _free_h5chunk_vp_inner_vp_dest_vp(
+		H5Viewport *h5chunk_vp,
+		H5Viewport *inner_vp,
+		H5Viewport *dest_vp)
 {
-	_free_H5Viewport(destvp_buf);
-	_free_H5Viewport(innervp_buf);
-	_free_H5Viewport(h5chunkvp_buf);
+	_free_H5Viewport(dest_vp);
+	_free_H5Viewport(inner_vp);
+	_free_H5Viewport(h5chunk_vp);
 	return;
 }
 
@@ -145,6 +144,29 @@ int _map_starts_to_h5chunks(const H5DSetDescriptor *h5dset,
 				     starts,
 				     nstart_buf,
 				     breakpoint_bufs, tchunkidx_bufs);
+}
+
+long long int _set_num_tchunks(const H5DSetDescriptor *h5dset,
+		const SEXP starts,
+		const LLongAEAE *tchunkidx_bufs,
+		int *num_tchunks_buf)
+{
+	int ndim, along, h5along, n;
+	long long int total_num_tchunks;  /* total nb of touched chunks */
+	SEXP start;
+
+	ndim = h5dset->ndim;
+	total_num_tchunks = 1;
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue) {
+			n = LLongAE_get_nelt(tchunkidx_bufs->elts[along]);
+		} else {
+			n = h5dset->h5nchunk[h5along];
+		}
+		total_num_tchunks *= num_tchunks_buf[along] = n;
+	}
+	return total_num_tchunks;
 }
 
 hid_t _create_mem_space(int ndim, const int *dim)
@@ -193,16 +215,16 @@ int _add_H5Viewport_to_selection(hid_t space_id, const H5Viewport *vp)
 }
 
 int _read_H5Viewport(const H5DSetDescriptor *h5dset,
-		const H5Viewport *dsetvp,
-		const H5Viewport *memvp,
+		const H5Viewport *h5dset_vp,
+		const H5Viewport *mem_vp,
 		void *mem, hid_t mem_space_id)
 {
 	int ret;
 
-	ret = _select_H5Viewport(h5dset->space_id, dsetvp);
+	ret = _select_H5Viewport(h5dset->space_id, h5dset_vp);
 	if (ret < 0)
 		return -1;
-	ret = _select_H5Viewport(mem_space_id, memvp);
+	ret = _select_H5Viewport(mem_space_id, mem_vp);
 	if (ret < 0)
 		return -1;
 	ret = H5Dread(h5dset->dset_id,
@@ -213,10 +235,10 @@ int _read_H5Viewport(const H5DSetDescriptor *h5dset,
 	return ret;
 }
 
-static void update_h5chunkvp_buf(const H5DSetDescriptor *h5dset,
+static void update_h5chunk_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *h5chunkvp_buf)
+		H5Viewport *h5chunk_vp)
 {
 	int ndim, along, h5along, i;
 	SEXP start;
@@ -239,24 +261,24 @@ static void update_h5chunkvp_buf(const H5DSetDescriptor *h5dset,
 		d = h5dset->h5dim[h5along] - off;
 		if (d > chunkd)
 			d = chunkd;
-		h5chunkvp_buf->h5off[h5along] = off;
-		h5chunkvp_buf->h5dim[h5along] = d;
+		h5chunk_vp->h5off[h5along] = off;
+		h5chunk_vp->h5dim[h5along] = d;
 	}
-	//printf("# h5chunkvp_buf->h5off:");
+	//printf("# h5chunk_vp->h5off:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", h5chunkvp_buf->h5off[h5along]);
+	//      printf(" %llu", h5chunk_vp->h5off[h5along]);
 	//printf("\n");
-	//printf("# h5chunkvp_buf->h5dim:");
+	//printf("# h5chunk_vp->h5dim:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", h5chunkvp_buf->h5dim[h5along]);
+	//      printf(" %llu", h5chunk_vp->h5dim[h5along]);
 	//printf("\n");
 	return;
 }
 
-static void update_destvp_buf(const H5DSetDescriptor *h5dset,
+static void update_dest_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const IntAEAE *breakpoint_bufs,
-		const H5Viewport *h5chunkvp, H5Viewport *destvp_buf)
+		const H5Viewport *h5chunk_vp, H5Viewport *dest_vp)
 {
 	int ndim, along, h5along, i, off, d;
 	SEXP start;
@@ -273,54 +295,54 @@ static void update_destvp_buf(const H5DSetDescriptor *h5dset,
 			off = i == 0 ? 0 : breakpoint[i - 1];
 			d = breakpoint[i] - off;
 		} else {
-			off = h5chunkvp->h5off[h5along];
-			d = h5chunkvp->h5dim[h5along];
+			off = h5chunk_vp->h5off[h5along];
+			d = h5chunk_vp->h5dim[h5along];
 		}
-		if (destvp_buf->h5off != NULL) {
-			destvp_buf->h5off[h5along] = off;
-			destvp_buf->h5dim[h5along] = d;
+		if (dest_vp->h5off != NULL) {
+			dest_vp->h5off[h5along] = off;
+			dest_vp->h5dim[h5along] = d;
 		}
-		destvp_buf->off[along] = off;
-		destvp_buf->dim[along] = d;
+		dest_vp->off[along] = off;
+		dest_vp->dim[along] = d;
 	}
-	//printf("# destvp_buf (offsets):");
+	//printf("# dest_vp (offsets):");
 	//for (along = 0; along < ndim; along++)
-	//      printf(" %d", destvp_buf->off[along]);
+	//      printf(" %d", dest_vp->off[along]);
 	//printf("\n");
-	//printf("# destvp_buf (dims):");
+	//printf("# dest_vp (dims):");
 	//for (along = 0; along < ndim; along++)
-	//      printf(" %d", destvp_buf->dim[along]);
+	//      printf(" %d", dest_vp->dim[along]);
 	//printf("\n");
 	return;
 }
 
-void _update_h5chunkvp_destvp_bufs(const H5DSetDescriptor *h5dset,
+void _update_h5chunk_vp_dest_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts,
 		const IntAEAE *breakpoint_bufs,
 		const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *h5chunkvp_buf, H5Viewport *destvp_buf)
+		H5Viewport *h5chunk_vp, H5Viewport *dest_vp)
 {
-	update_h5chunkvp_buf(h5dset,
+	update_h5chunk_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, tchunkidx_bufs,
-			h5chunkvp_buf);
-	update_destvp_buf(h5dset,
+			h5chunk_vp);
+	update_dest_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, breakpoint_bufs,
-			h5chunkvp_buf, destvp_buf);
+			h5chunk_vp, dest_vp);
 	return;
 }
 
 int _tchunk_is_fully_selected(int ndim,
-		const H5Viewport *h5chunkvp,
-		const H5Viewport *destvp)
+		const H5Viewport *h5chunk_vp,
+		const H5Viewport *dest_vp)
 {
 	int along, h5along, not_fully;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		not_fully = h5chunkvp->h5dim[h5along] !=
-			    (hsize_t) destvp->dim[along];
+		not_fully = h5chunk_vp->h5dim[h5along] !=
+			    (hsize_t) dest_vp->dim[along];
 		if (not_fully)
 			return 0;
 	}
@@ -401,7 +423,7 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
 #define CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
 
 int _read_h5chunk(const H5DSetDescriptor *h5dset,
-		const H5Viewport *h5chunkvp,
+		const H5Viewport *h5chunk_vp,
 		void *chunk_data_out,
 		void *compressed_chunk_data_buf)
 {
@@ -410,7 +432,7 @@ int _read_h5chunk(const H5DSetDescriptor *h5dset,
 	uint32_t filters;
 
 	ret = H5Dget_chunk_storage_size(h5dset->dset_id,
-					h5chunkvp->h5off,
+					h5chunk_vp->h5off,
 					&chunk_storage_size);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_chunk_storage_size() "
@@ -428,7 +450,7 @@ int _read_h5chunk(const H5DSetDescriptor *h5dset,
 		return -1;
 	}
 	ret = H5Dread_chunk(h5dset->dset_id, H5P_DEFAULT,
-			    h5chunkvp->h5off, &filters,
+			    h5chunk_vp->h5off, &filters,
 			    compressed_chunk_data_buf);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dread_chunk() returned an error");
