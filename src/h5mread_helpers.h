@@ -38,29 +38,29 @@ int _alloc_H5Viewport(
 
 void _free_H5Viewport(H5Viewport *vp);
 
-int _alloc_h5chunk_vp_middle_vp_dest_vp(
+int _alloc_tchunk_vp_middle_vp_dest_vp(
 	int ndim,
-	H5Viewport *h5chunk_vp,
+	H5Viewport *tchunk_vp,
 	H5Viewport *middle_vp,
 	H5Viewport *dest_vp,
 	int dest_vp_mode
 );
 
-void _free_h5chunk_vp_middle_vp_dest_vp(
-	H5Viewport *h5chunk_vp,
+void _free_tchunk_vp_middle_vp_dest_vp(
+	H5Viewport *tchunk_vp,
 	H5Viewport *middle_vp,
 	H5Viewport *dest_vp
 );
 
-int _alloc_h5chunk_vp_inner_vp_dest_vp(
+int _alloc_tchunk_vp_inner_vp_dest_vp(
 	int ndim,
-	H5Viewport *h5chunk_vp,
+	H5Viewport *tchunk_vp,
 	H5Viewport *inner_vp,
 	H5Viewport *dest_vp
 );
 
-void _free_h5chunk_vp_inner_vp_dest_vp(
-	H5Viewport *h5chunk_vp,
+void _free_tchunk_vp_inner_vp_dest_vp(
+	H5Viewport *tchunk_vp,
 	H5Viewport *inner_vp,
 	H5Viewport *dest_vp
 );
@@ -90,7 +90,7 @@ int _select_H5Viewport(
 	const H5Viewport *vp
 );
 
-int _add_H5Viewport_to_selection(
+int _add_H5Viewport_to_h5selection(
 	hid_t space_id,
 	const H5Viewport *vp
 );
@@ -103,19 +103,31 @@ int _read_H5Viewport(
 	hid_t mem_space_id
 );
 
-void _update_h5chunk_vp_dest_vp(
+int _read_h5selection(
+	const H5DSetDescriptor *h5dset,
+	const H5Viewport *mem_vp,
+	void *mem,
+	hid_t mem_space_id
+);
+
+void _update_tchunk_vp_dest_vp(
 	const H5DSetDescriptor *h5dset,
 	const int *tchunk_midx, int moved_along,
 	SEXP starts,
 	const IntAEAE *breakpoint_bufs,
 	const LLongAEAE *tchunkidx_bufs,
-	H5Viewport *h5chunk_vp,
+	H5Viewport *tchunk_vp,
 	H5Viewport *dest_vp
+);
+
+int _tchunk_is_truncated(
+	const H5DSetDescriptor *h5dset,
+	const H5Viewport *tchunk_vp
 );
 
 int _tchunk_is_fully_selected(
 	int ndim,
-	const H5Viewport *h5chunk_vp,
+	const H5Viewport *tchunk_vp,
 	const H5Viewport *dest_vp
 );
 

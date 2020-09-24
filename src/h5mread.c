@@ -5,7 +5,7 @@
 #include "h5mread.h"
 
 #include "global_errmsg_buf.h"
-#include "array_selection.h"
+#include "uaselection.h"
 #include "H5DSetDescriptor.h"
 #include "h5mread_startscounts.h"
 #include "h5mread_starts.h"
@@ -160,7 +160,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, as_int, 0) < 0)
 		return ans;
 
-	ret = _shallow_check_selection(h5dset.ndim, starts, counts);
+	ret = _shallow_check_uaselection(h5dset.ndim, starts, counts);
 	if (ret < 0)
 		goto on_error;
 

@@ -4,8 +4,18 @@
  ****************************************************************************/
 #include "h5mread_helpers.h"
 
+/*
+Some useful links:
+- Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
+    https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
+- Documentation of H5Dread():
+    https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
+- An H5Dread() example:
+    https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
+*/
+
 #include "global_errmsg_buf.h"
-#include "array_selection.h"
+#include "uaselection.h"
 #include "H5DSetDescriptor.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -53,68 +63,68 @@ void _free_H5Viewport(H5Viewport *vp)
 }
 
 /* Used in read_data_4_5(), read_data_7(), and read_data_8(). */
-int _alloc_h5chunk_vp_middle_vp_dest_vp(int ndim,
-		H5Viewport *h5chunk_vp,
+int _alloc_tchunk_vp_middle_vp_dest_vp(int ndim,
+		H5Viewport *tchunk_vp,
 		H5Viewport *middle_vp,
 		H5Viewport *dest_vp, int dest_vp_mode)
 {
-	if (_alloc_H5Viewport(h5chunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
+	if (_alloc_H5Viewport(tchunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
 	middle_vp->h5off = _alloc_hsize_t_buf(ndim, 1, "'middle_vp->h5off'");
 	if (middle_vp->h5off == NULL) {
-		_free_H5Viewport(h5chunk_vp);
+		_free_H5Viewport(tchunk_vp);
 		return -1;
 	}
-	middle_vp->h5dim = h5chunk_vp->h5dim;
+	middle_vp->h5dim = tchunk_vp->h5dim;
 	if (_alloc_H5Viewport(dest_vp, ndim, dest_vp_mode) < 0) {
 		free(middle_vp->h5off);
-		_free_H5Viewport(h5chunk_vp);
+		_free_H5Viewport(tchunk_vp);
 		return -1;
 	}
 	return 0;
 }
 
 /* Used in read_data_4_5(), read_data_7(), and read_data_8(). */
-void _free_h5chunk_vp_middle_vp_dest_vp(
-		H5Viewport *h5chunk_vp,
+void _free_tchunk_vp_middle_vp_dest_vp(
+		H5Viewport *tchunk_vp,
 		H5Viewport *middle_vp,
 		H5Viewport *dest_vp)
 {
 	_free_H5Viewport(dest_vp);
 	free(middle_vp->h5off);
-	_free_H5Viewport(h5chunk_vp);
+	_free_H5Viewport(tchunk_vp);
 	return;
 }
 
 /* Used in read_data_6(). */
-int _alloc_h5chunk_vp_inner_vp_dest_vp(int ndim,
-		H5Viewport *h5chunk_vp,
+int _alloc_tchunk_vp_inner_vp_dest_vp(int ndim,
+		H5Viewport *tchunk_vp,
 		H5Viewport *inner_vp,
 		H5Viewport *dest_vp)
 {
-	if (_alloc_H5Viewport(h5chunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
+	if (_alloc_H5Viewport(tchunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
 	if (_alloc_H5Viewport(inner_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0) {
-		_free_H5Viewport(h5chunk_vp);
+		_free_H5Viewport(tchunk_vp);
 		return -1;
 	}
 	if (_alloc_H5Viewport(dest_vp, ndim, ALLOC_ALL_FIELDS) < 0) {
 		_free_H5Viewport(inner_vp);
-		_free_H5Viewport(h5chunk_vp);
+		_free_H5Viewport(tchunk_vp);
 		return -1;
 	}
 	return 0;
 }
 
 /* Used in read_data_6(). */
-void _free_h5chunk_vp_inner_vp_dest_vp(
-		H5Viewport *h5chunk_vp,
+void _free_tchunk_vp_inner_vp_dest_vp(
+		H5Viewport *tchunk_vp,
 		H5Viewport *inner_vp,
 		H5Viewport *dest_vp)
 {
 	_free_H5Viewport(dest_vp);
 	_free_H5Viewport(inner_vp);
-	_free_H5Viewport(h5chunk_vp);
+	_free_H5Viewport(tchunk_vp);
 	return;
 }
 
@@ -201,7 +211,7 @@ int _select_H5Viewport(hid_t space_id, const H5Viewport *vp)
 	return 0;
 }
 
-int _add_H5Viewport_to_selection(hid_t space_id, const H5Viewport *vp)
+int _add_H5Viewport_to_h5selection(hid_t space_id, const H5Viewport *vp)
 {
 	int ret;
 
@@ -235,10 +245,33 @@ int _read_H5Viewport(const H5DSetDescriptor *h5dset,
 	return ret;
 }
 
-static void update_h5chunk_vp(const H5DSetDescriptor *h5dset,
+int _read_h5selection(const H5DSetDescriptor *h5dset,
+		const H5Viewport *mem_vp,
+		void *mem, hid_t mem_space_id)
+{
+	int ret;
+
+	if (mem_vp == NULL) {
+		ret = H5Sselect_all(mem_space_id);
+		if (ret < 0)
+		    PRINT_TO_ERRMSG_BUF("H5Sselect_all() returned an error");
+	} else {
+		ret = _select_H5Viewport(mem_space_id, mem_vp);
+	}
+	if (ret < 0)
+		return -1;
+	ret = H5Dread(h5dset->dset_id,
+		      h5dset->mem_type_id, mem_space_id,
+		      h5dset->space_id, H5P_DEFAULT, mem);
+	if (ret < 0)
+		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
+	return ret;
+}
+
+static void update_tchunk_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *h5chunk_vp)
+		H5Viewport *tchunk_vp)
 {
 	int ndim, along, h5along, i;
 	SEXP start;
@@ -261,16 +294,16 @@ static void update_h5chunk_vp(const H5DSetDescriptor *h5dset,
 		d = h5dset->h5dim[h5along] - off;
 		if (d > chunkd)
 			d = chunkd;
-		h5chunk_vp->h5off[h5along] = off;
-		h5chunk_vp->h5dim[h5along] = d;
+		tchunk_vp->h5off[h5along] = off;
+		tchunk_vp->h5dim[h5along] = d;
 	}
-	//printf("# h5chunk_vp->h5off:");
+	//printf("# tchunk_vp->h5off:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", h5chunk_vp->h5off[h5along]);
+	//      printf(" %llu", tchunk_vp->h5off[h5along]);
 	//printf("\n");
-	//printf("# h5chunk_vp->h5dim:");
+	//printf("# tchunk_vp->h5dim:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", h5chunk_vp->h5dim[h5along]);
+	//      printf(" %llu", tchunk_vp->h5dim[h5along]);
 	//printf("\n");
 	return;
 }
@@ -278,7 +311,7 @@ static void update_h5chunk_vp(const H5DSetDescriptor *h5dset,
 static void update_dest_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const IntAEAE *breakpoint_bufs,
-		const H5Viewport *h5chunk_vp, H5Viewport *dest_vp)
+		const H5Viewport *tchunk_vp, H5Viewport *dest_vp)
 {
 	int ndim, along, h5along, i, off, d;
 	SEXP start;
@@ -295,8 +328,8 @@ static void update_dest_vp(const H5DSetDescriptor *h5dset,
 			off = i == 0 ? 0 : breakpoint[i - 1];
 			d = breakpoint[i] - off;
 		} else {
-			off = h5chunk_vp->h5off[h5along];
-			d = h5chunk_vp->h5dim[h5along];
+			off = tchunk_vp->h5off[h5along];
+			d = tchunk_vp->h5dim[h5along];
 		}
 		if (dest_vp->h5off != NULL) {
 			dest_vp->h5off[h5along] = off;
@@ -316,32 +349,51 @@ static void update_dest_vp(const H5DSetDescriptor *h5dset,
 	return;
 }
 
-void _update_h5chunk_vp_dest_vp(const H5DSetDescriptor *h5dset,
+void _update_tchunk_vp_dest_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts,
 		const IntAEAE *breakpoint_bufs,
 		const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *h5chunk_vp, H5Viewport *dest_vp)
+		H5Viewport *tchunk_vp, H5Viewport *dest_vp)
 {
-	update_h5chunk_vp(h5dset,
+	update_tchunk_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, tchunkidx_bufs,
-			h5chunk_vp);
+			tchunk_vp);
 	update_dest_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, breakpoint_bufs,
-			h5chunk_vp, dest_vp);
+			tchunk_vp, dest_vp);
 	return;
 }
 
+/* Return 1 if the chunk that 'tchunk_vp' is pointing at is "truncated"
+   (a.k.a. "partial edge chunk" in HDF5's terminology), and 0 otherwise
+   (i.e. if the new chunk is a full-size chunk). */
+int _tchunk_is_truncated(const H5DSetDescriptor *h5dset,
+			 const H5Viewport *tchunk_vp)
+{
+	int ndim, h5along;
+	hsize_t chunkd, d;
+
+	ndim = h5dset->ndim;
+	for (h5along = 0; h5along < ndim; h5along++) {
+		chunkd = h5dset->h5chunkdim[h5along];
+		d = tchunk_vp->h5dim[h5along];
+		if (d != chunkd)
+			return 1;
+	}
+	return 0;
+}
+
 int _tchunk_is_fully_selected(int ndim,
-		const H5Viewport *h5chunk_vp,
+		const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp)
 {
 	int along, h5along, not_fully;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		not_fully = h5chunk_vp->h5dim[h5along] !=
+		not_fully = tchunk_vp->h5dim[h5along] !=
 			    (hsize_t) dest_vp->dim[along];
 		if (not_fully)
 			return 0;

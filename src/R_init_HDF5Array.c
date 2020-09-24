@@ -1,6 +1,6 @@
 #include <R_ext/Rdynload.h>
 
-#include "array_selection.h"
+#include "uaselection.h"
 #include "H5DSetDescriptor.h"
 #include "h5mread.h"
 #include "h5dimscales.h"
@@ -9,10 +9,10 @@
 
 static const R_CallMethodDef callMethods[] = {
 
-/* array_selection.c */
-	CALLMETHOD_DEF(C_check_selection, 3),
-	CALLMETHOD_DEF(C_check_ordered_selection, 3),
-	CALLMETHOD_DEF(C_reduce_selection, 3),
+/* uaselection.c */
+	CALLMETHOD_DEF(C_check_uaselection, 3),
+	CALLMETHOD_DEF(C_check_ordered_uaselection, 3),
+	CALLMETHOD_DEF(C_reduce_uaselection, 3),
 	CALLMETHOD_DEF(C_map_starts_to_chunks, 3),
 
 /* H5DSetDescriptor.c */

@@ -8,17 +8,17 @@
 ### NOT exported!
 check_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call2("C_check_selection", dim, starts, counts, PACKAGE="HDF5Array")
+    .Call2("C_check_uaselection", dim, starts, counts, PACKAGE="HDF5Array")
 }
 
 ### NOT exported!
 check_ordered_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call2("C_check_ordered_selection", dim, starts, counts,
+    .Call2("C_check_ordered_uaselection", dim, starts, counts,
            PACKAGE="HDF5Array")
 }
 
-### The selection must be strictly ascending along each dimension.
+### The selection to reduce must be strictly ascending along each dimension.
 ### Return NULL if the selection could not be reduced.
 ### Typical usage:
 ###     reduced <- reduce_selection(dim, starts, counts)
@@ -29,7 +29,7 @@ check_ordered_selection <- function(dim, starts=NULL, counts=NULL)
 ### NOT exported!
 reduce_selection <- function(dim, starts=NULL, counts=NULL)
 {
-    .Call2("C_reduce_selection", dim, starts, counts, PACKAGE="HDF5Array")
+    .Call2("C_reduce_uaselection", dim, starts, counts, PACKAGE="HDF5Array")
 }
 
 ### NOT exported!
@@ -40,7 +40,8 @@ map_starts_to_chunks <- function(starts, dim, chunkdim)
 
 ### When both 'starts' and 'counts' are specified, the selection must be
 ### strictly ascending along each dimension.
-### By default the supplied selection is checked and reduced (if it can be).
+### By default the user-supplied selection is checked and reduced (if it
+### can be).
 ### Set 'noreduce' to TRUE to skip the reduction step.
 ### Set 'as.integer' to TRUE to force returning the result as an integer array.
 h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,

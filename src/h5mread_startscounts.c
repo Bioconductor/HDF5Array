@@ -4,18 +4,8 @@
  ****************************************************************************/
 #include "h5mread_startscounts.h"
 
-/*
- * Some useful links:
- * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
- * - Documentation of H5Dread():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
- * - An H5Dread() example:
- *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
- */
-
 #include "global_errmsg_buf.h"
-#include "array_selection.h"
+#include "uaselection.h"
 #include "h5mread_helpers.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -26,36 +16,38 @@
  * Low-level helpers
  */
 
-static size_t set_nblocks(int ndim, SEXP starts,
-			  const int *ans_dim, int expand, int *nblocks)
+static size_t set_nchips(int ndim, SEXP starts,
+			  const int *ans_dim, int expand, int *nchips)
 {
-	size_t total_num_blocks;
-	int along, nblock;
+	size_t total_num_chips;
+	int along, nchip;
 	SEXP start;
 
-	total_num_blocks = 1;
+	total_num_chips = 1;
 	for (along = 0; along < ndim; along++) {
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue) {
-			nblock = LENGTH(start);
+			nchip = LENGTH(start);
 		} else {
-			nblock = expand ? ans_dim[along] : 1;
+			nchip = expand ? ans_dim[along] : 1;
 		}
-		total_num_blocks *= nblocks[along] = nblock;
+		total_num_chips *= nchips[along] = nchip;
 	}
-	return total_num_blocks;
+	return total_num_chips;
 }
 
 
 /****************************************************************************
  * read_data_1_2()
  *
- * A single call to H5Dread().
+ * A single call to _read_h5selection() (wrapper for H5Dread()).
  *
  * More precisely:
- *   - First walk over the blocks described by 'starts' and 'counts' and
- *     add each block to the selection.
- *   - Then make a single call to H5Dread().
+ * - First walk over all the "chips" in the user-supplied array selection
+ *   and add each chip to the h5 selection. (The "chips" in the array
+ *   selection are its connected components i.e. its contiguous block-like
+ *   components. Note that each chip can be represented by a H5Viewport.)
+ * - Then make a single call to _read_h5selection().
  */
 
 static void init_h5dset_vp(const H5DSetDescriptor *h5dset,
@@ -111,7 +103,7 @@ static void update_h5dset_vp(int ndim,
 /* Return nb of hyperslabs (or -1 on error). */
 static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 			SEXP starts, SEXP counts, const int *ans_dim,
-			int *nblocks, int *midx_buf)
+			int *nchips, int *midx_buf)
 {
 	int ret, ndim, moved_along;
 	H5Viewport h5dset_vp;
@@ -124,7 +116,7 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 	}
 
 	ndim = h5dset->ndim;
-	set_nblocks(ndim, starts, ans_dim, 0, nblocks);
+	set_nchips(ndim, starts, ans_dim, 0, nchips);
 
 	/* Allocate 'h5dset_vp'. */
 	if (_alloc_H5Viewport(&h5dset_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
@@ -139,12 +131,12 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 		num_hyperslabs++;
 		update_h5dset_vp(ndim, midx_buf, moved_along,
 				 starts, counts, &h5dset_vp);
-		/* Add to current selection. */
-		ret = _add_H5Viewport_to_selection(h5dset->space_id,
-						   &h5dset_vp);
+		/* Add to current h5 selection. */
+		ret = _add_H5Viewport_to_h5selection(h5dset->space_id,
+						     &h5dset_vp);
 		if (ret < 0)
 			break;
-		moved_along = _next_midx(ndim, nblocks, midx_buf);
+		moved_along = _next_midx(ndim, nchips, midx_buf);
 	} while (moved_along < ndim);
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs);
 
@@ -175,14 +167,14 @@ static inline hsize_t *add_element(int ndim, const int *midx,
 /* Return nb of selected elements (or -1 on error). */
 static long long int select_elements(const H5DSetDescriptor *h5dset,
 			SEXP starts, const int *ans_dim,
-			int *nblocks, int *midx_buf)
+			int *nchips, int *midx_buf)
 {
 	int ndim, outer_moved_along, ret;
 	size_t num_elements;
 	hsize_t *coord_buf, *coord_p;
 
 	ndim = h5dset->ndim;
-	num_elements = set_nblocks(ndim, starts, ans_dim, 1, nblocks);
+	num_elements = set_nchips(ndim, starts, ans_dim, 1, nchips);
 
 	/* Allocate 'coord_buf'. */
 	coord_buf = _alloc_hsize_t_buf(num_elements * ndim, 0, "'coord_buf'");
@@ -194,7 +186,7 @@ static long long int select_elements(const H5DSetDescriptor *h5dset,
 	outer_moved_along = ndim;
 	do {
 		coord_p = add_element(ndim, midx_buf, starts, coord_p);
-		outer_moved_along = _next_midx(ndim, nblocks, midx_buf);
+		outer_moved_along = _next_midx(ndim, nchips, midx_buf);
 	} while (outer_moved_along < ndim);
 
 	ret = H5Sselect_elements(h5dset->space_id, H5S_SELECT_APPEND,
@@ -205,37 +197,37 @@ static long long int select_elements(const H5DSetDescriptor *h5dset,
 	return (long long int) num_elements;
 }
 
-static int set_selection(const H5DSetDescriptor *h5dset, int method,
-			 SEXP starts, SEXP counts, const int *ans_dim)
+static int set_h5selection(const H5DSetDescriptor *h5dset, int method,
+			   SEXP starts, SEXP counts, const int *ans_dim)
 {
 	int ndim;
-	IntAE *nblock_buf, *midx_buf;
-	long long int total_num_blocks;
+	IntAE *nchip_buf, *midx_buf;
+	long long int total_num_chips;
 
 	ndim = h5dset->ndim;
-	nblock_buf = new_IntAE(ndim, ndim, 0);
+	nchip_buf = new_IntAE(ndim, ndim, 0);
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
 	//clock_t t0 = clock();
 	if (method == 1) {
-		total_num_blocks = select_hyperslabs(h5dset,
+		total_num_chips = select_hyperslabs(h5dset,
 					starts, counts, ans_dim,
-					nblock_buf->elts, midx_buf->elts);
+					nchip_buf->elts, midx_buf->elts);
 	} else {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "'method' is set to 2");
 			return -1;
 		}
-		total_num_blocks = select_elements(h5dset,
+		total_num_chips = select_elements(h5dset,
 					starts, ans_dim,
-					nblock_buf->elts, midx_buf->elts);
+					nchip_buf->elts, midx_buf->elts);
 	}
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
-	//printf("time for setting selection: %e\n", dt);
-	//printf("total_num_blocks: %lld, time per block: %e\n",
-	//	total_num_blocks, dt / total_num_blocks);
-	return total_num_blocks < 0 ? -1 : 0;
+	//printf("time for setting h5 selection: %e\n", dt);
+	//printf("total_num_chips: %lld, time per chip: %e\n",
+	//	total_num_chips, dt / total_num_chips);
+	return total_num_chips < 0 ? -1 : 0;
 }
 
 static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
@@ -244,37 +236,21 @@ static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 {
 	int ret;
 
-	ret = set_selection(h5dset, method,
-			    starts, counts, ans_dim);
+	ret = set_h5selection(h5dset, method, starts, counts, ans_dim);
 	if (ret < 0)
 		return -1;
-
-	ret = H5Sselect_all(dest_space_id);
-	if (ret < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Sselect_all() returned an error");
-		return -1;
-	}
-
-	//clock_t t0 = clock();
-	ret = H5Dread(h5dset->dset_id,
-		      h5dset->mem_type_id, dest_space_id,
-		      h5dset->space_id, H5P_DEFAULT, dest);
-	if (ret < 0)
-		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
-	//printf("time for reading data from selection: %e\n",
-	//	(1.0 * clock() - t0) / CLOCKS_PER_SEC);
-	return ret;
+	return _read_h5selection(h5dset, NULL, dest, dest_space_id);
 }
 
 
 /****************************************************************************
  * read_data_3()
  *
- * One call to H5Dread() per block in the selection.
- *
- * More precisely, walk over the blocks described by 'starts' and 'counts'
- * and make one call to H5Dread() per block.
- *
+ * One call to _read_H5Viewport() (wrapper for H5Dread()) per "chip" in the
+ * user-supplied array selection.
+ * (The "chips" in the array selection are its connected components i.e. its
+ * contiguous block-like components. Note that each chip can be represented
+ * by a H5Viewport.)
  */
 
 static int read_hyperslab(const H5DSetDescriptor *h5dset,
@@ -283,7 +259,7 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 		H5Viewport *h5dset_vp, H5Viewport *dest_vp,
 		void *dest, hid_t dest_space_id)
 {
-	int ndim, along, h5along, i, ret;
+	int ndim, along, h5along, i;
 	SEXP start;
 
 	ndim = h5dset->ndim;
@@ -304,19 +280,8 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 		}
 	}
 	update_h5dset_vp(ndim, midx, moved_along, starts, counts, h5dset_vp);
-
-	ret = _select_H5Viewport(h5dset->space_id, h5dset_vp);
-	if (ret < 0)
-		return -1;
-	ret = _select_H5Viewport(dest_space_id, dest_vp);
-	if (ret < 0)
-		return -1;
-	ret = H5Dread(h5dset->dset_id,
-		      h5dset->mem_type_id, dest_space_id,
-		      h5dset->space_id, H5P_DEFAULT, dest);
-	if (ret < 0)
-		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
-	return ret;
+	return _read_H5Viewport(h5dset, h5dset_vp,
+				dest_vp, dest, dest_space_id);
 }
 
 static int read_data_3(const H5DSetDescriptor *h5dset,
@@ -325,14 +290,14 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 {
 	int ndim, moved_along, ret;
 	H5Viewport h5dset_vp, dest_vp;
-	IntAE *nblock_buf, *midx_buf;
+	IntAE *nchip_buf, *midx_buf;
 	long long int num_hyperslabs;
 
 	ndim = h5dset->ndim;
-	nblock_buf = new_IntAE(ndim, ndim, 0);
+	nchip_buf = new_IntAE(ndim, ndim, 0);
 	midx_buf = new_IntAE(ndim, ndim, 0);
 
-	set_nblocks(ndim, starts, ans_dim, 0, nblock_buf->elts);
+	set_nchips(ndim, starts, ans_dim, 0, nchip_buf->elts);
 
 	/* Allocate 'h5dset_vp' and 'dest_vp'. */
 	if (_alloc_H5Viewport(&h5dset_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
@@ -358,7 +323,7 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 				     dest, dest_space_id);
 		if (ret < 0)
 			break;
-		moved_along = _next_midx(ndim, nblock_buf->elts,
+		moved_along = _next_midx(ndim, nchip_buf->elts,
 					 midx_buf->elts);
 	} while (moved_along < ndim);
 
@@ -373,9 +338,9 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
  * _h5mread_startscounts()
  */
 
-static long long int check_selection_against_h5dset(
+static long long int check_uaselection_against_h5dset(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, SEXP counts, int *selection_dim_buf)
+		SEXP starts, SEXP counts, int *uaselection_dim_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -385,15 +350,15 @@ static long long int check_selection_against_h5dset(
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) h5dset->h5dim[h5along];
-	return _check_selection(ndim, dim_buf->elts, starts, counts,
-				selection_dim_buf);
+	return _check_uaselection(ndim, dim_buf->elts, starts, counts,
+				  uaselection_dim_buf);
 }
 
-static long long int check_ordered_selection_against_h5dset(
+static long long int check_ordered_uaselection_against_h5dset(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, SEXP counts, int *selection_dim_buf,
-		int *nstart_buf, int *nblock_buf,
-		long long int *last_block_start_buf)
+		SEXP starts, SEXP counts, int *uaselection_dim_buf,
+		int *nstart_buf, int *nchip_buf,
+		long long int *last_chip_start_buf)
 {
 	int ndim, along, h5along;
 	LLongAE *dim_buf;
@@ -403,10 +368,10 @@ static long long int check_ordered_selection_against_h5dset(
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--)
 		dim_buf->elts[along] =
 			(long long int) h5dset->h5dim[h5along];
-	return _check_ordered_selection(ndim, dim_buf->elts, starts, counts,
-					selection_dim_buf,
-					nstart_buf, nblock_buf,
-					last_block_start_buf);
+	return _check_ordered_uaselection(ndim, dim_buf->elts, starts, counts,
+					  uaselection_dim_buf,
+					  nstart_buf, nchip_buf,
+					  last_chip_start_buf);
 }
 
 /* Implements methods 1 to 3.
@@ -417,8 +382,8 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 {
 	int ndim, ret;
 	long long int ans_len;
-	IntAE *nstart_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
+	IntAE *nstart_buf, *nchip_buf;
+	LLongAE *last_chip_start_buf;
 	SEXP ans, reduced;
 	void *dest;
 	hid_t dest_space_id;
@@ -427,28 +392,29 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 	ndim = h5dset->ndim;
 	if (noreduce || method == 2) {
 		/* This call will populate 'ans_dim'. */
-		ans_len = check_selection_against_h5dset(h5dset,
+		ans_len = check_uaselection_against_h5dset(h5dset,
 					starts, counts, ans_dim);
 		if (ans_len < 0)
 			return R_NilValue;
 	} else {
 		nstart_buf = new_IntAE(ndim, ndim, 0);
-		nblock_buf = new_IntAE(ndim, ndim, 0);
-		last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-		/* This call will populate 'ans_dim', 'nblock_buf',
-		   and 'last_block_start_buf'. */
-		ans_len = check_ordered_selection_against_h5dset(h5dset,
+		nchip_buf = new_IntAE(ndim, ndim, 0);
+		last_chip_start_buf = new_LLongAE(ndim, ndim, 0);
+		/* This call will populate 'ans_dim', 'nchip_buf',
+		   and 'last_chip_start_buf'. */
+		ans_len = check_ordered_uaselection_against_h5dset(h5dset,
 					starts, counts, ans_dim,
-					nstart_buf->elts, nblock_buf->elts,
-					last_block_start_buf->elts);
+					nstart_buf->elts, nchip_buf->elts,
+					last_chip_start_buf->elts);
 		if (ans_len < 0)
 			return R_NilValue;
-		if (_selection_can_be_reduced(ndim, nstart_buf->elts,
-						    nblock_buf->elts)) {
-			reduced = PROTECT(_reduce_selection(
+		if (_uaselection_can_be_reduced(ndim, nstart_buf->elts,
+						nchip_buf->elts))
+		{
+			reduced = PROTECT(_reduce_uaselection(
 						ndim, starts, counts, ans_dim,
-						nblock_buf->elts,
-						last_block_start_buf->elts));
+						nchip_buf->elts,
+						last_chip_start_buf->elts));
 			nprotect++;
 			starts = VECTOR_ELT(reduced, 0);
 			counts = VECTOR_ELT(reduced, 1);

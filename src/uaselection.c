@@ -2,7 +2,7 @@
  *             Manipulation of a user-supplied array selection              *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
-#include "array_selection.h"
+#include "uaselection.h"
 
 #include "global_errmsg_buf.h"
 
@@ -119,13 +119,13 @@ static const long long int *check_dim(SEXP dim)
 
 
 /****************************************************************************
- * Shallow check of an array selection
+ * Shallow check of a user-supplied array selection
  */
 
 /* Only check that each of 'starts' and 'counts' is either NULL or a list
    of length as 'ndim'.
-   Return 0 is the selection is valid and -1 if it's not. */
-int _shallow_check_selection(int ndim, SEXP starts, SEXP counts)
+   Return 0 if the uaselection is valid and -1 if it's not. */
+int _shallow_check_uaselection(int ndim, SEXP starts, SEXP counts)
 {
 	if (starts == R_NilValue) {
 		if (counts != R_NilValue) {
@@ -164,18 +164,19 @@ int _shallow_check_selection(int ndim, SEXP starts, SEXP counts)
 
 
 /****************************************************************************
- * Deep check of an array selection
+ * Deep check of a user-supplied array selection
  */
 
-static void set_error_for_selection_too_large(int along1)
+static void set_error_for_uaselection_too_large(int along1)
 {
 	PRINT_TO_ERRMSG_BUF("too many elements (>= 2^31) selected "
 			    "along dimension %d of array", along1);
 	return;
 }
 
-static void set_errmsg_for_selection_beyond_dim(int along1, int i,
-						int no_counts)
+static void set_errmsg_for_uaselection_beyond_dim(
+		int along1, int i,
+		int no_counts)
 {
 	const char *msg = "selection must be within extent of "
 			  "array, but you\n  have:";
@@ -192,8 +193,9 @@ static void set_errmsg_for_selection_beyond_dim(int along1, int i,
 	return;
 }
 
-static void set_errmsg_for_non_strictly_ascending_selection(int along1, int i,
-							    int no_counts)
+static void set_errmsg_for_non_strictly_ascending_uaselection(
+		int along1, int i,
+		int no_counts)
 {
 	const char *msg = "selection must be strictly ascending "
 			  "along each dimension, but\n  you have:";
@@ -219,17 +221,17 @@ static inline int get_untrusted_start(SEXP start, int i, long long int *s,
 		return -1;
 	}
 	if (*s < min_start) {
-		set_errmsg_for_non_strictly_ascending_selection(
+		set_errmsg_for_non_strictly_ascending_uaselection(
 			along + 1, i, no_counts);
 		return -1;
 	}
 	return 0;
 }
 
-static int check_selection_along(int along,
-				 SEXP start, SEXP count, long long int d)
+static int check_uaselection_along(int along,
+				  SEXP start, SEXP count, long long int d)
 {
-	long long int selection_dim, s, c, e;
+	long long int uaselection_dim, s, c, e;
 	int n, i, ret;
 
 	if (start == R_NilValue) {
@@ -242,17 +244,17 @@ static int check_selection_along(int along,
 		}
 		if (d >= 0) {
 			if (d > INT_MAX) {
-				set_error_for_selection_too_large(along + 1);
+				set_error_for_uaselection_too_large(along + 1);
 				return -1;
 			}
-			selection_dim = d;
+			uaselection_dim = d;
 		} else {
-			/* The dimension of the selection along the current
+			/* The dimension of the uaselection along the current
 			   dimension is undefined in that case.
 			   We **arbitrary** set it to INT_MAX. */
-			selection_dim = INT_MAX;
+			uaselection_dim = INT_MAX;
 		}
-		return (int) selection_dim;
+		return (int) uaselection_dim;
 	}
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
@@ -267,7 +269,7 @@ static int check_selection_along(int along,
 		if (ret < 0)
 			return -1;
 		if (d >= 0 && s > d) {
-			set_errmsg_for_selection_beyond_dim(
+			set_errmsg_for_uaselection_beyond_dim(
 				along + 1, i, 1);
 			return -1;
 		}
@@ -275,7 +277,7 @@ static int check_selection_along(int along,
 	if (count == R_NilValue)
 		return n;
 	/* Walk on the 'count' (and 'start') elements. */
-	selection_dim = 0;
+	uaselection_dim = 0;
 	for (i = 0; i < n; i++) {
 		ret = get_untrusted_elt(count, i, &c, "counts", along);
 		if (ret < 0)
@@ -290,83 +292,87 @@ static int check_selection_along(int along,
 		s = _get_trusted_elt(start, i);
 		e = s + c - 1;      // could overflow! (FIXME)
 		if (d >= 0 && e > d) {
-			set_errmsg_for_selection_beyond_dim(
+			set_errmsg_for_uaselection_beyond_dim(
 				along + 1, i, 0);
 			return -1;
 		}
-		selection_dim += c; // could overflow! (FIXME)
-		if (selection_dim > INT_MAX) {
-			set_error_for_selection_too_large(along + 1);
+		uaselection_dim += c; // could overflow! (FIXME)
+		if (uaselection_dim > INT_MAX) {
+			set_error_for_uaselection_too_large(along + 1);
 			return -1;
 		}
 	}
-	return (int) selection_dim;
+	return (int) uaselection_dim;
 }
 
 /* 'dim' must be NULL or point to an array of 'ndim' elements.
 
    'starts' and 'counts' are **assumed** to be NULL or lists of length 'ndim'.
-   This should have been already checked by _shallow_check_selection() so is
+   This should have been already checked by _shallow_check_uaselection() so is
    not checked again.
 
-   'selection_dim_buf' must point to an array of 'ndim' elements.
+   'uaselection_dim_buf' must point to an array of 'ndim' elements.
 */
-long long int _check_selection(int ndim, const long long int *dim,
-			SEXP starts, SEXP counts, int *selection_dim_buf)
+long long int _check_uaselection(int ndim, const long long int *dim,
+			SEXP starts, SEXP counts, int *uaselection_dim_buf)
 {
-	long long int selection_len;
-	int along, selection_dim;
+	long long int uaselection_len;
+	int along, uaselection_dim;
 	SEXP start, count;
 
-	selection_len = 1;
+	uaselection_len = 1;
 	for (along = 0; along < ndim; along++) {
 		start = GET_LIST_ELT(starts, along);
 		count = GET_LIST_ELT(counts, along);
-		selection_dim = check_selection_along(along,
-						      start, count, dim[along]);
-		if (selection_dim < 0)
+		uaselection_dim = check_uaselection_along(along, start, count,
+							dim[along]);
+		if (uaselection_dim < 0)
 			return -1;
-		selection_dim_buf[along] = selection_dim;
-		selection_len *= selection_dim;
+		uaselection_dim_buf[along] = uaselection_dim;
+		uaselection_len *= uaselection_dim;
 	}
-	return selection_len;
+	return uaselection_len;
 }
 
 /* --- .Call ENTRY POINT ---
- * Return the dimensions of the selection.
+ * Return the dimensions of the user-supplied array selection.
  */
-SEXP C_check_selection(SEXP dim, SEXP starts, SEXP counts)
+SEXP C_check_uaselection(SEXP dim, SEXP starts, SEXP counts)
 {
 	const long long int *dim_p;
 	int ndim, ret;
-	IntAE *selection_dim_buf;
-	long long int selection_len;
+	IntAE *uaselection_dim_buf;
+	long long int uaselection_len;
 
 	dim_p = check_dim(dim);
 	ndim = LENGTH(dim);
-	ret = _shallow_check_selection(ndim, starts, counts);
+	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
 
-	selection_dim_buf = new_IntAE(ndim, ndim, 0);
-	selection_len = _check_selection(ndim, dim_p, starts, counts,
-					 selection_dim_buf->elts);
-	if (selection_len < 0)
+	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
+	uaselection_len = _check_uaselection(ndim, dim_p, starts, counts,
+					     uaselection_dim_buf->elts);
+	if (uaselection_len < 0)
 		error(_HDF5Array_global_errmsg_buf());
-	return new_INTEGER_from_IntAE(selection_dim_buf);
+	return new_INTEGER_from_IntAE(uaselection_dim_buf);
 }
 
 
 /****************************************************************************
- * Deep check of an ordered array selection (in preparation for reduction)
+ * Deep check of an ordered user-supplied array selection (in preparation for
+ * its reduction)
+ *
+ * The "chips" in the user-supplied array selection are its connected
+ * components i.e. its contiguous block-like components.
  */
 
-static int check_ordered_selection_along_NULL_start(int along,
+static int check_ordered_uaselection_along_NULL_start(int along,
 			SEXP count, long long int d,
-			int *nstart_buf, int *nblock_buf,
-			long long int *last_block_start_buf)
+			int *nstart_buf, int *nchip_buf,
+			long long int *last_chip_start_buf)
 {
-	int selection_dim;
+	int uaselection_dim;
 
 	if (count != R_NilValue) {
 		PRINT_TO_ERRMSG_BUF(
@@ -377,43 +383,43 @@ static int check_ordered_selection_along_NULL_start(int along,
 	}
 	if (d >= 0) {
 		if (d > INT_MAX) {
-			set_error_for_selection_too_large(along + 1);
+			set_error_for_uaselection_too_large(along + 1);
 			return -1;
 		}
-		selection_dim = d;
+		uaselection_dim = d;
 		nstart_buf[along] = d;
-		nblock_buf[along] = d != 0;
-		last_block_start_buf[along] = 1;
+		nchip_buf[along] = d != 0;
+		last_chip_start_buf[along] = 1;
 	} else {
-		/* The dimension of the selection along the current
+		/* The dimension of the uaselection along the current
 		   dimension is undefined in that case.
 		   We **arbitrary** set it to INT_MAX. */
-		selection_dim = INT_MAX;
-		nstart_buf[along] = nblock_buf[along] = 1;
-		last_block_start_buf[along] = 1;
+		uaselection_dim = INT_MAX;
+		nstart_buf[along] = nchip_buf[along] = 1;
+		last_chip_start_buf[along] = 1;
 	}
-	return selection_dim;
+	return uaselection_dim;
 }
 
-static int check_ordered_selection_along(int along,
+static int check_ordered_uaselection_along(int along,
 			SEXP start, SEXP count, long long int d,
-			int *nstart_buf, int *nblock_buf,
-			long long int *last_block_start_buf)
+			int *nstart_buf, int *nchip_buf,
+			long long int *last_chip_start_buf)
 {
-	long long int selection_dim, min_start, s, c;
+	long long int uaselection_dim, min_start, s, c;
 	int n, i, ret;
 
 	if (start == R_NilValue)
-		return check_ordered_selection_along_NULL_start(along,
+		return check_ordered_uaselection_along_NULL_start(along,
 				count, d,
-				nstart_buf, nblock_buf, last_block_start_buf);
+				nstart_buf, nchip_buf, last_chip_start_buf);
 	if (check_INTEGER_or_NUMERIC(start, "starts", along) < 0)
 		return -1;
 	n = LENGTH(start);
 	if (shallow_check_count(count, n, along) < 0)
 		return -1;
 	nstart_buf[along] = n;
-	nblock_buf[along] = 0;
+	nchip_buf[along] = 0;
 	min_start = 0;
 	if (count == R_NilValue) {
 		/* Walk on the 'start' elements. */
@@ -423,20 +429,20 @@ static int check_ordered_selection_along(int along,
 			if (ret < 0)
 				return -1;
 			if (s != min_start) {
-				nblock_buf[along]++;
-				last_block_start_buf[along] = s;
+				nchip_buf[along]++;
+				last_chip_start_buf[along] = s;
 			}
 			min_start = s + 1;
 			if (d >= 0 && s > d) {
-				set_errmsg_for_selection_beyond_dim(
+				set_errmsg_for_uaselection_beyond_dim(
 					along + 1, i, 1);
 				return -1;
 			}
 		}
-		selection_dim = n;
+		uaselection_dim = n;
 	} else {
 		/* Walk on the 'start' and 'count' elements. */
-		selection_dim = 0;
+		uaselection_dim = 0;
 		for (i = 0; i < n; i++) {
 			ret = get_untrusted_elt(count, i, &c, "counts", along);
 			if (ret < 0)
@@ -453,102 +459,103 @@ static int check_ordered_selection_along(int along,
 			if (ret < 0)
 				return -1;
 			if (s != min_start) {
-				nblock_buf[along]++;
-				last_block_start_buf[along] = s;
+				nchip_buf[along]++;
+				last_chip_start_buf[along] = s;
 			}
 			min_start = s + c;  // could overflow! (FIXME)
 			if (d >= 0 && min_start - 1 > d) {
-				set_errmsg_for_selection_beyond_dim(
+				set_errmsg_for_uaselection_beyond_dim(
 					along + 1, i, 0);
 				return -1;
 			}
-			selection_dim += c; // could overflow! (FIXME)
-			if (selection_dim > INT_MAX) {
-				set_error_for_selection_too_large(along + 1);
+			uaselection_dim += c; // could overflow! (FIXME)
+			if (uaselection_dim > INT_MAX) {
+				set_error_for_uaselection_too_large(along + 1);
 				return -1;
 			}
 		}
 	}
-	return (int) selection_dim;
+	return (int) uaselection_dim;
 }
 
 /* 'dim' must be NULL or point to an array of 'ndim' elements.
 
    'starts' and 'counts' are **assumed** to be NULL or lists of length 'ndim'.
-   This should have been already checked by _shallow_check_selection() so is
+   This should have been already checked by _shallow_check_uaselection() so is
    not checked again.
 
-   Each of 'selection_dim_buf', 'nstart_buf', 'nblock_buf', and
-   'last_block_start_buf' must point to an array of 'ndim' elements.
+   Each of 'uaselection_dim_buf', 'nstart_buf', 'nchip_buf', and
+   'last_chip_start_buf' must point to an array of 'ndim' elements.
 */
-long long int _check_ordered_selection(int ndim, const long long int *dim,
-			SEXP starts, SEXP counts, int *selection_dim_buf,
-			int *nstart_buf, int *nblock_buf,
-			long long int *last_block_start_buf)
+long long int _check_ordered_uaselection(int ndim, const long long int *dim,
+			SEXP starts, SEXP counts, int *uaselection_dim_buf,
+			int *nstart_buf, int *nchip_buf,
+			long long int *last_chip_start_buf)
 {
-	long long int selection_len;
-	int along, selection_dim;
+	long long int uaselection_len;
+	int along, uaselection_dim;
 	SEXP start, count;
 
-	selection_len = 1;
+	uaselection_len = 1;
 	for (along = 0; along < ndim; along++) {
 		start = GET_LIST_ELT(starts, along);
 		count = GET_LIST_ELT(counts, along);
-		selection_dim = check_ordered_selection_along(along,
+		uaselection_dim = check_ordered_uaselection_along(along,
 					start, count,
 					dim != NULL ? dim[along] : -1,
-					nstart_buf, nblock_buf,
-					last_block_start_buf);
-		if (selection_dim < 0)
+					nstart_buf, nchip_buf,
+					last_chip_start_buf);
+		if (uaselection_dim < 0)
 			return -1;
-		selection_dim_buf[along] = selection_dim;
-		selection_len *= selection_dim;
+		uaselection_dim_buf[along] = uaselection_dim;
+		uaselection_len *= uaselection_dim;
 	}
-	return selection_len;
+	return uaselection_len;
 }
 
 /* --- .Call ENTRY POINT ---
- * Return the dimensions of the selection.
+ * Return the dimensions of the user-supplied array selection.
  */
-SEXP C_check_ordered_selection(SEXP dim, SEXP starts, SEXP counts)
+SEXP C_check_ordered_uaselection(SEXP dim, SEXP starts, SEXP counts)
 {
 	const long long int *dim_p;
 	int ndim, ret;
-	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
-	long long int selection_len;
+	IntAE *uaselection_dim_buf, *nstart_buf, *nchip_buf;
+	LLongAE *last_chip_start_buf;
+	long long int uaselection_len;
 
 	dim_p = check_dim(dim);
 	ndim = LENGTH(dim);
-	ret = _shallow_check_selection(ndim, starts, counts);
+	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
 
-	selection_dim_buf = new_IntAE(ndim, ndim, 0);
+	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
-	selection_len = _check_ordered_selection(ndim, dim_p, starts, counts,
-				selection_dim_buf->elts,
-				nstart_buf->elts, nblock_buf->elts,
-				last_block_start_buf->elts);
-	if (selection_len < 0)
+	nchip_buf = new_IntAE(ndim, ndim, 0);
+	last_chip_start_buf = new_LLongAE(ndim, ndim, 0);
+	uaselection_len = _check_ordered_uaselection(ndim, dim_p,
+				starts, counts,
+				uaselection_dim_buf->elts,
+				nstart_buf->elts, nchip_buf->elts,
+				last_chip_start_buf->elts);
+	if (uaselection_len < 0)
 		error(_HDF5Array_global_errmsg_buf());
-	return new_INTEGER_from_IntAE(selection_dim_buf);
+	return new_INTEGER_from_IntAE(uaselection_dim_buf);
 }
 
 
 /****************************************************************************
- * Reduce the array selection
+ * Reduce the user-supplied array selection
  */
 
-int _selection_can_be_reduced(int ndim, const int *nstart, const int *nblock)
+int _uaselection_can_be_reduced(int ndim, const int *nstart, const int *nchip)
 {
 	int along;
 
 	for (along = 0; along < ndim; along++) {
-		/* nblock[along] should always be <= nstart[along] */
-		if (nblock[along] < nstart[along])
+		/* nchip[along] should always be <= nstart[along] */
+		if (nchip[along] < nstart[along])
 			return 1;
 	}
 	return 0;
@@ -576,8 +583,8 @@ static SEXP dup_or_coerce_to_INTSXP(SEXP x, int dup)
  * to handle start values that are >= 2^31 which this coercion doesn't support
  * at the moment.
  */
-static void stitch_selection(SEXP start_in, SEXP count_in,
-			     SEXP start_out, int *count_out)
+static void stitch_uaselection(SEXP start_in, SEXP count_in,
+			      SEXP start_out, int *count_out)
 {
 	int n, i, j;
 	long long int min_start, s, c;
@@ -616,25 +623,25 @@ static void stitch_selection(SEXP start_in, SEXP count_in,
 	return;
 }
 
-static void reduce_selection_along(int along,
-				   SEXP start, SEXP count,
-				   const int *selection_dim,
-				   const int *nblock,
-				   const long long int *last_block_start,
-				   SEXP reduced_starts, SEXP reduced_counts)
+static void reduce_uaselection_along(int along,
+				    SEXP start, SEXP count,
+				    const int *uaselection_dim,
+				    const int *nchip,
+				    const long long int *last_chip_start,
+				    SEXP reduced_starts, SEXP reduced_counts)
 {
 	int n, dup;
 	SEXP reduced_start, reduced_count;
 	SEXPTYPE type;
 
 	n = LENGTH(start);
-	if (nblock[along] == n) {
+	if (nchip[along] == n) {
 		/* Nothing to stitch. */
-		dup = IS_INTEGER(start) || last_block_start[along] > INT_MAX;
+		dup = IS_INTEGER(start) || last_chip_start[along] > INT_MAX;
 		reduced_start = PROTECT(dup_or_coerce_to_INTSXP(start, dup));
 		SET_VECTOR_ELT(reduced_starts, along, reduced_start);
 		UNPROTECT(1);
-		if (selection_dim[along] == n)
+		if (uaselection_dim[along] == n)
 			return;
 		dup = IS_INTEGER(count);
 		reduced_count = PROTECT(dup_or_coerce_to_INTSXP(count, dup));
@@ -643,21 +650,21 @@ static void reduce_selection_along(int along,
 		return;
 	}
 	/* Stitch. */
-	type = last_block_start[along] <= INT_MAX ? INTSXP : REALSXP;
-	reduced_start = PROTECT(allocVector(type, nblock[along]));
+	type = last_chip_start[along] <= INT_MAX ? INTSXP : REALSXP;
+	reduced_start = PROTECT(allocVector(type, nchip[along]));
 	SET_VECTOR_ELT(reduced_starts, along, reduced_start);
 	UNPROTECT(1);
-	reduced_count = PROTECT(NEW_INTEGER(nblock[along]));
+	reduced_count = PROTECT(NEW_INTEGER(nchip[along]));
 	SET_VECTOR_ELT(reduced_counts, along, reduced_count);
 	UNPROTECT(1);
-	stitch_selection(start, count, reduced_start, INTEGER(reduced_count));
+	stitch_uaselection(start, count, reduced_start, INTEGER(reduced_count));
 	return;
 }
 
-SEXP _reduce_selection(int ndim, SEXP starts, SEXP counts,
-		       const int *selection_dim,
-		       const int *nblock,
-		       const long long int *last_block_start)
+SEXP _reduce_uaselection(int ndim, SEXP starts, SEXP counts,
+			 const int *uaselection_dim,
+			 const int *nchip,
+			 const long long int *last_chip_start)
 {
 	SEXP reduced_starts, reduced_counts, start, count, ans;
 	int along;
@@ -671,11 +678,11 @@ SEXP _reduce_selection(int ndim, SEXP starts, SEXP counts,
 			if (start == R_NilValue)
 				continue;
 			count = GET_LIST_ELT(counts, along);
-			reduce_selection_along(along,
-					       start, count,
-					       selection_dim,
-					       nblock, last_block_start,
-					       reduced_starts, reduced_counts);
+			reduce_uaselection_along(along,
+					start, count,
+					uaselection_dim,
+					nchip, last_chip_start,
+					reduced_starts, reduced_counts);
 		}
 	}
 	ans = PROTECT(NEW_LIST(2));
@@ -688,53 +695,55 @@ SEXP _reduce_selection(int ndim, SEXP starts, SEXP counts,
 
 /* --- .Call ENTRY POINT ---
  * Negative values in 'dim' are treated as infinite dimensions.
- * Return a list of length 2 or NULL if the selection could not be reduced.
+ * Return a list of length 2 or NULL if the user-supplied array selection
+ * could not be reduced.
  * When returning a list of length 2:
  *   - The 1st list element is the list of reduced starts.
  *   - The 2nd list element is the list of reduced counts.
  * The 2 lists have the same length as 'starts'. Also they have the same
  * shape (i.e. same lengths()).
  */
-SEXP C_reduce_selection(SEXP dim, SEXP starts, SEXP counts)
+SEXP C_reduce_uaselection(SEXP dim, SEXP starts, SEXP counts)
 {
 	const long long int *dim_p;
 	int ndim, ret;
-	IntAE *selection_dim_buf, *nstart_buf, *nblock_buf;
-	LLongAE *last_block_start_buf;
-	long long int selection_len;
+	IntAE *uaselection_dim_buf, *nstart_buf, *nchip_buf;
+	LLongAE *last_chip_start_buf;
+	long long int uaselection_len;
 
 	dim_p = check_dim(dim);
 	ndim = LENGTH(dim);
-	ret = _shallow_check_selection(ndim, starts, counts);
+	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
 
-	selection_dim_buf = new_IntAE(ndim, ndim, 0);
+	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
-	nblock_buf = new_IntAE(ndim, ndim, 0);
-	last_block_start_buf = new_LLongAE(ndim, ndim, 0);
+	nchip_buf = new_IntAE(ndim, ndim, 0);
+	last_chip_start_buf = new_LLongAE(ndim, ndim, 0);
 
 	/* 1st pass */
-	selection_len = _check_ordered_selection(ndim, dim_p, starts, counts,
-				selection_dim_buf->elts,
-				nstart_buf->elts, nblock_buf->elts,
-				last_block_start_buf->elts);
-	if (selection_len < 0)
+	uaselection_len = _check_ordered_uaselection(ndim, dim_p,
+				starts, counts,
+				uaselection_dim_buf->elts,
+				nstart_buf->elts, nchip_buf->elts,
+				last_chip_start_buf->elts);
+	if (uaselection_len < 0)
 		error(_HDF5Array_global_errmsg_buf());
-	if (!_selection_can_be_reduced(ndim,
+	if (!_uaselection_can_be_reduced(ndim,
 				       nstart_buf->elts,
-				       nblock_buf->elts))
+				       nchip_buf->elts))
 		return R_NilValue;
 
 	/* 2nd pass */
-	return _reduce_selection(ndim, starts, counts,
-				 selection_dim_buf->elts, nblock_buf->elts,
-				 last_block_start_buf->elts);
+	return _reduce_uaselection(ndim, starts, counts,
+				   uaselection_dim_buf->elts, nchip_buf->elts,
+				   last_chip_start_buf->elts);
 }
 
 
 /****************************************************************************
- * Map array selection to chunks
+ * Map the user-supplied array selection to the physical chunks
  */
 
 static int map_start_to_chunks(int along,
@@ -748,7 +757,7 @@ static int map_start_to_chunks(int along,
 
 	if (start == R_NilValue) {
 		if (d > INT_MAX) {
-			set_error_for_selection_too_large(along + 1);
+			set_error_for_uaselection_too_large(along + 1);
 			return -1;
 		}
 		nstart_buf[along] = d;
@@ -778,7 +787,7 @@ static int map_start_to_chunks(int along,
 	if (ret < 0)
 		return -1;
 	if (s > d) {
-		set_errmsg_for_selection_beyond_dim(along + 1, 0, 1);
+		set_errmsg_for_uaselection_beyond_dim(along + 1, 0, 1);
 		return -1;
 	}
 	tchunkidx = (s - 1) / chunkd;
@@ -791,7 +800,7 @@ static int map_start_to_chunks(int along,
 		if (ret < 0)
 			return -1;
 		if (s > d) {
-			set_errmsg_for_selection_beyond_dim(along + 1, i, 1);
+			set_errmsg_for_uaselection_beyond_dim(along + 1, i, 1);
 			return -1;
 		}
 		prev_tchunkidx = tchunkidx;
@@ -811,7 +820,7 @@ static int map_start_to_chunks(int along,
 /* 'dim', 'chunkdim', and 'nstart_buf' must point to arrays of 'ndim' elements.
 
    'starts' is **assumed** to be NULL or a list of length 'ndim'.
-   This should have been already checked by _shallow_check_selection() so is
+   This should have been already checked by _shallow_check_uaselection() so is
    not checked again.
 
    'breakpoint_bufs' and 'tchunkidx_bufs' must be of length 'ndim'.
@@ -906,7 +915,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 
 	dim_p = check_dim(dim);
 	ndim = LENGTH(dim);
-	ret = _shallow_check_selection(ndim, starts, R_NilValue);
+	ret = _shallow_check_uaselection(ndim, starts, R_NilValue);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
 

@@ -4,18 +4,8 @@
  ****************************************************************************/
 #include "h5mread_starts.h"
 
-/*
- * Some useful links:
- * - Documentation of H5Sselect_hyperslab() and H5Sselect_elements():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5S.html
- * - Documentation of H5Dread():
- *     https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html#Dataset-Read
- * - An H5Dread() example:
- *     https://support.hdfgroup.org/HDF5/doc/Intro/IntroExamples.html#CheckAndReadExample
- */
-
 #include "global_errmsg_buf.h"
-#include "array_selection.h"
+#include "uaselection.h"
 #include "h5mread_helpers.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -26,11 +16,13 @@
 /****************************************************************************
  * read_data_4_5()
  *
- * One call to H5Dread() per chunk touched by the user selection.
+ * One call to _read_H5Viewport() or _read_h5chunk() (wrappers for H5Dread()
+ * or H5Dread_chunk(), respectively) per chunk touched by the user-supplied
+ * array selection.
  *
  * More precisely, walk over the chunks touched by 'starts'. For each chunk:
- *   - Make one call to H5Dread() to load the **entire** chunk data to an
- *     intermediate buffer.
+ *   - Make one call to _read_H5Viewport() or _read_h5chunk() to load the
+ *     **entire** chunk data to an intermediate buffer.
  *   - Copy the user-selected data from the intermediate buffer to 'ans'.
  *
  * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
@@ -39,7 +31,7 @@
 
 static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 			const int *out_dim, const H5Viewport *dest_vp,
-			const H5Viewport *h5chunk_vp,
+			const H5Viewport *tchunk_vp,
 			const hsize_t *h5chunkdim,
 			size_t *in_offset, size_t *out_offset)
 {
@@ -55,7 +47,7 @@ static void init_in_offset_and_out_offset(int ndim, SEXP starts,
 		start = GET_LIST_ELT(starts, along);
 		if (start != R_NilValue)
 			in_off += _get_trusted_elt(start, i) - 1 -
-				  h5chunk_vp->h5off[h5along];
+				  tchunk_vp->h5off[h5along];
 		out_off += i;
 	}
 	*in_offset = in_off;
@@ -162,7 +154,7 @@ static int load_val_to_array(const H5DSetDescriptor *h5dset,
 
 static int gather_selected_chunk_data(
 		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *h5chunk_vp,
+		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
 		SEXP ans, const int *out_dim,
 		const H5Viewport *dest_vp, int *inner_midx_buf)
 {
@@ -173,7 +165,7 @@ static int gather_selected_chunk_data(
 	ndim = h5dset->ndim;
 	init_in_offset_and_out_offset(ndim, starts,
 			out_dim, dest_vp,
-			h5chunk_vp, h5dset->h5chunkdim,
+			tchunk_vp, h5dset->h5chunkdim,
 			&in_offset, &out_offset);
 	/* Walk on the selected elements in current chunk. */
 	num_elts = 0;
@@ -202,7 +194,7 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 			SEXP starts,
 			SEXP ans, const int *ans_dim,
 			int *inner_midx_buf,
-			const H5Viewport *h5chunk_vp,
+			const H5Viewport *tchunk_vp,
 			const H5Viewport *middle_vp,
 			const H5Viewport *dest_vp,
 			void *chunk_data_buf, hid_t chunk_space_id,
@@ -216,11 +208,11 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 		   in dense format, chunks of 100x100, wrapped in the
 		   TENxBrainData package). That's 60 microseconds per chunk! */
 		ret = _read_H5Viewport(h5dset,
-				h5chunk_vp, middle_vp,
+				tchunk_vp, middle_vp,
 				chunk_data_buf, chunk_space_id);
 	} else {
 		ret = _read_h5chunk(h5dset,
-				h5chunk_vp,
+				tchunk_vp,
 				chunk_data_buf,
 				compressed_chunk_data_buf);
 	}
@@ -228,7 +220,7 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 		return ret;
 	ret = gather_selected_chunk_data(
 			h5dset,
-			starts, chunk_data_buf, h5chunk_vp,
+			starts, chunk_data_buf, tchunk_vp,
 			ans, ans_dim,
 			dest_vp, inner_midx_buf);
 	return ret;
@@ -262,7 +254,7 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
 	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
-	H5Viewport h5chunk_vp, middle_vp, dest_vp;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
 	long long int tchunk_rank;
 
@@ -279,12 +271,12 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 		return -1;
 	}
 
-	/* Allocate 'h5chunk_vp', 'middle_vp', and 'dest_vp'.
+	/* Allocate 'tchunk_vp', 'middle_vp', and 'dest_vp'.
 	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the
 	   context of read_data_4_5(), we won't use 'dest_vp.h5off' or
 	   'dest_vp.h5dim', only 'dest_vp.off' and 'dest_vp.dim'. */
-	if (_alloc_h5chunk_vp_middle_vp_dest_vp(ndim,
-		&h5chunk_vp, &middle_vp, &dest_vp,
+	if (_alloc_tchunk_vp_middle_vp_dest_vp(ndim,
+		&tchunk_vp, &middle_vp, &dest_vp,
 		ALLOC_OFF_AND_DIM) < 0)
 	{
 		H5Sclose(chunk_space_id);
@@ -299,7 +291,7 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 					CHUNK_COMPRESSION_OVERHEAD);
 	}
 	if (chunk_data_buf == NULL) {
-		_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp,
+		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
 						   &middle_vp,
 						   &dest_vp);
 		H5Sclose(chunk_space_id);
@@ -311,19 +303,19 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 		compressed_chunk_data_buf = chunk_data_buf +
 					    h5dset->chunk_data_buf_size;
 
-	/* Walk over the chunks touched by the user selection. */
+	/* Walk over the chunks touched by the user-supplied array selection. */
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
-		_update_h5chunk_vp_dest_vp(h5dset,
+		_update_tchunk_vp_dest_vp(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			&h5chunk_vp, &dest_vp);
+			&tchunk_vp, &dest_vp);
 		ret = read_data_from_chunk_4_5(h5dset, method,
 			starts,
 			ans, ans_dim,
 			inner_midx_buf->elts,
-			&h5chunk_vp, &middle_vp, &dest_vp,
+			&tchunk_vp, &middle_vp, &dest_vp,
 			chunk_data_buf, chunk_space_id,
 			compressed_chunk_data_buf);
 		if (ret < 0)
@@ -333,7 +325,7 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
-	_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp, &middle_vp, &dest_vp);
+	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
 	H5Sclose(chunk_space_id);
 	return ret;
 }
@@ -342,41 +334,25 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 /****************************************************************************
  * read_data_6()
  *
- * One call to H5Dread() per chunk touched by the user selection.
- * No intermediate buffer.
+ * One call to _read_h5selection() (wrapper for H5Dread()) per chunk touched
+ * by the user-supplied array selection. No intermediate buffer.
  *
  * More precisely, walk over the chunks touched by 'starts'. For each chunk:
- *   - Select the hyperslabs obtained by intersecting the selection with
- *     the current chunk.
- *   - Call H5Dread(). This loads the selected data **directly** to the
- *     output array.
+ *   - Select the hyperslabs obtained by intersecting the user-supplied
+ *     array selection with the current chunk.
+ *   - Call _read_h5selection(). This loads the selected data **directly**
+ *     to the final destination array (ans).
  *
  * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
  * NULL. This is NOT checked!
  */
 
-/*
-static hsize_t *alloc_coord_buf(int ndim, const hsize_t *h5chunkdim)
-{
-	size_t max_inner_block_per_chunk;
-	int along;
-
-	max_inner_block_per_chunk = 1;
-	for (along = 0; along < ndim; along++)
-		max_inner_block_per_chunk *= (h5chunkdim[along] + 1) / 2;
-	//printf("max_inner_block_per_chunk = %lu\n",
-	//       max_inner_block_per_chunk);
-	return _alloc_hsize_t_buf(max_inner_block_per_chunk * ndim,
-				  "'coord_buf'");
-}
-*/
-
 static void update_inner_breakpoints(int ndim, int moved_along,
 		SEXP starts,
 		const H5Viewport *dest_vp,
-		IntAEAE *inner_breakpoint_bufs, int *inner_nblock_buf)
+		IntAEAE *inner_breakpoint_bufs, int *inner_nchip_buf)
 {
-	int along, d, off, nblock, i;
+	int along, d, off, nchip, i;
 	IntAE *inner_breakpoint_buf;
 	SEXP start;
 	long long int s0, s1;
@@ -390,28 +366,29 @@ static void update_inner_breakpoints(int ndim, int moved_along,
 		start = GET_LIST_ELT(starts, along);
 		if (start == R_NilValue) {
 			IntAE_insert_at(inner_breakpoint_buf, 0, d);
-			inner_nblock_buf[along] = 1;
+			inner_nchip_buf[along] = 1;
 			continue;
 		}
 		off = dest_vp->off[along];
 		s1 = _get_trusted_elt(start, off);
-		nblock = 0;
+		nchip = 0;
 		for (i = 1; i < d; i++) {
 			s0 = s1;
 			s1 = _get_trusted_elt(start, off + i);
 			if (s1 != s0 + 1)
 				IntAE_insert_at(inner_breakpoint_buf,
-						nblock++, i);
+						nchip++, i);
 		}
-		IntAE_insert_at(inner_breakpoint_buf, nblock++, d);
-		inner_nblock_buf[along] = nblock;
+		IntAE_insert_at(inner_breakpoint_buf, nchip++, d);
+		inner_nchip_buf[along] = nchip;
 	}
 	return;
 }
 
 static void init_inner_vp(int ndim,
-			SEXP starts, const H5Viewport *h5chunk_vp,
-			H5Viewport *inner_vp)
+		SEXP starts,
+		const H5Viewport *tchunk_vp,
+		H5Viewport *inner_vp)
 {
 	int along, h5along;
 	SEXP start;
@@ -421,8 +398,8 @@ static void init_inner_vp(int ndim,
 		start = GET_LIST_ELT(starts, along);
 		if (start == R_NilValue) {
 			inner_vp->h5off[h5along] =
-					h5chunk_vp->h5off[h5along];
-			d = h5chunk_vp->h5dim[h5along];
+					tchunk_vp->h5off[h5along];
+			d = tchunk_vp->h5dim[h5along];
 		} else {
 			d = 1;
 		}
@@ -432,10 +409,10 @@ static void init_inner_vp(int ndim,
 }
 
 static void update_inner_vp(int ndim,
-			SEXP starts, const H5Viewport *dest_vp,
-			const int *inner_midx, int inner_moved_along,
-			const IntAEAE *inner_breakpoint_bufs,
-			H5Viewport *inner_vp)
+		SEXP starts, const H5Viewport *dest_vp,
+		const int *inner_midx, int inner_moved_along,
+		const IntAEAE *inner_breakpoint_bufs,
+		H5Viewport *inner_vp)
 {
 	int along, h5along, idx, off, d, i;
 	SEXP start;
@@ -513,12 +490,12 @@ static long long int select_elements_from_chunk(
 }
 
 /* Return nb of hyperslabs (or -1 on error). */
-static long long int select_intersection_of_blocks_with_chunk(
+static long long int select_intersection_of_chips_with_chunk(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts,
-		const H5Viewport *dest_vp, const H5Viewport *h5chunk_vp,
+		const H5Viewport *dest_vp, const H5Viewport *tchunk_vp,
 		const IntAEAE *inner_breakpoint_bufs,
-		const int *inner_nblock,
+		const int *inner_nchip,
 		int *inner_midx_buf,
 		H5Viewport *inner_vp)
 {
@@ -533,44 +510,29 @@ static long long int select_intersection_of_blocks_with_chunk(
 
 	ndim = h5dset->ndim;
 
-	init_inner_vp(ndim, starts, h5chunk_vp, inner_vp);
+	init_inner_vp(ndim, starts, tchunk_vp, inner_vp);
 
-	/* Walk on the block intersections with the currrent chunk. */
+	/* Walk on the "inner chips" i.e. on the intersections between
+	   the "chips" in the user-supplied array selection and the currrent
+	   chunk. */
 	num_hyperslabs = 0;
 	inner_moved_along = ndim;
 	do {
 		num_hyperslabs++;
 		update_inner_vp(ndim, starts, dest_vp,
-				   inner_midx_buf, inner_moved_along,
-				   inner_breakpoint_bufs,
-				   inner_vp);
-		ret = _add_H5Viewport_to_selection(h5dset->space_id,
-						   inner_vp);
+				inner_midx_buf, inner_moved_along,
+				inner_breakpoint_bufs,
+				inner_vp);
+		ret = _add_H5Viewport_to_h5selection(h5dset->space_id,
+						     inner_vp);
 		if (ret < 0)
 			return -1;
-		inner_moved_along = _next_midx(ndim, inner_nblock,
+		inner_moved_along = _next_midx(ndim, inner_nchip,
 					       inner_midx_buf);
 	} while (inner_moved_along < ndim);
-	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(inner_nblock)
+	//printf("nb of hyperslabs = %lld\n", num_hyperslabs); // = prod(inner_nchip)
 
 	return num_hyperslabs;
-}
-
-static int read_selection(const H5DSetDescriptor *h5dset,
-			  const H5Viewport *dest_vp,
-			  void *mem, hid_t mem_space_id)
-{
-	int ret;
-
-	ret = _select_H5Viewport(mem_space_id, dest_vp);
-	if (ret < 0)
-		return -1;
-	ret = H5Dread(h5dset->dset_id,
-		      h5dset->mem_type_id, mem_space_id,
-		      h5dset->space_id, H5P_DEFAULT, mem);
-	if (ret < 0)
-		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
-	return ret;
 }
 
 static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
@@ -578,28 +540,28 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 			SEXP starts,
 			const IntAEAE *breakpoint_bufs,
 			const LLongAEAE *tchunkidx_bufs,
-			void *mem, hid_t mem_space_id,
+			void *dest, hid_t dest_space_id,
 			int *inner_midx_buf,
-			const H5Viewport *h5chunk_vp,
+			const H5Viewport *tchunk_vp,
 			H5Viewport *inner_vp,
 			const H5Viewport *dest_vp,
 			IntAEAE *inner_breakpoint_bufs,
-			const IntAE *inner_nblock_buf)
+			const IntAE *inner_nchip_buf)
 			// hsize_t *coord_buf)
 {
 	int ret;
 
 	update_inner_breakpoints(h5dset->ndim, moved_along,
 			starts, dest_vp,
-			inner_breakpoint_bufs, inner_nblock_buf->elts);
+			inner_breakpoint_bufs, inner_nchip_buf->elts);
 	//t0 = clock();
-	/* Having 'inner_nblock_buf->elts' identical to 'dest_vp->dim'
-	   means that all the inner blocks are single elements so we use
+	/* Having 'inner_nchip_buf->elts' identical to 'dest_vp->dim'
+	   means that all the inner chips are single elements so we use
 	   select_elements_from_chunk() which could be faster than
-	   select_intersection_of_blocks_with_chunk() in that case.
+	   select_intersection_of_chips_with_chunk() in that case.
 	   NO IT'S NOT FASTER! */
-	//ret = memcmp(inner_nblock_buf->elts, dest_vp->dim,
-	//	     ndim * sizeof(int));
+	//ret = memcmp(inner_nchip_buf->elts, dest_vp->dim,
+	//	       ndim * sizeof(int));
 	//printf("# chunk %lld: %s\n", tchunk_rank,
 	//       ret == 0 ? "select_elements" : "select_hyperslabs");
 	//if (ret == 0) {
@@ -607,9 +569,9 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 	//		starts, dest_vp,
 	//		inner_midx_buf, coord_buf);
 	//} else {
-		ret = select_intersection_of_blocks_with_chunk(
-			h5dset, starts, dest_vp, h5chunk_vp,
-			inner_breakpoint_bufs, inner_nblock_buf->elts,
+		ret = select_intersection_of_chips_with_chunk(
+			h5dset, starts, dest_vp, tchunk_vp,
+			inner_breakpoint_bufs, inner_nchip_buf->elts,
 			inner_midx_buf, inner_vp);
 	//}
 	if (ret < 0)
@@ -617,8 +579,8 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 	//t_select_elements += clock() - t0;
 
 	//t0 = clock();
-	ret = read_selection(h5dset, dest_vp, mem, mem_space_id);
-	//t_read_selection += clock() - t0;
+	ret = _read_h5selection(h5dset, dest_vp, dest, dest_space_id);
+	//t_read_h5selection += clock() - t0;
 	return ret;
 }
 
@@ -629,53 +591,53 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
 		       const int *num_tchunks,
 		       SEXP ans, const int *ans_dim)
 {
-	void *mem;
+	void *dest;
 	int ndim, moved_along, ret;
-	hid_t mem_space_id;
-	H5Viewport h5chunk_vp, inner_vp, dest_vp;
+	hid_t dest_space_id;
+	H5Viewport tchunk_vp, inner_vp, dest_vp;
 	//hsize_t *coord_buf;
-	IntAE *tchunk_midx_buf, *inner_nblock_buf, *inner_midx_buf;
+	IntAE *tchunk_midx_buf, *inner_nchip_buf, *inner_midx_buf;
 	IntAEAE *inner_breakpoint_bufs;
 	long long int tchunk_rank;
 
-	mem = DATAPTR(ans);
-	if (mem == NULL)
+	dest = DATAPTR(ans);
+	if (dest == NULL)
 		return -1;
 	ndim = h5dset->ndim;
-	mem_space_id = _create_mem_space(ndim, ans_dim);
-	if (mem_space_id < 0)
+	dest_space_id = _create_mem_space(ndim, ans_dim);
+	if (dest_space_id < 0)
 		return -1;
 
-	/* Allocate 'h5chunk_vp', 'inner_vp', and 'dest_vp'. */
-	if (_alloc_h5chunk_vp_inner_vp_dest_vp(ndim,
-		&h5chunk_vp, &inner_vp, &dest_vp) < 0)
+	/* Allocate 'tchunk_vp', 'inner_vp', and 'dest_vp'. */
+	if (_alloc_tchunk_vp_inner_vp_dest_vp(ndim,
+		&tchunk_vp, &inner_vp, &dest_vp) < 0)
 	{
-		H5Sclose(mem_space_id);
+		H5Sclose(dest_space_id);
 		return -1;
 	}
 
 	/* Prepare buffers. */
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
-	inner_nblock_buf = new_IntAE(ndim, ndim, 0);
+	inner_nchip_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_breakpoint_bufs = new_IntAEAE(ndim, ndim);
 
-	/* Walk over the chunks touched by the user selection. */
+	/* Walk over the chunks touched by the user-supplied array selection. */
 	tchunk_rank = 0;
 	moved_along = ndim;
-	//clock_t t_select_elements = 0, t_read_selection = 0, t0;
+	//clock_t t_select_elements = 0, t_read_h5selection = 0, t0;
 	do {
-		_update_h5chunk_vp_dest_vp(h5dset,
+		_update_tchunk_vp_dest_vp(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			&h5chunk_vp, &dest_vp);
+			&tchunk_vp, &dest_vp);
 		ret = read_data_from_chunk_6(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			mem, mem_space_id,
+			dest, dest_space_id,
 			inner_midx_buf->elts,
-			&h5chunk_vp, &inner_vp, &dest_vp,
-			inner_breakpoint_bufs, inner_nblock_buf);
+			&tchunk_vp, &inner_vp, &dest_vp,
+			inner_breakpoint_bufs, inner_nchip_buf);
 			//coord_buf);
 		if (ret < 0)
 			break;
@@ -684,8 +646,8 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	//free(coord_buf);
-	_free_h5chunk_vp_inner_vp_dest_vp(&h5chunk_vp, &inner_vp, &dest_vp);
-	H5Sclose(mem_space_id);
+	_free_tchunk_vp_inner_vp_dest_vp(&tchunk_vp, &inner_vp, &dest_vp);
+	H5Sclose(dest_space_id);
 	return ret;
 }
 
@@ -708,9 +670,9 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 		       SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ok, ret;
-	hid_t chunk_space_id, mem_space_id;
-	void *mem, *chunk_data_buf;
-	H5Viewport h5chunk_vp, middle_vp, dest_vp;
+	hid_t chunk_space_id, dest_space_id;
+	void *dest, *chunk_data_buf;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
 	long long int tchunk_rank;
 
@@ -720,37 +682,37 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
 		return -1;
 	}
-	mem = DATAPTR(ans);
-	if (mem == NULL) {
+	dest = DATAPTR(ans);
+	if (dest == NULL) {
 		H5Sclose(chunk_space_id);
 		return -1;
 	}
-	mem_space_id = _create_mem_space(ndim, ans_dim);
-	if (mem_space_id < 0) {
+	dest_space_id = _create_mem_space(ndim, ans_dim);
+	if (dest_space_id < 0) {
 		H5Sclose(chunk_space_id);
 		return -1;
 	}
 
-	/* Allocate 'h5chunk_vp', 'middle_vp', and 'dest_vp'.
+	/* Allocate 'tchunk_vp', 'middle_vp', and 'dest_vp'.
 	   Unlike in read_data_4_5(), here we set 'dest_vp_mode' to
 	   ALLOC_ALL_FIELDS because, in the context of read_data_7(),
 	   we will use 'dest_vp.h5off' and 'dest_vp.h5dim', not
 	   just 'dest_vp.off' and 'dest_vp.dim'. */
-	if (_alloc_h5chunk_vp_middle_vp_dest_vp(ndim,
-		&h5chunk_vp, &middle_vp, &dest_vp,
+	if (_alloc_tchunk_vp_middle_vp_dest_vp(ndim,
+		&tchunk_vp, &middle_vp, &dest_vp,
 		ALLOC_ALL_FIELDS) < 0)
 	{
-		H5Sclose(mem_space_id);
+		H5Sclose(dest_space_id);
 		H5Sclose(chunk_space_id);
 		return -1;
 	}
 
 	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
 	if (chunk_data_buf == NULL) {
-		_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp,
+		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
 						   &middle_vp,
 						   &dest_vp);
-		H5Sclose(mem_space_id);
+		H5Sclose(dest_space_id);
 		H5Sclose(chunk_space_id);
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 				    "for 'chunk_data_buf'");
@@ -761,22 +723,22 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
-	/* Walk over the chunks touched by the user selection. */
+	/* Walk over the chunks touched by the user-supplied array selection. */
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
-		_update_h5chunk_vp_dest_vp(h5dset,
+		_update_tchunk_vp_dest_vp(h5dset,
 			tchunk_midx_buf->elts, moved_along,
 			starts, breakpoint_bufs, tchunkidx_bufs,
-			&h5chunk_vp, &dest_vp);
+			&tchunk_vp, &dest_vp);
 		ok = _tchunk_is_fully_selected(h5dset->ndim,
-					       &h5chunk_vp, &dest_vp);
+					       &tchunk_vp, &dest_vp);
 		if (ok) {
 			/* Load the chunk **directly** into 'ans' (no
 			   intermediate buffer). */
 			ret = _read_H5Viewport(h5dset,
-				&h5chunk_vp, &dest_vp,
-				mem, mem_space_id);
+				&tchunk_vp, &dest_vp,
+				dest, dest_space_id);
 		} else {
 			/* Load the **entire** chunk to an intermediate
 			   buffer then copy the user-selected data from
@@ -785,7 +747,7 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 				starts,
 				ans, ans_dim,
 				inner_midx_buf->elts,
-				&h5chunk_vp, &middle_vp, &dest_vp,
+				&tchunk_vp, &middle_vp, &dest_vp,
 				chunk_data_buf, chunk_space_id, NULL);
 		}
 		if (ret < 0)
@@ -795,8 +757,8 @@ static int read_data_7(const H5DSetDescriptor *h5dset,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
 	free(chunk_data_buf);
-	_free_h5chunk_vp_middle_vp_dest_vp(&h5chunk_vp, &middle_vp, &dest_vp);
-	H5Sclose(mem_space_id);
+	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
+	H5Sclose(dest_space_id);
 	H5Sclose(chunk_space_id);
 	return ret;
 }
