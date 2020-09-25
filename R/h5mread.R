@@ -5,39 +5,6 @@
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
-### NOT exported!
-check_selection <- function(dim, starts=NULL, counts=NULL)
-{
-    .Call2("C_check_uaselection", dim, starts, counts, PACKAGE="HDF5Array")
-}
-
-### NOT exported!
-check_ordered_selection <- function(dim, starts=NULL, counts=NULL)
-{
-    .Call2("C_check_ordered_uaselection", dim, starts, counts,
-           PACKAGE="HDF5Array")
-}
-
-### The selection to reduce must be strictly ascending along each dimension.
-### Return NULL if the selection could not be reduced.
-### Typical usage:
-###     reduced <- reduce_selection(dim, starts, counts)
-###     if (!is.null(reduced)) {
-###         starts <- reduced[[1L]]
-###         counts <- reduced[[2L]]
-###     }
-### NOT exported!
-reduce_selection <- function(dim, starts=NULL, counts=NULL)
-{
-    .Call2("C_reduce_uaselection", dim, starts, counts, PACKAGE="HDF5Array")
-}
-
-### NOT exported!
-map_starts_to_chunks <- function(starts, dim, chunkdim)
-{
-    .Call2("C_map_starts_to_chunks", starts, dim, chunkdim, PACKAGE="HDF5Array")
-}
-
 ### When both 'starts' and 'counts' are specified, the selection must be
 ### strictly ascending along each dimension.
 ### By default the user-supplied selection is checked and reduced (if it

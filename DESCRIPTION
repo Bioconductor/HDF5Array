@@ -25,6 +25,7 @@ Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 License: Artistic-2.0
 Collate: utils.R
 	H5DSetDescriptor-class.R
+	uaselection.R
 	h5mread.R
 	h5mread_from_reshaped.R
 	h5dimscales.R

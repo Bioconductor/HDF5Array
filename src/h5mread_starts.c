@@ -439,7 +439,7 @@ static void update_inner_vp(int ndim,
 }
 
 /* Return nb of selected elements (or -1 on error). */
-static long long int select_elements_from_chunk(
+static long long int NOT_USED_select_elements_from_chunk(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts,
 		const H5Viewport *dest_vp,
@@ -556,8 +556,8 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 			inner_breakpoint_bufs, inner_nchip_buf->elts);
 	//t0 = clock();
 	/* Having 'inner_nchip_buf->elts' identical to 'dest_vp->dim'
-	   means that all the inner chips are single elements so we use
-	   select_elements_from_chunk() which could be faster than
+	   means that all the inner chips are single elements so we
+	   use select_elements_from_chunk() which could be faster than
 	   select_intersection_of_chips_with_chunk() in that case.
 	   NO IT'S NOT FASTER! */
 	//ret = memcmp(inner_nchip_buf->elts, dest_vp->dim,
@@ -800,6 +800,8 @@ SEXP _h5mread_starts(const H5DSetDescriptor *h5dset, SEXP starts,
 		ans_len *= ans_dim[along];
 	ans = PROTECT(allocVector(h5dset->Rtype, ans_len));
 
+	/* ans_len != 0 means that the user-supplied array selection
+	   is not empty */
 	if (ans_len != 0) {
 		if (method <= 5) {
 			/* methods 4 and 5 */
