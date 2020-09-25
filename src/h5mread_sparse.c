@@ -15,6 +15,112 @@
 
 
 /****************************************************************************
+ * Fast append an element to an auto-extending buffer
+ */
+
+static inline void IntAE_fast_append(IntAE *ae, int val)
+{
+	/* We don't use IntAE_get_nelt() for maximum speed. */
+	if (ae->_nelt == ae->_buflength)
+		IntAE_extend(ae, increase_buflength(ae->_buflength));
+	ae->elts[ae->_nelt++] = val;
+	return;
+}
+
+static inline void DoubleAE_fast_append(DoubleAE *ae, double val)
+{
+	/* We don't use DoubleAE_get_nelt() for maximum speed. */
+	if (ae->_nelt == ae->_buflength)
+		DoubleAE_extend(ae, increase_buflength(ae->_buflength));
+	ae->elts[ae->_nelt++] = val;
+	return;
+}
+
+static inline void CharAE_fast_append(CharAE *ae, char c)
+{
+	/* We don't use CharAE_get_nelt() for maximum speed. */
+	if (ae->_nelt == ae->_buflength)
+		CharAE_extend(ae, increase_buflength(ae->_buflength));
+	ae->elts[ae->_nelt++] = c;
+	return;
+}
+
+static inline void CharAEAE_fast_append(CharAEAE *aeae, CharAE *ae)
+{
+	/* We don't use CharAEAE_get_nelt() for maximum speed. */
+	if (aeae->_nelt == aeae->_buflength)
+		CharAEAE_extend(aeae, increase_buflength(aeae->_buflength));
+	aeae->elts[aeae->_nelt++] = ae;
+	return;
+}
+
+
+/****************************************************************************
+ * Fast append a non-zero value to an auto-extending buffer
+ *
+ * These helpers functions are used in append_nonzero_val_to_nzdata_buf().
+ * Note that we cap the number of elements in the auto-extending buffers to
+ * INT_MAX. This is because the length of 'nzdata' itself must not exceed
+ * INT_MAX, otherwise 'nzindex' would need to be a matrix with more than
+ * INT_MAX rows which R does not support yet.
+ */
+
+static inline int IntAE_append_if_nonzero(IntAE *ae, int val)
+{
+	if (val == 0)
+		return 0;
+	/* We don't use IntAE_get_nelt() for maximum speed. */
+	if (ae->_nelt >= INT_MAX)
+		return -1;
+	IntAE_fast_append(ae, val);
+	return 1;
+}
+
+static inline int DoubleAE_append_if_nonzero(DoubleAE *ae, double val)
+{
+	if (val == 0.0)
+		return 0;
+	/* We don't use DoubleAE_get_nelt() for maximum speed. */
+	if (ae->_nelt >= INT_MAX)
+		return -1;
+	DoubleAE_fast_append(ae, val);
+	return 1;
+}
+
+static inline int CharAE_append_if_nonzero(CharAE *ae, char c)
+{
+	if (c == 0)
+		return 0;
+	/* We don't use CharAE_get_nelt() for maximum speed. */
+	if (ae->_nelt >= INT_MAX)
+		return -1;
+	CharAE_fast_append(ae, c);
+	return 1;
+}
+
+static inline int CharAEAE_append_if_nonzero(CharAEAE *aeae, const char *s,
+					     size_t n)
+{
+	size_t s_len;
+
+	for (s_len = 0; s_len < n; s_len++)
+		if (s[s_len] == 0)
+			break;
+	if (s_len == 0)
+		return 0;
+	/* We don't use CharAEAE_get_nelt() for maximum speed. */
+	if (aeae->_nelt >= INT_MAX)
+		return -1;
+	CharAE *ae = new_CharAE(s_len);
+	memcpy(ae->elts, s, s_len);
+	/* We don't use CharAE_set_nelt() for maximum speed. */
+	ae->_nelt = s_len;
+	CharAEAE_fast_append(aeae, ae);
+	return 1;
+}
+
+
+/****************************************************************************
  * Manipulation of 'nzdata' and 'nzindex' buffers
  */
 
@@ -272,96 +378,36 @@ static inline int append_nonzero_val_to_nzdata_buf(
 		const int *in, size_t in_offset,
 		void *nzdata_buf)
 {
-	size_t nzdata_len;
+	int ret;
 
-	/* The maximum 'nzdata' length that we support is INT_MAX. This
-	   is because at the end of the read_data_8() call we will need
-	   to turn 'nzindex_bufs' into an ordinary matrix with 'length(nzdata)'
-	   rows. However R does not support ordinary matrices or arrays
-	   with dimensions >= INT_MAX yet.
-	   The function that will turn 'nzindex_bufs' into an ordinary matrix
-	   is make_nzindex_from_bufs(). See above.
-	*/
 	switch (h5dset->Rtype) {
 	    case LGLSXP:
 	    case INTSXP: {
 		int val = ((int *) in)[in_offset];
-		if (val == 0)
-			return 0;
-		IntAE *buf = (IntAE *) nzdata_buf;
-		nzdata_len = IntAE_get_nelt(buf);
-		if (nzdata_len >= INT_MAX) {
-			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
-			return -1;
-		}
-		IntAE_insert_at(buf, nzdata_len, val);
+		ret = IntAE_append_if_nonzero((IntAE *) nzdata_buf, val);
 	    } break;
 	    case REALSXP: {
 		double val = ((double *) in)[in_offset];
-		if (val == 0.0)
-			return 0;
-		DoubleAE *buf = (DoubleAE *) nzdata_buf;
-		nzdata_len = DoubleAE_get_nelt(buf);
-		if (nzdata_len >= INT_MAX) {
-			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
-			return -1;
-		}
-		DoubleAE_insert_at(buf, nzdata_len, val);
+		ret = DoubleAE_append_if_nonzero((DoubleAE *) nzdata_buf, val);
 	    } break;
 	    case STRSXP: {
-		const char *val = ((char *) in) + in_offset * h5dset->H5size;
-		size_t val_len;
-		for (val_len = 0; val_len < h5dset->H5size; val_len++)
-			if (val[val_len] == 0)
-				break;
-		if (val_len == 0)
-			return 0;
-		CharAEAE *buf = (CharAEAE *) nzdata_buf;
-		nzdata_len = CharAEAE_get_nelt(buf);
-		if (nzdata_len >= INT_MAX) {
-			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
-			return -1;
-		}
-		CharAE *buf_elt = new_CharAE(val_len);
-		memcpy(buf_elt->elts, val, val_len);
-		CharAE_set_nelt(buf_elt, val_len);
-		CharAEAE_insert_at(buf, nzdata_len, buf_elt);
+		const char *s = ((char *) in) + in_offset * h5dset->H5size;
+		ret = CharAEAE_append_if_nonzero((CharAEAE *) nzdata_buf, s,
+						 h5dset->H5size);
 	    } break;
 	    case RAWSXP: {
 		char val = ((char *) in)[in_offset];
-		if (val == 0)
-			return 0;
-		CharAE *buf = (CharAE *) nzdata_buf;
-		nzdata_len = CharAE_get_nelt(buf);
-		if (nzdata_len >= INT_MAX) {
-			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
-			return -1;
-		}
-		CharAE_insert_at(buf, nzdata_len, val);
+		ret = CharAE_append_if_nonzero((CharAE *) nzdata_buf, val);
 	    } break;
 	    default:
 		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
 				    CHAR(type2str(h5dset->Rtype)));
 		return -1;
 	}
-	return 1;
+	if (ret < 0)
+		PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
+	return ret;
 }
-
-/*
-static inline void load_midx_to_nzindex_buf(int ndim,
-		const H5Viewport *dest_vp,
-		const int *inner_midx_buf,
-		IntAE *nzindex_buf)
-{
-	int along, midx;
-
-	for (along = 0; along < ndim; along++) {
-		midx = dest_vp->off[along] + inner_midx_buf[along] + 1;
-		IntAE_insert_at(nzindex_buf, IntAE_get_nelt(nzindex_buf), midx);
-	}
-	return;
-}
-*/
 
 static inline void append_array_index_to_nzindex_bufs(
 		const H5Viewport *dest_vp,
@@ -371,11 +417,12 @@ static inline void append_array_index_to_nzindex_bufs(
 	int ndim, along, midx;
 	IntAE *nzindex_buf;
 
-	ndim = IntAEAE_get_nelt(nzindex_bufs);
+	/* We don't use IntAEAE_get_nelt() for maximum speed. */
+	ndim = nzindex_bufs->_nelt;
 	for (along = 0; along < ndim; along++) {
 		nzindex_buf = nzindex_bufs->elts[along];
 		midx = dest_vp->off[along] + inner_midx_buf[along] + 1;
-		IntAE_insert_at(nzindex_buf, IntAE_get_nelt(nzindex_buf), midx);
+		IntAE_fast_append(nzindex_buf, midx);
 	}
 	return;
 }
@@ -401,7 +448,7 @@ static int gather_full_chunk_data_as_sparse(
 		ret = append_nonzero_val_to_nzdata_buf(h5dset,
 					in, in_offset, nzdata_buf);
 		if (ret < 0)
-			return ret;
+			return -1;
 		if (ret > 0)
 			append_array_index_to_nzindex_bufs(dest_vp,
 					inner_midx_buf, nzindex_bufs);
@@ -432,7 +479,7 @@ static int gather_selected_chunk_data_as_sparse(
 		ret = append_nonzero_val_to_nzdata_buf(h5dset,
 					in, in_offset, nzdata_buf);
 		if (ret < 0)
-			return ret;
+			return -1;
 		if (ret > 0)
 			append_array_index_to_nzindex_bufs(dest_vp,
 					inner_midx_buf, nzindex_bufs);
