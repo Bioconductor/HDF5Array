@@ -59,18 +59,19 @@ static inline void CharAEAE_fast_append(CharAEAE *aeae, CharAE *ae)
  * Fast append a non-zero value to an auto-extending buffer
  *
  * These helpers functions are used in append_nonzero_val_to_nzdata_buf().
- * Note that we cap the number of elements in the auto-extending buffers to
- * INT_MAX. This is because the length of 'nzdata' itself must not exceed
- * INT_MAX, otherwise 'nzindex' would need to be a matrix with more than
- * INT_MAX rows which R does not support yet.
+ * Note that we cap both the length of 'nzdata' and the number of rows in
+ * 'nzindex' to INT_MAX. This is to prevent 'nzindex' from growing into a
+ * matrix with more than INT_MAX rows, which R does not support yet.
  */
+
+#define	NZDATA_MAXLENGTH INT_MAX
 
 static inline int IntAE_append_if_nonzero(IntAE *ae, int val)
 {
 	if (val == 0)
 		return 0;
 	/* We don't use IntAE_get_nelt() for maximum speed. */
-	if (ae->_nelt >= INT_MAX)
+	if (ae->_nelt >= NZDATA_MAXLENGTH)
 		return -1;
 	IntAE_fast_append(ae, val);
 	return 1;
@@ -81,7 +82,7 @@ static inline int DoubleAE_append_if_nonzero(DoubleAE *ae, double val)
 	if (val == 0.0)
 		return 0;
 	/* We don't use DoubleAE_get_nelt() for maximum speed. */
-	if (ae->_nelt >= INT_MAX)
+	if (ae->_nelt >= NZDATA_MAXLENGTH)
 		return -1;
 	DoubleAE_fast_append(ae, val);
 	return 1;
@@ -92,7 +93,7 @@ static inline int CharAE_append_if_nonzero(CharAE *ae, char c)
 	if (c == 0)
 		return 0;
 	/* We don't use CharAE_get_nelt() for maximum speed. */
-	if (ae->_nelt >= INT_MAX)
+	if (ae->_nelt >= NZDATA_MAXLENGTH)
 		return -1;
 	CharAE_fast_append(ae, c);
 	return 1;
@@ -109,7 +110,7 @@ static inline int CharAEAE_append_if_nonzero(CharAEAE *aeae, const char *s,
 	if (s_len == 0)
 		return 0;
 	/* We don't use CharAEAE_get_nelt() for maximum speed. */
-	if (aeae->_nelt >= INT_MAX)
+	if (aeae->_nelt >= NZDATA_MAXLENGTH)
 		return -1;
 	CharAE *ae = new_CharAE(s_len);
 	memcpy(ae->elts, s, s_len);
@@ -147,9 +148,9 @@ static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs)
 
 	ndim = IntAEAE_get_nelt(nzindex_bufs);
 	nzindex_nrow = IntAE_get_nelt(nzindex_bufs->elts[0]);
-	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX otherwise the
-	   earlier calls to append_nonzero_val_to_nzdata_buf() (see below)
-	   would have raised an error. */
+	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see NZDATA_MAXLENGTH
+	   above) otherwise earlier calls to append_nonzero_val_to_nzdata_buf()
+	   (see below) would have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzindex_nrow, ndim));
 	out_p = INTEGER(nzindex);
 	for (along = 0; along < ndim; along++) {
@@ -193,9 +194,9 @@ static SEXP NOT_USED_make_nzindex_from_buf(const IntAE *nzindex_buf,
 				    "length(nzindex) != length(nzdata) * ndim");
 		return R_NilValue;
 	}
-	/* 'nzdata_len' is guaranteed to be <= INT_MAX otherwise the
-	   earlier calls to append_nonzero_val_to_nzdata_buf() (see below)
-	   would have raised an error. */
+	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see NZDATA_MAXLENGTH
+	   above) otherwise earlier calls to append_nonzero_val_to_nzdata_buf()
+	   (see below) would have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	in_p = nzindex_buf->elts;
 	for (i = 0; i < nzdata_len; i++) {
@@ -268,9 +269,9 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 	int *out_p, i, buf_nrow, along;
 	const int *in_p;
 
-	/* 'nzdata_len' is guaranteed to be <= INT_MAX otherwise the
-	   earlier calls to append_nonzero_val_to_nzdata_buf() (see below)
-	   would have raised an error. */
+	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see NZDATA_MAXLENGTH
+	   above) otherwise earlier calls to append_nonzero_val_to_nzdata_buf()
+	   (see below) would have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	out_p = INTEGER(nzindex);
 	total_num_tchunks = IntAEAE_get_nelt(nzindex_bufs);
@@ -373,6 +374,10 @@ static inline void update_in_offset(int ndim,
 	return;
 }
 
+/* We don't let the length of 'nzdata' exceed INT_MAX (see NZDATA_MAXLENGTH
+   above). Return 0 if val is zero, 1 if val is non-zero and was successfully
+   appended, and -1 if val is non-zero but couldn't be appended because the
+   length of 'nzdata' is already NZDATA_MAXLENGTH. */
 static inline int append_nonzero_val_to_nzdata_buf(
 		const H5DSetDescriptor *h5dset,
 		const int *in, size_t in_offset,
@@ -434,8 +439,8 @@ static inline void append_array_index_to_nzindex_bufs(
 static int gather_full_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
-		IntAEAE *nzindex_bufs, void *nzdata_buf,
-		const H5Viewport *dest_vp, int *inner_midx_buf)
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
 	int ndim, inner_moved_along, ret;
 	size_t in_offset;
@@ -461,11 +466,42 @@ static int gather_full_chunk_data_as_sparse(
 	return 0;
 }
 
+/* INTSXP is the most common Rtype for sparse data so we give it a special
+   boost. */
+static int gather_full_chunk_int_data_as_sparse(
+		const H5DSetDescriptor *h5dset,
+		SEXP starts, const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, IntAE *nzdata_buf)
+{
+	int ndim, inner_moved_along, ret;
+
+	ndim = h5dset->ndim;
+	/* Walk on **all** the elements in current chunk and append
+	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
+	while (1) {
+		ret = IntAE_append_if_nonzero(nzdata_buf, *in);
+		if (ret < 0) {
+			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
+			return -1;
+		}
+		if (ret > 0)
+			append_array_index_to_nzindex_bufs(dest_vp,
+					inner_midx_buf, nzindex_bufs);
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		in++;
+	};
+	return 0;
+}
+
 static int gather_selected_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
-		IntAEAE *nzindex_bufs, void *nzdata_buf,
-		const H5Viewport *dest_vp, int *inner_midx_buf)
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
 	int ndim, inner_moved_along, ret;
 	size_t in_offset;
@@ -515,17 +551,25 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
 		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
 	if (go_fast) {
-		ret = gather_full_chunk_data_as_sparse(
-			h5dset,
-			starts, chunk_data_buf, tchunk_vp,
-			nzindex_bufs, nzdata_buf,
-			dest_vp, inner_midx_buf);
+		if (h5dset->Rtype == INTSXP || h5dset->Rtype == LGLSXP) {
+			ret = gather_full_chunk_int_data_as_sparse(
+				h5dset,
+				starts, (const int *) chunk_data_buf, tchunk_vp,
+				dest_vp, inner_midx_buf,
+				nzindex_bufs, (IntAE *) nzdata_buf);
+		} else {
+			ret = gather_full_chunk_data_as_sparse(
+				h5dset,
+				starts, chunk_data_buf, tchunk_vp,
+				dest_vp, inner_midx_buf,
+				nzindex_bufs, nzdata_buf);
+		}
 	} else {
 		ret = gather_selected_chunk_data_as_sparse(
 			h5dset,
 			starts, chunk_data_buf, tchunk_vp,
-			nzindex_bufs, nzdata_buf,
-			dest_vp, inner_midx_buf);
+			dest_vp, inner_midx_buf,
+			nzindex_bufs, nzdata_buf);
 	}
 	return ret;
 }
