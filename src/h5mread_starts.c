@@ -191,14 +191,14 @@ static int gather_selected_chunk_data(
 }
 
 static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
-			SEXP starts,
-			SEXP ans, const int *ans_dim,
-			int *inner_midx_buf,
-			const H5Viewport *tchunk_vp,
-			const H5Viewport *middle_vp,
-			const H5Viewport *dest_vp,
-			void *chunk_data_buf, hid_t chunk_space_id,
-			void *compressed_chunk_data_buf)
+		SEXP starts,
+		SEXP ans, const int *ans_dim,
+		int *inner_midx_buf,
+		const H5Viewport *tchunk_vp,
+		const H5Viewport *middle_vp,
+		const H5Viewport *dest_vp,
+		void *chunk_data_buf, hid_t chunk_space_id,
+		void *compressed_chunk_data_buf)
 {
 	int ret;
 
@@ -245,11 +245,11 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
   shuffled.
  */
 static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
-			 SEXP starts,
-			 const IntAEAE *breakpoint_bufs,
-			 const LLongAEAE *tchunkidx_bufs,
-			 const int *num_tchunks,
-			 SEXP ans, const int *ans_dim)
+		SEXP starts,
+		const IntAEAE *breakpoint_bufs,
+		const LLongAEAE *tchunkidx_bufs,
+		const int *num_tchunks,
+		SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
@@ -536,18 +536,18 @@ static long long int select_intersection_of_chips_with_chunk(
 }
 
 static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
-			const int *chunk_midx, int moved_along,
-			SEXP starts,
-			const IntAEAE *breakpoint_bufs,
-			const LLongAEAE *tchunkidx_bufs,
-			void *dest, hid_t dest_space_id,
-			int *inner_midx_buf,
-			const H5Viewport *tchunk_vp,
-			H5Viewport *inner_vp,
-			const H5Viewport *dest_vp,
-			IntAEAE *inner_breakpoint_bufs,
-			const IntAE *inner_nchip_buf)
-			// hsize_t *coord_buf)
+		const int *chunk_midx, int moved_along,
+		SEXP starts,
+		const IntAEAE *breakpoint_bufs,
+		const LLongAEAE *tchunkidx_bufs,
+		void *dest, hid_t dest_space_id,
+		int *inner_midx_buf,
+		const H5Viewport *tchunk_vp,
+		H5Viewport *inner_vp,
+		const H5Viewport *dest_vp,
+		IntAEAE *inner_breakpoint_bufs,
+		const IntAE *inner_nchip_buf)
+		// hsize_t *coord_buf)
 {
 	int ret;
 
@@ -585,11 +585,11 @@ static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
 }
 
 static int read_data_6(const H5DSetDescriptor *h5dset,
-		       SEXP starts,
-		       const IntAEAE *breakpoint_bufs,
-		       const LLongAEAE *tchunkidx_bufs,
-		       const int *num_tchunks,
-		       SEXP ans, const int *ans_dim)
+		SEXP starts,
+		const IntAEAE *breakpoint_bufs,
+		const LLongAEAE *tchunkidx_bufs,
+		const int *num_tchunks,
+		SEXP ans, const int *ans_dim)
 {
 	void *dest;
 	int ndim, moved_along, ret;
@@ -663,11 +663,11 @@ static int read_data_6(const H5DSetDescriptor *h5dset,
  */
 
 static int read_data_7(const H5DSetDescriptor *h5dset,
-		       SEXP starts,
-		       const IntAEAE *breakpoint_bufs,
-		       const LLongAEAE *tchunkidx_bufs,
-		       const int *num_tchunks,
-		       SEXP ans, const int *ans_dim)
+		SEXP starts,
+		const IntAEAE *breakpoint_bufs,
+		const LLongAEAE *tchunkidx_bufs,
+		const int *num_tchunks,
+		SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ok, ret;
 	hid_t chunk_space_id, dest_space_id;

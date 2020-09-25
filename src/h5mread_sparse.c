@@ -77,6 +77,27 @@ static SEXP make_nzindex_from_buf(const IntAE *nzindex_buf,
 	return nzindex;
 }
 
+static int copy_nzdata_and_nzindex_to_ans(const H5DSetDescriptor *h5dset,
+		const void *nzdata_buf, const IntAE *nzindex_buf, SEXP ans)
+{
+	SEXP ans_elt;
+
+	/* Move the data in 'nzdata_buf' to an atomic vector. */
+	ans_elt = PROTECT(make_nzdata_from_buf(nzdata_buf, h5dset->Rtype));
+	SET_VECTOR_ELT(ans, 1, ans_elt);
+	UNPROTECT(1);
+	if (ans_elt == R_NilValue)  /* should never happen */
+		return -1;
+	/* Move the data in 'nzindex_buf' to an ordinary matrix. */
+	ans_elt = PROTECT(make_nzindex_from_buf(nzindex_buf, XLENGTH(ans_elt),
+						h5dset->ndim));
+	SET_VECTOR_ELT(ans, 0, ans_elt);
+	UNPROTECT(1);
+	if (ans_elt == R_NilValue)  /* should never happen */
+		return -1;
+	return 0;
+}
+
 /* 'make_nzdata_from_IntAE_bufs()' and 'make_nzindex_from_bufs()' are not used
    at the moment. Would be used if we were using one nzdata and one nzindex
    buffer per touched chunk (e.g. an IntAEAE of length the total nb of touched
@@ -419,11 +440,11 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 }
 
 static int read_data_8(const H5DSetDescriptor *h5dset,
-			 SEXP starts,
-			 const IntAEAE *breakpoint_bufs,
-			 const LLongAEAE *tchunkidx_bufs,
-			 const int *num_tchunks,
-			 SEXP ans, const int *ans_dim)
+		SEXP starts,
+		const IntAEAE *breakpoint_bufs,
+		const LLongAEAE *tchunkidx_bufs,
+		const int *num_tchunks,
+		SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ret;
 	hid_t chunk_space_id;
@@ -496,27 +517,15 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	free(chunk_data_buf);
 	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
 	H5Sclose(chunk_space_id);
-
 	if (ret < 0)
 		return -1;
 
-	/* Move the data in 'nzdata_buf' to an atomic vector. */
-	SEXP nzdata = PROTECT(make_nzdata_from_buf(nzdata_buf, h5dset->Rtype));
-	SET_VECTOR_ELT(ans, 1, nzdata);
-	UNPROTECT(1);
-	if (nzdata == R_NilValue)
-		return -1;
-
-	/* Move the data in 'nzindex_buf' to an ordinary matrix. */
-	SEXP nzindex = PROTECT(make_nzindex_from_buf(nzindex_buf,
-						     XLENGTH(nzdata),
-						     ndim));
-	SET_VECTOR_ELT(ans, 0, nzindex);
-	UNPROTECT(1);
-	if (nzindex == R_NilValue)
-		return -1;
-
-	return 0;
+	//clock_t t0 = clock();
+	ret = copy_nzdata_and_nzindex_to_ans(h5dset, nzdata_buf, nzindex_buf,
+					     ans);
+	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
+	//printf("copy_nzdata_and_nzindex_to_ans(): %e sec\n", dt);
+	return ret;
 }
 
 

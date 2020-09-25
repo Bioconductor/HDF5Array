@@ -231,8 +231,8 @@ static int set_h5selection(const H5DSetDescriptor *h5dset, int method,
 }
 
 static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
-			 SEXP starts, SEXP counts, const int *ans_dim,
-			 void *dest, hid_t dest_space_id)
+		SEXP starts, SEXP counts, const int *ans_dim,
+		void *dest, hid_t dest_space_id)
 {
 	int ret;
 
@@ -285,8 +285,8 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 }
 
 static int read_data_3(const H5DSetDescriptor *h5dset,
-		       SEXP starts, SEXP counts, const int *ans_dim,
-		       void *dest, hid_t dest_space_id)
+		SEXP starts, SEXP counts, const int *ans_dim,
+		void *dest, hid_t dest_space_id)
 {
 	int ndim, moved_along, ret;
 	H5Viewport h5dset_vp, dest_vp;
