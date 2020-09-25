@@ -292,19 +292,7 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 
 
 /****************************************************************************
- * read_data_8()
- *
- * One call to _read_H5Viewport() (wrapper for H5Dread()) per chunk touched
- * by the user-supplied array selection.
- *
- * More precisely, walk over the chunks touched by 'starts'. For each chunk:
- *   - Make one call to _read_H5Viewport() to load the **entire** chunk data
- *     to an intermediate buffer.
- *   - Gather the non-zero user-selected data found in the chunk into
- *     'nzindex_bufs' and 'nzdata_buf'.
- *
- * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
- * NULL. This is NOT checked!
+ * Helpers used by the data gathering functions
  */
 
 static void init_in_offset(int ndim, SEXP starts,
@@ -432,13 +420,24 @@ static inline void append_array_index_to_nzindex_bufs(
 	return;
 }
 
+
+/****************************************************************************
+ * Data gathering functions
+ */
+
+typedef int (*GatherChunkDataFunType)(
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf);
+
 /* Does NOT work properly on a truncated chunk! Works properly only if the
    chunk data fills the full 'chunk_data_buf', that is, if the current chunk
    is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
    chunk" in HDF5's terminology). */
 static int gather_full_chunk_data_as_sparse(
-		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const void *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
 		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
@@ -466,40 +465,9 @@ static int gather_full_chunk_data_as_sparse(
 	return 0;
 }
 
-/* INTSXP is the most common Rtype for sparse data so we give it a special
-   boost. */
-static int gather_full_chunk_int_data_as_sparse(
-		const H5DSetDescriptor *h5dset,
-		SEXP starts, const int *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
-		IntAEAE *nzindex_bufs, IntAE *nzdata_buf)
-{
-	int ndim, inner_moved_along, ret;
-
-	ndim = h5dset->ndim;
-	/* Walk on **all** the elements in current chunk and append
-	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
-	while (1) {
-		ret = IntAE_append_if_nonzero(nzdata_buf, *in);
-		if (ret < 0) {
-			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
-			return -1;
-		}
-		if (ret > 0)
-			append_array_index_to_nzindex_bufs(dest_vp,
-					inner_midx_buf, nzindex_bufs);
-		inner_moved_along = _next_midx(ndim, dest_vp->dim,
-					       inner_midx_buf);
-		if (inner_moved_along == ndim)
-			break;
-		in++;
-	};
-	return 0;
-}
-
 static int gather_selected_chunk_data_as_sparse(
-		const H5DSetDescriptor *h5dset,
-		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const void *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
 		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
@@ -533,46 +501,168 @@ static int gather_selected_chunk_data_as_sparse(
 	return 0;
 }
 
-static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
-			SEXP starts,
-			int *inner_midx_buf,
-			const H5Viewport *tchunk_vp,
-			const H5Viewport *middle_vp,
-			const H5Viewport *dest_vp,
-			void *chunk_data_buf, hid_t chunk_space_id,
-			IntAEAE *nzindex_bufs, void *nzdata_buf)
+static int gather_chunk_data_as_sparse(
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
-	int ret, go_fast;
+	int go_fast, ret;
 
-	ret = _read_H5Viewport(h5dset, tchunk_vp, middle_vp,
-			       chunk_data_buf, chunk_space_id);
-	if (ret < 0)
-		return ret;
 	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
 		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
 	if (go_fast) {
-		if (h5dset->Rtype == INTSXP || h5dset->Rtype == LGLSXP) {
-			ret = gather_full_chunk_int_data_as_sparse(
-				h5dset,
-				starts, (const int *) chunk_data_buf, tchunk_vp,
-				dest_vp, inner_midx_buf,
-				nzindex_bufs, (IntAE *) nzdata_buf);
-		} else {
-			ret = gather_full_chunk_data_as_sparse(
-				h5dset,
-				starts, chunk_data_buf, tchunk_vp,
-				dest_vp, inner_midx_buf,
-				nzindex_bufs, nzdata_buf);
-		}
+		ret = gather_full_chunk_data_as_sparse(
+			h5dset, starts,
+			chunk_data_buf, tchunk_vp,
+			dest_vp, inner_midx_buf,
+			nzindex_bufs, nzdata_buf);
 	} else {
 		ret = gather_selected_chunk_data_as_sparse(
-			h5dset,
-			starts, chunk_data_buf, tchunk_vp,
+			h5dset, starts,
+			chunk_data_buf, tchunk_vp,
 			dest_vp, inner_midx_buf,
 			nzindex_bufs, nzdata_buf);
 	}
 	return ret;
 }
+
+/* Does NOT work properly on a truncated chunk! Works properly only if the
+   chunk data fills the full 'chunk_data_buf', that is, if the current chunk
+   is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
+   chunk" in HDF5's terminology). */
+static int gather_full_chunk_int_data_as_sparse(
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, IntAE *nzdata_buf)
+{
+	int ndim, inner_moved_along, ret;
+
+	ndim = h5dset->ndim;
+	/* Walk on **all** the elements in current chunk and append
+	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
+	while (1) {
+		ret = IntAE_append_if_nonzero(nzdata_buf, *in);
+		if (ret < 0) {
+			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
+			return -1;
+		}
+		if (ret > 0)
+			append_array_index_to_nzindex_bufs(dest_vp,
+					inner_midx_buf, nzindex_bufs);
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		in++;
+	};
+	return 0;
+}
+
+static int gather_selected_chunk_int_data_as_sparse(
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, IntAE *nzdata_buf)
+{
+	int ndim, inner_moved_along, ret;
+	size_t in_offset;
+
+	ndim = h5dset->ndim;
+	init_in_offset(ndim, starts, dest_vp, tchunk_vp,
+		       h5dset->h5chunkdim, &in_offset);
+	/* Walk on the **selected** elements in current chunk and append
+	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
+	while (1) {
+		ret = IntAE_append_if_nonzero(nzdata_buf, in[in_offset]);
+		if (ret < 0) {
+			PRINT_TO_ERRMSG_BUF("too many non-zero values to load");
+			return -1;
+		}
+		if (ret > 0)
+			append_array_index_to_nzindex_bufs(dest_vp,
+					inner_midx_buf, nzindex_bufs);
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		update_in_offset(ndim,
+				 inner_midx_buf, inner_moved_along,
+				 starts,
+				 dest_vp,
+				 h5dset->h5chunkdim,
+				 &in_offset);
+	};
+	return 0;
+}
+
+static int gather_chunk_int_data_as_sparse(
+		const H5DSetDescriptor *h5dset, SEXP starts,
+		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf)
+{
+	int go_fast, ret;
+
+	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
+		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
+	if (go_fast) {
+		ret = gather_full_chunk_int_data_as_sparse(
+			h5dset, starts,
+			(const int *) chunk_data_buf, tchunk_vp,
+			dest_vp, inner_midx_buf,
+			nzindex_bufs, (IntAE *) nzdata_buf);
+	} else {
+		ret = gather_selected_chunk_int_data_as_sparse(
+			h5dset, starts,
+			(const int *) chunk_data_buf, tchunk_vp,
+			dest_vp, inner_midx_buf,
+			nzindex_bufs, (IntAE *) nzdata_buf);
+	}
+	return ret;
+}
+
+typedef struct sparse_data_gatherer_t {
+	GatherChunkDataFunType gathering_fun;
+	IntAEAE *nzindex_bufs;
+	void *nzdata_buf;
+} SparseDataGatherer;
+
+static SparseDataGatherer sparse_data_gatherer(
+		const H5DSetDescriptor *h5dset,
+		IntAEAE *nzindex_bufs, void *nzdata_buf)
+{
+	SparseDataGatherer gatherer;
+
+	/* INTSXP is the most common Rtype for sparse data so we give it a
+	   little boost. */
+	if (h5dset->Rtype == INTSXP || h5dset->Rtype == LGLSXP) {
+		gatherer.gathering_fun = gather_chunk_int_data_as_sparse;
+	} else {
+		gatherer.gathering_fun = gather_chunk_data_as_sparse;
+	}
+	gatherer.nzindex_bufs = nzindex_bufs;
+	gatherer.nzdata_buf = nzdata_buf;
+	return gatherer;
+}
+
+
+/****************************************************************************
+ * read_data_8()
+ *
+ * One call to _read_H5Viewport() (wrapper for H5Dread()) per chunk touched
+ * by the user-supplied array selection.
+ *
+ * More precisely, walk over the chunks touched by 'starts'. For each chunk:
+ *   - Make one call to _read_H5Viewport() to load the **entire** chunk data
+ *     to an intermediate buffer.
+ *   - Gather the non-zero user-selected data found in the chunk into
+ *     'nzindex_bufs' and 'nzdata_buf'.
+ *
+ * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
+ * NULL. This is NOT checked!
+ */
 
 static int read_data_8(const H5DSetDescriptor *h5dset,
 		SEXP starts,
@@ -582,10 +672,11 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
 	int ndim, moved_along, ret;
-	hid_t chunk_space_id;
-	void *chunk_data_buf;
-	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
+	void *chunk_data_buf;
+	hid_t chunk_space_id;
+	SparseDataGatherer gatherer;
 	long long int tchunk_rank;
 
 	ndim = h5dset->ndim;
@@ -595,12 +686,6 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
-	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
-	if (chunk_space_id < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
-		return -1;
-	}
-
 	/* Allocate 'tchunk_vp', 'middle_vp', and 'dest_vp'.
 	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the
 	   context of read_data_8(), we won't use 'dest_vp.h5off' or
@@ -609,44 +694,56 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		&tchunk_vp, &middle_vp, &dest_vp,
 		ALLOC_OFF_AND_DIM) < 0)
 	{
-		H5Sclose(chunk_space_id);
 		return -1;
 	}
 
 	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
 	if (chunk_data_buf == NULL) {
 		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
-						   &middle_vp,
-						   &dest_vp);
-		H5Sclose(chunk_space_id);
+						  &middle_vp,
+						  &dest_vp);
 		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
 				    "for 'chunk_data_buf'");
 		return -1;
 	}
+	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
+	if (chunk_space_id < 0) {
+		free(chunk_data_buf);
+		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
+						  &middle_vp,
+						  &dest_vp);
+		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
+		return -1;
+	}
+
+	gatherer = sparse_data_gatherer(h5dset, nzindex_bufs, nzdata_buf);
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
 		_update_tchunk_vp_dest_vp(h5dset,
-			tchunk_midx_buf->elts, moved_along,
-			starts, breakpoint_bufs, tchunkidx_bufs,
-			&tchunk_vp, &dest_vp);
-		ret = read_data_from_chunk_8(h5dset,
-			starts,
-			inner_midx_buf->elts,
-			&tchunk_vp, &middle_vp, &dest_vp,
-			chunk_data_buf, chunk_space_id,
-			nzindex_bufs, nzdata_buf);
+				tchunk_midx_buf->elts, moved_along,
+				starts, breakpoint_bufs, tchunkidx_bufs,
+				&tchunk_vp, &dest_vp);
+		ret = _read_H5Viewport(h5dset,
+				&tchunk_vp, &middle_vp,
+				chunk_data_buf, chunk_space_id);
+		if (ret < 0)
+			break;
+		ret = gatherer.gathering_fun(h5dset, starts,
+				chunk_data_buf, &tchunk_vp,
+				&dest_vp, inner_midx_buf->elts,
+				gatherer.nzindex_bufs, gatherer.nzdata_buf);
 		if (ret < 0)
 			break;
 		tchunk_rank++;
 		moved_along = _next_midx(ndim, num_tchunks,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
+	H5Sclose(chunk_space_id);
 	free(chunk_data_buf);
 	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
-	H5Sclose(chunk_space_id);
 	return ret;
 }
 
