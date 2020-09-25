@@ -9,7 +9,7 @@
 #include "h5mread_helpers.h"
 
 #include <stdlib.h>  /* for malloc, free */
-#include <string.h>  /* for strncpy, memcmp */
+#include <string.h>  /* for strncpy, memcpy */
 #include <limits.h>  /* for INT_MAX */
 //#include <time.h>
 
@@ -47,8 +47,9 @@ static SEXP make_nzdata_from_buf(const void *nzdata_buf, SEXPTYPE Rtype)
 	return R_NilValue;
 }
 
-static SEXP make_nzindex_from_buf(const IntAE *nzindex_buf,
-				  R_xlen_t nzdata_len, int ndim)
+/* No longer used. Replaced by make_nzindex_from_bufs() below. */
+static SEXP NOT_USED_make_nzindex_from_buf(const IntAE *nzindex_buf,
+		R_xlen_t nzdata_len, int ndim)
 {
 	SEXP nzindex;
 	size_t nzindex_len;
@@ -77,8 +78,31 @@ static SEXP make_nzindex_from_buf(const IntAE *nzindex_buf,
 	return nzindex;
 }
 
+static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs)
+{
+	int ndim, along;
+	size_t nzindex_nrow;
+	SEXP nzindex;
+	int *out_p;
+
+	ndim = IntAEAE_get_nelt(nzindex_bufs);
+	nzindex_nrow = IntAE_get_nelt(nzindex_bufs->elts[0]);
+	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX otherwise the
+	   earlier calls to load_nonzero_val_to_nzdata_buf() (see below)
+	   would have raised an error. */
+	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzindex_nrow, ndim));
+	out_p = INTEGER(nzindex);
+	for (along = 0; along < ndim; along++) {
+		memcpy(out_p, nzindex_bufs->elts[along]->elts,
+		       sizeof(int) * nzindex_nrow);
+		out_p += nzindex_nrow;
+	}
+	UNPROTECT(1);
+	return nzindex;
+}
+
 static int copy_nzdata_and_nzindex_to_ans(const H5DSetDescriptor *h5dset,
-		const void *nzdata_buf, const IntAE *nzindex_buf, SEXP ans)
+		const void *nzdata_buf, const IntAEAE *nzindex_bufs, SEXP ans)
 {
 	SEXP ans_elt;
 
@@ -88,9 +112,8 @@ static int copy_nzdata_and_nzindex_to_ans(const H5DSetDescriptor *h5dset,
 	UNPROTECT(1);
 	if (ans_elt == R_NilValue)  /* should never happen */
 		return -1;
-	/* Move the data in 'nzindex_buf' to an ordinary matrix. */
-	ans_elt = PROTECT(make_nzindex_from_buf(nzindex_buf, XLENGTH(ans_elt),
-						h5dset->ndim));
+	/* Move the data in 'nzindex_bufs' to an ordinary matrix. */
+	ans_elt = PROTECT(make_nzindex_from_bufs(nzindex_bufs));
 	SET_VECTOR_ELT(ans, 0, ans_elt);
 	UNPROTECT(1);
 	if (ans_elt == R_NilValue)  /* should never happen */
@@ -98,13 +121,13 @@ static int copy_nzdata_and_nzindex_to_ans(const H5DSetDescriptor *h5dset,
 	return 0;
 }
 
-/* 'make_nzdata_from_IntAE_bufs()' and 'make_nzindex_from_bufs()' are not used
-   at the moment. Would be used if we were using one nzdata and one nzindex
-   buffer per touched chunk (e.g. an IntAEAE of length the total nb of touched
-   chunks) instead of a single nzdata and nzindex buffer for all the chunks
-   like we do at the moment. */
-static SEXP make_nzdata_from_IntAE_bufs(const IntAEAE *nzdata_bufs,
-					SEXPTYPE Rtype)
+/* Replacements for make_nzdata_from_buf() and NOT_USED_make_nzindex_from_buf()
+   in case we decided to use one nzdata and one nzindex buffer per touched
+   chunk (e.g. an IntAEAE of length the total nb of touched chunks) instead
+   of a single nzdata and nzindex buffer for all the chunks like we do at the
+   moment. */
+static SEXP NOT_USED_make_nzdata_from_IntAE_bufs(const IntAEAE *nzdata_bufs,
+		SEXPTYPE Rtype)
 {
 	size_t total_num_tchunks, nzdata_len, tchunk_rank, buf_nelt;
 	const IntAE *buf;
@@ -130,8 +153,8 @@ static SEXP make_nzdata_from_IntAE_bufs(const IntAEAE *nzdata_bufs,
 	return nzdata;
 }
 
-static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
-				   R_xlen_t nzdata_len, int ndim)
+static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
+		R_xlen_t nzdata_len, int ndim)
 {
 	size_t total_num_tchunks, tchunk_rank, buf_nelt;
 	const IntAE *buf;
@@ -140,7 +163,7 @@ static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 	const int *in_p;
 
 	/* 'nzdata_len' is guaranteed to be <= INT_MAX otherwise the
-	   earlier calls to load_nonzero_val_to_nzdata_buf() (see above)
+	   earlier calls to load_nonzero_val_to_nzdata_buf() (see below)
 	   would have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	out_p = INTEGER(nzindex);
@@ -252,11 +275,11 @@ static inline int load_nonzero_val_to_nzdata_buf(
 
 	/* The maximum 'nzdata' length that we support is INT_MAX. This
 	   is because at the end of the read_data_8() call we will need
-	   to turn 'nzindex_buf' into an ordinary matrix with 'length(nzdata)'
+	   to turn 'nzindex_bufs' into an ordinary matrix with 'length(nzdata)'
 	   rows. However R does not support ordinary matrices or arrays
 	   with dimensions >= INT_MAX yet.
-	   The function that will turn 'nzindex_buf' into an ordinary matrix
-	   is make_nzindex_from_buf(). See above.
+	   The function that will turn 'nzindex_bufs' into an ordinary matrix
+	   is make_nzindex_from_bufs(). See above.
 	*/
 	switch (h5dset->Rtype) {
 	    case LGLSXP:
@@ -322,6 +345,7 @@ static inline int load_nonzero_val_to_nzdata_buf(
 	return 1;
 }
 
+/*
 static inline void load_midx_to_nzindex_buf(int ndim,
 		const H5Viewport *dest_vp,
 		const int *inner_midx_buf,
@@ -335,6 +359,24 @@ static inline void load_midx_to_nzindex_buf(int ndim,
 	}
 	return;
 }
+*/
+
+static inline void load_midx_to_nzindex_bufs(
+		const H5Viewport *dest_vp,
+		const int *inner_midx_buf,
+		IntAEAE *nzindex_bufs)
+{
+	int ndim, along, midx;
+	IntAE *nzindex_buf;
+
+	ndim = IntAEAE_get_nelt(nzindex_bufs);
+	for (along = 0; along < ndim; along++) {
+		nzindex_buf = nzindex_bufs->elts[along];
+		midx = dest_vp->off[along] + inner_midx_buf[along] + 1;
+		IntAE_insert_at(nzindex_buf, IntAE_get_nelt(nzindex_buf), midx);
+	}
+	return;
+}
 
 /* Does NOT work properly on a truncated chunk! Works properly only if the
    chunk data fills the full 'chunk_data_buf', that is, if the current chunk
@@ -343,7 +385,7 @@ static inline void load_midx_to_nzindex_buf(int ndim,
 static int gather_full_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
-		IntAE *nzindex_buf, void *nzdata_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf,
 		const H5Viewport *dest_vp, int *inner_midx_buf)
 {
 	int ndim, inner_moved_along, ret;
@@ -352,15 +394,15 @@ static int gather_full_chunk_data_as_sparse(
 	ndim = h5dset->ndim;
 	in_offset = 0;
 	/* Walk on **all** the elements in current chunk and load
-	   the non-zero ones into 'nzindex_buf' and 'nzdata_buf'. */
+	   the non-zero ones into 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
 		ret = load_nonzero_val_to_nzdata_buf(h5dset,
 					in, in_offset, nzdata_buf);
 		if (ret < 0)
 			return ret;
 		if (ret > 0)
-			load_midx_to_nzindex_buf(ndim, dest_vp, inner_midx_buf,
-						 nzindex_buf);
+			load_midx_to_nzindex_bufs(dest_vp, inner_midx_buf,
+						  nzindex_bufs);
 		inner_moved_along = _next_midx(ndim, dest_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
@@ -373,7 +415,7 @@ static int gather_full_chunk_data_as_sparse(
 static int gather_selected_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset,
 		SEXP starts, const void *in, const H5Viewport *tchunk_vp,
-		IntAE *nzindex_buf, void *nzdata_buf,
+		IntAEAE *nzindex_bufs, void *nzdata_buf,
 		const H5Viewport *dest_vp, int *inner_midx_buf)
 {
 	int ndim, inner_moved_along, ret;
@@ -383,15 +425,15 @@ static int gather_selected_chunk_data_as_sparse(
 	init_in_offset(ndim, starts, dest_vp, tchunk_vp,
 		       h5dset->h5chunkdim, &in_offset);
 	/* Walk on the **selected** elements in current chunk and load
-	   the non-zero ones into 'nzindex_buf' and 'nzdata_buf'. */
+	   the non-zero ones into 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
 		ret = load_nonzero_val_to_nzdata_buf(h5dset,
 					in, in_offset, nzdata_buf);
 		if (ret < 0)
 			return ret;
 		if (ret > 0)
-			load_midx_to_nzindex_buf(ndim, dest_vp, inner_midx_buf,
-						 nzindex_buf);
+			load_midx_to_nzindex_bufs(dest_vp, inner_midx_buf,
+						  nzindex_bufs);
 		inner_moved_along = _next_midx(ndim, dest_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
@@ -408,7 +450,7 @@ static int gather_selected_chunk_data_as_sparse(
 
 static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 			SEXP starts,
-			IntAE *nzindex_buf, void *nzdata_buf,
+			IntAEAE *nzindex_bufs, void *nzdata_buf,
 			int *inner_midx_buf,
 			const H5Viewport *tchunk_vp,
 			const H5Viewport *middle_vp,
@@ -427,13 +469,13 @@ static int read_data_from_chunk_8(const H5DSetDescriptor *h5dset,
 		ret = gather_full_chunk_data_as_sparse(
 			h5dset,
 			starts, chunk_data_buf, tchunk_vp,
-			nzindex_buf, nzdata_buf,
+			nzindex_bufs, nzdata_buf,
 			dest_vp, inner_midx_buf);
 	} else {
 		ret = gather_selected_chunk_data_as_sparse(
 			h5dset,
 			starts, chunk_data_buf, tchunk_vp,
-			nzindex_buf, nzdata_buf,
+			nzindex_bufs, nzdata_buf,
 			dest_vp, inner_midx_buf);
 	}
 	return ret;
@@ -450,7 +492,8 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	hid_t chunk_space_id;
 	void *chunk_data_buf;
 	H5Viewport tchunk_vp, middle_vp, dest_vp;
-	IntAE *tchunk_midx_buf, *inner_midx_buf, *nzindex_buf;
+	IntAE *tchunk_midx_buf, *inner_midx_buf; //, *nzindex_buf;
+	IntAEAE *nzindex_bufs;
 	void *nzdata_buf;
 	long long int tchunk_rank;
 
@@ -460,7 +503,8 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
-	nzindex_buf = new_IntAE(ndim, 0, 0);
+	//nzindex_buf = new_IntAE(0, 0, 0);
+	nzindex_bufs = new_IntAEAE(ndim, ndim);
 	nzdata_buf = new_nzdata_buf(h5dset->Rtype);
 	if (nzdata_buf == NULL)
 		return -1;
@@ -504,7 +548,7 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 			&tchunk_vp, &dest_vp);
 		ret = read_data_from_chunk_8(h5dset,
 			starts,
-			nzindex_buf, nzdata_buf,
+			nzindex_bufs, nzdata_buf,
 			inner_midx_buf->elts,
 			&tchunk_vp, &middle_vp, &dest_vp,
 			chunk_data_buf, chunk_space_id);
@@ -521,10 +565,10 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		return -1;
 
 	//clock_t t0 = clock();
-	ret = copy_nzdata_and_nzindex_to_ans(h5dset, nzdata_buf, nzindex_buf,
+	ret = copy_nzdata_and_nzindex_to_ans(h5dset, nzdata_buf, nzindex_bufs,
 					     ans);
 	//double dt = (1.0 * clock() - t0) / CLOCKS_PER_SEC;
-	//printf("copy_nzdata_and_nzindex_to_ans(): %e sec\n", dt);
+	//printf("copy_nzdata_and_nzindex_to_ans(): %2.3f s\n", dt);
 	return ret;
 }
 
