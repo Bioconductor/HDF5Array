@@ -213,8 +213,7 @@ static int read_data_from_chunk_4_5(const H5DSetDescriptor *h5dset, int method,
 	} else {
 		ret = _read_h5chunk(h5dset,
 				tchunk_vp,
-				chunk_data_buf,
-				compressed_chunk_data_buf);
+				compressed_chunk_data_buf, chunk_data_buf);
 	}
 	if (ret < 0)
 		return ret;
@@ -252,10 +251,10 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 		SEXP ans, const int *ans_dim)
 {
 	int ndim, moved_along, ret;
-	hid_t chunk_space_id;
-	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
-	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
+	void *chunk_data_buf, *compressed_chunk_data_buf = NULL;
+	hid_t chunk_space_id;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	long long int tchunk_rank;
 
 	ndim = h5dset->ndim;
@@ -265,8 +264,24 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
+	if (method == 4) {
+		chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
+	} else {
+		warning("method 5 is still experimental, use at your own risk");
+		chunk_data_buf = malloc(2 * h5dset->chunk_data_buf_size +
+					CHUNK_COMPRESSION_OVERHEAD);
+	}
+	if (chunk_data_buf == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'chunk_data_buf'");
+		return -1;
+	}
+	if (method != 4)
+		compressed_chunk_data_buf = chunk_data_buf +
+					    h5dset->chunk_data_buf_size;
 	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
 	if (chunk_space_id < 0) {
+		free(chunk_data_buf);
 		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
 		return -1;
 	}
@@ -280,28 +295,9 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 		ALLOC_OFF_AND_DIM) < 0)
 	{
 		H5Sclose(chunk_space_id);
+		free(chunk_data_buf);
 		return -1;
 	}
-
-	if (method == 4) {
-		chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
-	} else {
-		warning("method 5 is still experimental, use at your own risk");
-		chunk_data_buf = malloc(2 * h5dset->chunk_data_buf_size +
-					CHUNK_COMPRESSION_OVERHEAD);
-	}
-	if (chunk_data_buf == NULL) {
-		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
-						   &middle_vp,
-						   &dest_vp);
-		H5Sclose(chunk_space_id);
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'chunk_data_buf'");
-		return -1;
-	}
-	if (method != 4)
-		compressed_chunk_data_buf = chunk_data_buf +
-					    h5dset->chunk_data_buf_size;
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	tchunk_rank = 0;
@@ -324,9 +320,9 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 		moved_along = _next_midx(ndim, num_tchunks,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
-	free(chunk_data_buf);
 	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
 	H5Sclose(chunk_space_id);
+	free(chunk_data_buf);
 	return ret;
 }
 

@@ -136,8 +136,8 @@ int _tchunk_is_fully_selected(
 int _read_h5chunk(
 	const H5DSetDescriptor *h5dset,
 	const H5Viewport *h5chunk_vp,
-	void *chunk_data_out,
-	void *compressed_chunk_data_buf
+	void *compressed_chunk_data_buf,
+	void *chunk_data_buf
 );
 
 #endif  /* _H5MREAD_HELPERS_H_ */

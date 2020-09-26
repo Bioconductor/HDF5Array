@@ -122,7 +122,7 @@ static inline int CharAEAE_append_if_nonzero(CharAEAE *aeae, const char *s,
 
 
 /****************************************************************************
- * Manipulation of 'nzdata' and 'nzindex' buffers
+ * Manipulation of the 'nzindex' and 'nzdata' buffers
  */
 
 static void *new_nzdata_buf(SEXPTYPE Rtype)
@@ -292,14 +292,13 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 
 
 /****************************************************************************
- * Helpers used by the data gathering functions
+ * Low-level helpers used by the data gathering functions
  */
 
 static void init_in_offset(int ndim, SEXP starts,
-		   const H5Viewport *dest_vp,
-		   const H5Viewport *tchunk_vp,
-		   const hsize_t *h5chunkdim,
-		   size_t *in_offset)
+		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
+		const H5Viewport *tchunk_vp,
+		size_t *in_offset)
 {
 	size_t in_off;
 	int along, h5along, i;
@@ -318,11 +317,9 @@ static void init_in_offset(int ndim, SEXP starts,
 	return;
 }
 
-static inline void update_in_offset(int ndim,
+static inline void update_in_offset(int ndim, SEXP starts,
+		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
 		const int *inner_midx, int inner_moved_along,
-		SEXP starts,
-		const H5Viewport *dest_vp,
-		const hsize_t *h5chunkdim,
 		size_t *in_offset)
 {
 	SEXP start;
@@ -475,8 +472,9 @@ static int gather_selected_chunk_data_as_sparse(
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-	init_in_offset(ndim, starts, dest_vp, tchunk_vp,
-		       h5dset->h5chunkdim, &in_offset);
+	init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+		       tchunk_vp,
+		       &in_offset);
 	/* Walk on the **selected** elements in current chunk and append
 	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
@@ -491,11 +489,8 @@ static int gather_selected_chunk_data_as_sparse(
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		update_in_offset(ndim,
+		update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
 				 inner_midx_buf, inner_moved_along,
-				 starts,
-				 dest_vp,
-				 h5dset->h5chunkdim,
 				 &in_offset);
 	};
 	return 0;
@@ -570,8 +565,9 @@ static int gather_selected_chunk_int_data_as_sparse(
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-	init_in_offset(ndim, starts, dest_vp, tchunk_vp,
-		       h5dset->h5chunkdim, &in_offset);
+	init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+		       tchunk_vp,
+		       &in_offset);
 	/* Walk on the **selected** elements in current chunk and append
 	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
@@ -587,11 +583,8 @@ static int gather_selected_chunk_int_data_as_sparse(
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		update_in_offset(ndim,
+		update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
 				 inner_midx_buf, inner_moved_along,
-				 starts,
-				 dest_vp,
-				 h5dset->h5chunkdim,
 				 &in_offset);
 	};
 	return 0;
@@ -673,9 +666,9 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 {
 	int ndim, moved_along, ret;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
-	H5Viewport tchunk_vp, middle_vp, dest_vp;
-	void *chunk_data_buf;
+	void *chunk_data_buf; //*compressed_chunk_data_buf;
 	hid_t chunk_space_id;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	SparseDataGatherer gatherer;
 	long long int tchunk_rank;
 
@@ -686,6 +679,23 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
+	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
+	//chunk_data_buf = malloc(2 * h5dset->chunk_data_buf_size +
+	//			CHUNK_COMPRESSION_OVERHEAD);
+	if (chunk_data_buf == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for 'chunk_data_buf'");
+		return -1;
+	}
+	//compressed_chunk_data_buf = chunk_data_buf +
+	//			    h5dset->chunk_data_buf_size;
+	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
+	if (chunk_space_id < 0) {
+		free(chunk_data_buf);
+		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
+		return -1;
+	}
+
 	/* Allocate 'tchunk_vp', 'middle_vp', and 'dest_vp'.
 	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the
 	   context of read_data_8(), we won't use 'dest_vp.h5off' or
@@ -694,25 +704,8 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		&tchunk_vp, &middle_vp, &dest_vp,
 		ALLOC_OFF_AND_DIM) < 0)
 	{
-		return -1;
-	}
-
-	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
-	if (chunk_data_buf == NULL) {
-		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
-						  &middle_vp,
-						  &dest_vp);
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'chunk_data_buf'");
-		return -1;
-	}
-	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
-	if (chunk_space_id < 0) {
+		H5Sclose(chunk_space_id);
 		free(chunk_data_buf);
-		_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp,
-						  &middle_vp,
-						  &dest_vp);
-		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
 		return -1;
 	}
 
@@ -729,10 +722,14 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		ret = _read_H5Viewport(h5dset,
 				&tchunk_vp, &middle_vp,
 				chunk_data_buf, chunk_space_id);
+		//ret = _read_h5chunk(h5dset,
+		//		&tchunk_vp,
+		//		compressed_chunk_data_buf, chunk_data_buf);
 		if (ret < 0)
 			break;
 		ret = gatherer.gathering_fun(h5dset, starts,
 				chunk_data_buf, &tchunk_vp,
+				//compressed_chunk_data_buf, &tchunk_vp,
 				&dest_vp, inner_midx_buf->elts,
 				gatherer.nzindex_bufs, gatherer.nzdata_buf);
 		if (ret < 0)
@@ -741,9 +738,9 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 		moved_along = _next_midx(ndim, num_tchunks,
 					 tchunk_midx_buf->elts);
 	} while (moved_along < ndim);
+	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
 	H5Sclose(chunk_space_id);
 	free(chunk_data_buf);
-	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
 	return ret;
 }
 

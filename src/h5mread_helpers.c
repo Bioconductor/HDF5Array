@@ -22,6 +22,28 @@ Some useful links:
 #include <zlib.h>  /* for uncompress(), Z_OK, Z_MEM_ERROR, etc.. */
 
 
+static void print_chunk_data(const H5DSetDescriptor *h5dset,
+			     void *chunk_data_buf)
+{
+	printf("chunk_data_buf:");
+/*
+	for (size_t i = 0; i < h5dset->chunk_data_buf_size; i++) {
+		if (i % 12 == 0)
+			printf("\n ");
+		printf(" '%c'", ((char *) chunk_data_buf)[i]);
+	}
+*/
+	size_t nval = h5dset->chunk_data_buf_size / h5dset->ans_elt_size;
+	for (size_t i = 0; i < nval; i++) {
+		if (i % 12 == 0)
+			printf("\n ");
+		printf(" %4d", ((int *) chunk_data_buf)[i]);
+	}
+	printf("\n");
+	return;
+}
+
+
 /****************************************************************************
  * Memory management of H5Viewport structs
  */
@@ -242,6 +264,7 @@ int _read_H5Viewport(const H5DSetDescriptor *h5dset,
 		      h5dset->space_id, H5P_DEFAULT, mem);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
+	//print_chunk_data(h5dset, mem);
 	return ret;
 }
 
@@ -414,7 +437,7 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
 	int ret;
 	uLong destLen;
 
-	destLen = uncompressed_size;
+	destLen = (uLong) uncompressed_size;
 	ret = uncompress((Bytef *) uncompressed_chunk_data, &destLen,
 			 compressed_chunk_data, (uLong) compressed_size);
 	if (ret == Z_OK) {
@@ -442,6 +465,20 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
 		PRINT_TO_ERRMSG_BUF("unknown error in uncompress()");
 	}
 	return -1;
+}
+
+static void transpose_bytes(const char *in, size_t nrow, size_t ncol, char *out)
+{
+	size_t i, j, in_offset;
+
+	for (i = 0; i < nrow; i++) {
+		in_offset = i;
+		for (j = 0; j < ncol; j++) {
+			*(out++) = *(in + in_offset);
+			in_offset += nrow;
+		}
+	}
+	return;
 }
 
 /*
@@ -476,8 +513,8 @@ static int uncompress_chunk_data(const void *compressed_chunk_data,
 
 int _read_h5chunk(const H5DSetDescriptor *h5dset,
 		const H5Viewport *h5chunk_vp,
-		void *chunk_data_out,
-		void *compressed_chunk_data_buf)
+		void *compressed_chunk_data_buf,
+		void *chunk_data_buf)
 {
 	int ret;
 	hsize_t chunk_storage_size;
@@ -513,10 +550,17 @@ int _read_h5chunk(const H5DSetDescriptor *h5dset,
 
 	//FIXME: This will error if chunk data is not compressed!
 	//TODO: Decompress only if chunk data is compressed. There should be
-	// a bit in the returned 'filters' that indicates this.
-	return uncompress_chunk_data(compressed_chunk_data_buf,
-				     chunk_storage_size,
-				     chunk_data_out,
-				     h5dset->chunk_data_buf_size);
+	//a bit in the returned 'filters' that indicates this.
+	ret = uncompress_chunk_data(compressed_chunk_data_buf,
+				    chunk_storage_size,
+				    chunk_data_buf,
+				    h5dset->chunk_data_buf_size);
+	if (ret < 0)
+		return -1;
+	size_t nval = h5dset->chunk_data_buf_size / h5dset->ans_elt_size;
+	transpose_bytes(chunk_data_buf, nval, h5dset->ans_elt_size,
+			compressed_chunk_data_buf);
+	//print_chunk_data(h5dset, compressed_chunk_data_buf);
+	return 0;
 }
 
