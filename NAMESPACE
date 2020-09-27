@@ -42,7 +42,7 @@ exportMethods(
     coerce, show,
 
     ## Methods for generics defined in the BiocGenerics package:
-    path, "path<-", type,
+    path, "path<-", type, updateObject,
 
     ## Methods for generics defined in the DelayedArray package:
     extract_array,

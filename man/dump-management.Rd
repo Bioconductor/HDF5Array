@@ -248,7 +248,7 @@ lsHDF5DumpFile()
 ## realization happens e.g. in memory if set to NULL or in an HDF5 file
 ## if set to "HDF5Array". See '?realize' in the DelayedArray package for
 ## more information about "realization backends".
-setRealizationBackend("HDF5Array")
+setAutoRealizationBackend("HDF5Array")
 m <- matrix(runif(20), nrow=4)
 P <- C \%*\% m
 lsHDF5DumpFile()

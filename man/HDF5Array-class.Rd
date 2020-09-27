@@ -28,7 +28,7 @@
 
 \usage{
 ## Constructor function:
-HDF5Array(filepath, name, type=NA)
+HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 }
 
 \arguments{
@@ -38,6 +38,13 @@ HDF5Array(filepath, name, type=NA)
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
+  }
+  \item{as.sparse}{
+    Wether the HDF5 dataset should be considered sparse (and treated
+    as such for better performance) or not. Note that if your dataset
+    uses the HDF5-based sparse matrix representation from 10x Genomics,
+    you should use the \code{\link{TENxMatrix}()} constructor instead
+    of the \code{HDF5Array()} constructor.
   }
   \item{type}{
     By default the \code{\link[DelayedArray]{type}} of the returned
@@ -113,13 +120,20 @@ tally_file <- system.file("extdata", "example.tally.hfs5",
 h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16:
-cvg0 <- HDF5Array(tally_file, "/ExampleStudy/16/Coverages")
-cvg0
+name <- "/ExampleStudy/16/Coverages"
+cvg <- HDF5Array(tally_file, name)
+cvg
 
-is(cvg0, "DelayedArray")  # TRUE
-seed(cvg0)
-path(cvg0)
-chunkdim(cvg0)
+is(cvg, "DelayedArray")  # TRUE
+seed(cvg)
+path(cvg)
+chunkdim(cvg)
+
+## The data in the dataset looks sparse. In this case it is recommended
+## to set 'as.sparse' to TRUE when constructing the HDF5Array object.
+## This will make block processing (used in operations like sum()) more
+## memory efficient and likely faster:
+cvg0 <- HDF5Array(tally_file, name, as.sparse=TRUE)
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames

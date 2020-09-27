@@ -6,21 +6,26 @@
 setClass("HDF5ArraySeed",
     contains="Array",
     representation(
-        filepath="character",       # Absolute path to the HDF5 file so the
-                                    # object doesn't break when the user
-                                    # changes the working directory (e.g.
-                                    # with setwd()).
-                                    # The path must also be in its canonical
-                                    # form so paths from different objects
-                                    # can be compared (required by
-                                    # quickResaveHDF5SummarizedExperiment()).
-        name="character",           # Name of the dataset in the HDF5 file.
-        type="character",           # NA or the wanted type.
+        ## Absolute path to the HDF5 file so the object doesn't break
+        ## when the user changes the working directory (e.g. with setwd()).
+        ## The path must also be in its canonical form so comparing
+        ## paths from different objects is meaningful (required by
+        ## quickResaveHDF5SummarizedExperiment()).
+        filepath="character",
+        ## Name of the dataset in the HDF5 file.
+        name="character",
+        ## Wether the HDF5 dataset should be considered sparse (and treated
+        ## as such) or not. Slot added in HDF5Array 1.17.8.
+        as_sparse="logical",
+        ## NA or the desired type. Slot added in HDF5Array 1.15.6.
+        type="character",
         dim="integer",
         chunkdim="integer_OR_NULL",
-        first_val="ANY"             # First value in the dataset.
+        ## First value in the dataset.
+        first_val="ANY"
     ),
     prototype(
+        as_sparse=FALSE,
         type=NA_character_
     )
 )
@@ -80,6 +85,11 @@ validate_HDF5ArraySeed_dataset <- function(x)
     x_name <- x@name
     if (!isSingleString(x_name))
         return("'name' slot must be a single string")
+
+    ## 'as_sparse' slot.
+    x_as_sparse <- x@as_sparse
+    if (!isTRUEorFALSE(x_as_sparse))
+        return("'as_sparse' slot must be TRUE or FALSE")
 
     ## 'dim' slot.
     msg <- DelayedArray:::validate_dim_slot(x, "dim")
@@ -220,14 +230,14 @@ setMethod("dimnames", "HDF5ArraySeed",
 ### extract_array()
 ###
 
-### If the user requested a specific type when HDF5ArraySeed object 'x'
-### was constructed then we must return an array of that type.
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
     ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
     ## the "type" slot.
     if (!.hasSlot(x, "type"))
         return(h5read2(path(x), x@name, index))
+    ## If the user requested a specific type when HDF5ArraySeed object 'x'
+    ## was constructed then we must return an array of that type.
     as_int <- !is.na(x@type) && x@type == "integer"
     ans <- h5read2(path(x), x@name, index, as.integer=as_int)
     if (!is.na(x@type) && typeof(ans) != x@type)
@@ -236,6 +246,40 @@ setMethod("dimnames", "HDF5ArraySeed",
 }
 
 setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### is_sparse() and extract_sparse_array()
+###
+
+### Prior to HDF5Array 1.17.8 HDF5ArraySeed objects didn't have the
+### "as_sparse" slot.
+setMethod("is_sparse", "HDF5ArraySeed",
+    function(x) .hasSlot(x, "as_sparse") && x@as_sparse
+)
+
+.extract_sparse_array_from_HDF5ArraySeed <- function(x, index)
+{
+    if (!is_sparse(x))
+        stop(wmsg("calling extract_sparse_array() on an HDF5ArraySeed ",
+                  "object is supported only if the object is sparse"))
+    ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
+    ## the "type" slot.
+    if (!.hasSlot(x, "type"))
+        return(h5read2(path(x), x@name, index, as.sparse=TRUE))
+    ## If the user requested a specific type when HDF5ArraySeed object 'x'
+    ## was constructed then we must return a SparseArraySeed object of
+    ## that type.
+    as_int <- !is.na(x@type) && x@type == "integer"
+    ans <- h5read2(path(x), x@name, index, as.integer=as_int, as.sparse=TRUE)
+    if (!is.na(x@type) && typeof(ans) != x@type)
+        storage.mode(ans@nzdata) <- x@type
+    ans
+}
+
+setMethod("extract_sparse_array", "HDF5ArraySeed",
+    .extract_sparse_array_from_HDF5ArraySeed
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -250,7 +294,7 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 ### Constructor
 ###
 
-HDF5ArraySeed <- function(filepath, name, type=NA)
+HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
 {
     ## Check 'filepath'.
     filepath <- normarg_path(filepath, "'filepath'", "HDF5 dataset")
@@ -261,6 +305,10 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
                   "the name of the dataset in the HDF5 file"))
     if (name == "")
         stop(wmsg("'name' cannot be the empty string"))
+
+    ## Check 'as.sparse'.
+    if (!isTRUEorFALSE(as.sparse))
+        stop(wmsg("'as.sparse' must be TRUE or FALSE"))
 
     ## Check 'type'
     if (!isSingleStringOrNA(type))
@@ -280,9 +328,42 @@ HDF5ArraySeed <- function(filepath, name, type=NA)
 
     new2("HDF5ArraySeed", filepath=filepath,
                           name=name,
+                          as_sparse=as.sparse,
                           type=type,
                           dim=dim,
                           chunkdim=chunkdim,
                           first_val=first_val)
 }
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### updateObject()
+###
+
+setMethod("updateObject", "HDF5ArraySeed",
+    function(object, ..., verbose=FALSE)
+    {
+        ## The "type" slot was added in HDF5Array 1.15.6.
+        if (!.hasSlot(object, "type")) {
+            return(new2("HDF5ArraySeed", filepath=object@filepath,
+                                         name=object@name,
+                                         type=type(object@first_val),
+                                         dim=object@dim,
+                                         chunkdim=object@chunkdim,
+                                         first_val=object@first_val,
+                                         check=FALSE))
+        }
+        ## The "as_sparse" slot was added in HDF5Array 1.17.8.
+        if (!.hasSlot(object, "as_sparse")) {
+            return(new2("HDF5ArraySeed", filepath=object@filepath,
+                                         name=object@name,
+                                         type=object@type,
+                                         dim=object@dim,
+                                         chunkdim=object@chunkdim,
+                                         first_val=object@first_val,
+                                         check=FALSE))
+        }
+        object
+    }
+)
 

@@ -28,15 +28,17 @@ setMethod("DelayedArray", "HDF5ArraySeed",
 
 ### Works directly on an HDF5ArraySeed object, in which case it must be
 ### called with a single argument.
-HDF5Array <- function(filepath, name, type=NA)
+HDF5Array <- function(filepath, name, as.sparse=FALSE, type=NA)
 {
     if (is(filepath, "HDF5ArraySeed")) {
-        if (!(missing(name) && identical(type, NA)))
+        if (!(missing(name) &&
+              identical(as.sparse, FALSE) &&
+              identical(type, NA)))
             stop(wmsg("HDF5Array() must be called with a single argument ",
                       "when passed an HDF5ArraySeed object"))
         seed <- filepath
     } else {
-        seed <- HDF5ArraySeed(filepath, name, type=type)
+        seed <- HDF5ArraySeed(filepath, name, as.sparse=as.sparse, type=type)
     }
     DelayedArray(seed)
 }

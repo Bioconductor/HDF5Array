@@ -11,13 +11,17 @@
 \alias{dim,HDF5ArraySeed-method}
 \alias{dimnames,HDF5ArraySeed-method}
 \alias{extract_array,HDF5ArraySeed-method}
+\alias{is_sparse,HDF5ArraySeed-method}
+\alias{extract_sparse_array,HDF5ArraySeed-method}
 \alias{chunkdim,HDF5ArraySeed-method}
+
+\alias{updateObject,HDF5ArraySeed-method}
 
 \title{HDF5ArraySeed objects}
 
 \description{
-  HDF5ArraySeed is a low-level helper class for representing a pointer
-  to an HDF5 dataset.
+  HDF5ArraySeed is a low-level helper class for representing a
+  pointer to an HDF5 dataset.
   HDF5ArraySeed objects are not intended to be used directly. Most
   end users should create and manipulate \link{HDF5Array} objects
   instead. See \code{?\link{HDF5Array}} for more information.
@@ -25,11 +29,11 @@
 
 \usage{
 ## Constructor function:
-HDF5ArraySeed(filepath, name, type=NA)
+HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 }
 
 \arguments{
-  \item{filepath, name, type}{
+  \item{filepath, name, as.sparse, type}{
     See \code{?\link{HDF5Array}} for a description of these arguments.
   }
 }
@@ -62,11 +66,15 @@ tally_file <- system.file("extdata", "example.tally.hfs5",
 library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
-seed <- HDF5ArraySeed(tally_file, "/ExampleStudy/16/Coverages")
-seed
-path(seed)
-dim(seed)
-chunkdim(seed)
+name <- "/ExampleStudy/16/Coverages"  # name of the dataset of interest
+seed1 <- HDF5ArraySeed(tally_file, name)
+seed1
+path(seed1)
+dim(seed1)
+chunkdim(seed1)
+
+seed2 <- HDF5ArraySeed(tally_file, name, as.sparse=TRUE)
+seed2
 }
 \keyword{classes}
 \keyword{methods}
