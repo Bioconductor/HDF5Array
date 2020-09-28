@@ -40,7 +40,7 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
     The name of the dataset in the HDF5 file.
   }
   \item{as.sparse}{
-    Wether the HDF5 dataset should be considered sparse (and treated
+    Whether the HDF5 dataset should be considered sparse (and treated
     as such for better performance) or not. Note that if your dataset
     uses the HDF5-based sparse matrix representation from 10x Genomics,
     you should use the \code{\link{TENxMatrix}()} constructor instead
