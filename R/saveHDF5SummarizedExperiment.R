@@ -121,8 +121,8 @@
         if (verbose)
             message("Start writing assay ", i, "/", nassay, " to ",
                     "HDF5 file:\n  ", h5_path)
-        a <- writeHDF5Array(a, h5_path, h5_name, chunkdim, level,
-                            verbose=verbose)
+        a <- writeHDF5Array(a, h5_path, h5_name,
+                            chunkdim=chunkdim, level=level, verbose=verbose)
         if (verbose)
             message("Finished writing assay ", i, "/", nassay, " to ",
                     "HDF5 file:\n  ", h5_path, "\n")
