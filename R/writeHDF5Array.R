@@ -14,10 +14,14 @@
 setClass("HDF5RealizationSink",
     contains="RealizationSink",
     representation(
+        ## Slots that support the RealizationSink constructor contract.
         dim="integer",              # Naming this slot "dim" makes dim() work
                                     # out of the box.
         dimnames="list",
         type="character",           # Single string.
+        as_sparse="logical",        # TRUE or FALSE.
+
+        ## Other slots.
         filepath="character",       # Single string.
         name="character",           # Dataset name.
         chunkdim="integer_OR_NULL"  # An integer vector parallel to the 'dim'
@@ -36,6 +40,10 @@ setMethod("dimnames", "HDF5RealizationSink",
 )
 
 setMethod("type", "HDF5RealizationSink", function(x) x@type)
+
+setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
+
+setMethod("is_sparse", "HDF5RealizationSink", function(x) x@as_sparse)
 
 .normarg_chunkdim <- function(chunkdim, dim)
 {
@@ -62,14 +70,23 @@ setMethod("type", "HDF5RealizationSink", function(x) x@type)
     chunkdim
 }
 
+### Note that the supplied 'as.sparse' value is stored in the 'as_sparse'
+### slot of the returned object, and that's all. It doesn't change how the
+### data will be laid out to the HDF5 file in anyway (HDF5 doesn't support
+### sparse storage at the moment). The only reason we store the supplied
+### 'as.sparse' value in the object is so that we can propagate it later
+### when we coerce the object to HDF5ArraySeed.
 ### Unlike with rhdf5::h5createDataset(), if 'chunkdim' is NULL then an
 ### automatic chunk geometry will be used. To write "unchunked data" (a.k.a.
 ### contiguous data), 'chunkdim' must be set to 0.
 HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
+                                as.sparse=FALSE,
                                 filepath=NULL, name=NULL,
                                 H5type=NULL, size=NULL,
                                 chunkdim=NULL, level=NULL)
 {
+    if (!isTRUEorFALSE(as.sparse))
+        stop(wmsg("'as.sparse' must be TRUE or FALSE"))
     if (is.null(filepath)) {
         filepath <- getHDF5DumpFile(for.use=TRUE)
     } else {
@@ -108,11 +125,10 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         h5writeDimnames(dimnames, filepath, name)
     }
     new2("HDF5RealizationSink", dim=dim, dimnames=dimnames, type=type,
+                                as_sparse=as.sparse,
                                 filepath=filepath, name=name,
                                 chunkdim=chunkdim)
 }
-
-setMethod("chunkdim", "HDF5RealizationSink", function(x) x@chunkdim)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -135,7 +151,8 @@ setMethod("write_block", "HDF5RealizationSink",
 ###
 
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
-    function(from) HDF5ArraySeed(from@filepath, from@name, type=from@type)
+    function(from) HDF5ArraySeed(from@filepath, from@name,
+                                 as.sparse=from@as_sparse)
 )
 
 setAs("HDF5RealizationSink", "HDF5Array",
@@ -159,18 +176,24 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### Return an HDF5Array object pointing to the newly written HDF5 dataset
 ### on disk.
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
-                           H5type=NULL, chunkdim=NULL, level=NULL,
-                           with.dimnames=FALSE, verbose=FALSE)
+                              H5type=NULL, chunkdim=NULL, level=NULL,
+                              as.sparse=NA,
+                              with.dimnames=FALSE, verbose=FALSE)
 {
+    if (!(is.logical(as.sparse) && length(as.sparse) == 1L))
+        stop(wmsg("'as.sparse' must be NA, TRUE or FALSE"))
     if (!isTRUEorFALSE(with.dimnames))
         stop("'with.dimnames' must be TRUE or FALSE")
     if (!isTRUEorFALSE(verbose))
         stop("'verbose' must be TRUE or FALSE")
+
+    if (is.na(as.sparse))
+        as.sparse <- is_sparse(x)
     sink_dimnames <- if (with.dimnames) dimnames(x) else NULL
     ## compute_max_string_size() will trigger block processing if 'x' is a
     ## DelayedArray object of type "character", so it could take a while.
     size <- compute_max_string_size(x)
-    sink <- HDF5RealizationSink(dim(x), sink_dimnames, type(x),
+    sink <- HDF5RealizationSink(dim(x), sink_dimnames, type(x), as.sparse,
                                 filepath=filepath, name=name,
                                 H5type=H5type, size=size,
                                 chunkdim=chunkdim, level=level)

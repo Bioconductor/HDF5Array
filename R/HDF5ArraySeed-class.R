@@ -6,21 +6,31 @@
 setClass("HDF5ArraySeed",
     contains="Array",
     representation(
+        ## ----------------- user supplied slots -----------------
+
         ## Absolute path to the HDF5 file so the object doesn't break
         ## when the user changes the working directory (e.g. with setwd()).
         ## The path must also be in its canonical form so comparing
         ## paths from different objects is meaningful (required by
         ## quickResaveHDF5SummarizedExperiment()).
         filepath="character",
+
         ## Name of the dataset in the HDF5 file.
         name="character",
+
         ## Whether the HDF5 dataset should be considered sparse (and treated
         ## as such) or not. Slot added in HDF5Array 1.17.8.
-        as_sparse="logical",
+        as_sparse="logical",  # TRUE or FALSE
+
         ## NA or the desired type. Slot added in HDF5Array 1.15.6.
         type="character",
+
+        ## ------------ automatically populated slots ------------
+
         dim="integer",
+
         chunkdim="integer_OR_NULL",
+
         ## First value in the dataset.
         first_val="ANY"
     ),

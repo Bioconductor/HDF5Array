@@ -40,11 +40,19 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
     The name of the dataset in the HDF5 file.
   }
   \item{as.sparse}{
-    Whether the HDF5 dataset should be considered sparse (and treated
-    as such for better performance) or not. Note that if your dataset
-    uses the HDF5-based sparse matrix representation from 10x Genomics,
-    you should use the \code{\link{TENxMatrix}()} constructor instead
-    of the \code{HDF5Array()} constructor.
+    Whether the HDF5 dataset should be flagged as sparse or not, that is,
+    whether it should be considered sparse (and treated as such) or not.
+    Note that HDF5 doesn't natively support sparse storage at the moment
+    so HDF5 datasets cannot be stored in a sparse format, only in a dense
+    one. However a dataset stored in a dense format can still contain a lot
+    of zeroes. Using \code{as.sparse=TRUE} on such dataset will enable
+    some optimizations that can lead to a lower memory footprint (and
+    possibly better performance) when operating on the HDF5Array.
+
+    IMPORTANT NOTE: If the dataset is in the 10x Genomics format (i.e. if
+    it uses the HDF5-based sparse matrix representation from 10x Genomics),
+    you should use the \code{\link{TENxMatrix}()} constructor instead of
+    the \code{HDF5Array()} constructor.
   }
   \item{type}{
     By default the \code{\link[DelayedArray]{type}} of the returned
@@ -134,6 +142,7 @@ chunkdim(cvg)
 ## This will make block processing (used in operations like sum()) more
 ## memory efficient and likely faster:
 cvg0 <- HDF5Array(tally_file, name, as.sparse=TRUE)
+is_sparse(cvg0)  # TRUE
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames

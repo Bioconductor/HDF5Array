@@ -18,7 +18,8 @@
 
 \usage{
 saveHDF5SummarizedExperiment(x, dir="my_h5_se", prefix="", replace=FALSE,
-                                chunkdim=NULL, level=NULL, verbose=FALSE)
+                                chunkdim=NULL, level=NULL, as.sparse=NA,
+                                verbose=FALSE)
 
 loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
 
@@ -56,8 +57,18 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
   \item{chunkdim, level}{
     The dimensions of the chunks and the compression level to use for
     writing the assay data to disk.
+
     Passed to the internal calls to \code{writeHDF5Array}.
     See \code{?\link{writeHDF5Array}} for more information.
+  }
+  \item{as.sparse}{
+    Whether the assay data should be flagged as sparse or not. If set to
+    \code{NA} (the default), then the specific \code{as.sparse} value to
+    use for each assay is determined by calling \code{is_sparse()} on them.
+
+    Passed to the internal calls to \code{writeHDF5Array}.
+    See \code{?\link{writeHDF5Array}} for more information and an
+    IMPORTANT NOTE.
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.

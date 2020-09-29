@@ -112,7 +112,8 @@
     saveRDS(x, file=rds_path)
 }
 
-.write_h5_assays <- function(assays, h5_path, chunkdim, level, verbose)
+.write_h5_assays <- function(assays, h5_path, chunkdim, level,
+                                     as.sparse, verbose)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -122,7 +123,9 @@
             message("Start writing assay ", i, "/", nassay, " to ",
                     "HDF5 file:\n  ", h5_path)
         a <- writeHDF5Array(a, h5_path, h5_name,
-                            chunkdim=chunkdim, level=level, verbose=verbose)
+                               chunkdim=chunkdim, level=level,
+                               as.sparse=as.sparse,
+                               verbose=verbose)
         if (verbose)
             message("Finished writing assay ", i, "/", nassay, " to ",
                     "HDF5 file:\n  ", h5_path, "\n")
@@ -131,11 +134,11 @@
     assays
 }
 
-.write_HDF5SummarizedExperiment <- function(x,
-                                            rds_path=.SE_RDS_BASENAME,
-                                            h5_path=.ASSAYS_H5_BASENAME,
-                                            chunkdim=NULL, level=NULL,
-                                            verbose=FALSE)
+.write_HDF5SummarizedExperiment <- function(x, rds_path=.SE_RDS_BASENAME,
+                                               h5_path=.ASSAYS_H5_BASENAME,
+                                               chunkdim=NULL, level=NULL,
+                                               as.sparse=NA,
+                                               verbose=FALSE)
 {
     .load_SummarizedExperiment_package()
 
@@ -155,7 +158,8 @@
     if (!isTRUEorFALSE(verbose))
         stop(wmsg("'verbose' must be TRUE or FALSE"))
 
-    x@assays <- .write_h5_assays(x@assays, h5_path, chunkdim, level, verbose)
+    x@assays <- .write_h5_assays(x@assays, h5_path, chunkdim, level,
+                                           as.sparse, verbose)
     .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
     invisible(x)
 }
@@ -230,6 +234,7 @@
 saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
                                             replace=FALSE,
                                             chunkdim=NULL, level=NULL,
+                                            as.sparse=NA,
                                             verbose=FALSE)
 {
     .load_SummarizedExperiment_package()
@@ -261,6 +266,7 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
     .write_HDF5SummarizedExperiment(x, rds_path=rds_path,
                                        h5_path=h5_path,
                                        chunkdim=chunkdim, level=level,
+                                       as.sparse=as.sparse,
                                        verbose=verbose)
 }
 
