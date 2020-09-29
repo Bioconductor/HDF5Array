@@ -12,6 +12,7 @@
 \alias{dimnames,HDF5ArraySeed-method}
 \alias{extract_array,HDF5ArraySeed-method}
 \alias{is_sparse,HDF5ArraySeed-method}
+\alias{is_sparse<-,HDF5ArraySeed-method}
 \alias{extract_sparse_array,HDF5ArraySeed-method}
 \alias{chunkdim,HDF5ArraySeed-method}
 
@@ -75,6 +76,10 @@ chunkdim(seed1)
 
 seed2 <- HDF5ArraySeed(tally_file, name, as.sparse=TRUE)
 seed2
+
+## Alternatively:
+is_sparse(seed1) <- TRUE
+seed1  # same as 'seed2'
 }
 \keyword{classes}
 \keyword{methods}

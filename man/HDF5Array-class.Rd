@@ -11,6 +11,8 @@
 \alias{HDF5Matrix-class}
 \alias{HDF5Matrix}
 
+\alias{is_sparse<-,HDF5Array-method}
+
 \alias{matrixClass,HDF5Array-method}
 \alias{coerce,HDF5Array,HDF5Matrix-method}
 \alias{coerce,HDF5Matrix,HDF5Array-method}
@@ -143,6 +145,11 @@ chunkdim(cvg)
 ## memory efficient and likely faster:
 cvg0 <- HDF5Array(tally_file, name, as.sparse=TRUE)
 is_sparse(cvg0)  # TRUE
+
+## Note that we can also flag the HDF5Array object as sparse after
+## creation:
+is_sparse(cvg) <- TRUE
+cvg  # same as 'cvg0'
 
 ## ---------------------------------------------------------------------
 ## dim/dimnames

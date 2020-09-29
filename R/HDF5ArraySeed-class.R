@@ -268,6 +268,18 @@ setMethod("is_sparse", "HDF5ArraySeed",
     function(x) .hasSlot(x, "as_sparse") && x@as_sparse
 )
 
+setReplaceMethod("is_sparse", "HDF5ArraySeed",
+    function(x, value)
+    {
+        if (!isTRUEorFALSE(value))
+            stop(wmsg("the supplied value must be TRUE or FALSE"))
+        if (!.hasSlot(x, "as_sparse"))
+            x <- updateObject(x, check=FALSE)
+        x@as_sparse <- value
+        x
+    }
+)
+
 .extract_sparse_array_from_HDF5ArraySeed <- function(x, index)
 {
     if (!is_sparse(x))

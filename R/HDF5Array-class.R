@@ -43,6 +43,14 @@ HDF5Array <- function(filepath, name, as.sparse=FALSE, type=NA)
     DelayedArray(seed)
 }
 
+setReplaceMethod("is_sparse", "HDF5Array",
+    function(x, value)
+    {
+         is_sparse(x@seed) <- value
+         x
+    }
+)
+
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### HDF5Matrix objects
