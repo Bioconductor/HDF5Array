@@ -142,6 +142,7 @@ setMethod("write_block", "HDF5RealizationSink",
             block <- as.array(block)
         h5write(block, x@filepath, x@name,
                 start=start(viewport), count=width(viewport))
+        x
     }
 )
 

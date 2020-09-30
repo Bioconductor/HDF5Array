@@ -240,6 +240,7 @@ setMethod("write_block", "TENxRealizationSink",
                                         block@nzindex[ , 2L],
                                         ncol(viewport))
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
+        x
     }
 )
 
