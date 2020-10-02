@@ -182,7 +182,6 @@ if (.Platform$OS.type != "windows") {
     block_size <- if (.Platform$r_arch == "i386") 2e8 else 3e8
 }
 setAutoBlockSize(block_size)
-DelayedArray:::set_verbose_block_processing(TRUE)
 
 ## We're ready to compute the library sizes, number of genes expressed
 ## per cell, and average expression across cells:
@@ -202,7 +201,8 @@ FUN <- function(block)
 ## we supply a grid made with colAutoGrid() to generate blocks of full
 ## columns (see ?colAutoGrid for more information):
 system.time({
-  block_results <- blockApply(oneM25k, FUN, grid=colAutoGrid(oneM25k))
+  block_results <- blockApply(oneM25k, FUN, grid=colAutoGrid(oneM25k),
+                              verbose=TRUE)
 })
 
 ## 'block_results' is a list with 1 list element per block in
@@ -225,7 +225,6 @@ stopifnot(all.equal(ave_exprs, ave_exprs2))
 ## settings:
 setAutoBPPARAM()
 setAutoBlockSize()
-DelayedArray:::set_verbose_block_processing(FALSE)
 
 ## ---------------------------------------------------------------------
 ## extractNonzeroDataByCol()

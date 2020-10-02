@@ -36,7 +36,7 @@
 }
 
 \usage{
-writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
+writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
 }
 
 \arguments{
@@ -67,7 +67,10 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=FALSE)
     See \code{?\link{getHDF5DumpCompressionLevel}} for more information.
   }
   \item{verbose}{
-    Set to \code{TRUE} to make the function display progress.
+    Whether block processing progress should be displayed or not.
+    If set to \code{NA} (the default), verbosity is controlled
+    by \code{DelayedArray:::get_verbose_block_processing()}.
+    Setting \code{verbose} to \code{TRUE} or \code{FALSE} overrides this.
   }
 }
 

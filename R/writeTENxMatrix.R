@@ -283,17 +283,12 @@ setAs("TENxRealizationSink", "DelayedArray",
 ### Return a TENxMatrix object pointing to the newly written HDF5-based
 ### sparse matrix on disk.
 writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
-                            level=NULL, verbose=FALSE)
+                               level=NULL, verbose=NA)
 {
-    if (!isTRUEorFALSE(verbose))
-        stop("'verbose' must be TRUE or FALSE")
+    verbose <- DelayedArray:::normarg_verbose(verbose)
     sink <- TENxRealizationSink(dim(x), dimnames(x), type(x),
                                 filepath=filepath, group=group, level=level)
-    if (verbose) {
-        old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
-        on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
-    }
-    BLOCK_write_to_sink(x, sink)
+    BLOCK_write_to_sink(sink, x, verbose=verbose)
     ans <- as(sink, "TENxMatrix")
     if (verbose)
         message("sparsity: ", round(sparsity(ans), digits=2))

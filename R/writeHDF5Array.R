@@ -179,14 +179,13 @@ setAs("HDF5RealizationSink", "DelayedArray",
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                               H5type=NULL, chunkdim=NULL, level=NULL,
                               as.sparse=NA,
-                              with.dimnames=FALSE, verbose=FALSE)
+                              with.dimnames=FALSE, verbose=NA)
 {
     if (!(is.logical(as.sparse) && length(as.sparse) == 1L))
         stop(wmsg("'as.sparse' must be NA, TRUE or FALSE"))
     if (!isTRUEorFALSE(with.dimnames))
         stop("'with.dimnames' must be TRUE or FALSE")
-    if (!isTRUEorFALSE(verbose))
-        stop("'verbose' must be TRUE or FALSE")
+    verbose <- DelayedArray:::normarg_verbose(verbose)
 
     if (is.na(as.sparse))
         as.sparse <- is_sparse(x)
@@ -198,11 +197,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                                 filepath=filepath, name=name,
                                 H5type=H5type, size=size,
                                 chunkdim=chunkdim, level=level)
-    if (verbose) {
-        old_verbose <- DelayedArray:::set_verbose_block_processing(verbose)
-        on.exit(DelayedArray:::set_verbose_block_processing(old_verbose))
-    }
-    BLOCK_write_to_sink(x, sink)
+    sink <- BLOCK_write_to_sink(sink, x, verbose=verbose)
     as(sink, "HDF5Array")
 }
 

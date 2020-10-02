@@ -29,7 +29,7 @@
 \usage{
 writeHDF5Array(x, filepath=NULL, name=NULL,
                   H5type=NULL, chunkdim=NULL, level=NULL, as.sparse=NA,
-                  with.dimnames=FALSE, verbose=FALSE)
+                  with.dimnames=FALSE, verbose=NA)
 }
 
 \arguments{
@@ -112,14 +112,17 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     See \code{?\link{h5writeDimnames}} for more information.
   }
   \item{verbose}{
-    Set to \code{TRUE} to make the function display progress.
+    Whether block processing progress should be displayed or not.
+    If set to \code{NA} (the default), verbosity is controlled
+    by \code{DelayedArray:::get_verbose_block_processing()}.
+    Setting \code{verbose} to \code{TRUE} or \code{FALSE} overrides this.
   }
 }
 
 \details{
   Please note that, depending on the size of the data to write to disk
-  and the performance of the disk, \code{writeHDF5Array} can take a long
-  time to complete. Use \code{verbose=TRUE} to see its progress.
+  and the performance of the disk, \code{writeHDF5Array()} can take a
+  long time to complete. Use \code{verbose=TRUE} to see its progress.
 
   Use \code{\link{setHDF5DumpFile}} and \code{\link{setHDF5DumpName}} to
   control the location of automatically created HDF5 datasets.

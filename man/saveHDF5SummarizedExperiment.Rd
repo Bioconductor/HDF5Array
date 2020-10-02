@@ -19,7 +19,7 @@
 \usage{
 saveHDF5SummarizedExperiment(x, dir="my_h5_se", prefix="", replace=FALSE,
                                 chunkdim=NULL, level=NULL, as.sparse=NA,
-                                verbose=FALSE)
+                                verbose=NA)
 
 loadHDF5SummarizedExperiment(dir="my_h5_se", prefix="")
 
@@ -72,6 +72,11 @@ quickResaveHDF5SummarizedExperiment(x, verbose=FALSE)
   }
   \item{verbose}{
     Set to \code{TRUE} to make the function display progress.
+
+    In the case of \code{saveHDF5SummarizedExperiment()}, \code{verbose}
+    is set to \code{NA} by default, in which case verbosity is controlled
+    by \code{DelayedArray:::get_verbose_block_processing()}.
+    Setting \code{verbose} to \code{TRUE} or \code{FALSE} overrides this.
   }
 }
 

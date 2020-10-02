@@ -235,7 +235,7 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
                                             replace=FALSE,
                                             chunkdim=NULL, level=NULL,
                                             as.sparse=NA,
-                                            verbose=FALSE)
+                                            verbose=NA)
 {
     .load_SummarizedExperiment_package()
 
@@ -252,6 +252,8 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
 
     if (!isTRUEorFALSE(replace))
         stop(wmsg("'replace' must be TRUE or FALSE"))
+
+    verbose <- DelayedArray:::normarg_verbose(verbose)
 
     if (!dir.exists(dir)) {
         .create_dir(dir)
