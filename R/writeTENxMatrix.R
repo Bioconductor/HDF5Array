@@ -288,7 +288,7 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
     verbose <- DelayedArray:::normarg_verbose(verbose)
     sink <- TENxRealizationSink(dim(x), dimnames(x), type(x),
                                 filepath=filepath, group=group, level=level)
-    BLOCK_write_to_sink(sink, x, verbose=verbose)
+    sink <- BLOCK_write_to_sink(sink, x, verbose=verbose)
     ans <- as(sink, "TENxMatrix")
     if (verbose)
         message("sparsity: ", round(sparsity(ans), digits=2))
