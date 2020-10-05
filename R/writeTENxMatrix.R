@@ -198,19 +198,19 @@ setMethod("chunkdim", "TENxRealizationSink", function(x) c(nrow(x), 1L))
 ### Writing data to a TENxRealizationSink object
 ###
 
-.check_viewport <- function(viewport, x)
+.check_viewport <- function(viewport, sink)
 {
-    if (!identical(nrow(viewport), nrow(x)))
-        stop(wmsg("The \"write_block\" method for ", class(x), " objects ",
+    if (!identical(nrow(viewport), nrow(sink)))
+        stop(wmsg("The \"write_block\" method for ", class(sink), " objects ",
                   "can only be used to write a block to a viewport that ",
                   "spans full columns i.e. to a viewport such that ",
-                  "'nrow(viewport) == nrow(x)'."))
+                  "'nrow(viewport) == nrow(sink)'."))
 
-    current_col_idx <- .get_current_col_index(x@filepath, x@group)
+    current_col_idx <- .get_current_col_index(sink@filepath, sink@group)
     if (!identical(start(viewport)[[2L]], current_col_idx))
         stop(wmsg("The block to write is not adjacent to the last ",
                   "written block.\n\n",
-                  "The \"write_block\" method for ", class(x), " objects ",
+                  "The \"write_block\" method for ", class(sink), " objects ",
                   "can only be used in \"appending mode\", that is, each ",
                   "block must be written to a viewport that is adjacent to ",
                   "the viewport where the previous block was written (with ",
@@ -221,26 +221,26 @@ setMethod("chunkdim", "TENxRealizationSink", function(x) c(nrow(x), 1L))
 
 ### Support "appending mode" only.
 setMethod("write_block", "TENxRealizationSink",
-    function(x, viewport, block)
+    function(sink, viewport, block)
     {
-        .check_viewport(viewport, x)
+        .check_viewport(viewport, sink)
         if (!is(block, "SparseArraySeed"))
             block <- as(block, "SparseArraySeed")
 
         ## Append the nonzero data.
-        new_data_len1 <- .append_data(x@filepath, x@group, block@nzdata)
+        new_data_len1 <- .append_data(sink@filepath, sink@group, block@nzdata)
 
         ## Append the 0-based row indices of the nonzero data.
-        new_data_len2 <- .append_row_indices(x@filepath, x@group,
+        new_data_len2 <- .append_row_indices(sink@filepath, sink@group,
                                              block@nzindex[ , 1L] - 1L)
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
-        new_data_len3 <- .append_indptr(x@filepath, x@group,
+        new_data_len3 <- .append_indptr(sink@filepath, sink@group,
                                         block@nzindex[ , 2L],
                                         ncol(viewport))
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
-        x
+        sink
     }
 )
 

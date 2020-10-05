@@ -136,13 +136,13 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
 ###
 
 setMethod("write_block", "HDF5RealizationSink",
-    function(x, viewport, block)
+    function(sink, viewport, block)
     {
         if (!is.array(block))
             block <- as.array(block)
-        h5write(block, x@filepath, x@name,
+        h5write(block, sink@filepath, sink@name,
                 start=start(viewport), count=width(viewport))
-        x
+        sink
     }
 )
 
