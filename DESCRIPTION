@@ -12,7 +12,7 @@ Description: Implements the HDF5Array and TENxMatrix classes, 2 convenient
 Version: 1.17.14
 Encoding: UTF-8
 Author: Hervé Pagès
-Maintainer: Hervé Pagès <hpages@fredhutch.org>
+Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
 biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.15.16), rhdf5 (>= 2.31.6)
