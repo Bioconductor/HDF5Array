@@ -123,10 +123,12 @@ setMethod("dimnames", "TENxMatrixSeed",
 ### .get_data_indices_by_col()
 ###
 
-### S4Vectors:::fancy_mseq() does not accept 'offset' of type double yet so
-### we implement a version that does.
-### Will this work if sum(lengths) is > .Machine$integer.max?
-.fancy_mseq <- function(lengths, offset=0)
+### base::sequence() does not properly handle a 'from' that is >
+### .Machine$integer.max so we implement a variant that does. Note that
+### the 2nd argument of this variant is 'offset' instead of 'from' ('offset'
+### being the same as 'from' - 1).
+### TODO: Does .sequence2() work if sum(lengths) is > .Machine$integer.max?
+.sequence2 <- function(lengths, offset=0)
 {
     lengths_len <- length(lengths)
     if (lengths_len == 0L)
@@ -143,7 +145,7 @@ setMethod("dimnames", "TENxMatrixSeed",
     col_ranges <- S4Vectors:::extract_data_frame_rows(x@col_ranges, j)
     start2 <- col_ranges[ , "start"]
     width2 <- col_ranges[ , "width"]
-    idx2 <- .fancy_mseq(width2, offset=start2 - 1L)
+    idx2 <- .sequence2(width2, offset=start2 - 1L)
     ### Will this work if 'idx2' is a long vector?
     relist(idx2, PartitioningByWidth(width2))
 }
