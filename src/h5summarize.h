@@ -9,7 +9,8 @@ SEXP C_h5summarize(
 	SEXP index,
 	SEXP as_integer,
 	SEXP op,
-	SEXP na_rm
+	SEXP na_rm,
+	SEXP verbose
 );
 
 #endif  /* _H5SUMMARIZE_H_ */

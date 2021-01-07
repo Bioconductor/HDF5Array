@@ -249,7 +249,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset,
 		const IntAEAE *breakpoint_bufs,
 		const LLongAEAE *tchunkidx_bufs,
 		const int *num_tchunks,
-		int opcode, int na_rm)
+		int opcode, int na_rm, int verbose)
 {
 	int ndim, moved_along, ret;
 	IntAE *tchunk_midx_buf, *inner_midx_buf;
@@ -305,6 +305,12 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset,
 				tchunk_midx_buf->elts, moved_along,
 				index, breakpoint_bufs, tchunkidx_bufs,
 				&tchunk_vp, &dest_vp);
+		if (verbose)
+			_print_tchunk_info(ndim,
+					num_tchunks, tchunk_midx_buf->elts,
+					tchunk_rank,
+					index,
+					tchunkidx_bufs, &tchunk_vp);
 		ret = _read_H5Viewport(h5dset,
 				&tchunk_vp, &middle_vp,
 				chunk_data_buf, chunk_space_id);
@@ -335,9 +341,9 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset,
 
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
-		   SEXP op, SEXP na_rm)
+		   SEXP op, SEXP na_rm, SEXP verbose)
 {
-	int as_int, opcode, narm0, ret;
+	int as_int, opcode, narm0, verbose0, ret;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
 	IntAEAE *breakpoint_bufs;
@@ -358,6 +364,11 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	if (!(IS_LOGICAL(na_rm) && LENGTH(na_rm) == 1))
 		error("'na.rm' must be TRUE or FALSE");
 	narm0 = LOGICAL(na_rm)[0];
+
+	/* Check 'verbose'. */
+	if (!(IS_LOGICAL(verbose) && LENGTH(verbose) == 1))
+		error("'verbose' must be TRUE or FALSE");
+	verbose0 = LOGICAL(verbose)[0];
 
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
@@ -393,7 +404,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	ans = PROTECT(h5summarize(&h5dset, index,
 				  breakpoint_bufs, tchunkidx_bufs,
 				  ntchunk_buf->elts,
-				  opcode, narm0));
+				  opcode, narm0, verbose0));
 
 	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);

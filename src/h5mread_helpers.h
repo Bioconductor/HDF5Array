@@ -105,6 +105,16 @@ void _update_tchunk_vp_dest_vp(
 	H5Viewport *dest_vp
 );
 
+void _print_tchunk_info(
+	int ndim,
+	const int *num_tchunks_buf,
+	const int *tchunk_midx,
+	int tchunk_rank,
+	const SEXP index,
+	const LLongAEAE *tchunkidx_bufs,
+	const H5Viewport *tchunk_vp
+);
+
 int _tchunk_is_truncated(
 	const H5DSetDescriptor *h5dset,
 	const H5Viewport *tchunk_vp

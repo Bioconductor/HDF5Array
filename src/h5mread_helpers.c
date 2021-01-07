@@ -389,6 +389,45 @@ void _update_tchunk_vp_dest_vp(const H5DSetDescriptor *h5dset,
 	return;
 }
 
+void _print_tchunk_info(int ndim,
+		const int *num_tchunks_buf, const int *tchunk_midx,
+		int tchunk_rank,
+		const SEXP index, const LLongAEAE *tchunkidx_bufs,
+		const H5Viewport *tchunk_vp)
+{
+	int along, h5along, i;
+	long long int total_num_tchunks, tchunkidx;
+
+	total_num_tchunks = 1;
+	for (along = 0; along < ndim; along++)
+		total_num_tchunks *= num_tchunks_buf[along];
+
+	printf("processing chunk %d/%lld: [",
+	       tchunk_rank + 1, total_num_tchunks);
+	for (along = 0; along < ndim; along++) {
+		i = tchunk_midx[along] + 1;
+		if (along != 0)
+			printf(", ");
+		printf("%d/%d", i, num_tchunks_buf[along]);
+	}
+	printf("] -- <<");
+	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
+		i = tchunk_midx[along];
+		if (GET_LIST_ELT(index, along) != R_NilValue) {
+			tchunkidx = tchunkidx_bufs->elts[along]->elts[i];
+		} else {
+			tchunkidx = i;
+		}
+		if (along != 0)
+			printf(", ");
+		printf("#%lld=%llu:%llu", tchunkidx + 1,
+		       tchunk_vp->h5off[h5along] + 1,
+		       tchunk_vp->h5off[h5along] + tchunk_vp->h5dim[h5along]);
+	}
+	printf(">>\n");
+	return;
+}
+
 /* Return 1 if the chunk that 'tchunk_vp' is pointing at is "truncated"
    (a.k.a. "partial edge chunk" in HDF5's terminology), and 0 otherwise
    (i.e. if the new chunk is a full-size chunk). */

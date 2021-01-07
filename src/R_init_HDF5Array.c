@@ -33,7 +33,7 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_h5setdimlabels, 3),
 
 /* h5summarize.c */
-	CALLMETHOD_DEF(C_h5summarize, 6),
+	CALLMETHOD_DEF(C_h5summarize, 7),
 
 	{NULL, NULL, 0}
 };
