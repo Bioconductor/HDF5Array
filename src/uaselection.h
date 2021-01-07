@@ -13,12 +13,6 @@
 /* Like VECTOR_ELT(x, i) except that 'x' can be R_NilValue. */
 #define GET_LIST_ELT(x, i) ((x) != R_NilValue ? VECTOR_ELT(x, i) : R_NilValue)
 
-static inline long long int _get_trusted_elt(SEXP x, int i)
-{
-	return IS_INTEGER(x) ? (long long int) INTEGER(x)[i] :
-			       (long long int) REAL(x)[i];
-}
-
 int _shallow_check_uaselection(
 	int ndim,
 	SEXP starts,
@@ -91,6 +85,17 @@ SEXP C_map_starts_to_chunks(
 	SEXP dim,
 	SEXP chunkdim
 );
+
+
+/****************************************************************************
+ * Inline functions
+ */
+
+static inline long long int _get_trusted_elt(SEXP x, int i)
+{
+	return IS_INTEGER(x) ? (long long int) INTEGER(x)[i] :
+			       (long long int) REAL(x)[i];
+}
 
 #endif  /* _UASELECTION_H_ */
 

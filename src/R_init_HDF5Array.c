@@ -4,6 +4,7 @@
 #include "H5DSetDescriptor.h"
 #include "h5mread.h"
 #include "h5dimscales.h"
+#include "h5summarize.h"
 
 #define CALLMETHOD_DEF(fun, numArgs) {#fun, (DL_FUNC) &fun, numArgs}
 
@@ -30,6 +31,9 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_h5setdimscales, 5),
 	CALLMETHOD_DEF(C_h5getdimlabels, 2),
 	CALLMETHOD_DEF(C_h5setdimlabels, 3),
+
+/* h5summarize.c */
+	CALLMETHOD_DEF(C_h5summarize, 6),
 
 	{NULL, NULL, 0}
 };

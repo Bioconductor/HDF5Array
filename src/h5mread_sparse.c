@@ -295,70 +295,6 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
  * Low-level helpers used by the data gathering functions
  */
 
-static void init_in_offset(int ndim, SEXP starts,
-		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
-		const H5Viewport *tchunk_vp,
-		size_t *in_offset)
-{
-	size_t in_off;
-	int along, h5along, i;
-	SEXP start;
-
-	in_off = 0;
-	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
-		in_off *= h5chunkdim[h5along];
-		i = dest_vp->off[along];
-		start = GET_LIST_ELT(starts, along);
-		if (start != R_NilValue)
-			in_off += _get_trusted_elt(start, i) - 1 -
-				  tchunk_vp->h5off[h5along];
-	}
-	*in_offset = in_off;
-	return;
-}
-
-static inline void update_in_offset(int ndim, SEXP starts,
-		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
-		const int *inner_midx, int inner_moved_along,
-		size_t *in_offset)
-{
-	SEXP start;
-	int i1, i0, along, h5along, di;
-	long long int in_off_inc;
-
-	start = GET_LIST_ELT(starts, inner_moved_along);
-	if (start != R_NilValue) {
-		i1 = dest_vp->off[inner_moved_along] +
-		     inner_midx[inner_moved_along];
-		i0 = i1 - 1;
-		in_off_inc = _get_trusted_elt(start, i1) -
-			     _get_trusted_elt(start, i0);
-	} else {
-		in_off_inc = 1;
-	}
-	if (inner_moved_along >= 1) {
-		along = inner_moved_along - 1;
-		h5along = ndim - inner_moved_along;
-		do {
-			in_off_inc *= h5chunkdim[h5along];
-			di = 1 - dest_vp->dim[along];
-			start = GET_LIST_ELT(starts, along);
-			if (start != R_NilValue) {
-				i1 = dest_vp->off[along];
-				i0 = i1 - di;
-				in_off_inc += _get_trusted_elt(start, i1) -
-					      _get_trusted_elt(start, i0);
-			} else {
-				in_off_inc += di;
-			}
-			along--;
-			h5along++;
-		} while (along >= 0);
-	}
-	*in_offset += in_off_inc;
-	return;
-}
-
 /* We don't let the length of 'nzdata' exceed INT_MAX (see NZDATA_MAXLENGTH
    above). Return 0 if val is zero, 1 if val is non-zero and was successfully
    appended, and -1 if val is non-zero but couldn't be appended because the
@@ -371,8 +307,7 @@ static inline int append_nonzero_val_to_nzdata_buf(
 	int ret;
 
 	switch (h5dset->Rtype) {
-	    case LGLSXP:
-	    case INTSXP: {
+	    case LGLSXP: case INTSXP: {
 		int val = ((int *) in)[in_offset];
 		ret = IntAE_append_if_nonzero((IntAE *) nzdata_buf, val);
 	    } break;
@@ -472,9 +407,9 @@ static int gather_selected_chunk_data_as_sparse(
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-	init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
-		       tchunk_vp,
-		       &in_offset);
+	_init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+			tchunk_vp,
+			&in_offset);
 	/* Walk on the **selected** elements in current chunk and append
 	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
@@ -489,9 +424,9 @@ static int gather_selected_chunk_data_as_sparse(
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
-				 inner_midx_buf, inner_moved_along,
-				 &in_offset);
+		_update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+				  inner_midx_buf, inner_moved_along,
+				  &in_offset);
 	};
 	return 0;
 }
@@ -565,9 +500,9 @@ static int gather_selected_chunk_int_data_as_sparse(
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
-	init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
-		       tchunk_vp,
-		       &in_offset);
+	_init_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+			tchunk_vp,
+			&in_offset);
 	/* Walk on the **selected** elements in current chunk and append
 	   the non-zero ones to 'nzindex_bufs' and 'nzdata_buf'. */
 	while (1) {
@@ -583,9 +518,9 @@ static int gather_selected_chunk_int_data_as_sparse(
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
-				 inner_midx_buf, inner_moved_along,
-				 &in_offset);
+		_update_in_offset(ndim, starts, h5dset->h5chunkdim, dest_vp,
+				  inner_midx_buf, inner_moved_along,
+				  &in_offset);
 	};
 	return 0;
 }
@@ -712,6 +647,7 @@ static int read_data_8(const H5DSetDescriptor *h5dset,
 	gatherer = sparse_data_gatherer(h5dset, nzindex_bufs, nzdata_buf);
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
+
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {

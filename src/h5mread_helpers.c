@@ -15,7 +15,6 @@ Some useful links:
 */
 
 #include "global_errmsg_buf.h"
-#include "uaselection.h"
 #include "H5DSetDescriptor.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -562,5 +561,32 @@ int _read_h5chunk(const H5DSetDescriptor *h5dset,
 			compressed_chunk_data_buf);
 	//print_chunk_data(h5dset, compressed_chunk_data_buf);
 	return 0;
+}
+
+
+/****************************************************************************
+ * _init_in_offset()
+ */
+
+void _init_in_offset(int ndim, SEXP starts,
+		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
+		const H5Viewport *tchunk_vp,
+		size_t *in_offset)
+{
+	size_t in_off;
+	int along, h5along, i;
+	SEXP start;
+
+	in_off = 0;
+	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
+		in_off *= h5chunkdim[h5along];
+		i = dest_vp->off[along];
+		start = GET_LIST_ELT(starts, along);
+		if (start != R_NilValue)
+			in_off += _get_trusted_elt(start, i) - 1 -
+				  tchunk_vp->h5off[h5along];
+	}
+	*in_offset = in_off;
+	return;
 }
 

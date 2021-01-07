@@ -32,6 +32,7 @@ Collate: utils.R
 	h5mread_from_reshaped.R
 	h5dimscales.R
 	h5utils.R
+	h5summarize.R
 	HDF5ArraySeed-class.R
 	HDF5Array-class.R
 	ReshapedHDF5ArraySeed-class.R

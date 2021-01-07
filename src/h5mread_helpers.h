@@ -1,24 +1,9 @@
 #ifndef _H5MREAD_HELPERS_H_
 #define _H5MREAD_HELPERS_H_
 
+#include "uaselection.h"
 #include "H5DSetDescriptor.h"
 #include "hdf5.h"
-
-static inline int _next_midx(int ndim, const int *max_idx_plus_one,
-			     int *midx_buf)
-{
-	int along, i;
-
-	for (along = 0; along < ndim; along++) {
-		i = midx_buf[along] + 1;
-		if (i < max_idx_plus_one[along]) {
-			midx_buf[along] = i;
-			break;
-		}
-		midx_buf[along] = 0;
-	}
-	return along;
-}
 
 /* A data structure for representing a viewport on a HDF5 dataset. */
 typedef struct {
@@ -139,6 +124,78 @@ int _read_h5chunk(
 	void *compressed_chunk_data_buf,
 	void *chunk_data_buf
 );
+
+void _init_in_offset(
+	int ndim,
+	SEXP starts,
+	const hsize_t *h5chunkdim,
+	const H5Viewport *dest_vp,
+	const H5Viewport *tchunk_vp,
+	size_t *in_offset
+);
+
+
+/****************************************************************************
+ * Inline helper functions
+ */
+
+static inline int _next_midx(int ndim, const int *max_idx_plus_one,
+			     int *midx_buf)
+{
+	int along, i;
+
+	for (along = 0; along < ndim; along++) {
+		i = midx_buf[along] + 1;
+		if (i < max_idx_plus_one[along]) {
+			midx_buf[along] = i;
+			break;
+		}
+		midx_buf[along] = 0;
+	}
+	return along;
+}
+
+static inline void _update_in_offset(int ndim, SEXP starts,
+		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
+		const int *inner_midx, int inner_moved_along,
+		size_t *in_offset)
+{
+	SEXP start;
+	int i1, i0, along, h5along, di;
+	long long int in_off_inc;
+
+	start = GET_LIST_ELT(starts, inner_moved_along);
+	if (start != R_NilValue) {
+		i1 = dest_vp->off[inner_moved_along] +
+		     inner_midx[inner_moved_along];
+		i0 = i1 - 1;
+		in_off_inc = _get_trusted_elt(start, i1) -
+			     _get_trusted_elt(start, i0);
+	} else {
+		in_off_inc = 1;
+	}
+	if (inner_moved_along >= 1) {
+		along = inner_moved_along - 1;
+		h5along = ndim - inner_moved_along;
+		do {
+			in_off_inc *= h5chunkdim[h5along];
+			di = 1 - dest_vp->dim[along];
+			start = GET_LIST_ELT(starts, along);
+			if (start != R_NilValue) {
+				i1 = dest_vp->off[along];
+				i0 = i1 - di;
+				in_off_inc += _get_trusted_elt(start, i1) -
+					      _get_trusted_elt(start, i0);
+			} else {
+				in_off_inc += di;
+			}
+			along--;
+			h5along++;
+		} while (along >= 0);
+	}
+	*in_offset += in_off_inc;
+	return;
+}
 
 #endif  /* _H5MREAD_HELPERS_H_ */
 

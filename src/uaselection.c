@@ -760,7 +760,8 @@ static int map_start_to_chunks(int along,
 			set_error_for_uaselection_too_large(along + 1);
 			return -1;
 		}
-		nstart_buf[along] = d;
+		if (nstart_buf != NULL)
+			nstart_buf[along] = d;
 		return 0;
 	}
 
@@ -777,7 +778,8 @@ static int map_start_to_chunks(int along,
 	}
 
 	n = LENGTH(start);
-	nstart_buf[along] = n;
+	if (nstart_buf != NULL)
+		nstart_buf[along] = n;
 
 	if (n == 0)
 		return 0;
@@ -817,7 +819,8 @@ static int map_start_to_chunks(int along,
 	return 0;
 }
 
-/* 'dim', 'chunkdim', and 'nstart_buf' must point to arrays of 'ndim' elements.
+/* 'dim', 'chunkdim', and 'nstart_buf' must point to arrays of 'ndim'
+   elements (alternatively 'nstart_buf' can be set to NULL).
 
    'starts' is **assumed** to be NULL or a list of length 'ndim'.
    This should have been already checked by _shallow_check_uaselection() so is

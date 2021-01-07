@@ -300,6 +300,7 @@ static int read_data_4_5(const H5DSetDescriptor *h5dset, int method,
 	}
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
+
 	tchunk_rank = 0;
 	moved_along = ndim;
 	do {
