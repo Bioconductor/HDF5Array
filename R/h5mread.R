@@ -61,12 +61,12 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
         stop(wmsg("'starts' must be a list (or NULL)"))
     }
     ## C_h5mread() will return an ordinary array if 'as.sparse' is FALSE,
-    ## or 'list(nzindex, nzdata, ans_dim)' if it's TRUE.
+    ## or 'list(ans_dim, nzindex, nzdata)' if it's TRUE.
     ans <- .Call2("C_h5mread", filepath, name, starts, counts, noreduce,
                                as.integer, as.sparse, method,
                                PACKAGE="HDF5Array")
     if (as.sparse)
-        ans <- SparseArraySeed(ans[[3L]], ans[[1L]], ans[[2L]], check=FALSE)
+        ans <- SparseArraySeed(ans[[1L]], ans[[2L]], ans[[3L]], check=FALSE)
     if (is.null(starts) || !order_starts)
         return(ans)
     index <- lapply(seq_along(starts0),

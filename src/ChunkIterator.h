@@ -32,7 +32,8 @@ void _destroy_ChunkIterator(
 int _init_ChunkIterator(
 	ChunkIterator *chunk_iter,
 	const H5DSetDescriptor *h5dset,
-	SEXP index
+	SEXP index,
+	int *selection_dim
 );
 
 int _next_chunk(

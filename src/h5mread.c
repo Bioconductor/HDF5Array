@@ -189,11 +189,11 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		PROTECT(ans);
 		if (sparse) {
 			if (h5dset.Rtype == LGLSXP)
-				fix_logical_NAs(VECTOR_ELT(ans, 1));
+				fix_logical_NAs(VECTOR_ELT(ans, 2));
 			else if (h5dset.Rtype == STRSXP && h5dset.as_na_attr)
-				set_character_NAs(VECTOR_ELT(ans, 1));
-			/* Final 'ans' is 'list(nzindex, nzdata, ans_dim)'. */
-			SET_VECTOR_ELT(ans, 2, ans_dim);
+				set_character_NAs(VECTOR_ELT(ans, 2));
+			/* Final 'ans' is 'list(ans_dim, nzindex, nzdata)'. */
+			SET_VECTOR_ELT(ans, 0, ans_dim);
 		} else {
 			if (h5dset.Rtype == LGLSXP)
 				fix_logical_NAs(ans);

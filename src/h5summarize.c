@@ -6,11 +6,11 @@
 
 #include "global_errmsg_buf.h"
 #include "uaselection.h"
-#include "H5DSetDescriptor.h"
 #include "h5mread_helpers.h"
 #include "ChunkIterator.h"
 
 #include <string.h>  /* for strcmp */
+#include <limits.h>  /* for INT_MAX */
 
 #define	MIN_OPCODE	1
 #define	MAX_OPCODE	2
@@ -569,7 +569,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	status = 0;
-	ret = _init_ChunkIterator(&chunk_iter, h5dset, index);
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL);
 	if (ret < 0)
 		return R_NilValue;
 	while ((ret = _next_chunk(&chunk_iter))) {
@@ -585,14 +585,14 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 					&chunk_iter.tchunk_vp);
 		if (int_OP != NULL) {
 			summarize_chunk_int_data(h5dset, index,
-				(int *) chunk_iter.chunk_data_buf,
+				chunk_iter.chunk_data_buf,
 				&chunk_iter.tchunk_vp,
 				&chunk_iter.dest_vp,
 				chunk_iter.inner_midx_buf,
 				int_OP, init, na_rm, &status);
 		} else {
 			summarize_chunk_double_data(h5dset, index,
-				(double *) chunk_iter.chunk_data_buf,
+				chunk_iter.chunk_data_buf,
 				&chunk_iter.tchunk_vp,
 				&chunk_iter.dest_vp,
 				chunk_iter.inner_midx_buf,

@@ -23,9 +23,9 @@ void _destroy_ChunkIterator(ChunkIterator *chunk_iter)
 }
 
 int _init_ChunkIterator(ChunkIterator *chunk_iter,
-		const H5DSetDescriptor *h5dset, SEXP index)
+		const H5DSetDescriptor *h5dset, SEXP index, int *selection_dim)
 {
-	int ndim, along, ret;
+	int ndim, ret;
 
 	chunk_iter->h5dset = h5dset;
 	chunk_iter->index = index;
@@ -37,10 +37,11 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 	chunk_iter->chunk_space_id = -1;
 	chunk_iter->chunk_data_buf = NULL;
 
-	/* Set 'chunk_iter->breakpoint_bufs' and 'chunk_iter->tchunkidx_bufs'. */
+	/* Set 'chunk_iter->breakpoint_bufs' and 'chunk_iter->tchunkidx_bufs'.
+	   Also populate 'selection_dim' if not set to NULL. */
 	chunk_iter->breakpoint_bufs = new_IntAEAE(ndim, ndim);
 	chunk_iter->tchunkidx_bufs = new_LLongAEAE(ndim, ndim);
-	ret = _map_starts_to_h5chunks(h5dset, index, NULL,
+	ret = _map_starts_to_h5chunks(h5dset, index, selection_dim,
 				      chunk_iter->breakpoint_bufs,
 				      chunk_iter->tchunkidx_bufs);
 	if (ret < 0)
@@ -66,9 +67,6 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 
 	/* Set 'chunk_iter->tchunk_midx_buf' and 'chunk_iter->inner_midx_buf'. */
 	chunk_iter->tchunk_midx_buf = new_IntAE(ndim, ndim, 0)->elts;
-	for (along = 0; along < ndim; along++)
-		chunk_iter->tchunk_midx_buf[along] =
-			chunk_iter->num_tchunks[along] - 1;
 	chunk_iter->inner_midx_buf = new_IntAE(ndim, ndim, 0)->elts;
 
 	/* Set 'chunk_iter->chunk_space_id'. */
@@ -112,14 +110,17 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
  */
 int _next_chunk(ChunkIterator *chunk_iter)
 {
-	int ndim, ret;
+	int ret;
 
-	ndim = chunk_iter->h5dset->ndim;
-	chunk_iter->moved_along = _next_midx(ndim, chunk_iter->num_tchunks,
-					     chunk_iter->tchunk_midx_buf);
 	chunk_iter->tchunk_rank++;
 	if (chunk_iter->tchunk_rank == chunk_iter->total_num_tchunks)
 		return 0;
+	chunk_iter->moved_along =
+		chunk_iter->tchunk_rank == 0 ?
+			chunk_iter->h5dset->ndim :
+			_next_midx(chunk_iter->h5dset->ndim,
+				   chunk_iter->num_tchunks,
+				   chunk_iter->tchunk_midx_buf);
 	_update_tchunk_vp_dest_vp(chunk_iter->h5dset,
 			chunk_iter->tchunk_midx_buf,
 			chunk_iter->moved_along,
