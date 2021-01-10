@@ -8,9 +8,8 @@
 #include "uaselection.h"
 #include "H5DSetDescriptor.h"
 #include "h5mread_helpers.h"
+#include "ChunkIterator.h"
 
-#include "hdf5.h"
-#include <stdlib.h>  /* for malloc, free */
 #include <string.h>  /* for strcmp */
 
 #define	MIN_OPCODE	1
@@ -62,176 +61,308 @@ static int check_Rtype(SEXPTYPE Rtype, int opcode)
 	return -1;
 }
 
-static SEXP summarize0(int opcode, SEXPTYPE Rtype)
-{
-	SEXP ans;
 
-	switch (opcode) {
-	    case MIN_OPCODE:
-		ans = PROTECT(NEW_NUMERIC(1));
-		REAL(ans)[0] = R_PosInf;
-		break;
-	    case MAX_OPCODE:
-		ans = PROTECT(NEW_NUMERIC(1));
-		REAL(ans)[0] = R_NegInf;
-		break;
-	    case RANGE_OPCODE:
-		ans = PROTECT(NEW_NUMERIC(2));
-		REAL(ans)[0] = R_PosInf;
-		REAL(ans)[1] = R_NegInf;
-		break;
-	    case SUM_OPCODE:
-		ans = PROTECT(NEW_NUMERIC(1));
-		REAL(ans)[0] = 0.0;
-		break;
-	    case PROD_OPCODE:
-		ans = PROTECT(NEW_NUMERIC(1));
-		REAL(ans)[0] = 1.0;
-		break;
-	    case ANY_OPCODE:
-		ans = PROTECT(NEW_LOGICAL(1));
-		LOGICAL(ans)[0] = 0;
-		break;
-	    case ALL_OPCODE:
-		ans = PROTECT(NEW_LOGICAL(1));
-		LOGICAL(ans)[0] = 1;
-		break;
-	    default:
-		/* Should never happen. */
-		PRINT_TO_ERRMSG_BUF("invalid opcode: %d", opcode);
-		return R_NilValue;
+/****************************************************************************
+ * Callback functions used for summarization of int data.
+ *
+ * Return new status:
+ *   0 = 'init' has not been set yet
+ *   1 = 'init' has been set
+ *   2 = 'init' has been set and we don't need to continue (break condition)
+ */
+
+typedef int (*IntOP)(void *init, int x, int na_rm, int status);
+typedef int (*DoubleOP)(void *init, double x, int na_rm, int status);
+
+static inline int int_min(void *init, int x, int na_rm, int status)
+{
+	int *init0;
+
+	init0 = (int *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return 2;
 	}
-	UNPROTECT(1);
-	return ans;
+	if (status == 0 || x < *init0)
+		*init0 = x;
+	return 1;
+}
+static inline int double_min(void *init, double x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (R_IsNA(x) || R_IsNaN(x)) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return R_IsNA(x) ? 2 : 1;
+	}
+	if (!R_IsNaN(*init0) && x < *init0)
+		*init0 = x;
+	return 1;
 }
 
-/* Return non-zero value if a break condition was encountered. */
-static inline int summarize_val(
-		const H5DSetDescriptor *h5dset,
-		const int *in, size_t in_offset,
-		int opcode, int na_rm, SEXP ans, int *done)
+static inline int int_max(void *init, int x, int na_rm, int status)
 {
-	int x;
-	double xx;
+	int *init0;
 
-	switch (h5dset->Rtype) {
-	    case LGLSXP:
-		x = ((int *) in)[in_offset];
-		/* See fix_logical_NAs() in h5mread.c for why we replace
-		   negative values with NA_LOGICAL. */
-		if (x < 0)
-			x = NA_LOGICAL;
-		if (opcode == ANY_OPCODE) {
-			if (x == NA_LOGICAL) {
-				if (!na_rm) {
-					LOGICAL(ans)[0] = NA_LOGICAL;
-					*done = 1;
-				}
-			} else if (x != 0) {
-				LOGICAL(ans)[0] = 1;
-				*done = 1;
-			}
-			return 0;
-		}
-		if (opcode == ALL_OPCODE) {
-			if (x == NA_LOGICAL) {
-				if (!na_rm) {
-					LOGICAL(ans)[0] = NA_LOGICAL;
-					*done = 1;
-				}
-			} else if (x == 0) {
-				LOGICAL(ans)[0] = 0;
-				*done = 1;
-			}
-			return 0;
-		}
-		xx = x == NA_LOGICAL ? NA_REAL : (double) x;
-		break;
-	    case INTSXP:
-		x = ((int *) in)[in_offset];
-		xx = x == NA_INTEGER ? NA_REAL : (double) x;
-		break;
-	    case REALSXP:
-		xx = ((double *) in)[in_offset];
-		break;
-	    default:
-		/* Should never happen. Early call to check_Rtype() should
-		   have caught this. */
-		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-				    CHAR(type2str(h5dset->Rtype)));
-		return -1;
+	init0 = (int *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return 2;
 	}
-	if (R_IsNA(xx) || R_IsNaN(xx)) {
-		if (!na_rm) {
-			if (opcode == RANGE_OPCODE) {
-				REAL(ans)[0] = REAL(ans)[1] = NA_REAL;
-			} else {
-				REAL(ans)[0] = NA_REAL;
-			}
-			*done = 1;
-		}
-		return 0;
+	if (status == 0 || x > *init0)
+		*init0 = x;
+	return 1;
+}
+static inline int double_max(void *init, double x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (R_IsNA(x) || R_IsNaN(x)) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return R_IsNA(x) ? 2 : 1;
 	}
-	switch (opcode) {
-	    case MIN_OPCODE:
-		if (xx < REAL(ans)[0]) {
-			REAL(ans)[0] = xx;
-			if (na_rm && xx == R_NegInf)
-				*done = 1;
-		}
-		break;
-	    case MAX_OPCODE:
-		if (xx > REAL(ans)[0]) {
-			REAL(ans)[0] = xx;
-			if (na_rm && xx == R_PosInf)
-				*done = 1;
-		}
-		break;
-	    case RANGE_OPCODE:
-		if (xx < REAL(ans)[0])
-			REAL(ans)[0] = xx;
-		if (xx > REAL(ans)[1])
-			REAL(ans)[1] = xx;
-		if (na_rm
-		 && REAL(ans)[0] == R_NegInf
-		 && REAL(ans)[1] == R_PosInf)
-			*done = 1;
-		break;
-	    case SUM_OPCODE:
-		REAL(ans)[0] += xx;
-		break;
-	    case PROD_OPCODE:
-		REAL(ans)[0] *= xx;
-		break;
-	    default:
-		/* Should never happen. */
-		PRINT_TO_ERRMSG_BUF("invalid opcode: %d", opcode);
-		return -1;
-	}
-	return 0;
+	if (!R_IsNaN(*init0) && x > *init0)
+		*init0 = x;
+	return 1;
 }
 
-static int summarize_selected_chunk_data(
-		const H5DSetDescriptor *h5dset,
-		SEXP index, const void *in, const H5Viewport *tchunk_vp,
+static inline int int_range(void *init, int x, int na_rm, int status)
+{
+	int *init0;
+
+	init0 = (int *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		init0[0] = init0[1] = x;
+		return 2;
+	}
+	if (status == 0) {
+		init0[0] = init0[1] = x;
+		return 1;
+	}
+	if (x < init0[0])
+		init0[0] = x;
+	if (x > init0[1])
+		init0[1] = x;
+	return 1;
+}
+static inline int double_range(void *init, double x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (R_IsNA(x) || R_IsNaN(x)) {
+		if (na_rm)
+			return status;
+		init0[0] = init0[1] = x;
+		return R_IsNA(x) ? 2 : 1;
+	}
+	if (!R_IsNaN(init0[0])) {
+		if (x < init0[0])
+			init0[0] = x;
+		if (x > init0[1])
+			init0[1] = x;
+	}
+	return 1;
+}
+
+static inline int int_sum(void *init, int x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = NA_REAL;
+		return 2;
+	}
+	*init0 += x;
+	return 1;
+}
+static inline int double_sum(void *init, double x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (R_IsNA(x) || R_IsNaN(x)) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return R_IsNA(x) ? 2 : 1;
+	}
+	if (!R_IsNaN(*init0))
+		*init0 += x;
+	return 1;
+}
+
+static inline int int_prod(void *init, int x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = NA_REAL;
+		return 2;
+	}
+	*init0 *= x;
+	return 1;
+}
+static inline int double_prod(void *init, double x, int na_rm, int status)
+{
+	double *init0;
+
+	init0 = (double *) init;
+	if (R_IsNA(x) || R_IsNaN(x)) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return R_IsNA(x) ? 2 : 1;
+	}
+	if (!R_IsNaN(*init0))
+		*init0 *= x;
+	return 1;
+}
+
+static inline int int_any(void *init, int x, int na_rm, int status)
+{
+	int *init0;
+
+	init0 = (int *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return 1;
+	}
+	if (x == 0)
+		return 1;
+	*init0 = x;
+	return 2;
+}
+
+static inline int int_all(void *init, int x, int na_rm, int status)
+{
+	int *init0;
+
+	init0 = (int *) init;
+	if (x == NA_INTEGER) {
+		if (na_rm)
+			return status;
+		*init0 = x;
+		return 1;
+	}
+	if (x != 0)
+		return 1;
+	*init0 = x;
+	return 2;
+}
+
+
+/****************************************************************************
+ * Summarize chunk data
+ */
+
+typedef void (*SummarizeChunkIntDataFunType)(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const int *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
-		int opcode, int na_rm, SEXP ans)
+		IntOP int_OP, void *init, int na_rm, int *status);
+
+typedef void (*SummarizeChunkDoubleDataFunType)(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const double *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		DoubleOP double_OP, void *init, int na_rm, int *status);
+
+/* Does NOT work properly on a truncated chunk! Works properly only if the
+   chunk data fills the full 'chunk_data_buf', that is, if the current chunk
+   is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
+   chunk" in HDF5's terminology). */
+static void summarize_full_chunk_int_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntOP int_OP, void *init, int na_rm, int *status)
 {
-	int ndim, done, inner_moved_along, ret;
+	int ndim, inner_moved_along;
+	size_t in_offset;
+
+	ndim = h5dset->ndim;
+	in_offset = 0;
+	/* Walk on the **all** elements in current chunk. */
+	while (1) {
+		*status = int_OP(init, in[in_offset], na_rm, *status);
+		if (*status == 2)
+			break;
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		in_offset++;
+	};
+	return;
+}
+
+/* Does NOT work properly on a truncated chunk! Works properly only if the
+   chunk data fills the full 'chunk_data_buf', that is, if the current chunk
+   is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
+   chunk" in HDF5's terminology). */
+static void summarize_full_chunk_double_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const double *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		DoubleOP double_OP, void *init, int na_rm, int *status)
+{
+	int ndim, inner_moved_along;
+	size_t in_offset;
+
+	ndim = h5dset->ndim;
+	in_offset = 0;
+	/* Walk on the **all** elements in current chunk. */
+	while (1) {
+		*status = double_OP(init, in[in_offset], na_rm, *status);
+		if (*status == 2)
+			break;
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		in_offset++;
+	};
+	return;
+}
+
+static void summarize_selected_chunk_int_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntOP int_OP, void *init, int na_rm, int *status)
+{
+	int ndim, inner_moved_along;
 	size_t in_offset;
 
 	ndim = h5dset->ndim;
 	_init_in_offset(ndim, index, h5dset->h5chunkdim, dest_vp,
 			tchunk_vp,
 			&in_offset);
-	done = 0;
 	/* Walk on the **selected** elements in current chunk. */
 	while (1) {
-		ret = summarize_val(h5dset, in, in_offset,
-				    opcode, na_rm, ans, &done);
-		if (ret < 0)
-			return -1;
-		if (done)
+		*status = int_OP(init, in[in_offset], na_rm, *status);
+		if (*status == 2)
 			break;
 		inner_moved_along = _next_midx(ndim, dest_vp->dim,
 					       inner_midx_buf);
@@ -241,102 +372,210 @@ static int summarize_selected_chunk_data(
 				  inner_midx_buf, inner_moved_along,
 				  &in_offset);
 	};
-	return 0;
+	return;
 }
 
-static SEXP h5summarize(const H5DSetDescriptor *h5dset,
-		SEXP index,
-		const IntAEAE *breakpoint_bufs,
-		const LLongAEAE *tchunkidx_bufs,
-		const int *num_tchunks,
-		int opcode, int na_rm, int verbose)
+static void summarize_selected_chunk_double_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const double *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		DoubleOP double_OP, void *init, int na_rm, int *status)
 {
-	int ndim, moved_along, ret;
-	IntAE *tchunk_midx_buf, *inner_midx_buf;
-	void *chunk_data_buf;
-	hid_t chunk_space_id;
-	H5Viewport tchunk_vp, middle_vp, dest_vp;
-	long long int tchunk_rank;
-	SEXP ans;
+	int ndim, inner_moved_along;
+	size_t in_offset;
 
 	ndim = h5dset->ndim;
+	_init_in_offset(ndim, index, h5dset->h5chunkdim, dest_vp,
+			tchunk_vp,
+			&in_offset);
+	/* Walk on the **selected** elements in current chunk. */
+	while (1) {
+		*status = double_OP(init, in[in_offset], na_rm, *status);
+		if (*status == 2)
+			break;
+		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+					       inner_midx_buf);
+		if (inner_moved_along == ndim)
+			break;
+		_update_in_offset(ndim, index, h5dset->h5chunkdim, dest_vp,
+				  inner_midx_buf, inner_moved_along,
+				  &in_offset);
+	};
+	return;
+}
 
-	/* Prepare buffers. */
+static void summarize_chunk_int_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const int *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		IntOP int_OP, void *init, int na_rm, int *status)
+{
+	int go_fast;
+	SummarizeChunkIntDataFunType fun;
 
-	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
-	inner_midx_buf = new_IntAE(ndim, ndim, 0);
+	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
+		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
+	fun = go_fast ? summarize_full_chunk_int_data
+		      : summarize_selected_chunk_int_data;
+	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
+            int_OP, init, na_rm, status);
+	return;
+}
 
-	chunk_data_buf = malloc(h5dset->chunk_data_buf_size);
-	if (chunk_data_buf == NULL) {
-		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-				    "for 'chunk_data_buf'");
-		return R_NilValue;
+static void summarize_chunk_double_data(
+		const H5DSetDescriptor *h5dset, SEXP index,
+		const double *in, const H5Viewport *tchunk_vp,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		DoubleOP double_OP, void *init, int na_rm, int *status)
+{
+	int go_fast;
+	SummarizeChunkDoubleDataFunType fun;
+
+	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
+		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
+	fun = go_fast ? summarize_full_chunk_double_data
+		      : summarize_selected_chunk_double_data;
+	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
+            double_OP, init, na_rm, status);
+	return;
+}
+
+static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
+		int opcode, int na_rm, int verbose)
+{
+	IntOP int_OP;
+	DoubleOP double_OP;
+	int x2[2];
+	double xx2[2];
+	void *init;
+	SEXP ans;
+	int status, ret;
+	ChunkIterator chunk_iter;
+
+	/* Allocate 'ans', 'init', and set 'int_OP' or 'double_OP'. */
+	int_OP = NULL;
+	double_OP = NULL;
+	if (opcode == ANY_OPCODE) {
+		int_OP = int_any;
+		x2[0] = 0;
+		init = x2;
+	} else if (opcode == ALL_OPCODE) {
+		int_OP = int_all;
+		x2[0] = 1;
+		init = x2;
+	} else if (opcode == SUM_OPCODE) {
+		if (h5dset->Rtype == REALSXP) {
+			double_OP = double_sum;
+		} else {
+			int_OP = int_sum;
+		}
+		xx2[0] = 0.0;
+		init = xx2;
+	} else if (opcode == PROD_OPCODE) {
+		if (h5dset->Rtype == REALSXP) {
+			double_OP = double_prod;
+		} else {
+			int_OP = int_prod;
+		}
+		xx2[0] = 1.0;
+		init = xx2;
+	} else if (h5dset->Rtype == REALSXP) {
+		switch (opcode) {
+		    case MIN_OPCODE:
+			double_OP = double_min;
+			xx2[0] = R_PosInf;
+			break;
+		    case MAX_OPCODE:
+			double_OP = double_max;
+			xx2[0] = R_NegInf;
+			break;
+		    case RANGE_OPCODE:
+			double_OP = double_range;
+			xx2[0] = R_PosInf;
+			xx2[1] = R_NegInf;
+			break;
+		}
+		init = xx2;
+	} else {
+		/* NO initial value! */
+		switch (opcode) {
+		    case MIN_OPCODE:   int_OP    = int_min;      break;
+		    case MAX_OPCODE:   int_OP    = int_max;      break;
+		    case RANGE_OPCODE: int_OP    = int_range;    break;
+		}
+		init = x2;
 	}
-	chunk_space_id = H5Screate_simple(ndim, h5dset->h5chunkdim, NULL);
-	if (chunk_space_id < 0) {
-		free(chunk_data_buf);
-		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
-		return R_NilValue;
-	}
-
-	/* Allocate 'tchunk_vp', 'middle_vp', and 'dest_vp'.
-	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the
-	   context of h5summarize(), we won't use 'dest_vp.h5off' or
-	   'dest_vp.h5dim', only 'dest_vp.off' and 'dest_vp.dim'. */
-	if (_alloc_tchunk_vp_middle_vp_dest_vp(ndim,
-	        &tchunk_vp, &middle_vp, &dest_vp,
-	        ALLOC_OFF_AND_DIM) < 0)
-	{
-		H5Sclose(chunk_space_id);
-		free(chunk_data_buf);
-		return R_NilValue;
-	}
-
-	ans = PROTECT(summarize0(opcode, h5dset->Rtype));
-	if (ans == R_NilValue)
-		goto done;
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
-
-	tchunk_rank = 0;
-	moved_along = ndim;
-	do {
-		_update_tchunk_vp_dest_vp(h5dset,
-				tchunk_midx_buf->elts, moved_along,
-				index, breakpoint_bufs, tchunkidx_bufs,
-				&tchunk_vp, &dest_vp);
-		if (verbose)
-			_print_tchunk_info(ndim,
-					num_tchunks, tchunk_midx_buf->elts,
-					tchunk_rank,
-					index,
-					tchunkidx_bufs, &tchunk_vp);
-		ret = _read_H5Viewport(h5dset,
-				&tchunk_vp, &middle_vp,
-				chunk_data_buf, chunk_space_id);
-		if (ret < 0) {
-			ans = R_NilValue;
+	ans = R_NilValue;
+	status = 0;
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, index);
+	if (ret < 0)
+		return ans;
+	while ((ret = _next_chunk(&chunk_iter, verbose))) {
+		if (ret < 0)
 			break;
+		if (int_OP != NULL) {
+			summarize_chunk_int_data(h5dset, index,
+				(int *) chunk_iter.chunk_data_buf,
+				&chunk_iter.tchunk_vp,
+				&chunk_iter.dest_vp,
+				chunk_iter.inner_midx_buf,
+				int_OP, init, na_rm, &status);
+		} else {
+			summarize_chunk_double_data(h5dset, index,
+				(double *) chunk_iter.chunk_data_buf,
+				&chunk_iter.tchunk_vp,
+				&chunk_iter.dest_vp,
+				chunk_iter.inner_midx_buf,
+				double_OP, init, na_rm, &status);
 		}
-		ret = summarize_selected_chunk_data(h5dset,
-				index, chunk_data_buf, &tchunk_vp,
-				&dest_vp, inner_midx_buf->elts,
-				opcode, na_rm, ans);
-		if (ret < 0) {
-			ans = R_NilValue;
+		if (status == 2)
 			break;
+	}
+	_destroy_ChunkIterator(&chunk_iter);
+	if (ret < 0)
+		return ans;
+	if (opcode == ANY_OPCODE || opcode == ALL_OPCODE)
+		return ScalarLogical(x2[0]);
+	if (opcode == MIN_OPCODE || opcode == MAX_OPCODE) {
+		if (h5dset->Rtype == REALSXP)
+			return ScalarReal(xx2[0]);
+		if (status == 0) {
+			return ScalarReal(opcode == MIN_OPCODE ? R_PosInf
+							       : R_NegInf);
+		} else {
+			return ScalarInteger(x2[0]);
 		}
-		tchunk_rank++;
-		moved_along = _next_midx(ndim, num_tchunks,
-					 tchunk_midx_buf->elts);
-	} while (moved_along < ndim);
-
-    done:
-	_free_tchunk_vp_middle_vp_dest_vp(&tchunk_vp, &middle_vp, &dest_vp);
-	H5Sclose(chunk_space_id);
-	free(chunk_data_buf);
-	UNPROTECT(1);
-	return ans;
+	}
+	if (opcode == RANGE_OPCODE) {
+		if (h5dset->Rtype == REALSXP) {
+			ans = PROTECT(NEW_NUMERIC(2));
+			REAL(ans)[0] = xx2[0];
+			REAL(ans)[1] = xx2[1];
+		} else {
+			if (status == 0) {
+				ans = PROTECT(NEW_NUMERIC(2));
+				REAL(ans)[0] = R_PosInf;
+				REAL(ans)[1] = R_NegInf;
+			} else {
+				ans = PROTECT(NEW_INTEGER(2));
+				INTEGER(ans)[0] = x2[0];
+				INTEGER(ans)[1] = x2[1];
+			}
+		}
+		UNPROTECT(1);
+		return ans;
+	}
+	/* 'opcode' is either SUM_OPCODE or PROD_OPCODE. */
+	if (h5dset->Rtype == REALSXP)
+		return ScalarReal(xx2[0]);
+	/* Direct comparison with NA_REAL is safe. No need to use R_IsNA(). */
+	if (xx2[0] == NA_REAL)
+		return ScalarInteger(NA_INTEGER);
+	if (xx2[0] <= INT_MAX && xx2[0] >= -INT_MAX)
+		return ScalarInteger((int) xx2[0]);
+	return ScalarReal(xx2[0]);
 }
 
 /* --- .Call ENTRY POINT --- */
@@ -346,10 +585,6 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	int as_int, opcode, narm0, verbose0, ret;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
-	IntAEAE *breakpoint_bufs;
-	LLongAEAE *tchunkidx_bufs;  /* touched chunk ids along each dim */
-	IntAE *ntchunk_buf;  /* nb of touched chunks along each dim */
-	long long int total_num_tchunks;
 	SEXP ans;
 
 	/* Check 'as_integer'. */
@@ -386,24 +621,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		error(_HDF5Array_global_errmsg_buf());
 	}
 
-	/* This call will populate 'breakpoint_bufs' and 'tchunkidx_bufs'. */
-	breakpoint_bufs = new_IntAEAE(h5dset.ndim, h5dset.ndim);
-	tchunkidx_bufs = new_LLongAEAE(h5dset.ndim, h5dset.ndim);
-	ret = _map_starts_to_h5chunks(&h5dset, index, NULL,
-				      breakpoint_bufs, tchunkidx_bufs);
-	if (ret < 0) {
-		_destroy_H5DSetDescriptor(&h5dset);
-		H5Dclose(dset_id);
-		H5Fclose(file_id);
-		error(_HDF5Array_global_errmsg_buf());
-	}
-	ntchunk_buf = new_IntAE(h5dset.ndim, h5dset.ndim, 0);
-	total_num_tchunks = _set_num_tchunks(&h5dset, index,
-					     tchunkidx_bufs, ntchunk_buf->elts);
-
 	ans = PROTECT(h5summarize(&h5dset, index,
-				  breakpoint_bufs, tchunkidx_bufs,
-				  ntchunk_buf->elts,
 				  opcode, narm0, verbose0));
 
 	_destroy_H5DSetDescriptor(&h5dset);
