@@ -36,8 +36,7 @@ int _init_ChunkIterator(
 );
 
 int _next_chunk(
-	ChunkIterator *chunk_iter,
-	int verbose
+	ChunkIterator *chunk_iter
 );
 
 #endif  /* _CHUNKITERATOR_H_ */

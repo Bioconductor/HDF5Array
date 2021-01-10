@@ -25,7 +25,7 @@ void _destroy_ChunkIterator(ChunkIterator *chunk_iter)
 int _init_ChunkIterator(ChunkIterator *chunk_iter,
 		const H5DSetDescriptor *h5dset, SEXP index)
 {
-	int ndim, ret;
+	int ndim, along, ret;
 
 	chunk_iter->h5dset = h5dset;
 	chunk_iter->index = index;
@@ -66,6 +66,9 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 
 	/* Set 'chunk_iter->tchunk_midx_buf' and 'chunk_iter->inner_midx_buf'. */
 	chunk_iter->tchunk_midx_buf = new_IntAE(ndim, ndim, 0)->elts;
+	for (along = 0; along < ndim; along++)
+		chunk_iter->tchunk_midx_buf[along] =
+			chunk_iter->num_tchunks[along] - 1;
 	chunk_iter->inner_midx_buf = new_IntAE(ndim, ndim, 0)->elts;
 
 	/* Set 'chunk_iter->chunk_space_id'. */
@@ -94,8 +97,10 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 }
 
 /* Return:
- *     1 = if next chunk exists
- *     0 = if already on last chunk
+ *     1 = if the chunk before the move was not the last chunk and the move to
+ *         the next chunk was successful;
+ *     0 = if the chunk before the move was the last chunk and so the move to
+ *         the next chunk was not possible;
  *   < 0 = if error
  * Typical use:
  *     while (ret = _next_chunk(&chunk_iter)) {
@@ -105,10 +110,13 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
  *         handle current chunk
  *     }
  */
-int _next_chunk(ChunkIterator *chunk_iter, int verbose)
+int _next_chunk(ChunkIterator *chunk_iter)
 {
-	int ret, ndim;
+	int ndim, ret;
 
+	ndim = chunk_iter->h5dset->ndim;
+	chunk_iter->moved_along = _next_midx(ndim, chunk_iter->num_tchunks,
+					     chunk_iter->tchunk_midx_buf);
 	chunk_iter->tchunk_rank++;
 	if (chunk_iter->tchunk_rank == chunk_iter->total_num_tchunks)
 		return 0;
@@ -118,23 +126,10 @@ int _next_chunk(ChunkIterator *chunk_iter, int verbose)
 			chunk_iter->index,
 			chunk_iter->breakpoint_bufs, chunk_iter->tchunkidx_bufs,
 			&chunk_iter->tchunk_vp, &chunk_iter->dest_vp);
-	if (verbose)
-		_print_tchunk_info(chunk_iter->h5dset->ndim,
-				chunk_iter->num_tchunks,
-				chunk_iter->tchunk_midx_buf,
-				chunk_iter->tchunk_rank,
-				chunk_iter->index,
-				chunk_iter->tchunkidx_bufs,
-				&chunk_iter->tchunk_vp);
 	ret = _read_H5Viewport(chunk_iter->h5dset,
 			&chunk_iter->tchunk_vp, &chunk_iter->middle_vp,
 			chunk_iter->chunk_data_buf,
 			chunk_iter->chunk_space_id);
-	if (ret < 0)
-		return ret;  /* error */
-	ndim = chunk_iter->h5dset->ndim;
-	chunk_iter->moved_along = _next_midx(ndim, chunk_iter->num_tchunks,
-					     chunk_iter->tchunk_midx_buf);
-	return 1;
+	return ret < 0 ? ret : 1;
 }
 

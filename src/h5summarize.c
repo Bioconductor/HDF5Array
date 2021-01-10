@@ -76,199 +76,312 @@ typedef int (*DoubleOP)(void *init, double x, int na_rm, int status);
 
 static inline int int_min(void *init, int x, int na_rm, int status)
 {
-	int *init0;
+	int *int_init;
 
-	init0 = (int *) init;
+	int_init = (int *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*int_init = x;
 		return 2;
 	}
-	if (status == 0 || x < *init0)
-		*init0 = x;
+	if (status == 0 || x < *int_init)
+		*int_init = x;
 	return 1;
 }
 static inline int double_min(void *init, double x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (R_IsNA(x) || R_IsNaN(x)) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*double_init = x;
 		return R_IsNA(x) ? 2 : 1;
 	}
-	if (!R_IsNaN(*init0) && x < *init0)
-		*init0 = x;
+	if (!R_IsNaN(*double_init) && x < *double_init)
+		*double_init = x;
 	return 1;
 }
 
 static inline int int_max(void *init, int x, int na_rm, int status)
 {
-	int *init0;
+	int *int_init;
 
-	init0 = (int *) init;
+	int_init = (int *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*int_init = x;
 		return 2;
 	}
-	if (status == 0 || x > *init0)
-		*init0 = x;
+	if (status == 0 || x > *int_init)
+		*int_init = x;
 	return 1;
 }
 static inline int double_max(void *init, double x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (R_IsNA(x) || R_IsNaN(x)) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*double_init = x;
 		return R_IsNA(x) ? 2 : 1;
 	}
-	if (!R_IsNaN(*init0) && x > *init0)
-		*init0 = x;
+	if (!R_IsNaN(*double_init) && x > *double_init)
+		*double_init = x;
 	return 1;
 }
 
 static inline int int_range(void *init, int x, int na_rm, int status)
 {
-	int *init0;
+	int *int_init;
 
-	init0 = (int *) init;
+	int_init = (int *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		init0[0] = init0[1] = x;
+		int_init[0] = int_init[1] = x;
 		return 2;
 	}
 	if (status == 0) {
-		init0[0] = init0[1] = x;
+		int_init[0] = int_init[1] = x;
 		return 1;
 	}
-	if (x < init0[0])
-		init0[0] = x;
-	if (x > init0[1])
-		init0[1] = x;
+	if (x < int_init[0])
+		int_init[0] = x;
+	if (x > int_init[1])
+		int_init[1] = x;
 	return 1;
 }
 static inline int double_range(void *init, double x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (R_IsNA(x) || R_IsNaN(x)) {
 		if (na_rm)
 			return status;
-		init0[0] = init0[1] = x;
+		double_init[0] = double_init[1] = x;
 		return R_IsNA(x) ? 2 : 1;
 	}
-	if (!R_IsNaN(init0[0])) {
-		if (x < init0[0])
-			init0[0] = x;
-		if (x > init0[1])
-			init0[1] = x;
+	if (!R_IsNaN(double_init[0])) {
+		if (x < double_init[0])
+			double_init[0] = x;
+		if (x > double_init[1])
+			double_init[1] = x;
 	}
 	return 1;
 }
 
 static inline int int_sum(void *init, int x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = NA_REAL;
+		*double_init = NA_REAL;
 		return 2;
 	}
-	*init0 += x;
+	*double_init += x;
 	return 1;
 }
 static inline int double_sum(void *init, double x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (R_IsNA(x) || R_IsNaN(x)) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*double_init = x;
 		return R_IsNA(x) ? 2 : 1;
 	}
-	if (!R_IsNaN(*init0))
-		*init0 += x;
+	if (!R_IsNaN(*double_init))
+		*double_init += x;
 	return 1;
 }
 
 static inline int int_prod(void *init, int x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = NA_REAL;
+		*double_init = NA_REAL;
 		return 2;
 	}
-	*init0 *= x;
+	*double_init *= x;
 	return 1;
 }
 static inline int double_prod(void *init, double x, int na_rm, int status)
 {
-	double *init0;
+	double *double_init;
 
-	init0 = (double *) init;
+	double_init = (double *) init;
 	if (R_IsNA(x) || R_IsNaN(x)) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*double_init = x;
 		return R_IsNA(x) ? 2 : 1;
 	}
-	if (!R_IsNaN(*init0))
-		*init0 *= x;
+	if (!R_IsNaN(*double_init))
+		*double_init *= x;
 	return 1;
 }
 
 static inline int int_any(void *init, int x, int na_rm, int status)
 {
-	int *init0;
+	int *int_init;
 
-	init0 = (int *) init;
+	int_init = (int *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*int_init = x;
 		return 1;
 	}
 	if (x == 0)
 		return 1;
-	*init0 = x;
+	*int_init = x;
 	return 2;
 }
 
 static inline int int_all(void *init, int x, int na_rm, int status)
 {
-	int *init0;
+	int *int_init;
 
-	init0 = (int *) init;
+	int_init = (int *) init;
 	if (x == NA_INTEGER) {
 		if (na_rm)
 			return status;
-		*init0 = x;
+		*int_init = x;
 		return 1;
 	}
 	if (x != 0)
 		return 1;
-	*init0 = x;
+	*int_init = x;
 	return 2;
+}
+
+/* One of '*int_OP' or '*double_OP' will be set to NULL and the other one
+   to a non-NULL value. */
+static void select_OP(int opcode, SEXPTYPE Rtype,
+		IntOP *int_OP, DoubleOP *double_OP, void *init)
+{
+	int *int_init = (int *) init;
+	double *double_init = (double *) init;
+
+	*int_OP = NULL;
+	*double_OP = NULL;
+	if (opcode == ANY_OPCODE) {
+		*int_OP = int_any;
+		int_init[0] = 0;
+		return;
+	}
+	if (opcode == ALL_OPCODE) {
+		*int_OP = int_all;
+		int_init[0] = 1;
+		return;
+	}
+	if (opcode == SUM_OPCODE) {
+		if (Rtype == REALSXP) {
+			*double_OP = double_sum;
+		} else {
+			*int_OP = int_sum;
+		}
+		double_init[0] = 0.0;
+		return;
+	}
+	if (opcode == PROD_OPCODE) {
+		if (Rtype == REALSXP) {
+			*double_OP = double_prod;
+		} else {
+			*int_OP = int_prod;
+		}
+		double_init[0] = 1.0;
+		return;
+	}
+	if (Rtype == REALSXP) {
+		switch (opcode) {
+		    case MIN_OPCODE:
+			*double_OP = double_min;
+			double_init[0] = R_PosInf;
+			break;
+		    case MAX_OPCODE:
+			*double_OP = double_max;
+			double_init[0] = R_NegInf;
+			break;
+		    case RANGE_OPCODE:
+			*double_OP = double_range;
+			double_init[0] = R_PosInf;
+			double_init[1] = R_NegInf;
+			break;
+		}
+		return;
+	}
+	/* NO initial value! */
+	switch (opcode) {
+	    case MIN_OPCODE:   *int_OP = int_min;   break;
+	    case MAX_OPCODE:   *int_OP = int_max;   break;
+	    case RANGE_OPCODE: *int_OP = int_range; break;
+	}
+	return;
+}
+
+static SEXP init2SEXP(int opcode, SEXPTYPE Rtype, void *init, int status)
+{
+	int *int_init = (int *) init;
+	double *double_init = (double *) init;
+	SEXP ans;
+
+	if (opcode == ANY_OPCODE || opcode == ALL_OPCODE)
+		return ScalarLogical(int_init[0]);
+	if (opcode == MIN_OPCODE || opcode == MAX_OPCODE) {
+		if (Rtype == REALSXP)
+			return ScalarReal(double_init[0]);
+		if (status == 0) {
+			return ScalarReal(opcode == MIN_OPCODE ? R_PosInf
+							       : R_NegInf);
+		} else {
+			return ScalarInteger(int_init[0]);
+		}
+	}
+	if (opcode == RANGE_OPCODE) {
+		if (Rtype == REALSXP) {
+			ans = PROTECT(NEW_NUMERIC(2));
+			REAL(ans)[0] = double_init[0];
+			REAL(ans)[1] = double_init[1];
+		} else {
+			if (status == 0) {
+				ans = PROTECT(NEW_NUMERIC(2));
+				REAL(ans)[0] = R_PosInf;
+				REAL(ans)[1] = R_NegInf;
+			} else {
+				ans = PROTECT(NEW_INTEGER(2));
+				INTEGER(ans)[0] = int_init[0];
+				INTEGER(ans)[1] = int_init[1];
+			}
+		}
+		UNPROTECT(1);
+		return ans;
+	}
+	/* 'opcode' is either SUM_OPCODE or PROD_OPCODE. */
+	if (Rtype == REALSXP)
+		return ScalarReal(double_init[0]);
+	/* Direct comparison with NA_REAL is safe. No need to use R_IsNA(). */
+	if (double_init[0] == NA_REAL)
+		return ScalarInteger(NA_INTEGER);
+	if (double_init[0] <= INT_MAX && double_init[0] >= -INT_MAX)
+		return ScalarInteger((int) double_init[0]);
+	return ScalarReal(double_init[0]);
 }
 
 
@@ -418,7 +531,7 @@ static void summarize_chunk_int_data(
 	fun = go_fast ? summarize_full_chunk_int_data
 		      : summarize_selected_chunk_int_data;
 	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
-            int_OP, init, na_rm, status);
+	    int_OP, init, na_rm, status);
 	return;
 }
 
@@ -436,7 +549,7 @@ static void summarize_chunk_double_data(
 	fun = go_fast ? summarize_full_chunk_double_data
 		      : summarize_selected_chunk_double_data;
 	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
-            double_OP, init, na_rm, status);
+	    double_OP, init, na_rm, status);
 	return;
 }
 
@@ -445,76 +558,31 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 {
 	IntOP int_OP;
 	DoubleOP double_OP;
-	int x2[2];
-	double xx2[2];
-	void *init;
-	SEXP ans;
+	double init[2];  /* 'init' will store 1 or 2 ints or doubles */
 	int status, ret;
 	ChunkIterator chunk_iter;
 
-	/* Allocate 'ans', 'init', and set 'int_OP' or 'double_OP'. */
-	int_OP = NULL;
-	double_OP = NULL;
-	if (opcode == ANY_OPCODE) {
-		int_OP = int_any;
-		x2[0] = 0;
-		init = x2;
-	} else if (opcode == ALL_OPCODE) {
-		int_OP = int_all;
-		x2[0] = 1;
-		init = x2;
-	} else if (opcode == SUM_OPCODE) {
-		if (h5dset->Rtype == REALSXP) {
-			double_OP = double_sum;
-		} else {
-			int_OP = int_sum;
-		}
-		xx2[0] = 0.0;
-		init = xx2;
-	} else if (opcode == PROD_OPCODE) {
-		if (h5dset->Rtype == REALSXP) {
-			double_OP = double_prod;
-		} else {
-			int_OP = int_prod;
-		}
-		xx2[0] = 1.0;
-		init = xx2;
-	} else if (h5dset->Rtype == REALSXP) {
-		switch (opcode) {
-		    case MIN_OPCODE:
-			double_OP = double_min;
-			xx2[0] = R_PosInf;
-			break;
-		    case MAX_OPCODE:
-			double_OP = double_max;
-			xx2[0] = R_NegInf;
-			break;
-		    case RANGE_OPCODE:
-			double_OP = double_range;
-			xx2[0] = R_PosInf;
-			xx2[1] = R_NegInf;
-			break;
-		}
-		init = xx2;
-	} else {
-		/* NO initial value! */
-		switch (opcode) {
-		    case MIN_OPCODE:   int_OP    = int_min;      break;
-		    case MAX_OPCODE:   int_OP    = int_max;      break;
-		    case RANGE_OPCODE: int_OP    = int_range;    break;
-		}
-		init = x2;
-	}
+	/* Set one of 'int_OP' or 'double_OP' to NULL and the other one to
+	   an IntOP or DoubleOP function. Also initializes 'init' with 1 or
+	   2 ints or doubles. */
+	select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init);
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
-	ans = R_NilValue;
 	status = 0;
 	ret = _init_ChunkIterator(&chunk_iter, h5dset, index);
 	if (ret < 0)
-		return ans;
-	while ((ret = _next_chunk(&chunk_iter, verbose))) {
+		return R_NilValue;
+	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;
+		if (verbose)
+			_print_tchunk_info(chunk_iter.h5dset->ndim,
+					chunk_iter.num_tchunks,
+					chunk_iter.tchunk_midx_buf,
+					chunk_iter.tchunk_rank,
+					chunk_iter.index,
+					chunk_iter.tchunkidx_bufs,
+					&chunk_iter.tchunk_vp);
 		if (int_OP != NULL) {
 			summarize_chunk_int_data(h5dset, index,
 				(int *) chunk_iter.chunk_data_buf,
@@ -535,47 +603,8 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	}
 	_destroy_ChunkIterator(&chunk_iter);
 	if (ret < 0)
-		return ans;
-	if (opcode == ANY_OPCODE || opcode == ALL_OPCODE)
-		return ScalarLogical(x2[0]);
-	if (opcode == MIN_OPCODE || opcode == MAX_OPCODE) {
-		if (h5dset->Rtype == REALSXP)
-			return ScalarReal(xx2[0]);
-		if (status == 0) {
-			return ScalarReal(opcode == MIN_OPCODE ? R_PosInf
-							       : R_NegInf);
-		} else {
-			return ScalarInteger(x2[0]);
-		}
-	}
-	if (opcode == RANGE_OPCODE) {
-		if (h5dset->Rtype == REALSXP) {
-			ans = PROTECT(NEW_NUMERIC(2));
-			REAL(ans)[0] = xx2[0];
-			REAL(ans)[1] = xx2[1];
-		} else {
-			if (status == 0) {
-				ans = PROTECT(NEW_NUMERIC(2));
-				REAL(ans)[0] = R_PosInf;
-				REAL(ans)[1] = R_NegInf;
-			} else {
-				ans = PROTECT(NEW_INTEGER(2));
-				INTEGER(ans)[0] = x2[0];
-				INTEGER(ans)[1] = x2[1];
-			}
-		}
-		UNPROTECT(1);
-		return ans;
-	}
-	/* 'opcode' is either SUM_OPCODE or PROD_OPCODE. */
-	if (h5dset->Rtype == REALSXP)
-		return ScalarReal(xx2[0]);
-	/* Direct comparison with NA_REAL is safe. No need to use R_IsNA(). */
-	if (xx2[0] == NA_REAL)
-		return ScalarInteger(NA_INTEGER);
-	if (xx2[0] <= INT_MAX && xx2[0] >= -INT_MAX)
-		return ScalarInteger((int) xx2[0]);
-	return ScalarReal(xx2[0]);
+		return R_NilValue;
+	return init2SEXP(opcode, h5dset->Rtype, init, status);
 }
 
 /* --- .Call ENTRY POINT --- */
