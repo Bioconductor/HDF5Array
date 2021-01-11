@@ -359,14 +359,14 @@ static inline void append_array_index_to_nzindex_bufs(
 
 typedef int (*GatherChunkDataFunType)(
 		const H5DSetDescriptor *h5dset, SEXP starts,
-		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const void *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
 		IntAEAE *nzindex_bufs, void *nzdata_buf);
 
 /* Does NOT work properly on a truncated chunk! Works properly only if the
-   chunk data fills the full 'chunk_data_buf', that is, if the current chunk
-   is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
-   chunk" in HDF5's terminology). */
+   chunk data fills the full 'chunk_data_buf.data', that is, if the current
+   chunk is a full-size chunk and not a "truncated" chunk (a.k.a. "partial
+   edge chunk" in HDF5's terminology). */
 static int gather_full_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset, SEXP starts,
 		const void *in, const H5Viewport *tchunk_vp,
@@ -433,7 +433,7 @@ static int gather_selected_chunk_data_as_sparse(
 
 static int gather_chunk_data_as_sparse(
 		const H5DSetDescriptor *h5dset, SEXP starts,
-		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const void *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
 		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
@@ -444,13 +444,13 @@ static int gather_chunk_data_as_sparse(
 	if (go_fast) {
 		ret = gather_full_chunk_data_as_sparse(
 			h5dset, starts,
-			chunk_data_buf, tchunk_vp,
+			in, tchunk_vp,
 			dest_vp, inner_midx_buf,
 			nzindex_bufs, nzdata_buf);
 	} else {
 		ret = gather_selected_chunk_data_as_sparse(
 			h5dset, starts,
-			chunk_data_buf, tchunk_vp,
+			in, tchunk_vp,
 			dest_vp, inner_midx_buf,
 			nzindex_bufs, nzdata_buf);
 	}
@@ -458,9 +458,9 @@ static int gather_chunk_data_as_sparse(
 }
 
 /* Does NOT work properly on a truncated chunk! Works properly only if the
-   chunk data fills the full 'chunk_data_buf', that is, if the current chunk
-   is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
-   chunk" in HDF5's terminology). */
+   chunk data fills the full 'chunk_data_buf.data', that is, if the current
+   chunk is a full-size chunk and not a "truncated" chunk (a.k.a. "partial
+   edge chunk" in HDF5's terminology). */
 static int gather_full_chunk_int_data_as_sparse(
 		const H5DSetDescriptor *h5dset, SEXP starts,
 		const int *in, const H5Viewport *tchunk_vp,
@@ -527,7 +527,7 @@ static int gather_selected_chunk_int_data_as_sparse(
 
 static int gather_chunk_int_data_as_sparse(
 		const H5DSetDescriptor *h5dset, SEXP starts,
-		const void *chunk_data_buf, const H5Viewport *tchunk_vp,
+		const void *in, const H5Viewport *tchunk_vp,
 		const H5Viewport *dest_vp, int *inner_midx_buf,
 		IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
@@ -538,13 +538,13 @@ static int gather_chunk_int_data_as_sparse(
 	if (go_fast) {
 		ret = gather_full_chunk_int_data_as_sparse(
 			h5dset, starts,
-			(const int *) chunk_data_buf, tchunk_vp,
+			in, tchunk_vp,
 			dest_vp, inner_midx_buf,
 			nzindex_bufs, (IntAE *) nzdata_buf);
 	} else {
 		ret = gather_selected_chunk_int_data_as_sparse(
 			h5dset, starts,
-			(const int *) chunk_data_buf, tchunk_vp,
+			in, tchunk_vp,
 			dest_vp, inner_midx_buf,
 			nzindex_bufs, (IntAE *) nzdata_buf);
 	}
@@ -599,16 +599,21 @@ static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
 	int ndim, ret;
 	IntAE *inner_midx_buf;
 	ChunkIterator chunk_iter;
+	ChunkDataBuffer chunk_data_buf;
 
 	gatherer = sparse_data_gatherer(h5dset, nzindex_bufs, nzdata_buf);
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
-	ret = _init_ChunkIterator(&chunk_iter, h5dset, starts,
-				  selection_dim, 0);
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, starts, selection_dim);
 	if (ret < 0)
 		return ret;
+	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
+	if (ret < 0) {
+		_destroy_ChunkIterator(&chunk_iter);
+		return ret;
+	}
 	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;
@@ -621,8 +626,11 @@ static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
 				   chunk_iter.tchunkidx_bufs,
 				   &chunk_iter.tchunk_vp);
 */
+		ret = _load_chunk(&chunk_iter, &chunk_data_buf, 0);
+		if (ret < 0)
+			break;
 		ret = gatherer.gathering_fun(h5dset, starts,
-				chunk_iter.chunk_data_buf,
+				chunk_data_buf.data,
 				&chunk_iter.tchunk_vp,
 				&chunk_iter.dest_vp,
 				inner_midx_buf->elts,
@@ -630,6 +638,7 @@ static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
 		if (ret < 0)
 			break;
 	}
+	_destroy_ChunkDataBuffer(&chunk_data_buf);
 	_destroy_ChunkIterator(&chunk_iter);
 	return ret;
 }
