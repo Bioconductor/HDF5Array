@@ -14,14 +14,11 @@ typedef struct chunk_iterator_t {
 	LLongAEAE *tchunkidx_bufs;  /* touched chunk ids along each dim */
 	int *num_tchunks;           /* nb of touched chunks along each dim */
 	long long int total_num_tchunks;
-	H5Viewport tchunk_vp;
-	H5Viewport middle_vp;
-	H5Viewport dest_vp;
+	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	int *tchunk_midx_buf;
-	int *inner_midx_buf;
 	hid_t chunk_space_id;
 	void *chunk_data_buf;
-	int moved_along;
+	void *compressed_chunk_data_buf;  /* experimental! */
 	long long int tchunk_rank;
 } ChunkIterator;
 
@@ -33,7 +30,8 @@ int _init_ChunkIterator(
 	ChunkIterator *chunk_iter,
 	const H5DSetDescriptor *h5dset,
 	SEXP index,
-	int *selection_dim
+	int *selection_dim,
+	int use_H5Dread_chunk
 );
 
 int _next_chunk(

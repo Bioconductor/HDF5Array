@@ -14,7 +14,7 @@ typedef struct {
 	char *h5name;  /* canonical name as retrieved by H5Iget_name() */
 	char *storage_mode_attr;
 	H5T_class_t H5class;
-	size_t H5size, ans_elt_size, chunk_data_buf_size;
+	size_t H5size, ans_elt_size, chunk_data_buf_length, chunk_data_buf_size;
 	SEXPTYPE Rtype;
 	int as_na_attr, ndim, *h5nchunk;
 	hsize_t *h5dim, *h5chunkdim;

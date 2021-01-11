@@ -52,21 +52,21 @@ int _alloc_H5Viewport(H5Viewport *vp, int ndim, int mode)
 	vp->h5off = NULL;
 	vp->off = NULL;
 	if (mode != ALLOC_OFF_AND_DIM) {
-		/* Allocate memory for the 'h5off' and 'h5dim' fields. */
+		/* Allocate memory for members 'h5off' and 'h5dim'. */
 		vp->h5off = _alloc_hsize_t_buf(2 * ndim, 0,
-					       "H5Viewport fields");
+					       "H5Viewport members");
 		if (vp->h5off == NULL)
 			return -1;
 		vp->h5dim = vp->h5off + ndim;
 	}
 	if (mode != ALLOC_H5OFF_AND_H5DIM) {
-		/* Allocate memory for the 'off' and 'dim' fields. */
+		/* Allocate memory for members 'off' and 'dim'. */
 		vp->off = (int *) malloc(2 * ndim * sizeof(int));
 		if (vp->off == NULL) {
 			if (mode != ALLOC_OFF_AND_DIM)
 				free(vp->h5off);
 			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
-					    "for H5Viewport fields");
+					    "for H5Viewport members");
 			return -1;
 		}
 		vp->dim = vp->off + ndim;

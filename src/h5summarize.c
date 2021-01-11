@@ -389,44 +389,22 @@ static SEXP init2SEXP(int opcode, SEXPTYPE Rtype, void *init, int status)
  * Summarize chunk data
  */
 
-typedef void (*SummarizeChunkIntDataFunType)(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const int *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
-		IntOP int_OP, void *init, int na_rm, int *status);
-
-typedef void (*SummarizeChunkDoubleDataFunType)(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const double *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
-		DoubleOP double_OP, void *init, int na_rm, int *status);
-
 /* Does NOT work properly on a truncated chunk! Works properly only if the
    chunk data fills the full 'chunk_data_buf', that is, if the current chunk
    is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
    chunk" in HDF5's terminology). */
 static void summarize_full_chunk_int_data(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const int *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
+		const int *in, size_t in_length,
 		IntOP int_OP, void *init, int na_rm, int *status)
 {
-	int ndim, inner_moved_along;
 	size_t in_offset;
 
-	ndim = h5dset->ndim;
-	in_offset = 0;
 	/* Walk on the **all** elements in current chunk. */
-	while (1) {
+	for (in_offset = 0; in_offset < in_length; in_offset++) {
 		*status = int_OP(init, in[in_offset], na_rm, *status);
 		if (*status == 2)
-			break;
-		inner_moved_along = _next_midx(ndim, dest_vp->dim,
-					       inner_midx_buf);
-		if (inner_moved_along == ndim)
-			break;
-		in_offset++;
-	};
+			return;
+	}
 	return;
 }
 
@@ -435,26 +413,16 @@ static void summarize_full_chunk_int_data(
    is a full-size chunk and not a "truncated" chunk (a.k.a. "partial edge
    chunk" in HDF5's terminology). */
 static void summarize_full_chunk_double_data(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const double *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
+		const double *in, size_t in_length,
 		DoubleOP double_OP, void *init, int na_rm, int *status)
 {
-	int ndim, inner_moved_along;
 	size_t in_offset;
 
-	ndim = h5dset->ndim;
-	in_offset = 0;
 	/* Walk on the **all** elements in current chunk. */
-	while (1) {
+	for (in_offset = 0; in_offset < in_length; in_offset++) {
 		*status = double_OP(init, in[in_offset], na_rm, *status);
 		if (*status == 2)
-			break;
-		inner_moved_along = _next_midx(ndim, dest_vp->dim,
-					       inner_midx_buf);
-		if (inner_moved_along == ndim)
-			break;
-		in_offset++;
+			return;
 	};
 	return;
 }
@@ -517,49 +485,14 @@ static void summarize_selected_chunk_double_data(
 	return;
 }
 
-static void summarize_chunk_int_data(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const int *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
-		IntOP int_OP, void *init, int na_rm, int *status)
-{
-	int go_fast;
-	SummarizeChunkIntDataFunType fun;
-
-	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
-		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
-	fun = go_fast ? summarize_full_chunk_int_data
-		      : summarize_selected_chunk_int_data;
-	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
-	    int_OP, init, na_rm, status);
-	return;
-}
-
-static void summarize_chunk_double_data(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const double *in, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
-		DoubleOP double_OP, void *init, int na_rm, int *status)
-{
-	int go_fast;
-	SummarizeChunkDoubleDataFunType fun;
-
-	go_fast = _tchunk_is_fully_selected(h5dset->ndim, tchunk_vp, dest_vp)
-		  && ! _tchunk_is_truncated(h5dset, tchunk_vp);
-	fun = go_fast ? summarize_full_chunk_double_data
-		      : summarize_selected_chunk_double_data;
-	fun(h5dset, index, in, tchunk_vp, dest_vp, inner_midx_buf,
-	    double_OP, init, na_rm, status);
-	return;
-}
-
 static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 		int opcode, int na_rm, int verbose)
 {
 	IntOP int_OP;
 	DoubleOP double_OP;
 	double init[2];  /* 'init' will store 1 or 2 ints or doubles */
-	int status, ret;
+	int ndim, status, ret, go_fast;
+	IntAE *inner_midx_buf;
 	ChunkIterator chunk_iter;
 
 	/* Set one of 'int_OP' or 'double_OP' to NULL and the other one to
@@ -568,35 +501,58 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init);
 
 	/* Walk over the chunks touched by the user-supplied array selection. */
+	ndim = h5dset->ndim;
+	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 	status = 0;
-	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL);
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL, 0);
 	if (ret < 0)
 		return R_NilValue;
 	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;
 		if (verbose)
-			_print_tchunk_info(chunk_iter.h5dset->ndim,
-					chunk_iter.num_tchunks,
-					chunk_iter.tchunk_midx_buf,
-					chunk_iter.tchunk_rank,
-					chunk_iter.index,
-					chunk_iter.tchunkidx_bufs,
-					&chunk_iter.tchunk_vp);
-		if (int_OP != NULL) {
-			summarize_chunk_int_data(h5dset, index,
-				chunk_iter.chunk_data_buf,
+			_print_tchunk_info(ndim,
+				chunk_iter.num_tchunks,
+				chunk_iter.tchunk_midx_buf,
+				chunk_iter.tchunk_rank,
+				chunk_iter.index,
+				chunk_iter.tchunkidx_bufs,
+				&chunk_iter.tchunk_vp);
+		go_fast = _tchunk_is_fully_selected(ndim,
 				&chunk_iter.tchunk_vp,
-				&chunk_iter.dest_vp,
-				chunk_iter.inner_midx_buf,
-				int_OP, init, na_rm, &status);
+				&chunk_iter.dest_vp) &&
+			  ! _tchunk_is_truncated(h5dset,
+				&chunk_iter.tchunk_vp);
+		if (go_fast) {
+			if (int_OP != NULL) {
+				summarize_full_chunk_int_data(
+					chunk_iter.chunk_data_buf,
+					h5dset->chunk_data_buf_length,
+					int_OP, init, na_rm, &status);
+			} else {
+				summarize_full_chunk_double_data(
+					chunk_iter.chunk_data_buf,
+					h5dset->chunk_data_buf_length,
+					double_OP, init, na_rm, &status);
+			}
 		} else {
-			summarize_chunk_double_data(h5dset, index,
-				chunk_iter.chunk_data_buf,
-				&chunk_iter.tchunk_vp,
-				&chunk_iter.dest_vp,
-				chunk_iter.inner_midx_buf,
-				double_OP, init, na_rm, &status);
+			if (int_OP != NULL) {
+				summarize_selected_chunk_int_data(
+					h5dset, index,
+					chunk_iter.chunk_data_buf,
+					&chunk_iter.tchunk_vp,
+					&chunk_iter.dest_vp,
+					inner_midx_buf->elts,
+					int_OP, init, na_rm, &status);
+			} else {
+				summarize_selected_chunk_double_data(
+					h5dset, index,
+					chunk_iter.chunk_data_buf,
+					&chunk_iter.tchunk_vp,
+					&chunk_iter.dest_vp,
+					inner_midx_buf->elts,
+					double_OP, init, na_rm, &status);
+			}
 		}
 		if (status == 2)
 			break;

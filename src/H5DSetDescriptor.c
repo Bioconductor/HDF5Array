@@ -349,7 +349,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	char *h5name, *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
 	H5T_class_t H5class;
-	size_t H5size, ans_elt_size, chunk_data_buf_size;
+	size_t H5size, ans_elt_size, chunk_data_buf_length;
 	SEXPTYPE Rtype;
 	int as_na_attr, ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
@@ -358,7 +358,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 
 	h5dset->dset_id = dset_id;
 
-	/* Initialize the fields that _destroy_H5DSetDescriptor() will free
+	/* Initialize the members that _destroy_H5DSetDescriptor() will free
 	   or close. */
 	h5dset->h5name = NULL;
 	h5dset->storage_mode_attr = NULL;
@@ -369,13 +369,13 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	h5dset->h5chunkdim = NULL;
 	h5dset->h5nchunk = NULL;
 
-	/* Set 'h5dset->h5name'. */
+	/* Set member 'h5name'. */
 	h5name = get_h5name(dset_id);
 	if (h5name == NULL)
 		goto on_error;
 	h5dset->h5name = h5name;
 
-	/* Set 'h5dset->storage_mode_attr'. */
+	/* Set member 'storage_mode_attr'. */
 	buf = new_CharAE(0);
 	ret = _get_h5attrib_strval(dset_id, "storage.mode", buf);
 	if (ret < 0)
@@ -396,7 +396,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->storage_mode_attr = storage_mode_attr;
 	}
 
-	/* Set 'h5dset->dtype_id'. */
+	/* Set member 'dtype_id'. */
 	dtype_id = H5Dget_type(dset_id);
 	if (dtype_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
@@ -404,7 +404,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->dtype_id = dtype_id;
 
-	/* Set 'h5dset->H5class'. */
+	/* Set member 'H5class'. */
 	H5class = H5Tget_class(dtype_id);
 	if (H5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
@@ -412,7 +412,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->H5class = H5class;
 
-	/* Set 'h5dset->H5size'. */
+	/* Set member 'H5size'. */
 	H5size = H5Tget_size(dtype_id);
 	if (H5size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
@@ -420,7 +420,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->H5size = H5size;
 
-	/* Set 'h5dset->Rtype'. */
+	/* Set member 'Rtype'. */
 	if (h5dset->storage_mode_attr != NULL) {
 		if (map_storage_mode_to_Rtype(storage_mode_attr, as_int,
 					      &Rtype) < 0)
@@ -439,7 +439,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	if (get_Rtype_only)
 		return 0;
 
-	/* Set 'h5dset->as_na_attr'. */
+	/* Set member 'as_na_attr'. */
 	ret = get_h5attrib_intval(dset_id, "as.na", &as_na_attr);
 	if (ret < 0)
 		goto on_error;
@@ -451,7 +451,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->as_na_attr = ret == 2 ? as_na_attr : 0;
 
-	/* Set 'h5dset->space_id'. */
+	/* Set member 'space_id'. */
 	space_id = H5Dget_space(dset_id);
 	if (space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
@@ -459,7 +459,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->space_id = space_id;
 
-	/* Set 'h5dset->ndim'. */
+	/* Set member 'ndim'. */
 	ndim = H5Sget_simple_extent_ndims(space_id);
 	if (ndim < 0) {
 		PRINT_TO_ERRMSG_BUF(
@@ -468,7 +468,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->ndim = ndim;
 
-	/* Set 'h5dset->plist_id'. */
+	/* Set member 'plist_id'. */
 	plist_id = H5Dget_create_plist(dset_id);
 	if (plist_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
@@ -476,7 +476,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->plist_id = plist_id;
 
-	/* Set 'h5dset->h5dim'. */
+	/* Set member 'h5dim'. */
 	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
@@ -487,10 +487,10 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->h5dim = h5dim;
 
-	/* Set 'h5dset->H5layout'. */
+	/* Set member 'H5layout'. */
 	h5dset->H5layout = H5Pget_layout(plist_id);
 
-	/* Set 'h5dset->h5chunkdim'. */
+	/* Set member 'h5chunkdim'. */
 	if (h5dset->H5layout == H5D_CHUNKED) {
 		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
 		if (h5chunkdim == NULL)
@@ -510,7 +510,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->h5chunkdim = h5dset->h5dim;
 	}
 
-	/* Set 'h5dset->h5nchunk'. */
+	/* Set member 'h5nchunk'. */
 	if (h5dset->h5chunkdim != NULL) {
 		h5nchunk = (int *) malloc(ndim * sizeof(int));
 		if (h5nchunk == NULL) {
@@ -539,22 +539,23 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->h5nchunk = h5nchunk;
 	}
 
-	/* Set 'h5dset->ans_elt_size'. */
+	/* Set member 'ans_elt_size'. */
 	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, H5size);
 	if (ans_elt_size == 0)
 		goto on_error;
 	h5dset->ans_elt_size = ans_elt_size;
 
-	/* Set 'h5dset->chunk_data_buf_size'. */
+	/* Set members 'chunk_data_buf_length' and 'chunk_data_buf_size'. */
 	if (h5dset->h5chunkdim != NULL) {
-		chunk_data_buf_size = ans_elt_size;
+		chunk_data_buf_length = 1;
 		for (h5along = 0; h5along < ndim; h5along++)
-			chunk_data_buf_size *=
-				h5dset->h5chunkdim[h5along];
-		h5dset->chunk_data_buf_size = chunk_data_buf_size;
+			chunk_data_buf_length *= h5dset->h5chunkdim[h5along];
+		h5dset->chunk_data_buf_length = chunk_data_buf_length;
+		h5dset->chunk_data_buf_size =
+			chunk_data_buf_length * ans_elt_size;
 	}
 
-	/* Set 'h5dset->mem_type_id'. */
+	/* Set member 'mem_type_id'. */
 	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);
 	if (mem_type_id < 0)
 		goto on_error;
@@ -736,6 +737,8 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 		for (h5along = 0; h5along < h5dset->ndim; h5along++)
 			Rprintf(" %d", h5dset->h5nchunk[h5along]);
 		Rprintf("\n");
+		Rprintf("    chunk_data_buf_length = %lu\n",
+			h5dset->chunk_data_buf_length);
 		Rprintf("    chunk_data_buf_size = %lu\n",
 			h5dset->chunk_data_buf_size);
 	}
