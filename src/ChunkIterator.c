@@ -19,7 +19,9 @@ void _destroy_ChunkIterator(ChunkIterator *chunk_iter)
 }
 
 int _init_ChunkIterator(ChunkIterator *chunk_iter,
-		const H5DSetDescriptor *h5dset, SEXP index, int *selection_dim)
+		const H5DSetDescriptor *h5dset, SEXP index,
+		int *selection_dim,
+		int alloc_full_dest_vp)
 {
 	int ndim, ret;
 
@@ -52,15 +54,13 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 						chunk_iter->tchunkidx_bufs,
 						chunk_iter->num_tchunks);
 
-	/* Allocate members 'tchunk_vp', 'middle_vp', and 'dest_vp'.
-	   We set 'dest_vp_mode' to ALLOC_OFF_AND_DIM because, in the context
-	   of h5mread_sparse() or h5summarize(), we won't use 'dest_vp.h5off'
-	   or 'dest_vp.h5dim', only 'dest_vp.off' and 'dest_vp.dim'. */
+	/* Allocate members 'tchunk_vp', 'middle_vp', and 'dest_vp'. */
 	ret = _alloc_tchunk_vp_middle_vp_dest_vp(ndim,
-						 &chunk_iter->tchunk_vp,
-						 &chunk_iter->middle_vp,
-						 &chunk_iter->dest_vp,
-						 ALLOC_OFF_AND_DIM);
+				&chunk_iter->tchunk_vp,
+				&chunk_iter->middle_vp,
+				&chunk_iter->dest_vp,
+				alloc_full_dest_vp ? ALLOC_ALL_FIELDS
+						   : ALLOC_OFF_AND_DIM);
 	if (ret < 0)
 		goto on_error;
 
@@ -139,14 +139,6 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data = NULL;
 	chunk_data_buf->compressed_data = NULL;
 
-	/* Set member 'data_space_id'. */
-	chunk_data_buf->data_space_id =
-		H5Screate_simple(h5dset->ndim, h5dset->h5chunkdim, NULL);
-	if (chunk_data_buf->data_space_id < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Screate_simple() returned an error");
-		goto on_error;
-	}
-
 	/* Set members 'data_length' and 'data_size'. */
 	data_length = 1;
 	for (h5along = 0; h5along < h5dset->ndim; h5along++)
@@ -155,31 +147,40 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_size = data_length * h5dset->ans_elt_size;
 
 	return 0;
-
-    on_error:
-	_destroy_ChunkDataBuffer(chunk_data_buf);
-	return -1;
 }
 
 int _load_chunk(const ChunkIterator *chunk_iter,
 		ChunkDataBuffer *chunk_data_buf,
 		int use_H5Dread_chunk)
 {
+	const H5DSetDescriptor *h5dset;
+	hid_t data_space_id;
 	int ret;
 
-	if (!use_H5Dread_chunk) {
+	if (chunk_data_buf->data == NULL) {
+		chunk_data_buf->data = malloc(chunk_data_buf->data_size);
 		if (chunk_data_buf->data == NULL) {
-			chunk_data_buf->data =
-				malloc(chunk_data_buf->data_size);
-			if (chunk_data_buf->data == NULL) {
-				PRINT_TO_ERRMSG_BUF(
-					"failed to allocate memory "
-					"for member 'data'");
+			PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+					    "for 'chunk_data_buf->data'");
+			return -1;
+		}
+	}
+	h5dset = chunk_iter->h5dset;
+	if (!use_H5Dread_chunk) {
+		if (chunk_data_buf->data_space_id == -1) {
+			data_space_id = H5Screate_simple(h5dset->ndim,
+							 h5dset->h5chunkdim,
+							 NULL);
+			if (data_space_id < 0) {
+				PRINT_TO_ERRMSG_BUF("H5Screate_simple() "
+						    "returned an error");
 				return -1;
 			}
+			chunk_data_buf->data_space_id = data_space_id;
 		}
-		ret = _read_H5Viewport(chunk_iter->h5dset,
-				&chunk_iter->tchunk_vp, &chunk_iter->middle_vp,
+		ret = _read_H5Viewport(h5dset,
+				&chunk_iter->tchunk_vp,
+				&chunk_iter->middle_vp,
 				chunk_data_buf->data,
 				chunk_data_buf->data_space_id);
 	} else {
@@ -190,12 +191,12 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 				       CHUNK_COMPRESSION_OVERHEAD);
 			if (chunk_data_buf->compressed_data == NULL) {
 				PRINT_TO_ERRMSG_BUF(
-					"failed to allocate memory "
-					"for member 'compressed_data'");
+					"failed to allocate memory for "
+					"'chunk_data_buf->compressed_data'");
 				return -1;
 			}
 		}
-		ret = _read_h5chunk(chunk_iter->h5dset,
+		ret = _read_h5chunk(h5dset,
 				&chunk_iter->tchunk_vp,
 				chunk_data_buf->compressed_data,
 				chunk_data_buf->data);

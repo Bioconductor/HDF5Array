@@ -501,11 +501,15 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	   2 ints or doubles. */
 	select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init);
 
-	/* Walk over the chunks touched by the user-supplied array selection. */
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 	status = 0;
-	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL);
+
+	/* In the context of h5summarize(), we won't use
+	   'chunk_iter.dest_vp.h5off' or 'chunk_iter.dest_vp.h5dim', only
+	   'chunk_iter.dest_vp.off' and 'chunk_iter.dest_vp.dim', so we
+	   set 'alloc_full_dest_vp' (last arg) to 0. */
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL, 0);
 	if (ret < 0)
 		return R_NilValue;
 	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
@@ -513,6 +517,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 		_destroy_ChunkIterator(&chunk_iter);
 		return R_NilValue;
 	}
+	/* Walk over the chunks touched by the user-supplied array selection. */
 	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;

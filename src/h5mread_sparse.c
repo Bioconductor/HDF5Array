@@ -593,7 +593,7 @@ static SparseDataGatherer sparse_data_gatherer(
  */
 
 static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
-		int *selection_dim, IntAEAE *nzindex_bufs, void *nzdata_buf)
+		int *ans_dim, IntAEAE *nzindex_bufs, void *nzdata_buf)
 {
 	SparseDataGatherer gatherer;
 	int ndim, ret;
@@ -603,10 +603,15 @@ static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
 
 	gatherer = sparse_data_gatherer(h5dset, nzindex_bufs, nzdata_buf);
 
-	/* Walk over the chunks touched by the user-supplied array selection. */
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
-	ret = _init_ChunkIterator(&chunk_iter, h5dset, starts, selection_dim);
+
+	/* In the context of read_data_8(), 'chunk_iter.dest_vp.h5off'
+	   and 'chunk_iter.dest_vp.h5dim' won't be used, only
+	   'chunk_iter.dest_vp.off' and 'chunk_iter.dest_vp.dim', so
+	   we set 'alloc_full_dest_vp' (last arg) to 0. */
+	ret = _init_ChunkIterator(&chunk_iter, h5dset, starts,
+				  ans_dim, 0);
 	if (ret < 0)
 		return ret;
 	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
@@ -614,6 +619,7 @@ static int read_data_8(const H5DSetDescriptor *h5dset, SEXP starts,
 		_destroy_ChunkIterator(&chunk_iter);
 		return ret;
 	}
+	/* Walk over the chunks touched by the user-supplied array selection. */
 	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;
