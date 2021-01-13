@@ -23,48 +23,6 @@ int _alloc_H5Viewport(
 
 void _free_H5Viewport(H5Viewport *vp);
 
-int _alloc_tchunk_vp_middle_vp_dest_vp(
-	int ndim,
-	H5Viewport *tchunk_vp,
-	H5Viewport *middle_vp,
-	H5Viewport *dest_vp,
-	int dest_vp_mode
-);
-
-void _free_tchunk_vp_middle_vp_dest_vp(
-	H5Viewport *tchunk_vp,
-	H5Viewport *middle_vp,
-	H5Viewport *dest_vp
-);
-
-int _alloc_tchunk_vp_inner_vp_dest_vp(
-	int ndim,
-	H5Viewport *tchunk_vp,
-	H5Viewport *inner_vp,
-	H5Viewport *dest_vp
-);
-
-void _free_tchunk_vp_inner_vp_dest_vp(
-	H5Viewport *tchunk_vp,
-	H5Viewport *inner_vp,
-	H5Viewport *dest_vp
-);
-
-int _map_starts_to_h5chunks(
-	const H5DSetDescriptor *h5dset,
-	SEXP starts,
-	int *nstart_buf,
-	IntAEAE *breakpoint_bufs,
-	LLongAEAE *tchunkidx_bufs
-);
-
-long long int _set_num_tchunks(
-	const H5DSetDescriptor *h5dset,
-	const SEXP starts,
-	const LLongAEAE *tchunkidx_bufs,
-	int *num_tchunks_buf
-);
-
 hid_t _create_mem_space(
 	int ndim,
 	const int *dim
@@ -93,46 +51,6 @@ int _read_h5selection(
 	const H5Viewport *mem_vp,
 	void *mem,
 	hid_t mem_space_id
-);
-
-void _update_tchunk_vp_dest_vp(
-	const H5DSetDescriptor *h5dset,
-	const int *tchunk_midx, int moved_along,
-	SEXP starts,
-	const IntAEAE *breakpoint_bufs,
-	const LLongAEAE *tchunkidx_bufs,
-	H5Viewport *tchunk_vp,
-	H5Viewport *dest_vp
-);
-
-void _print_tchunk_info(
-	int ndim,
-	const int *num_tchunks_buf,
-	const int *tchunk_midx,
-	int tchunk_rank,
-	const SEXP index,
-	const LLongAEAE *tchunkidx_bufs,
-	const H5Viewport *tchunk_vp
-);
-
-int _tchunk_is_truncated(
-	const H5DSetDescriptor *h5dset,
-	const H5Viewport *tchunk_vp
-);
-
-int _tchunk_is_fully_selected(
-	int ndim,
-	const H5Viewport *tchunk_vp,
-	const H5Viewport *dest_vp
-);
-
-#define CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
-
-int _read_h5chunk(
-	const H5DSetDescriptor *h5dset,
-	const H5Viewport *h5chunk_vp,
-	void *compressed_chunk_data_buf,
-	void *chunk_data_buf
 );
 
 void _init_in_offset(

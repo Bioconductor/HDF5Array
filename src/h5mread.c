@@ -8,7 +8,7 @@
 #include "uaselection.h"
 #include "H5DSetDescriptor.h"
 #include "h5mread_startscounts.h"
-#include "h5mread_starts.h"
+#include "h5mread_index.h"
 #include "h5mread_sparse.h"
 
 #include "hdf5.h"
@@ -176,8 +176,8 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 					    method, INTEGER(ans_dim));
 	} else if (method <= 7) {
 		/* Implements methods 4 to 7. */
-		ans = _h5mread_starts(&h5dset, starts,
-				      method, INTEGER(ans_dim));
+		ans = _h5mread_index(&h5dset, starts,
+				     method, INTEGER(ans_dim));
 	} else {
 		/* Implements method 8.
 		   Return 'list(nzindex, nzdata, NULL)' or R_NilValue if

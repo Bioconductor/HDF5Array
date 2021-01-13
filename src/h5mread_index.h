@@ -4,9 +4,9 @@
 #include "H5DSetDescriptor.h"
 #include <Rdefines.h>
 
-SEXP _h5mread_starts(
+SEXP _h5mread_index(
 	const H5DSetDescriptor *h5dset,
-	SEXP starts,
+	SEXP index,
 	int method,
 	int *ans_dim
 );

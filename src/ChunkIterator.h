@@ -16,6 +16,7 @@ typedef struct chunk_iterator_t {
 	long long int total_num_tchunks;
 	H5Viewport tchunk_vp, middle_vp, dest_vp;
 	int *tchunk_midx_buf;
+	int moved_along;
 	long long int tchunk_rank;
 } ChunkIterator;
 
@@ -41,6 +42,27 @@ int _init_ChunkIterator(
 
 int _next_chunk(
 	ChunkIterator *chunk_iter
+);
+
+void _print_tchunk_info(
+	int ndim,
+	const int *num_tchunks_buf,
+	const int *tchunk_midx,
+	int tchunk_rank,
+	const SEXP index,
+	const LLongAEAE *tchunkidx_bufs,
+	const H5Viewport *tchunk_vp
+);
+
+int _tchunk_is_truncated(
+	const H5DSetDescriptor *h5dset,
+	const H5Viewport *tchunk_vp
+);
+
+int _tchunk_is_fully_selected(
+	int ndim,
+	const H5Viewport *tchunk_vp,
+	const H5Viewport *dest_vp
 );
 
 void _destroy_ChunkDataBuffer(
