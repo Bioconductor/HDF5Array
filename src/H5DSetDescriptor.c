@@ -422,8 +422,8 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 
 	/* Set member 'Rtype'. */
 	if (h5dset->storage_mode_attr != NULL) {
-		if (map_storage_mode_to_Rtype(storage_mode_attr, as_int,
-					      &Rtype) < 0)
+		if (map_storage_mode_to_Rtype(h5dset->storage_mode_attr,
+					      as_int, &Rtype) < 0)
 			goto on_error;
 	} else {
 		if (map_H5class_to_Rtype(H5class, as_int, H5size, &Rtype) < 0)
