@@ -44,15 +44,7 @@ int _next_chunk(
 	ChunkIterator *chunk_iter
 );
 
-void _print_tchunk_info(
-	int ndim,
-	const int *num_tchunks_buf,
-	const int *tchunk_midx,
-	int tchunk_rank,
-	const SEXP index,
-	const LLongAEAE *tchunkidx_bufs,
-	const H5Viewport *tchunk_vp
-);
+void _print_tchunk_info(const ChunkIterator *chunk_iter);
 
 int _tchunk_is_truncated(
 	const H5DSetDescriptor *h5dset,

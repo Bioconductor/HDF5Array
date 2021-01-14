@@ -249,6 +249,25 @@ static void transpose_bytes(const char *in, size_t nrow, size_t ncol, char *out)
 	return;
 }
 
+/*
+static void print_chunk_data(void *data, size_t data_length, size_t data_size)
+{
+	printf("chunk data:");
+	//for (size_t i = 0; i < data_size; i++) {
+	//	if (i % 12 == 0)
+	//		printf("\n ");
+	//	printf(" '%c'", ((char *) data)[i]);
+	//}
+	for (size_t i = 0; i < data_length; i++) {
+		if (i % 12 == 0)
+			printf("\n ");
+		printf(" %4d", ((int *) data)[i]);
+	}
+	printf("\n");
+	return;
+}
+*/
+
 #define	CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
 
 /*
@@ -281,8 +300,7 @@ static void transpose_bytes(const char *in, size_t nrow, size_t ncol, char *out)
  */
 static int read_h5chunk(const H5DSetDescriptor *h5dset,
 		const H5Viewport *h5chunk_vp,
-		void *compressed_chunk_data_buf,
-		void *chunk_data_buf)
+		ChunkDataBuffer *chunk_data_buf)
 {
 	int ret;
 	hsize_t chunk_storage_size;
@@ -296,19 +314,19 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 				    "returned an error");
 		return -1;
 	}
-	if (chunk_storage_size > h5dset->chunk_data_buf_size +
+	if (chunk_storage_size > chunk_data_buf->data_size +
 				 CHUNK_COMPRESSION_OVERHEAD)
 	{
 		PRINT_TO_ERRMSG_BUF("chunk storage size (%llu) bigger "
 				    "than expected (%lu + %d)",
 				    chunk_storage_size,
-				    h5dset->chunk_data_buf_size,
+				    chunk_data_buf->data_size,
 				    CHUNK_COMPRESSION_OVERHEAD);
 		return -1;
 	}
 	ret = H5Dread_chunk(h5dset->dset_id, H5P_DEFAULT,
 			    h5chunk_vp->h5off, &filters,
-			    compressed_chunk_data_buf);
+			    chunk_data_buf->compressed_data);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dread_chunk() returned an error");
 		return -1;
@@ -319,16 +337,18 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 	//FIXME: This will error if chunk data is not compressed!
 	//TODO: Decompress only if chunk data is compressed. There should be
 	//a bit in the returned 'filters' that indicates this.
-	ret = uncompress_chunk_data(compressed_chunk_data_buf,
+	ret = uncompress_chunk_data(chunk_data_buf->compressed_data,
 				    chunk_storage_size,
-				    chunk_data_buf,
-				    h5dset->chunk_data_buf_size);
+				    chunk_data_buf->data,
+				    chunk_data_buf->data_size);
 	if (ret < 0)
 		return -1;
-	size_t nval = h5dset->chunk_data_buf_size / h5dset->ans_elt_size;
-	transpose_bytes(chunk_data_buf, nval, h5dset->ans_elt_size,
-			compressed_chunk_data_buf);
-	//print_chunk_data(h5dset, compressed_chunk_data_buf);
+	transpose_bytes(chunk_data_buf->data, chunk_data_buf->data_length,
+			h5dset->ans_elt_size,
+			chunk_data_buf->compressed_data);
+	//print_chunk_data(chunk_data_buf->compressed_data,
+	//		   chunk_data_buf->data_length,
+	//		   chunk_data_buf->data_size);
 	return 0;
 }
 
@@ -440,40 +460,39 @@ int _next_chunk(ChunkIterator *chunk_iter)
 	return 1;
 }
 
-void _print_tchunk_info(int ndim,
-		const int *num_tchunks_buf, const int *tchunk_midx,
-		int tchunk_rank,
-		const SEXP index, const LLongAEAE *tchunkidx_bufs,
-		const H5Viewport *tchunk_vp)
+void _print_tchunk_info(const ChunkIterator *chunk_iter)
 {
-	int along, h5along, i;
+	int ndim, along, h5along, i;
 	long long int total_num_tchunks, tchunkidx;
 
+	ndim = chunk_iter->h5dset->ndim;
 	total_num_tchunks = 1;
 	for (along = 0; along < ndim; along++)
-		total_num_tchunks *= num_tchunks_buf[along];
+		total_num_tchunks *= chunk_iter->num_tchunks[along];
 
-	printf("processing chunk %d/%lld: [",
-	       tchunk_rank + 1, total_num_tchunks);
+	printf("processing chunk %lld/%lld: [",
+	       chunk_iter->tchunk_rank + 1, total_num_tchunks);
 	for (along = 0; along < ndim; along++) {
-		i = tchunk_midx[along] + 1;
+		i = chunk_iter->tchunk_midx_buf[along] + 1;
 		if (along != 0)
 			printf(", ");
-		printf("%d/%d", i, num_tchunks_buf[along]);
+		printf("%d/%d", i, chunk_iter->num_tchunks[along]);
 	}
 	printf("] -- <<");
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		i = tchunk_midx[along];
-		if (GET_LIST_ELT(index, along) != R_NilValue) {
-			tchunkidx = tchunkidx_bufs->elts[along]->elts[i];
+		i = chunk_iter->tchunk_midx_buf[along];
+		if (GET_LIST_ELT(chunk_iter->index, along) != R_NilValue) {
+			tchunkidx =
+			    chunk_iter->tchunkidx_bufs->elts[along]->elts[i];
 		} else {
 			tchunkidx = i;
 		}
 		if (along != 0)
 			printf(", ");
 		printf("#%lld=%llu:%llu", tchunkidx + 1,
-		       tchunk_vp->h5off[h5along] + 1,
-		       tchunk_vp->h5off[h5along] + tchunk_vp->h5dim[h5along]);
+		       chunk_iter->tchunk_vp.h5off[h5along] + 1,
+		       chunk_iter->tchunk_vp.h5off[h5along] +
+		           chunk_iter->tchunk_vp.h5dim[h5along]);
 	}
 	printf(">>\n");
 	return;
@@ -600,8 +619,7 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 		}
 		ret = read_h5chunk(h5dset,
 				&chunk_iter->tchunk_vp,
-				chunk_data_buf->compressed_data,
-				chunk_data_buf->data);
+				chunk_data_buf);
 	}
 	return ret;
 }

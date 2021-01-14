@@ -37,7 +37,7 @@ test_h5mread_2D <- function()
         checkIdentical(m[i, c(6:5, 5), drop=FALSE], current)
 
         ## Only methods 1 and 3 support 'counts'.
-        if (!(method %in% c(1, 3)))
+        if (!(method %in% c(1L, 3L)))
             return()
 
         starts <- list(integer(0), 4L)
@@ -97,8 +97,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m0, M0, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m0, M0, method=4L)
+            do_2D_tests(m0, M0, method=5L)
             do_2D_tests(m0, M0, method=6L)
-            do_2D_tests(m0, M0, method=7L)
             do_2D_sparse_tests(M0)
         }
         do_2D_tests(m0, M0)
@@ -116,8 +116,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m1, M1, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m1, M1, method=4L)
+            do_2D_tests(m1, M1, method=5L)
             do_2D_tests(m1, M1, method=6L)
-            do_2D_tests(m1, M1, method=7L)
             do_2D_sparse_tests(M1)
         }
         do_2D_tests(m1, M1)
@@ -126,8 +126,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m1, M1, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m1, M1, as.integer=TRUE, method=4L)
+            do_2D_tests(m1, M1, as.integer=TRUE, method=5L)
             do_2D_tests(m1, M1, as.integer=TRUE, method=6L)
-            do_2D_tests(m1, M1, as.integer=TRUE, method=7L)
             do_2D_sparse_tests(M1, as.integer=TRUE)
         }
     }
@@ -144,8 +144,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m2, M2, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m2, M2, method=4L)
+            do_2D_tests(m2, M2, method=5L)
             do_2D_tests(m2, M2, method=6L)
-            do_2D_tests(m2, M2, method=7L)
             do_2D_sparse_tests(M2)
         }
         do_2D_tests(m2, M2)
@@ -154,8 +154,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m2, M2, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m2, M2, as.integer=TRUE, method=4L)
+            do_2D_tests(m2, M2, as.integer=TRUE, method=5L)
             do_2D_tests(m2, M2, as.integer=TRUE, method=6L)
-            do_2D_tests(m2, M2, as.integer=TRUE, method=7L)
             do_2D_sparse_tests(M2, as.integer=TRUE)
         }
     }
@@ -193,8 +193,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m4, M4, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m4, M4, method=4L)
+            do_2D_tests(m4, M4, method=5L)
             do_2D_tests(m4, M4, method=6L)
-            do_2D_tests(m4, M4, method=7L)
             do_2D_sparse_tests(M4)
         }
         do_2D_tests(m4, M4)
@@ -202,8 +202,8 @@ test_h5mread_2D <- function()
         do_2D_tests(m0, M4, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_2D_tests(m0, M4, as.integer=TRUE, method=4L)
+            do_2D_tests(m0, M4, as.integer=TRUE, method=5L)
             do_2D_tests(m0, M4, as.integer=TRUE, method=6L)
-            do_2D_tests(m0, M4, as.integer=TRUE, method=7L)
             do_2D_sparse_tests(M4, as.integer=TRUE)
         }
     }
@@ -253,7 +253,7 @@ test_h5mread_3D <- function()
         checkIdentical(a[i, , c(6:5, 5), drop=FALSE], current)
 
         ## Only methods 1 and 3 support 'counts'.
-        if (!(method %in% c(1, 3)))
+        if (!(method %in% c(1L, 3L)))
             return()
 
         starts <- list(integer(0), NULL, 4L)
@@ -324,8 +324,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a0, A0, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a0, A0, method=4L)
+            do_3D_tests(a0, A0, method=5L)
             do_3D_tests(a0, A0, method=6L)
-            do_3D_tests(a0, A0, method=7L)
             do_3D_sparse_tests(A0)
         }
         do_3D_tests(a0, A0)
@@ -343,8 +343,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a1, A1, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a1, A1, method=4L)
+            do_3D_tests(a1, A1, method=5L)
             do_3D_tests(a1, A1, method=6L)
-            do_3D_tests(a1, A1, method=7L)
             do_3D_sparse_tests(A1)
         }
         do_3D_tests(a1, A1)
@@ -353,8 +353,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a1, A1, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a1, A1, as.integer=TRUE, method=4L)
+            do_3D_tests(a1, A1, as.integer=TRUE, method=5L)
             do_3D_tests(a1, A1, as.integer=TRUE, method=6L)
-            do_3D_tests(a1, A1, as.integer=TRUE, method=7L)
             do_3D_sparse_tests(A1, as.integer=TRUE)
         }
     }
@@ -371,8 +371,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a2, A2, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a2, A2, method=4L)
+            do_3D_tests(a2, A2, method=5L)
             do_3D_tests(a2, A2, method=6L)
-            do_3D_tests(a2, A2, method=7L)
             do_3D_sparse_tests(A2)
         }
         do_3D_tests(a2, A2)
@@ -381,8 +381,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a2, A2, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a2, A2, as.integer=TRUE, method=4L)
+            do_3D_tests(a2, A2, as.integer=TRUE, method=5L)
             do_3D_tests(a2, A2, as.integer=TRUE, method=6L)
-            do_3D_tests(a2, A2, as.integer=TRUE, method=7L)
             do_3D_sparse_tests(A2, as.integer=TRUE)
         }
     }
@@ -412,8 +412,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a4, A4, noreduce=TRUE, method=3L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a4, A4, method=4L)
+            do_3D_tests(a4, A4, method=5L)
             do_3D_tests(a4, A4, method=6L)
-            do_3D_tests(a4, A4, method=7L)
             do_3D_sparse_tests(A4)
         }
         do_3D_tests(a4, A4)
@@ -421,8 +421,8 @@ test_h5mread_3D <- function()
         do_3D_tests(a0, A4, as.integer=TRUE, method=1L)
         if (!identical(chunkdim, 0)) {
             do_3D_tests(a0, A4, as.integer=TRUE, method=4L)
+            do_3D_tests(a0, A4, as.integer=TRUE, method=5L)
             do_3D_tests(a0, A4, as.integer=TRUE, method=6L)
-            do_3D_tests(a0, A4, as.integer=TRUE, method=7L)
             do_3D_sparse_tests(A4)
         }
     }

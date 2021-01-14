@@ -11,7 +11,8 @@ SEXP C_h5mread(
 	SEXP noreduce,
 	SEXP as_integer,
 	SEXP as_sparse,
-	SEXP method
+	SEXP method,
+	SEXP use_H5Dread_chunk
 );
 
 #endif  /* _H5MREAD_H_ */

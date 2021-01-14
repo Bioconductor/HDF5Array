@@ -1,5 +1,5 @@
 /****************************************************************************
- *               Workhorses behind h5mread methods 4, 5, 6, 7               *
+ *                 Workhorses behind h5mread methods 4, 5, 6                *
  *                            Author: H. Pag\`es                            *
  ****************************************************************************/
 #include "h5mread_index.h"
@@ -17,17 +17,17 @@
 /****************************************************************************
  * read_data_4_5()
  *
- * One call to _read_H5Viewport() or _read_h5chunk() (wrappers for H5Dread()
- * or H5Dread_chunk(), respectively) per chunk touched by the user-supplied
- * array selection.
+ * method 4: One call to _read_H5Viewport() or _read_h5chunk() (wrappers for
+ * H5Dread() or H5Dread_chunk(), respectively) per chunk touched by the
+ * user-supplied array selection.
  *
  * More precisely, walk over the chunks touched by 'index'. For each chunk:
  *   - Make one call to _read_H5Viewport() or _read_h5chunk() to load the
  *     **entire** chunk data to an intermediate buffer.
  *   - Copy the user-selected data from the intermediate buffer to 'ans'.
  *
- * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT NULL.
- * This is NOT checked!
+ * method 5: Like read_data_4_5() but bypasses the intermediate buffer if a
+ * chunk is fully selected.
  */
 
 static void init_in_offset_and_out_offset(int ndim, SEXP index,
@@ -153,11 +153,12 @@ static int load_val_to_array(const H5DSetDescriptor *h5dset,
 	return 0;
 }
 
-static int gather_selected_chunk_data(
+static int copy_selected_chunk_data_to_ans(
 		const H5DSetDescriptor *h5dset, SEXP index,
-		const void *in, const H5Viewport *tchunk_vp,
-		const int *ans_dim, SEXP ans,
-		const H5Viewport *dest_vp, int *inner_midx_buf)
+		const H5Viewport *tchunk_vp,
+		const void *in,
+		const H5Viewport *dest_vp, int *inner_midx_buf,
+		const int *ans_dim, SEXP ans)
 {
 	int ndim, inner_moved_along, ret;
 	size_t in_offset, out_offset;
@@ -191,33 +192,16 @@ static int gather_selected_chunk_data(
 	return 0;
 }
 
-static int read_data_from_chunk_4_5(const ChunkIterator *chunk_iter,
-		const int *ans_dim, SEXP ans,
-		ChunkDataBuffer *chunk_data_buf,
-		int use_H5Dread_chunk,
-		int *inner_midx_buf)
-{
-	int ret;
-
-	ret = _load_chunk(chunk_iter, chunk_data_buf, use_H5Dread_chunk);
-	if (ret < 0)
-		return ret;
-	ret = gather_selected_chunk_data(chunk_iter->h5dset, chunk_iter->index,
-			chunk_data_buf->data, &chunk_iter->tchunk_vp,
-			ans_dim, ans,
-			&chunk_iter->dest_vp, inner_midx_buf);
-	return ret;
-}
-
 /*
-  WARNING: method 5 is not working properly on some datasets:
+  WARNING: 'use.H5Dread_chunk=TRUE' is not working properly on some datasets:
       library(HDF5Array)
       library(ExperimentHub)
       hub <- ExperimentHub()
       fname0 <- hub[["EH1039"]]
       h5mread(fname0, "mm10/barcodes", list(1), method=4L)
       # [1] "AAACCTGAGATAGGAG-1"
-      h5mread(fname0, "mm10/barcodes", list(1), method=5L)
+      h5mread(fname0, "mm10/barcodes", list(1),
+              method=4L, use.H5Dread_chunk=TRUE)
       # [1] "AAAAAAAAAAAAAAAAAAAA"
   Looks like the chunk data has been shuffled (transposed in that case)
   before being written to disk in order to improve compression.
@@ -228,45 +212,75 @@ static int read_data_from_chunk_4_5(const ChunkIterator *chunk_iter,
   shuffled.
  */
 static int read_data_4_5(ChunkIterator *chunk_iter,
-		const int *ans_dim, SEXP ans, int method)
+		const int *ans_dim, SEXP ans,
+		int method, int use_H5Dread_chunk)
 {
 	const H5DSetDescriptor *h5dset;
-	int ndim, ret;
+	int ndim, ret, direct_load;
 	IntAE *inner_midx_buf;
+	void *dest;
+	hid_t dest_space_id;
 	ChunkDataBuffer chunk_data_buf;
 
-	if (method == 5)
-		warning("method 5 is still experimental, use at your own risk");
+	if (use_H5Dread_chunk)
+		warning("using 'use.H5Dread_chunk=TRUE' is still "
+			"experimental, use at your own risk");
 
 	h5dset = chunk_iter->h5dset;
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
+	dest = DATAPTR(ans);
+	if (dest == NULL)
+		return -1;
+
+	dest_space_id = _create_mem_space(ndim, ans_dim);
+	if (dest_space_id < 0)
+		return -1;
+
 	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
-	if (ret < 0)
+	if (ret < 0) {
+		H5Sclose(dest_space_id);
 		return ret;
+	}
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	while ((ret = _next_chunk(chunk_iter))) {
 		if (ret < 0)
 			break;
-/*
-		_print_tchunk_info(ndim,
-				chunk_iter->num_tchunks,
-				chunk_iter->tchunk_midx_buf,
-				chunk_iter->tchunk_rank,
-				chunk_iter->index,
-				chunk_iter->tchunkidx_bufs,
-				&chunk_iter->tchunk_vp);
-*/
-		ret = read_data_from_chunk_4_5(
-			chunk_iter, ans_dim, ans,
-			&chunk_data_buf,
-			method == 5,
-			inner_midx_buf->elts);
+		//_print_tchunk_info(chunk_iter);
+		direct_load = method == 5 &&
+			      _tchunk_is_fully_selected(ndim,
+					&chunk_iter->tchunk_vp,
+					&chunk_iter->dest_vp);
+		if (direct_load) {
+			/* Load the chunk **directly** into 'ans' (no
+			   intermediate buffer). */
+			ret = _read_H5Viewport(h5dset,
+				&chunk_iter->tchunk_vp,
+				&chunk_iter->dest_vp,
+				dest, dest_space_id);
+		} else {
+			/* Load the **entire** chunk to an intermediate
+			   buffer then copy the user-selected chunk data
+			   from the intermediate buffer to 'ans'. */
+			ret = _load_chunk(chunk_iter, &chunk_data_buf,
+					  use_H5Dread_chunk);
+			if (ret < 0)
+				break;
+			ret = copy_selected_chunk_data_to_ans(
+					chunk_iter->h5dset,
+					chunk_iter->index,
+					&chunk_iter->tchunk_vp,
+					chunk_data_buf.data,
+					&chunk_iter->dest_vp,
+					inner_midx_buf->elts,
+					ans_dim, ans);
+		}
 		if (ret < 0)
 			break;
 	}
 	_destroy_ChunkDataBuffer(&chunk_data_buf);
+	H5Sclose(dest_space_id);
 	return ret;
 }
 
@@ -282,9 +296,6 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
  *     array selection with the current chunk.
  *   - Call _read_h5selection(). This loads the selected data **directly**
  *     to the final destination array (ans).
- *
- * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
- * NULL. This is NOT checked!
  */
 
 static void update_inner_breakpoints(int ndim, int moved_along,
@@ -379,8 +390,7 @@ static void update_inner_vp(int ndim,
 
 /* Return nb of hyperslabs (or -1 on error). */
 static long long int select_intersection_of_chips_with_chunk(
-		const H5DSetDescriptor *h5dset,
-		SEXP index,
+		const H5DSetDescriptor *h5dset, SEXP index,
 		const H5Viewport *dest_vp, const H5Viewport *tchunk_vp,
 		const IntAEAE *inner_breakpoint_bufs,
 		const int *inner_nchip,
@@ -423,31 +433,29 @@ static long long int select_intersection_of_chips_with_chunk(
 	return num_hyperslabs;
 }
 
-static int read_data_from_chunk_6(const H5DSetDescriptor *h5dset,
-		const int *chunk_midx, int moved_along,
-		SEXP index,
-		const IntAEAE *breakpoint_bufs,
-		const LLongAEAE *tchunkidx_bufs,
+static int read_data_from_chunk_6(const ChunkIterator *chunk_iter,
 		void *dest, hid_t dest_space_id,
 		int *inner_midx_buf,
-		const H5Viewport *tchunk_vp,
 		H5Viewport *inner_vp,
-		const H5Viewport *dest_vp,
 		IntAEAE *inner_breakpoint_bufs,
 		const IntAE *inner_nchip_buf)
 {
+	const H5DSetDescriptor *h5dset;
 	int ret;
 
-	update_inner_breakpoints(h5dset->ndim, moved_along,
-			index, dest_vp,
+	h5dset = chunk_iter->h5dset;
+	update_inner_breakpoints(h5dset->ndim, chunk_iter->moved_along,
+			chunk_iter->index, &chunk_iter->dest_vp,
 			inner_breakpoint_bufs, inner_nchip_buf->elts);
 	ret = select_intersection_of_chips_with_chunk(
-			h5dset, index, dest_vp, tchunk_vp,
+			h5dset, chunk_iter->index,
+			&chunk_iter->dest_vp, &chunk_iter->tchunk_vp,
 			inner_breakpoint_bufs, inner_nchip_buf->elts,
 			inner_midx_buf, inner_vp);
 	if (ret < 0)
 		return ret;
-	ret = _read_h5selection(h5dset, dest_vp, dest, dest_space_id);
+	ret = _read_h5selection(h5dset, &chunk_iter->dest_vp,
+				dest, dest_space_id);
 	return ret;
 }
 
@@ -455,7 +463,7 @@ static int read_data_6(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
 {
 	const H5DSetDescriptor *h5dset;
 	int ndim, ret;
-	IntAE *tchunk_midx_buf, *inner_nchip_buf, *inner_midx_buf;
+	IntAE *inner_midx_buf, *inner_nchip_buf;
 	IntAEAE *inner_breakpoint_bufs;
 	void *dest;
 	hid_t dest_space_id;
@@ -464,9 +472,8 @@ static int read_data_6(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
 
 	h5dset = chunk_iter->h5dset;
 	ndim = h5dset->ndim;
-	tchunk_midx_buf = new_IntAE(ndim, ndim, 0);
-	inner_nchip_buf = new_IntAE(ndim, ndim, 0);
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
+	inner_nchip_buf = new_IntAE(ndim, ndim, 0);
 	inner_breakpoint_bufs = new_IntAEAE(ndim, ndim);
 
 	dest = DATAPTR(ans);
@@ -492,16 +499,10 @@ static int read_data_6(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
 	while ((ret = _next_chunk(chunk_iter))) {
 		if (ret < 0)
 			break;
-		ret = read_data_from_chunk_6(h5dset,
-			tchunk_midx_buf->elts, chunk_iter->moved_along,
-			chunk_iter->index,
-			chunk_iter->breakpoint_bufs,
-			chunk_iter->tchunkidx_bufs,
+		ret = read_data_from_chunk_6(chunk_iter,
 			dest, dest_space_id,
 			inner_midx_buf->elts,
-			&chunk_iter->tchunk_vp,
 			&inner_vp,
-			&chunk_iter->dest_vp,
 			inner_breakpoint_bufs, inner_nchip_buf);
 		if (ret < 0)
 			break;
@@ -514,94 +515,26 @@ static int read_data_6(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
 
 
 /****************************************************************************
- * read_data_7()
- *
- * Like read_data_4_5() but bypasses the intermediate buffer if a chunk is
- * fully selected.
- *
- * Assumes that 'h5dset->h5chunkdim' and 'h5dset->h5nchunk' are NOT
- * NULL. This is NOT checked!
- */
-
-static int read_data_7(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
-{
-	const H5DSetDescriptor *h5dset;
-	int ndim, ret, ok;
-	IntAE *inner_midx_buf;
-	void *dest;
-	hid_t dest_space_id;
-	ChunkDataBuffer chunk_data_buf;
-
-	h5dset = chunk_iter->h5dset;
-	ndim = h5dset->ndim;
-	inner_midx_buf = new_IntAE(ndim, ndim, 0);
-
-	dest = DATAPTR(ans);
-	if (dest == NULL)
-		return -1;
-
-	dest_space_id = _create_mem_space(ndim, ans_dim);
-	if (dest_space_id < 0)
-		return -1;
-
-	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
-	if (ret < 0) {
-		H5Sclose(dest_space_id);
-		return ret;
-	}
-	/* Walk over the chunks touched by the user-supplied array selection. */
-	while ((ret = _next_chunk(chunk_iter))) {
-		if (ret < 0)
-			break;
-		ok = _tchunk_is_fully_selected(ndim,
-					       &chunk_iter->tchunk_vp,
-					       &chunk_iter->dest_vp);
-		if (ok) {
-			/* Load the chunk **directly** into 'ans' (no
-			   intermediate buffer). */
-			ret = _read_H5Viewport(h5dset,
-				&chunk_iter->tchunk_vp, &chunk_iter->dest_vp,
-				dest, dest_space_id);
-		} else {
-			/* Load the **entire** chunk to an intermediate
-			   buffer then copy the user-selected data from
-			   the intermediate buffer to 'ans'. */
-			ret = read_data_from_chunk_4_5(
-				chunk_iter, ans_dim, ans,
-				&chunk_data_buf,
-				0,
-				inner_midx_buf->elts);
-		}
-		if (ret < 0)
-			break;
-	}
-	_destroy_ChunkDataBuffer(&chunk_data_buf);
-	H5Sclose(dest_space_id);
-	return ret;
-}
-
-
-/****************************************************************************
  * _h5mread_index()
  *
- * Implements methods 4 to 7.
+ * Implements methods 4 to 6.
  * Return an ordinary array or R_NilValue if an error occured.
  */
 
 SEXP _h5mread_index(const H5DSetDescriptor *h5dset, SEXP index,
-		    int method, int *ans_dim)
+		    int method, int use_H5Dread_chunk, int *ans_dim)
 {
-	int ret, ndim, along;
 	ChunkIterator chunk_iter;
+	int ret, ndim, along;
 	R_xlen_t ans_len;
 	SEXP ans;
 
-	/* In the context of methods 6 & 7, 'chunk_iter.dest_vp.h5off'
+	/* In the context of methods 5 & 6, 'chunk_iter.dest_vp.h5off'
 	   and 'chunk_iter.dest_vp.h5dim' will be used, not just
 	   'chunk_iter.dest_vp.off' and 'chunk_iter.dest_vp.dim',
 	   so we set 'alloc_full_dest_vp' (last arg) to 1. */
 	ret = _init_ChunkIterator(&chunk_iter, h5dset, index,
-				  ans_dim, method == 6 || method == 7);
+				  ans_dim, method == 5 || method == 6);
 	if (ret < 0)
 		return R_NilValue;
 
@@ -611,14 +544,12 @@ SEXP _h5mread_index(const H5DSetDescriptor *h5dset, SEXP index,
 	ans = PROTECT(allocVector(h5dset->Rtype, ans_len));
 
 	if (method <= 5) {
-		/*  methods 4 and 5 */
-		ret = read_data_4_5(&chunk_iter, ans_dim, ans, method);
-	} else if (method == 6) {
+		/* methods 4 and 5 */
+		ret = read_data_4_5(&chunk_iter, ans_dim, ans,
+				    method, use_H5Dread_chunk);
+	} else {
 		/* method 6 */
 		ret = read_data_6(&chunk_iter, ans_dim, ans);
-	} else {
-		/* method 7 */
-		ret = read_data_7(&chunk_iter, ans_dim, ans);
 	}
 	_destroy_ChunkIterator(&chunk_iter);
 	UNPROTECT(1);

@@ -23,7 +23,7 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_get_h5mread_returned_type, 3),
 
 /* h5mread.c */
-	CALLMETHOD_DEF(C_h5mread, 8),
+	CALLMETHOD_DEF(C_h5mread, 9),
 
 /* h5dimscales.c */
 	CALLMETHOD_DEF(C_h5isdimscale, 2),

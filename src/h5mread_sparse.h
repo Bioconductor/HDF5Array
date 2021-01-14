@@ -6,7 +6,7 @@
 
 SEXP _h5mread_sparse(
 	const H5DSetDescriptor *h5dset,
-	SEXP starts,
+	SEXP index,
 	int *ans_dim
 );
 

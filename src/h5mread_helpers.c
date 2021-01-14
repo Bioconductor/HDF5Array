@@ -20,27 +20,6 @@ Some useful links:
 #include <stdlib.h>  /* for malloc, free */
 
 
-static void print_chunk_data(const H5DSetDescriptor *h5dset, void *data)
-{
-	printf("chunk data:");
-/*
-	for (size_t i = 0; i < h5dset->chunk_data_buf_size; i++) {
-		if (i % 12 == 0)
-			printf("\n ");
-		printf(" '%c'", ((char *) data)[i]);
-	}
-*/
-	size_t nval = h5dset->chunk_data_buf_size / h5dset->ans_elt_size;
-	for (size_t i = 0; i < nval; i++) {
-		if (i % 12 == 0)
-			printf("\n ");
-		printf(" %4d", ((int *) data)[i]);
-	}
-	printf("\n");
-	return;
-}
-
-
 /****************************************************************************
  * Memory management of H5Viewport structs
  */
@@ -149,7 +128,6 @@ int _read_H5Viewport(const H5DSetDescriptor *h5dset,
 		      h5dset->space_id, H5P_DEFAULT, mem);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
-	//print_chunk_data(h5dset, mem);
 	return ret;
 }
 
@@ -180,7 +158,7 @@ int _read_h5selection(const H5DSetDescriptor *h5dset,
  * _init_in_offset()
  */
 
-void _init_in_offset(int ndim, SEXP starts,
+void _init_in_offset(int ndim, SEXP index,
 		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
 		const H5Viewport *tchunk_vp,
 		size_t *in_offset)
@@ -193,7 +171,7 @@ void _init_in_offset(int ndim, SEXP starts,
 	for (along = ndim - 1, h5along = 0; along >= 0; along--, h5along++) {
 		in_off *= h5chunkdim[h5along];
 		i = dest_vp->off[along];
-		start = GET_LIST_ELT(starts, along);
+		start = GET_LIST_ELT(index, along);
 		if (start != R_NilValue)
 			in_off += _get_trusted_elt(start, i) - 1 -
 				  tchunk_vp->h5off[h5along];

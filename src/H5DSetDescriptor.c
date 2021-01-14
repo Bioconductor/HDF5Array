@@ -349,7 +349,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	char *h5name, *storage_mode_attr;
 	hid_t dtype_id, space_id, plist_id, mem_type_id;
 	H5T_class_t H5class;
-	size_t H5size, ans_elt_size, chunk_data_buf_length;
+	size_t H5size, ans_elt_size;
 	SEXPTYPE Rtype;
 	int as_na_attr, ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
@@ -545,16 +545,6 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		goto on_error;
 	h5dset->ans_elt_size = ans_elt_size;
 
-	/* Set members 'chunk_data_buf_length' and 'chunk_data_buf_size'. */
-	if (h5dset->h5chunkdim != NULL) {
-		chunk_data_buf_length = 1;
-		for (h5along = 0; h5along < ndim; h5along++)
-			chunk_data_buf_length *= h5dset->h5chunkdim[h5along];
-		h5dset->chunk_data_buf_length = chunk_data_buf_length;
-		h5dset->chunk_data_buf_size =
-			chunk_data_buf_length * ans_elt_size;
-	}
-
 	/* Set member 'mem_type_id'. */
 	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);
 	if (mem_type_id < 0)
@@ -737,10 +727,6 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 		for (h5along = 0; h5along < h5dset->ndim; h5along++)
 			Rprintf(" %d", h5dset->h5nchunk[h5along]);
 		Rprintf("\n");
-		Rprintf("    chunk_data_buf_length = %lu\n",
-			h5dset->chunk_data_buf_length);
-		Rprintf("    chunk_data_buf_size = %lu\n",
-			h5dset->chunk_data_buf_size);
 	}
 
 	Rprintf("- ans_elt_size = %lu\n", h5dset->ans_elt_size);

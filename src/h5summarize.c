@@ -522,13 +522,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 		if (ret < 0)
 			break;
 		if (verbose)
-			_print_tchunk_info(ndim,
-				chunk_iter.num_tchunks,
-				chunk_iter.tchunk_midx_buf,
-				chunk_iter.tchunk_rank,
-				chunk_iter.index,
-				chunk_iter.tchunkidx_bufs,
-				&chunk_iter.tchunk_vp);
+			_print_tchunk_info(&chunk_iter);
 		ret = _load_chunk(&chunk_iter, &chunk_data_buf, 0);
 		if (ret < 0)
 			break;

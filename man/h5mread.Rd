@@ -20,7 +20,8 @@
 
 \usage{
 h5mread(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
-        as.integer=FALSE, as.sparse=FALSE, method=0L)
+        as.integer=FALSE, as.sparse=FALSE,
+        method=0L, use.H5Dread_chunk=FALSE)
 
 get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 }
@@ -78,6 +79,9 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
     TODO
   }
   \item{method}{
+    TODO
+  }
+  \item{use.H5Dread_chunk}{
     TODO
   }
 }

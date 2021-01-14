@@ -15,11 +15,11 @@
 
 /* Return -1 on error. */
 static int select_method(const H5DSetDescriptor *h5dset,
-			 SEXP starts, SEXP counts, int sparse, int method)
+			 SEXP starts, SEXP counts, int as_sparse, int method)
 {
 	int along;
 
-	if (sparse) {
+	if (as_sparse) {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "'as.sparse' is set to TRUE");
@@ -31,13 +31,17 @@ static int select_method(const H5DSetDescriptor *h5dset,
 			return -1;
 		}
 		if (method == 0) {
-			method = 8;
-		} else if (method != 8) {
-			PRINT_TO_ERRMSG_BUF("only method 8 is supported "
+			method = 7;
+		} else if (method != 7) {
+			PRINT_TO_ERRMSG_BUF("only method 7 is supported "
 					    "when 'as.sparse' is set to TRUE");
 			return -1;
 		}
 		return method;
+	}
+	if (method < 0 || method > 6) {
+		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 6");
+		return -1;
 	}
 	if (h5dset->Rtype == STRSXP) {
 		if (counts != R_NilValue) {
@@ -71,7 +75,7 @@ static int select_method(const H5DSetDescriptor *h5dset,
 		   change in Rhdf5lib?
 		   Anyway thanks to Pete for providing such a useful report.
 
-		   Nov 26, 2019: I added method 7. Is like method 4 but
+		   Nov 26, 2019: I added method 5. Is like method 4 but
 		   bypasses the intermediate buffer if a chunk is fully
 		   selected. This is now preferred over methods 4 or 6. */
 		if (h5dset->h5chunkdim != NULL &&
@@ -82,25 +86,24 @@ static int select_method(const H5DSetDescriptor *h5dset,
 				if (VECTOR_ELT(starts, along) != R_NilValue) {
 					//method = 6;
 					//method = 4;
-					method = 7;
+					method = 5;
 					break;
 				}
 			}
 		}
-	} else if (method < 0 || method > 7) {
-		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 7");
-		return -1;
-	} else if (method >= 4) {
+		return method;
+	}
+	if (method >= 4) {
 		/* Make sure the data is chunked and 'counts' is NULL. */
 		if (h5dset->h5chunkdim == NULL) {
-			PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 cannot "
+			PRINT_TO_ERRMSG_BUF("methods 4, 5, and 6 cannot "
 				"be used on a contiguous dataset (unless\n  "
 				"it contains string data in which case "
 				"methods 4 and 5 can be used)");
 			return -1;
 		}
 		if (counts != R_NilValue) {
-			PRINT_TO_ERRMSG_BUF("methods 4, 5, 6, and 7 can "
+			PRINT_TO_ERRMSG_BUF("methods 4, 5, and 6 can "
 				"only be used when 'counts' is NULL");
 			return -1;
 		}
@@ -149,7 +152,8 @@ static void set_character_NAs(SEXP x)
 
 /* Return R_NilValue on error. */
 static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
-		    int as_int, int sparse, int method)
+		    int as_int, int as_sparse,
+		    int method, int use_H5Dread_chunk)
 {
 	SEXP ans, ans_dim;
 	H5DSetDescriptor h5dset;
@@ -164,9 +168,13 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ret < 0)
 		goto on_error;
 
-	method = select_method(&h5dset, starts, counts, sparse, method);
+	method = select_method(&h5dset, starts, counts, as_sparse, method);
 	if (method < 0)
 		goto on_error;
+	if (use_H5Dread_chunk && method != 4 && method != 5) {
+		PRINT_TO_ERRMSG_BUF("invalid use of 'use.H5Dread_chunk'");
+		goto on_error;
+	}
 
 	ans_dim = PROTECT(NEW_INTEGER(h5dset.ndim));
 
@@ -174,12 +182,13 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		/* Implements methods 1 to 3. */
 		ans = _h5mread_startscounts(&h5dset, starts, counts, noreduce,
 					    method, INTEGER(ans_dim));
-	} else if (method <= 7) {
-		/* Implements methods 4 to 7. */
+	} else if (method <= 6) {
+		/* Implements methods 4 to 6. */
 		ans = _h5mread_index(&h5dset, starts,
-				     method, INTEGER(ans_dim));
+				     method, use_H5Dread_chunk,
+				     INTEGER(ans_dim));
 	} else {
-		/* Implements method 8.
+		/* Implements method 7.
 		   Return 'list(nzindex, nzdata, NULL)' or R_NilValue if
 		   an error occured. */
 		ans = _h5mread_sparse(&h5dset, starts, INTEGER(ans_dim));
@@ -187,7 +196,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 
 	if (ans != R_NilValue) {
 		PROTECT(ans);
-		if (sparse) {
+		if (as_sparse) {
 			if (h5dset.Rtype == LGLSXP)
 				fix_logical_NAs(VECTOR_ELT(ans, 2));
 			else if (h5dset.Rtype == STRSXP && h5dset.as_na_attr)
@@ -212,9 +221,10 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 /* --- .Call ENTRY POINT --- */
 SEXP C_h5mread(SEXP filepath, SEXP name,
 	       SEXP starts, SEXP counts, SEXP noreduce,
-	       SEXP as_integer, SEXP as_sparse, SEXP method)
+	       SEXP as_integer, SEXP as_sparse,
+	       SEXP method, SEXP use_H5Dread_chunk)
 {
-	int noreduce0, as_int, sparse, method0;
+	int noreduce0, as_int, as_sparse0, method0, use_H5Dread_chunk0;
 	hid_t file_id, dset_id;
 	SEXP ans;
 
@@ -225,23 +235,29 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 
 	/* Check 'as_integer'. */
 	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
-		error("'as_integer' must be TRUE or FALSE");
+		error("'as.integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
 	/* Check 'as_sparse'. */
 	if (!(IS_LOGICAL(as_sparse) && LENGTH(as_sparse) == 1))
-		error("'as_sparse' must be TRUE or FALSE");
-	sparse = LOGICAL(as_sparse)[0];
+		error("'as.sparse' must be TRUE or FALSE");
+	as_sparse0 = LOGICAL(as_sparse)[0];
 
 	/* Check 'method'. */
 	if (!(IS_INTEGER(method) && LENGTH(method) == 1))
 		error("'method' must be a single integer");
 	method0 = INTEGER(method)[0];
 
+	/* Check 'use_H5Dread_chunk'. */
+	if (!(IS_LOGICAL(use_H5Dread_chunk) && LENGTH(use_H5Dread_chunk) == 1))
+		error("'use.H5Dread_chunk' must be TRUE or FALSE");
+	use_H5Dread_chunk0 = LOGICAL(use_H5Dread_chunk)[0];
+
 	file_id = _get_file_id(filepath, 1);
 	dset_id = _get_dset_id(file_id, name, filepath);
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
-			      as_int, sparse, method0));
+			      as_int, as_sparse0,
+			      method0, use_H5Dread_chunk0));
 	H5Dclose(dset_id);
 	H5Fclose(file_id);
 	UNPROTECT(1);

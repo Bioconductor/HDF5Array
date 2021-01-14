@@ -55,7 +55,7 @@ int _read_h5selection(
 
 void _init_in_offset(
 	int ndim,
-	SEXP starts,
+	SEXP index,
 	const hsize_t *h5chunkdim,
 	const H5Viewport *dest_vp,
 	const H5Viewport *tchunk_vp,
@@ -83,7 +83,7 @@ static inline int _next_midx(int ndim, const int *max_idx_plus_one,
 	return along;
 }
 
-static inline void _update_in_offset(int ndim, SEXP starts,
+static inline void _update_in_offset(int ndim, SEXP index,
 		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
 		const int *inner_midx, int inner_moved_along,
 		size_t *in_offset)
@@ -92,7 +92,7 @@ static inline void _update_in_offset(int ndim, SEXP starts,
 	int i1, i0, along, h5along, di;
 	long long int in_off_inc;
 
-	start = GET_LIST_ELT(starts, inner_moved_along);
+	start = GET_LIST_ELT(index, inner_moved_along);
 	if (start != R_NilValue) {
 		i1 = dest_vp->off[inner_moved_along] +
 		     inner_midx[inner_moved_along];
@@ -108,7 +108,7 @@ static inline void _update_in_offset(int ndim, SEXP starts,
 		do {
 			in_off_inc *= h5chunkdim[h5along];
 			di = 1 - dest_vp->dim[along];
-			start = GET_LIST_ELT(starts, along);
+			start = GET_LIST_ELT(index, along);
 			if (start != R_NilValue) {
 				i1 = dest_vp->off[along];
 				i0 = i1 - di;

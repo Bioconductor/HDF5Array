@@ -12,7 +12,8 @@
 ### Set 'noreduce' to TRUE to skip the reduction step.
 ### Set 'as.integer' to TRUE to force returning the result as an integer array.
 h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
-                    as.integer=FALSE, as.sparse=FALSE, method=0L)
+                    as.integer=FALSE, as.sparse=FALSE,
+                    method=0L, use.H5Dread_chunk=FALSE)
 {
     if (!isTRUEorFALSE(as.sparse))
         stop(wmsg("'as.sparse' must be TRUE or FALSE"))
@@ -63,7 +64,8 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
     ## C_h5mread() will return an ordinary array if 'as.sparse' is FALSE,
     ## or 'list(ans_dim, nzindex, nzdata)' if it's TRUE.
     ans <- .Call2("C_h5mread", filepath, name, starts, counts, noreduce,
-                               as.integer, as.sparse, method,
+                               as.integer, as.sparse,
+                               method, use.H5Dread_chunk,
                                PACKAGE="HDF5Array")
     if (as.sparse)
         ans <- SparseArraySeed(ans[[1L]], ans[[2L]], ans[[3L]], check=FALSE)

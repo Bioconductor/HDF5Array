@@ -8,6 +8,7 @@ SEXP _h5mread_index(
 	const H5DSetDescriptor *h5dset,
 	SEXP index,
 	int method,
+	int use_H5Dread_chunk,
 	int *ans_dim
 );
 
