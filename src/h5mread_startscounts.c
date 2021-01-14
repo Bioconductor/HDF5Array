@@ -232,14 +232,14 @@ static int set_h5selection(const H5DSetDescriptor *h5dset, int method,
 
 static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 		SEXP starts, SEXP counts, const int *ans_dim,
-		void *dest, hid_t dest_space_id)
+		void *mem, hid_t mem_space_id)
 {
 	int ret;
 
 	ret = set_h5selection(h5dset, method, starts, counts, ans_dim);
 	if (ret < 0)
 		return -1;
-	return _read_h5selection(h5dset, NULL, dest, dest_space_id);
+	return _read_h5selection(h5dset, mem_space_id, mem, NULL);
 }
 
 
@@ -256,15 +256,15 @@ static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 static int read_hyperslab(const H5DSetDescriptor *h5dset,
 		SEXP starts, SEXP counts,
 		const int *midx, int moved_along,
-		H5Viewport *h5dset_vp, H5Viewport *dest_vp,
-		void *dest, hid_t dest_space_id)
+		H5Viewport *h5dset_vp, H5Viewport *mem_vp,
+		void *mem, hid_t mem_space_id)
 {
 	int ndim, along, h5along, i;
 	SEXP start;
 
 	ndim = h5dset->ndim;
 
-	/* Update 'dest_vp' and 'h5dset_vp' IN THAT ORDER! */
+	/* Update 'mem_vp' and 'h5dset_vp' IN THAT ORDER! */
 	for (along = 0; along < ndim; along++) {
 		if (along > moved_along)
 			break;
@@ -274,22 +274,22 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 		h5along = ndim - 1 - along;
 		i = midx[along];
 		if (i == 0) {
-			dest_vp->h5off[h5along] = 0;
+			mem_vp->h5off[h5along] = 0;
 		} else {
-			dest_vp->h5off[h5along] += h5dset_vp->h5dim[h5along];
+			mem_vp->h5off[h5along] += h5dset_vp->h5dim[h5along];
 		}
 	}
 	update_h5dset_vp(ndim, midx, moved_along, starts, counts, h5dset_vp);
 	return _read_H5Viewport(h5dset, h5dset_vp,
-				dest_vp, dest, dest_space_id);
+				mem_space_id, mem, mem_vp);
 }
 
 static int read_data_3(const H5DSetDescriptor *h5dset,
 		SEXP starts, SEXP counts, const int *ans_dim,
-		void *dest, hid_t dest_space_id)
+		void *mem, hid_t mem_space_id)
 {
 	int ndim, moved_along, ret;
-	H5Viewport h5dset_vp, dest_vp;
+	H5Viewport h5dset_vp, mem_vp;
 	IntAE *nchip_buf, *midx_buf;
 	long long int num_hyperslabs;
 
@@ -299,17 +299,17 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 
 	set_nchips(ndim, starts, ans_dim, 0, nchip_buf->elts);
 
-	/* Allocate 'h5dset_vp' and 'dest_vp'. */
+	/* Allocate 'h5dset_vp' and 'mem_vp'. */
 	if (_alloc_H5Viewport(&h5dset_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
-	dest_vp.h5off = _alloc_hsize_t_buf(ndim, 1, "'dest_vp.h5off'");
-	if (dest_vp.h5off == NULL) {
+	mem_vp.h5off = _alloc_hsize_t_buf(ndim, 1, "'mem_vp.h5off'");
+	if (mem_vp.h5off == NULL) {
 		_free_H5Viewport(&h5dset_vp);
 		return -1;
 	}
-	dest_vp.h5dim = h5dset_vp.h5dim;
+	mem_vp.h5dim = h5dset_vp.h5dim;
 
-	/* Initialize 'h5dset_vp' (this also initializes 'dest_vp.h5dim'). */
+	/* Initialize 'h5dset_vp' (this also initializes 'mem_vp.h5dim'). */
 	init_h5dset_vp(h5dset, starts, &h5dset_vp);
 
 	/* Walk on the hyperslabs. */
@@ -319,8 +319,8 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 		num_hyperslabs++;
 		ret = read_hyperslab(h5dset, starts, counts,
 				     midx_buf->elts, moved_along,
-				     &h5dset_vp, &dest_vp,
-				     dest, dest_space_id);
+				     &h5dset_vp, &mem_vp,
+				     mem, mem_space_id);
 		if (ret < 0)
 			break;
 		moved_along = _next_midx(ndim, nchip_buf->elts,
@@ -328,7 +328,7 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 	} while (moved_along < ndim);
 
 	//printf("nb of hyperslabs = %lld\n", num_hyperslabs);
-	free(dest_vp.h5off);
+	free(mem_vp.h5off);
 	_free_H5Viewport(&h5dset_vp);
 	return ret;
 }
@@ -385,8 +385,8 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 	IntAE *nstart_buf, *nchip_buf;
 	LLongAE *last_chip_start_buf;
 	SEXP ans, reduced;
-	void *dest;
-	hid_t dest_space_id;
+	void *mem;
+	hid_t mem_space_id;
 	int nprotect = 0;
 
 	ndim = h5dset->ndim;
@@ -425,22 +425,22 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 	nprotect++;
 
 	if (ans_len != 0) {
-		dest = DATAPTR(ans);
-		if (dest == NULL)
+		mem = DATAPTR(ans);
+		if (mem == NULL)
 			goto on_error;
-		dest_space_id = _create_mem_space(ndim, ans_dim);
-		if (dest_space_id < 0)
+		mem_space_id = _create_mem_space(ndim, ans_dim);
+		if (mem_space_id < 0)
 			goto on_error;
 		if (method <= 2) {
 			ret = read_data_1_2(h5dset, method,
 					starts, counts, ans_dim,
-					dest, dest_space_id);
+					mem, mem_space_id);
 		} else {
 			ret = read_data_3(h5dset,
 					starts, counts, ans_dim,
-					dest, dest_space_id);
+					mem, mem_space_id);
 		}
-		H5Sclose(dest_space_id);
+		H5Sclose(mem_space_id);
 		if (ret < 0)
 			goto on_error;
 	}

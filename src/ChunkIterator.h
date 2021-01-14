@@ -14,7 +14,7 @@ typedef struct chunk_iterator_t {
 	LLongAEAE *tchunkidx_bufs;  /* touched chunk ids along each dim */
 	int *num_tchunks;           /* nb of touched chunks along each dim */
 	long long int total_num_tchunks;
-	H5Viewport tchunk_vp, middle_vp, dest_vp;
+	H5Viewport h5dset_vp, mem_vp;
 	int *tchunk_midx_buf;
 	int moved_along;
 	long long int tchunk_rank;
@@ -22,9 +22,10 @@ typedef struct chunk_iterator_t {
 
 /* A data structure for storing the data of a full chunk. */
 typedef struct chunk_data_buffer_t {
-	hid_t data_space_id;
 	size_t data_length, data_size;
+	hid_t data_space_id;
 	void *data;
+	H5Viewport data_vp;
 	void *compressed_data;  /* experimental! */
 } ChunkDataBuffer;
 
@@ -37,7 +38,7 @@ int _init_ChunkIterator(
 	const H5DSetDescriptor *h5dset,
 	SEXP index,
 	int *selection_dim,
-	int alloc_full_dest_vp
+	int alloc_full_mem_vp
 );
 
 int _next_chunk(
@@ -48,13 +49,13 @@ void _print_tchunk_info(const ChunkIterator *chunk_iter);
 
 int _tchunk_is_truncated(
 	const H5DSetDescriptor *h5dset,
-	const H5Viewport *tchunk_vp
+	const H5Viewport *h5dset_vp
 );
 
 int _tchunk_is_fully_selected(
 	int ndim,
-	const H5Viewport *tchunk_vp,
-	const H5Viewport *dest_vp
+	const H5Viewport *h5dset_vp,
+	const H5Viewport *mem_vp
 );
 
 void _destroy_ChunkDataBuffer(

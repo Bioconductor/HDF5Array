@@ -38,27 +38,27 @@ int _add_H5Viewport_to_h5selection(
 	const H5Viewport *vp
 );
 
+int _read_h5selection(
+	const H5DSetDescriptor *h5dset,
+	hid_t mem_space_id,
+	void *mem,
+	const H5Viewport *mem_vp
+);
+
 int _read_H5Viewport(
 	const H5DSetDescriptor *h5dset,
 	const H5Viewport *h5dset_vp,
-	const H5Viewport *mem_vp,
+	hid_t mem_space_id,
 	void *mem,
-	hid_t mem_space_id
-);
-
-int _read_h5selection(
-	const H5DSetDescriptor *h5dset,
-	const H5Viewport *mem_vp,
-	void *mem,
-	hid_t mem_space_id
+	const H5Viewport *mem_vp
 );
 
 void _init_in_offset(
 	int ndim,
 	SEXP index,
 	const hsize_t *h5chunkdim,
-	const H5Viewport *dest_vp,
-	const H5Viewport *tchunk_vp,
+	const H5Viewport *mem_vp,
+	const H5Viewport *h5dset_vp,
 	size_t *in_offset
 );
 
@@ -84,7 +84,7 @@ static inline int _next_midx(int ndim, const int *max_idx_plus_one,
 }
 
 static inline void _update_in_offset(int ndim, SEXP index,
-		const hsize_t *h5chunkdim, const H5Viewport *dest_vp,
+		const hsize_t *h5chunkdim, const H5Viewport *mem_vp,
 		const int *inner_midx, int inner_moved_along,
 		size_t *in_offset)
 {
@@ -94,7 +94,7 @@ static inline void _update_in_offset(int ndim, SEXP index,
 
 	start = GET_LIST_ELT(index, inner_moved_along);
 	if (start != R_NilValue) {
-		i1 = dest_vp->off[inner_moved_along] +
+		i1 = mem_vp->off[inner_moved_along] +
 		     inner_midx[inner_moved_along];
 		i0 = i1 - 1;
 		in_off_inc = _get_trusted_elt(start, i1) -
@@ -107,10 +107,10 @@ static inline void _update_in_offset(int ndim, SEXP index,
 		h5along = ndim - inner_moved_along;
 		do {
 			in_off_inc *= h5chunkdim[h5along];
-			di = 1 - dest_vp->dim[along];
+			di = 1 - mem_vp->dim[along];
 			start = GET_LIST_ELT(index, along);
 			if (start != R_NilValue) {
-				i1 = dest_vp->off[along];
+				i1 = mem_vp->off[along];
 				i0 = i1 - di;
 				in_off_inc += _get_trusted_elt(start, i1) -
 					      _get_trusted_elt(start, i0);

@@ -15,35 +15,23 @@
  * Low-level helpers (non-exported)
  */
 
-static int alloc_tchunk_vp_middle_vp_dest_vp(int ndim,
-		H5Viewport *tchunk_vp,
-		H5Viewport *middle_vp,
-		H5Viewport *dest_vp, int dest_vp_mode)
+static int alloc_h5dset_vp_mem_vp(int ndim,
+		H5Viewport *h5dset_vp,
+		H5Viewport *mem_vp, int mem_vp_mode)
 {
-	if (_alloc_H5Viewport(tchunk_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
+	if (_alloc_H5Viewport(h5dset_vp, ndim, ALLOC_H5OFF_AND_H5DIM) < 0)
 		return -1;
-	middle_vp->h5off = _alloc_hsize_t_buf(ndim, 1, "'middle_vp->h5off'");
-	if (middle_vp->h5off == NULL) {
-		_free_H5Viewport(tchunk_vp);
-		return -1;
-	}
-	middle_vp->h5dim = tchunk_vp->h5dim;
-	if (_alloc_H5Viewport(dest_vp, ndim, dest_vp_mode) < 0) {
-		free(middle_vp->h5off);
-		_free_H5Viewport(tchunk_vp);
+	if (_alloc_H5Viewport(mem_vp, ndim, mem_vp_mode) < 0) {
+		_free_H5Viewport(h5dset_vp);
 		return -1;
 	}
 	return 0;
 }
 
-static void free_tchunk_vp_middle_vp_dest_vp(
-		H5Viewport *tchunk_vp,
-		H5Viewport *middle_vp,
-		H5Viewport *dest_vp)
+static void free_h5dset_vp_mem_vp(H5Viewport *h5dset_vp, H5Viewport *mem_vp)
 {
-	_free_H5Viewport(dest_vp);
-	free(middle_vp->h5off);
-	_free_H5Viewport(tchunk_vp);
+	_free_H5Viewport(mem_vp);
+	_free_H5Viewport(h5dset_vp);
 	return;
 }
 
@@ -93,10 +81,10 @@ static long long int set_num_tchunks(const H5DSetDescriptor *h5dset,
 	return total_num_tchunks;
 }
 
-static void update_tchunk_vp(const H5DSetDescriptor *h5dset,
+static void update_h5dset_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *tchunk_vp)
+		H5Viewport *h5dset_vp)
 {
 	int ndim, along, h5along, i;
 	SEXP start;
@@ -119,24 +107,24 @@ static void update_tchunk_vp(const H5DSetDescriptor *h5dset,
 		d = h5dset->h5dim[h5along] - off;
 		if (d > chunkd)
 			d = chunkd;
-		tchunk_vp->h5off[h5along] = off;
-		tchunk_vp->h5dim[h5along] = d;
+		h5dset_vp->h5off[h5along] = off;
+		h5dset_vp->h5dim[h5along] = d;
 	}
-	//printf("# tchunk_vp->h5off:");
+	//printf("# h5dset_vp->h5off:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", tchunk_vp->h5off[h5along]);
+	//      printf(" %llu", h5dset_vp->h5off[h5along]);
 	//printf("\n");
-	//printf("# tchunk_vp->h5dim:");
+	//printf("# h5dset_vp->h5dim:");
 	//for (h5along = ndim - 1; h5along >= 0; h5along--)
-	//      printf(" %llu", tchunk_vp->h5dim[h5along]);
+	//      printf(" %llu", h5dset_vp->h5dim[h5along]);
 	//printf("\n");
 	return;
 }
 
-static void update_dest_vp(const H5DSetDescriptor *h5dset,
+static void update_mem_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts, const IntAEAE *breakpoint_bufs,
-		const H5Viewport *tchunk_vp, H5Viewport *dest_vp)
+		const H5Viewport *h5dset_vp, H5Viewport *mem_vp)
 {
 	int ndim, along, h5along, i, off, d;
 	SEXP start;
@@ -153,42 +141,42 @@ static void update_dest_vp(const H5DSetDescriptor *h5dset,
 			off = i == 0 ? 0 : breakpoint[i - 1];
 			d = breakpoint[i] - off;
 		} else {
-			off = tchunk_vp->h5off[h5along];
-			d = tchunk_vp->h5dim[h5along];
+			off = h5dset_vp->h5off[h5along];
+			d = h5dset_vp->h5dim[h5along];
 		}
-		if (dest_vp->h5off != NULL) {
-			dest_vp->h5off[h5along] = off;
-			dest_vp->h5dim[h5along] = d;
+		if (mem_vp->h5off != NULL) {
+			mem_vp->h5off[h5along] = off;
+			mem_vp->h5dim[h5along] = d;
 		}
-		dest_vp->off[along] = off;
-		dest_vp->dim[along] = d;
+		mem_vp->off[along] = off;
+		mem_vp->dim[along] = d;
 	}
-	//printf("# dest_vp (offsets):");
+	//printf("# mem_vp (offsets):");
 	//for (along = 0; along < ndim; along++)
-	//      printf(" %d", dest_vp->off[along]);
+	//      printf(" %d", mem_vp->off[along]);
 	//printf("\n");
-	//printf("# dest_vp (dims):");
+	//printf("# mem_vp (dims):");
 	//for (along = 0; along < ndim; along++)
-	//      printf(" %d", dest_vp->dim[along]);
+	//      printf(" %d", mem_vp->dim[along]);
 	//printf("\n");
 	return;
 }
 
-static void update_tchunk_vp_dest_vp(const H5DSetDescriptor *h5dset,
+static void update_h5dset_vp_mem_vp(const H5DSetDescriptor *h5dset,
 		const int *tchunk_midx, int moved_along,
 		SEXP starts,
 		const IntAEAE *breakpoint_bufs,
 		const LLongAEAE *tchunkidx_bufs,
-		H5Viewport *tchunk_vp, H5Viewport *dest_vp)
+		H5Viewport *h5dset_vp, H5Viewport *mem_vp)
 {
-	update_tchunk_vp(h5dset,
+	update_h5dset_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, tchunkidx_bufs,
-			tchunk_vp);
-	update_dest_vp(h5dset,
+			h5dset_vp);
+	update_mem_vp(h5dset,
 			tchunk_midx, moved_along,
 			starts, breakpoint_bufs,
-			tchunk_vp, dest_vp);
+			h5dset_vp, mem_vp);
 	return;
 }
 
@@ -359,17 +347,16 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 
 void _destroy_ChunkIterator(ChunkIterator *chunk_iter)
 {
-	if (chunk_iter->tchunk_vp.h5off != NULL)
-		free_tchunk_vp_middle_vp_dest_vp(&chunk_iter->tchunk_vp,
-						 &chunk_iter->middle_vp,
-						 &chunk_iter->dest_vp);
+	if (chunk_iter->h5dset_vp.h5off != NULL)
+		free_h5dset_vp_mem_vp(&chunk_iter->h5dset_vp,
+				      &chunk_iter->mem_vp);
 	return;
 }
 
 int _init_ChunkIterator(ChunkIterator *chunk_iter,
 		const H5DSetDescriptor *h5dset, SEXP index,
 		int *selection_dim,
-		int alloc_full_dest_vp)
+		int alloc_full_mem_vp)
 {
 	int ndim, ret;
 
@@ -384,7 +371,7 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 
 	/* Initialize the members that _destroy_ChunkIterator() will free
 	   or close. */
-	chunk_iter->tchunk_vp.h5off = NULL;
+	chunk_iter->h5dset_vp.h5off = NULL;
 
 	/* Set members 'breakpoint_bufs' and 'tchunkidx_bufs'.
 	   Also populate 'selection_dim' if not set to NULL. */
@@ -402,13 +389,12 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 						chunk_iter->tchunkidx_bufs,
 						chunk_iter->num_tchunks);
 
-	/* Allocate members 'tchunk_vp', 'middle_vp', and 'dest_vp'. */
-	ret = alloc_tchunk_vp_middle_vp_dest_vp(ndim,
-				&chunk_iter->tchunk_vp,
-				&chunk_iter->middle_vp,
-				&chunk_iter->dest_vp,
-				alloc_full_dest_vp ? ALLOC_ALL_FIELDS
-						   : ALLOC_OFF_AND_DIM);
+	/* Allocate members 'h5dset_vp' and 'mem_vp'. */
+	ret = alloc_h5dset_vp_mem_vp(ndim,
+				&chunk_iter->h5dset_vp,
+				&chunk_iter->mem_vp,
+				alloc_full_mem_vp ? ALLOC_ALL_FIELDS
+						  : ALLOC_OFF_AND_DIM);
 	if (ret < 0)
 		goto on_error;
 
@@ -451,12 +437,12 @@ int _next_chunk(ChunkIterator *chunk_iter)
 					_next_midx(h5dset->ndim,
 						chunk_iter->num_tchunks,
 						chunk_iter->tchunk_midx_buf);
-	update_tchunk_vp_dest_vp(h5dset,
+	update_h5dset_vp_mem_vp(h5dset,
 			chunk_iter->tchunk_midx_buf,
 			chunk_iter->moved_along,
 			chunk_iter->index,
 			chunk_iter->breakpoint_bufs, chunk_iter->tchunkidx_bufs,
-			&chunk_iter->tchunk_vp, &chunk_iter->dest_vp);
+			&chunk_iter->h5dset_vp, &chunk_iter->mem_vp);
 	return 1;
 }
 
@@ -490,19 +476,19 @@ void _print_tchunk_info(const ChunkIterator *chunk_iter)
 		if (along != 0)
 			Rprintf(", ");
 		Rprintf("#%lld=%llu:%llu", tchunkidx + 1,
-			chunk_iter->tchunk_vp.h5off[h5along] + 1,
-			chunk_iter->tchunk_vp.h5off[h5along] +
-			    chunk_iter->tchunk_vp.h5dim[h5along]);
+			chunk_iter->h5dset_vp.h5off[h5along] + 1,
+			chunk_iter->h5dset_vp.h5off[h5along] +
+			    chunk_iter->h5dset_vp.h5dim[h5along]);
 	}
 	Rprintf(">>\n");
 	return;
 }
 
-/* Return 1 if the chunk that 'tchunk_vp' is pointing at is "truncated"
+/* Return 1 if the chunk that 'h5dset_vp' is pointing at is "truncated"
    (a.k.a. "partial edge chunk" in HDF5's terminology), and 0 otherwise
    (i.e. if the new chunk is a full-size chunk). */
 int _tchunk_is_truncated(const H5DSetDescriptor *h5dset,
-			 const H5Viewport *tchunk_vp)
+			 const H5Viewport *h5dset_vp)
 {
 	int ndim, h5along;
 	hsize_t chunkd, d;
@@ -510,7 +496,7 @@ int _tchunk_is_truncated(const H5DSetDescriptor *h5dset,
 	ndim = h5dset->ndim;
 	for (h5along = 0; h5along < ndim; h5along++) {
 		chunkd = h5dset->h5chunkdim[h5along];
-		d = tchunk_vp->h5dim[h5along];
+		d = h5dset_vp->h5dim[h5along];
 		if (d != chunkd)
 			return 1;
 	}
@@ -518,14 +504,14 @@ int _tchunk_is_truncated(const H5DSetDescriptor *h5dset,
 }
 
 int _tchunk_is_fully_selected(int ndim,
-		const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp)
+		const H5Viewport *h5dset_vp,
+		const H5Viewport *mem_vp)
 {
 	int along, h5along, not_fully;
 
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
-		not_fully = tchunk_vp->h5dim[h5along] !=
-			    (hsize_t) dest_vp->dim[along];
+		not_fully = h5dset_vp->h5dim[h5along] !=
+			    (hsize_t) mem_vp->dim[along];
 		if (not_fully)
 			return 0;
 	}
@@ -538,6 +524,8 @@ void _destroy_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf)
 		H5Sclose(chunk_data_buf->data_space_id);
 	if (chunk_data_buf->data != NULL)
 		free(chunk_data_buf->data);
+	if (chunk_data_buf->data_vp.h5off != NULL)
+		free(chunk_data_buf->data_vp.h5off);
 	if (chunk_data_buf->compressed_data != NULL)
 		free(chunk_data_buf->compressed_data);
 	return;
@@ -558,6 +546,7 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	   or close. */
 	chunk_data_buf->data_space_id = -1;
 	chunk_data_buf->data = NULL;
+	chunk_data_buf->data_vp.h5off = NULL;
 	chunk_data_buf->compressed_data = NULL;
 
 	/* Set members 'data_length' and 'data_size'. */
@@ -599,11 +588,19 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 			}
 			chunk_data_buf->data_space_id = data_space_id;
 		}
+		if (chunk_data_buf->data_vp.h5off == NULL) {
+			chunk_data_buf->data_vp.h5off =
+				_alloc_hsize_t_buf(h5dset->ndim, 1,
+					"'chunk_data_buf->data_vp.h5off'");
+			if (chunk_data_buf->data_vp.h5off == NULL)
+				return -1;
+		}
+		chunk_data_buf->data_vp.h5dim = chunk_iter->h5dset_vp.h5dim;
 		ret = _read_H5Viewport(h5dset,
-				&chunk_iter->tchunk_vp,
-				&chunk_iter->middle_vp,
+				&chunk_iter->h5dset_vp,
+				chunk_data_buf->data_space_id,
 				chunk_data_buf->data,
-				chunk_data_buf->data_space_id);
+				&chunk_data_buf->data_vp);
 	} else {
 		/* Experimental! */
 		if (chunk_data_buf->compressed_data == NULL) {
@@ -618,7 +615,7 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 			}
 		}
 		ret = read_h5chunk(h5dset,
-				&chunk_iter->tchunk_vp,
+				&chunk_iter->h5dset_vp,
 				chunk_data_buf);
 	}
 	return ret;

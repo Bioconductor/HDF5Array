@@ -429,8 +429,8 @@ static void summarize_full_chunk_double_data(
 
 static void summarize_selected_chunk_int_data(
 		const H5DSetDescriptor *h5dset, SEXP index,
-		const int *data, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
+		const int *data, const H5Viewport *h5dset_vp,
+		const H5Viewport *mem_vp, int *inner_midx_buf,
 		IntOP int_OP, void *init, int na_rm, int *status)
 {
 	int ndim, inner_moved_along;
@@ -438,18 +438,18 @@ static void summarize_selected_chunk_int_data(
 
 	ndim = h5dset->ndim;
 	_init_in_offset(ndim, index, h5dset->h5chunkdim,
-			dest_vp, tchunk_vp,
+			mem_vp, h5dset_vp,
 			&offset);
 	/* Walk on the **selected** elements in current chunk. */
 	while (1) {
 		*status = int_OP(init, data[offset], na_rm, *status);
 		if (*status == 2)
 			break;
-		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+		inner_moved_along = _next_midx(ndim, mem_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		_update_in_offset(ndim, index, h5dset->h5chunkdim, dest_vp,
+		_update_in_offset(ndim, index, h5dset->h5chunkdim, mem_vp,
 				  inner_midx_buf, inner_moved_along,
 				  &offset);
 	};
@@ -458,8 +458,8 @@ static void summarize_selected_chunk_int_data(
 
 static void summarize_selected_chunk_double_data(
 		const H5DSetDescriptor *h5dset, SEXP index,
-		const double *data, const H5Viewport *tchunk_vp,
-		const H5Viewport *dest_vp, int *inner_midx_buf,
+		const double *data, const H5Viewport *h5dset_vp,
+		const H5Viewport *mem_vp, int *inner_midx_buf,
 		DoubleOP double_OP, void *init, int na_rm, int *status)
 {
 	int ndim, inner_moved_along;
@@ -467,18 +467,18 @@ static void summarize_selected_chunk_double_data(
 
 	ndim = h5dset->ndim;
 	_init_in_offset(ndim, index, h5dset->h5chunkdim,
-			dest_vp, tchunk_vp,
+			mem_vp, h5dset_vp,
 			&offset);
 	/* Walk on the **selected** elements in current chunk. */
 	while (1) {
 		*status = double_OP(init, data[offset], na_rm, *status);
 		if (*status == 2)
 			break;
-		inner_moved_along = _next_midx(ndim, dest_vp->dim,
+		inner_moved_along = _next_midx(ndim, mem_vp->dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
-		_update_in_offset(ndim, index, h5dset->h5chunkdim, dest_vp,
+		_update_in_offset(ndim, index, h5dset->h5chunkdim, mem_vp,
 				  inner_midx_buf, inner_moved_along,
 				  &offset);
 	};
@@ -506,9 +506,9 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	status = 0;
 
 	/* In the context of h5summarize(), we won't use
-	   'chunk_iter.dest_vp.h5off' or 'chunk_iter.dest_vp.h5dim', only
-	   'chunk_iter.dest_vp.off' and 'chunk_iter.dest_vp.dim', so we
-	   set 'alloc_full_dest_vp' (last arg) to 0. */
+	   'chunk_iter.mem_vp.h5off' or 'chunk_iter.mem_vp.h5dim', only
+	   'chunk_iter.mem_vp.off' and 'chunk_iter.mem_vp.dim', so we
+	   set 'alloc_full_mem_vp' (last arg) to 0. */
 	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL, 0);
 	if (ret < 0)
 		return R_NilValue;
@@ -527,10 +527,10 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 		if (ret < 0)
 			break;
 		go_fast = _tchunk_is_fully_selected(ndim,
-				&chunk_iter.tchunk_vp,
-				&chunk_iter.dest_vp) &&
+				&chunk_iter.h5dset_vp,
+				&chunk_iter.mem_vp) &&
 			  ! _tchunk_is_truncated(h5dset,
-				&chunk_iter.tchunk_vp);
+				&chunk_iter.h5dset_vp);
 		if (go_fast) {
 			if (int_OP != NULL) {
 				summarize_full_chunk_int_data(
@@ -548,16 +548,16 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 				summarize_selected_chunk_int_data(
 					h5dset, index,
 					chunk_data_buf.data,
-					&chunk_iter.tchunk_vp,
-					&chunk_iter.dest_vp,
+					&chunk_iter.h5dset_vp,
+					&chunk_iter.mem_vp,
 					inner_midx_buf->elts,
 					int_OP, init, na_rm, &status);
 			} else {
 				summarize_selected_chunk_double_data(
 					h5dset, index,
 					chunk_data_buf.data,
-					&chunk_iter.tchunk_vp,
-					&chunk_iter.dest_vp,
+					&chunk_iter.h5dset_vp,
+					&chunk_iter.mem_vp,
 					inner_midx_buf->elts,
 					double_OP, init, na_rm, &status);
 			}
