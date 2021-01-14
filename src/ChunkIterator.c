@@ -470,15 +470,15 @@ void _print_tchunk_info(const ChunkIterator *chunk_iter)
 	for (along = 0; along < ndim; along++)
 		total_num_tchunks *= chunk_iter->num_tchunks[along];
 
-	printf("processing chunk %lld/%lld: [",
-	       chunk_iter->tchunk_rank + 1, total_num_tchunks);
+	Rprintf("processing chunk %lld/%lld: [",
+		chunk_iter->tchunk_rank + 1, total_num_tchunks);
 	for (along = 0; along < ndim; along++) {
 		i = chunk_iter->tchunk_midx_buf[along] + 1;
 		if (along != 0)
-			printf(", ");
-		printf("%d/%d", i, chunk_iter->num_tchunks[along]);
+			Rprintf(", ");
+		Rprintf("%d/%d", i, chunk_iter->num_tchunks[along]);
 	}
-	printf("] -- <<");
+	Rprintf("] -- <<");
 	for (along = 0, h5along = ndim - 1; along < ndim; along++, h5along--) {
 		i = chunk_iter->tchunk_midx_buf[along];
 		if (GET_LIST_ELT(chunk_iter->index, along) != R_NilValue) {
@@ -488,13 +488,13 @@ void _print_tchunk_info(const ChunkIterator *chunk_iter)
 			tchunkidx = i;
 		}
 		if (along != 0)
-			printf(", ");
-		printf("#%lld=%llu:%llu", tchunkidx + 1,
-		       chunk_iter->tchunk_vp.h5off[h5along] + 1,
-		       chunk_iter->tchunk_vp.h5off[h5along] +
-		           chunk_iter->tchunk_vp.h5dim[h5along]);
+			Rprintf(", ");
+		Rprintf("#%lld=%llu:%llu", tchunkidx + 1,
+			chunk_iter->tchunk_vp.h5off[h5along] + 1,
+			chunk_iter->tchunk_vp.h5off[h5along] +
+			    chunk_iter->tchunk_vp.h5dim[h5along]);
 	}
-	printf(">>\n");
+	Rprintf(">>\n");
 	return;
 }
 
