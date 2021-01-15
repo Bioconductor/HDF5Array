@@ -556,7 +556,10 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_length = data_length;
 	chunk_data_buf->data_size = data_length * h5dset->ans_elt_size;
 
-	return 0;
+	/* Set member 'data_type_id'. */
+	chunk_data_buf->data_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
+							       h5dset->type_id);
+	return chunk_data_buf->data_type_id < 0 ? -1 : 0;
 }
 
 int _load_chunk(const ChunkIterator *chunk_iter,
@@ -598,6 +601,7 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 		chunk_data_buf->data_vp.h5dim = chunk_iter->h5dset_vp.h5dim;
 		ret = _read_H5Viewport(h5dset,
 				&chunk_iter->h5dset_vp,
+				chunk_data_buf->data_type_id,
 				chunk_data_buf->data_space_id,
 				chunk_data_buf->data,
 				&chunk_data_buf->data_vp);

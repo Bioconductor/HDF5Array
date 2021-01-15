@@ -23,7 +23,7 @@ typedef struct chunk_iterator_t {
 /* A data structure for storing the data of a full chunk. */
 typedef struct chunk_data_buffer_t {
 	size_t data_length, data_size;
-	hid_t data_space_id;
+	hid_t data_type_id, data_space_id;
 	void *data;
 	H5Viewport data_vp;
 	void *compressed_data;  /* experimental! */

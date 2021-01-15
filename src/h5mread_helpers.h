@@ -40,6 +40,7 @@ int _add_H5Viewport_to_h5selection(
 
 int _read_h5selection(
 	const H5DSetDescriptor *h5dset,
+	hid_t mem_type_id,
 	hid_t mem_space_id,
 	void *mem,
 	const H5Viewport *mem_vp
@@ -48,6 +49,7 @@ int _read_h5selection(
 int _read_H5Viewport(
 	const H5DSetDescriptor *h5dset,
 	const H5Viewport *h5dset_vp,
+	hid_t mem_type_id,
 	hid_t mem_space_id,
 	void *mem,
 	const H5Viewport *mem_vp

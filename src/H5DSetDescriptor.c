@@ -308,14 +308,13 @@ static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t H5size)
 	return 0;
 }
 
-static hid_t get_mem_type_id_from_Rtype(SEXPTYPE Rtype, hid_t dtype_id)
+hid_t _get_mem_type_for_Rtype(SEXPTYPE Rtype, hid_t type_id)
 {
 	switch (Rtype) {
-	    case LGLSXP:
-	    case INTSXP:  return H5T_NATIVE_INT;
-	    case REALSXP: return H5T_NATIVE_DOUBLE;
-	    case STRSXP:  return dtype_id;
-	    case RAWSXP:  return H5T_NATIVE_UCHAR;
+	    case LGLSXP: case INTSXP: return H5T_NATIVE_INT;
+	    case REALSXP:             return H5T_NATIVE_DOUBLE;
+	    case STRSXP:              return type_id;
+	    case RAWSXP:              return H5T_NATIVE_UCHAR;
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
 	return -1;
@@ -334,8 +333,8 @@ void _destroy_H5DSetDescriptor(H5DSetDescriptor *h5dset)
 		H5Pclose(h5dset->plist_id);
 	if (h5dset->space_id != -1)
 		H5Sclose(h5dset->space_id);
-	if (h5dset->dtype_id != -1)
-		H5Tclose(h5dset->dtype_id);
+	if (h5dset->type_id != -1)
+		H5Tclose(h5dset->type_id);
 	if (h5dset->storage_mode_attr != NULL)
 		free(h5dset->storage_mode_attr);
 	if (h5dset->h5name != NULL)
@@ -347,7 +346,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		     int as_int, int get_Rtype_only)
 {
 	char *h5name, *storage_mode_attr;
-	hid_t dtype_id, space_id, plist_id, mem_type_id;
+	hid_t type_id, space_id, plist_id;
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size;
 	SEXPTYPE Rtype;
@@ -362,7 +361,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	   or close. */
 	h5dset->h5name = NULL;
 	h5dset->storage_mode_attr = NULL;
-	h5dset->dtype_id = -1;
+	h5dset->type_id = -1;
 	h5dset->space_id = -1;
 	h5dset->plist_id = -1;
 	h5dset->h5dim = NULL;
@@ -396,16 +395,16 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->storage_mode_attr = storage_mode_attr;
 	}
 
-	/* Set member 'dtype_id'. */
-	dtype_id = H5Dget_type(dset_id);
-	if (dtype_id < 0) {
+	/* Set member 'type_id'. */
+	type_id = H5Dget_type(dset_id);
+	if (type_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		goto on_error;
 	}
-	h5dset->dtype_id = dtype_id;
+	h5dset->type_id = type_id;
 
 	/* Set member 'H5class'. */
-	H5class = H5Tget_class(dtype_id);
+	H5class = H5Tget_class(type_id);
 	if (H5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		goto on_error;
@@ -413,7 +412,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	h5dset->H5class = H5class;
 
 	/* Set member 'H5size'. */
-	H5size = H5Tget_size(dtype_id);
+	H5size = H5Tget_size(type_id);
 	if (H5size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
 		goto on_error;
@@ -429,7 +428,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		if (map_H5class_to_Rtype(H5class, as_int, H5size, &Rtype) < 0)
 			goto on_error;
 	}
-	if (Rtype == STRSXP && H5Tis_variable_str(dtype_id) != 0) {
+	if (Rtype == STRSXP && H5Tis_variable_str(type_id) != 0) {
 		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
 				    "is not supported at the moment");
 		goto on_error;
@@ -545,11 +544,6 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		goto on_error;
 	h5dset->ans_elt_size = ans_elt_size;
 
-	/* Set member 'mem_type_id'. */
-	mem_type_id = get_mem_type_id_from_Rtype(Rtype, dtype_id);
-	if (mem_type_id < 0)
-		goto on_error;
-	h5dset->mem_type_id = mem_type_id;
 	return 0;
 
     on_error:
@@ -677,7 +671,7 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	}
 
 	Rprintf("H5DSetDescriptor:\n");
-	Rprintf("- dset_id = %lu\n", h5dset->dset_id);
+	Rprintf("- dset_id = %ld\n", h5dset->dset_id);
 
 	Rprintf("- h5name = \"%s\"\n", h5dset->h5name);
 
@@ -689,7 +683,7 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	}
 	Rprintf("\n");
 
-	Rprintf("- dtype_id = %lu\n", h5dset->dtype_id);
+	Rprintf("- type_id = %ld\n", h5dset->type_id);
 
 	Rprintf("- H5class = %s\n", H5class2str(h5dset->H5class));
 
@@ -699,11 +693,11 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 
 	Rprintf("- as_na_attr = %d\n", h5dset->as_na_attr);
 
-	Rprintf("- space_id = %lu\n", h5dset->space_id);
+	Rprintf("- space_id = %ld\n", h5dset->space_id);
 
 	Rprintf("- ndim = %d\n", h5dset->ndim);
 
-	Rprintf("- plist_id = %lu\n", h5dset->plist_id);
+	Rprintf("- plist_id = %ld\n", h5dset->plist_id);
 
 	Rprintf("- h5dim =");
 	for (h5along = 0; h5along < h5dset->ndim; h5along++)
@@ -730,8 +724,6 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	}
 
 	Rprintf("- ans_elt_size = %lu\n", h5dset->ans_elt_size);
-
-	Rprintf("- mem_type_id = %lu\n", h5dset->mem_type_id);
 
 	return R_NilValue;
 }
