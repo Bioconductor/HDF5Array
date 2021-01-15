@@ -10,7 +10,7 @@
    needed by functions C_h5mread(), C_h5getdimscales(), and C_h5setdimscales().
  */
 typedef struct {
-	hid_t dset_id, type_id, space_id, plist_id;
+	hid_t dset_id, type_id, native_type_id, space_id, plist_id;
 	char *h5name;  /* canonical name as retrieved by H5Iget_name() */
 	char *storage_mode_attr;
 	H5T_class_t H5class;

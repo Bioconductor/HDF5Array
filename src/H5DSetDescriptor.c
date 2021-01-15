@@ -10,6 +10,154 @@
 #include <string.h>  /* for strcmp */
 #include <limits.h>  /* for INT_MAX */
 
+
+/* Make sure to keep normalize_native_type_id()
+   and normalized_native_type_id2str() in sync! */
+#define	COMPARE1_TYPE_WITH(predef_type_id) \
+	if (H5Tequal(native_type_id, predef_type_id) > 0) \
+		return predef_type_id;
+static hid_t normalize_native_type_id(hid_t native_type_id)
+{
+	/* See H5Tpublic.h for authoritative list of native types.
+	   Note that the list published at
+	     https://portal.hdfgroup.org/display/HDF5/Predefined+Datatypes
+	   might be incomplete or out-of-sync with H5Tpublic.h. */
+	COMPARE1_TYPE_WITH(H5T_NATIVE_SCHAR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UCHAR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_SCHAR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UCHAR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_SHORT)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_USHORT)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_LONG)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_ULONG)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_LLONG)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_ULLONG)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_FLOAT)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_DOUBLE)
+#ifdef H5T_NATIVE_LDOUBLE
+	COMPARE1_TYPE_WITH(H5T_NATIVE_LDOUBLE)
+#endif
+	COMPARE1_TYPE_WITH(H5T_NATIVE_B8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_B16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_B32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_B64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_OPAQUE)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_HADDR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_HSIZE)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_HSSIZE)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_HERR)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_HBOOL)
+
+	/* C9x integer types */
+
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST8)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST8)
+
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST16)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST16)
+
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST32)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST32)
+
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST64)
+	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST64)
+
+	PRINT_TO_ERRMSG_BUF("failed to normalize native type id %ld",
+			    native_type_id);
+	return -1;
+}
+
+/* Make sure to keep normalize_native_type_id()
+   and normalized_native_type_id2str() in sync! */
+#define	COMPARE2_TYPE_WITH(predef_type_id) \
+	if (native_type_id == predef_type_id) \
+		return #predef_type_id;
+static const char *normalized_native_type_id2str(hid_t native_type_id)
+{
+	static char s[50];
+
+	COMPARE2_TYPE_WITH(H5T_NATIVE_SCHAR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UCHAR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_SCHAR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UCHAR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_SHORT)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_USHORT)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_LONG)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_ULONG)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_LLONG)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_ULLONG)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_FLOAT)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_DOUBLE)
+#ifdef H5T_NATIVE_LDOUBLE
+	COMPARE2_TYPE_WITH(H5T_NATIVE_LDOUBLE)
+#endif
+	COMPARE2_TYPE_WITH(H5T_NATIVE_B8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_B16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_B32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_B64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_OPAQUE)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_HADDR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_HSIZE)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_HSSIZE)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_HERR)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_HBOOL)
+
+	/* C9x integer types */
+
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST8)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST8)
+
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST16)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST16)
+
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST32)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST32)
+
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST64)
+	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST64)
+
+	/* Should never happen if normalized_native_type_id2str()
+	   is kept in sync with normalize_native_type_id(). */
+	sprintf(s, "unknown native type (%ld)", native_type_id);
+	return s;
+}
+
 static const char *H5class2str(H5T_class_t H5class)
 {
 	static char s[32];
@@ -346,7 +494,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		     int as_int, int get_Rtype_only)
 {
 	char *h5name, *storage_mode_attr;
-	hid_t type_id, space_id, plist_id;
+	hid_t type_id, native_type_id, space_id, plist_id, tmp;
 	H5T_class_t H5class;
 	size_t H5size, ans_elt_size;
 	SEXPTYPE Rtype;
@@ -402,6 +550,25 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		goto on_error;
 	}
 	h5dset->type_id = type_id;
+
+	/* Set member 'native_type_id'.
+	   Gosh, it really sucks that H5Tget_native_type() doesn't actually
+	   return the id of a predefined native type like H5T_NATIVE_INT.
+	   Instead it returns a stupid random type id that cannot be
+	   compared directly with the predefined ones using something
+	   like the == operator. Nope, you need to compare with H5Tequal()!
+	   And to make the matter even worse, the documentation for
+	   H5Tget_native_type() doesn't say anything about this! */
+	tmp = H5Tget_native_type(type_id, H5T_DIR_DEFAULT);
+	if (tmp < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_native_type() returned an error");
+		goto on_error;
+	}
+	native_type_id = normalize_native_type_id(tmp);
+	H5Tclose(tmp);
+	if (native_type_id < 0)
+		goto on_error;
+	h5dset->native_type_id = native_type_id;
 
 	/* Set member 'H5class'. */
 	H5class = H5Tget_class(type_id);
@@ -684,6 +851,9 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	Rprintf("\n");
 
 	Rprintf("- type_id = %ld\n", h5dset->type_id);
+
+	Rprintf("- native_type = %s\n",
+		normalized_native_type_id2str(h5dset->native_type_id));
 
 	Rprintf("- H5class = %s\n", H5class2str(h5dset->H5class));
 
