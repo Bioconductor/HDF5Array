@@ -316,9 +316,10 @@ static inline int append_nonzero_val_to_nzdata_buf(
 		ret = DoubleAE_append_if_nonzero((DoubleAE *) nzdata_buf, val);
 	    } break;
 	    case STRSXP: {
-		const char *s = ((char *) in) + in_offset * h5dset->H5size;
+		const char *s = ((char *) in) +
+				in_offset * h5dset->h5type_size;
 		ret = CharAEAE_append_if_nonzero((CharAEAE *) nzdata_buf, s,
-						 h5dset->H5size);
+						 h5dset->h5type_size);
 	    } break;
 	    case RAWSXP: {
 		char val = ((char *) in)[in_offset];
@@ -604,7 +605,7 @@ static int read_data_7(ChunkIterator *chunk_iter,
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
 
-	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
+	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset, 1);
 	if (ret < 0)
 		return ret;
 	/* Walk over the chunks touched by the user-supplied array selection. */

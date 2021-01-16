@@ -286,7 +286,7 @@ static void print_chunk_data(void *data, size_t data_length, size_t data_size)
  *       call ser_read member of a H5D_layout_ops_t object
  *            ??
  */
-static int read_h5chunk(const H5DSetDescriptor *h5dset,
+static int read_h5chunk(hid_t dset_id,
 		const H5Viewport *h5chunk_vp,
 		ChunkDataBuffer *chunk_data_buf)
 {
@@ -294,7 +294,7 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 	hsize_t chunk_storage_size;
 	uint32_t filters;
 
-	ret = H5Dget_chunk_storage_size(h5dset->dset_id,
+	ret = H5Dget_chunk_storage_size(dset_id,
 					h5chunk_vp->h5off,
 					&chunk_storage_size);
 	if (ret < 0) {
@@ -312,7 +312,7 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 				    CHUNK_COMPRESSION_OVERHEAD);
 		return -1;
 	}
-	ret = H5Dread_chunk(h5dset->dset_id, H5P_DEFAULT,
+	ret = H5Dread_chunk(dset_id, H5P_DEFAULT,
 			    h5chunk_vp->h5off, &filters,
 			    chunk_data_buf->compressed_data);
 	if (ret < 0) {
@@ -331,8 +331,9 @@ static int read_h5chunk(const H5DSetDescriptor *h5dset,
 				    chunk_data_buf->data_size);
 	if (ret < 0)
 		return -1;
-	transpose_bytes(chunk_data_buf->data, chunk_data_buf->data_length,
-			h5dset->ans_elt_size,
+	transpose_bytes(chunk_data_buf->data,
+			chunk_data_buf->data_length,
+			chunk_data_buf->data_type_size,
 			chunk_data_buf->compressed_data);
 	//print_chunk_data(chunk_data_buf->compressed_data,
 	//		   chunk_data_buf->data_length,
@@ -532,9 +533,10 @@ void _destroy_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf)
 }
 
 int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
-		const H5DSetDescriptor *h5dset)
+		const H5DSetDescriptor *h5dset, int use_Rtype)
 {
-	size_t data_length;
+	size_t data_length, data_type_size;
+	hid_t data_type_id;
 	int h5along;
 
 	if (h5dset->h5chunkdim == NULL) {
@@ -549,17 +551,29 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_vp.h5off = NULL;
 	chunk_data_buf->compressed_data = NULL;
 
-	/* Set members 'data_length' and 'data_size'. */
+	/* Set member 'data_length'. */
 	data_length = 1;
 	for (h5along = 0; h5along < h5dset->ndim; h5along++)
 		data_length *= h5dset->h5chunkdim[h5along];
 	chunk_data_buf->data_length = data_length;
-	chunk_data_buf->data_size = data_length * h5dset->ans_elt_size;
 
-	/* Set member 'data_type_id'. */
-	chunk_data_buf->data_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-							       h5dset->type_id);
-	return chunk_data_buf->data_type_id < 0 ? -1 : 0;
+	/* Set members 'data_type_id' and 'data_type_size'. */
+	if (h5dset->h5class == H5T_STRING || use_Rtype) {
+		data_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
+						       h5dset->h5type_id);
+		if (data_type_id < 0)
+			return -1;
+		data_type_size = h5dset->Rtype_size;
+	} else {
+		data_type_id = h5dset->native_type_id;
+		data_type_size = h5dset->native_type_size;
+	}
+	chunk_data_buf->data_type_id = data_type_id;
+	chunk_data_buf->data_type_size = data_type_size;
+
+	/* Set member 'data_size'. */
+	chunk_data_buf->data_size = data_length * data_type_size;
+	return 0;
 }
 
 int _load_chunk(const ChunkIterator *chunk_iter,
@@ -618,9 +632,9 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 				return -1;
 			}
 		}
-		ret = read_h5chunk(h5dset,
-				&chunk_iter->h5dset_vp,
-				chunk_data_buf);
+		ret = read_h5chunk(h5dset->dset_id,
+				   &chunk_iter->h5dset_vp,
+				   chunk_data_buf);
 	}
 	return ret;
 }

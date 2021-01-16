@@ -109,7 +109,7 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 	H5Viewport h5dset_vp;
 	long long int num_hyperslabs;
 
-	ret = H5Sselect_none(h5dset->space_id);
+	ret = H5Sselect_none(h5dset->h5space_id);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
@@ -132,7 +132,7 @@ static long long int select_hyperslabs(const H5DSetDescriptor *h5dset,
 		update_h5dset_vp(ndim, midx_buf, moved_along,
 				 starts, counts, &h5dset_vp);
 		/* Add to current h5 selection. */
-		ret = _add_H5Viewport_to_h5selection(h5dset->space_id,
+		ret = _add_H5Viewport_to_h5selection(h5dset->h5space_id,
 						     &h5dset_vp);
 		if (ret < 0)
 			break;
@@ -189,7 +189,7 @@ static long long int select_elements(const H5DSetDescriptor *h5dset,
 		outer_moved_along = _next_midx(ndim, nchips, midx_buf);
 	} while (outer_moved_along < ndim);
 
-	ret = H5Sselect_elements(h5dset->space_id, H5S_SELECT_APPEND,
+	ret = H5Sselect_elements(h5dset->h5space_id, H5S_SELECT_APPEND,
 				 num_elements, coord_buf);
 	free(coord_buf);
 	if (ret < 0)
@@ -435,7 +435,7 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 			goto on_error;
 
 		mem_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-						      h5dset->type_id);
+						      h5dset->h5type_id);
 		if (mem_type_id < 0)
 			goto on_error;
 

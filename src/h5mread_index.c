@@ -126,9 +126,10 @@ static int load_val_to_array(const H5DSetDescriptor *h5dset,
 		REAL(out)[out_offset] = val;
 	    } break;
 	    case STRSXP: {
-		const char *val = ((char *) in) + in_offset * h5dset->H5size;
+		const char *val = ((char *) in) +
+				  in_offset * h5dset->h5type_size;
 		int val_len;
-		for (val_len = 0; val_len < h5dset->H5size; val_len++)
+		for (val_len = 0; val_len < h5dset->h5type_size; val_len++)
 			if (val[val_len] == 0)
 				break;
 		int is_na = h5dset->as_na_attr &&
@@ -235,7 +236,7 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 		return -1;
 
 	mem_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-					      h5dset->type_id);
+					      h5dset->h5type_id);
 	if (mem_type_id < 0)
 		return -1;
 
@@ -243,7 +244,7 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 	if (mem_space_id < 0)
 		return -1;
 
-	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
+	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset, 1);
 	if (ret < 0) {
 		H5Sclose(mem_space_id);
 		return ret;
@@ -405,7 +406,7 @@ static long long int select_intersection_of_chips_with_chunk(
 	int ret, ndim, inner_moved_along;
 	long long int num_hyperslabs;
 
-	ret = H5Sselect_none(h5dset->space_id);
+	ret = H5Sselect_none(h5dset->h5space_id);
 	if (ret < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Sselect_none() returned an error");
 		return -1;
@@ -426,7 +427,7 @@ static long long int select_intersection_of_chips_with_chunk(
 				inner_midx_buf, inner_moved_along,
 				inner_breakpoint_bufs,
 				inner_vp);
-		ret = _add_H5Viewport_to_h5selection(h5dset->space_id,
+		ret = _add_H5Viewport_to_h5selection(h5dset->h5space_id,
 						     inner_vp);
 		if (ret < 0)
 			return -1;
@@ -486,7 +487,7 @@ static int read_data_6(ChunkIterator *chunk_iter, const int *ans_dim, SEXP ans)
 		return -1;
 
 	mem_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-					      h5dset->type_id);
+					      h5dset->h5type_id);
 	if (mem_type_id < 0)
 		return -1;
 

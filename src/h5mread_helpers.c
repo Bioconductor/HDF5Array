@@ -127,7 +127,7 @@ int _read_h5selection(const H5DSetDescriptor *h5dset,
 		return -1;
 	ret = H5Dread(h5dset->dset_id,
 		      mem_type_id, mem_space_id,
-		      h5dset->space_id, H5P_DEFAULT, mem);
+		      h5dset->h5space_id, H5P_DEFAULT, mem);
 	if (ret < 0)
 		PRINT_TO_ERRMSG_BUF("H5Dread() returned an error");
 	return ret;
@@ -140,7 +140,7 @@ int _read_H5Viewport(const H5DSetDescriptor *h5dset,
 {
 	int ret;
 
-	ret = _select_H5Viewport(h5dset->space_id, h5dset_vp);
+	ret = _select_H5Viewport(h5dset->h5space_id, h5dset_vp);
 	if (ret < 0)
 		return -1;
 	return _read_h5selection(h5dset, mem_type_id, mem_space_id, mem, mem_vp);

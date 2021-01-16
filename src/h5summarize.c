@@ -11,6 +11,7 @@
 
 #include <string.h>  /* for strcmp */
 #include <limits.h>  /* for INT_MAX */
+//#include <time.h>
 
 #define	MIN_OPCODE	1
 #define	MAX_OPCODE	2
@@ -491,15 +492,18 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	IntOP int_OP;
 	DoubleOP double_OP;
 	double init[2];  /* 'init' will store 1 or 2 ints or doubles */
+	//double init2[2];
 	int ndim, status, ret, go_fast;
 	IntAE *inner_midx_buf;
 	ChunkIterator chunk_iter;
 	ChunkDataBuffer chunk_data_buf;
+	//ChunkDataBuffer chunk_data_buf2;
 
 	/* Set one of 'int_OP' or 'double_OP' to NULL and the other one to
 	   an IntOP or DoubleOP function. Also initializes 'init' with 1 or
 	   2 ints or doubles. */
 	select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init);
+	//select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init2);
 
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
@@ -512,20 +516,40 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	ret = _init_ChunkIterator(&chunk_iter, h5dset, index, NULL, 0);
 	if (ret < 0)
 		return R_NilValue;
-	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset);
+
+	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset, 1);
 	if (ret < 0) {
 		_destroy_ChunkIterator(&chunk_iter);
 		return R_NilValue;
 	}
+
+	//ret = _init_ChunkDataBuffer(&chunk_data_buf2, h5dset, 0);
+	//if (ret < 0) {
+	//	_destroy_ChunkIterator(&chunk_iter);
+	//	return R_NilValue;
+	//}
+
 	/* Walk over the chunks touched by the user-supplied array selection. */
 	while ((ret = _next_chunk(&chunk_iter))) {
 		if (ret < 0)
 			break;
 		if (verbose)
 			_print_tchunk_info(&chunk_iter);
+
+		//clock_t t0 = clock();
 		ret = _load_chunk(&chunk_iter, &chunk_data_buf, 0);
 		if (ret < 0)
 			break;
+		//double dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
+		//printf("_load_chunk() to chunk_data_buf: %2.3f ms\n", dt);
+
+		//t0 = clock();
+		//ret = _load_chunk(&chunk_iter, &chunk_data_buf2, 0);
+		//if (ret < 0)
+		//	break;
+		//dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
+		//printf("_load_chunk() to chunk_data_buf2: %2.3f ms\n", dt);
+
 		go_fast = _tchunk_is_fully_selected(ndim,
 				&chunk_iter.h5dset_vp,
 				&chunk_iter.mem_vp) &&
@@ -533,10 +557,20 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 				&chunk_iter.h5dset_vp);
 		if (go_fast) {
 			if (int_OP != NULL) {
+				//t0 = clock();
 				summarize_full_chunk_int_data(
 					chunk_data_buf.data,
 					chunk_data_buf.data_length,
 					int_OP, init, na_rm, &status);
+				//dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
+				//printf("summarize_full_chunk_int_data: %2.3f ms\n", dt);
+				//t0 = clock();
+				//summarize_full_chunk_int16_data(
+				//	chunk_data_buf2.data,
+				//	chunk_data_buf2.data_length,
+				//	int_OP, init2, na_rm, &status);
+				//dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
+				//printf("summarize_full_chunk_int16_data: %2.3f ms\n", dt);
 			} else {
 				summarize_full_chunk_double_data(
 					chunk_data_buf.data,
@@ -565,6 +599,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 		if (status == 2)
 			break;
 	}
+	//_destroy_ChunkDataBuffer(&chunk_data_buf2);
 	_destroy_ChunkDataBuffer(&chunk_data_buf);
 	_destroy_ChunkIterator(&chunk_iter);
 	if (ret < 0)

@@ -22,8 +22,11 @@ typedef struct chunk_iterator_t {
 
 /* A data structure for storing the data of a full chunk. */
 typedef struct chunk_data_buffer_t {
-	size_t data_length, data_size;
-	hid_t data_type_id, data_space_id;
+	size_t data_length;
+	hid_t data_type_id;
+	size_t data_type_size;
+	size_t data_size;
+	hid_t data_space_id;
 	void *data;
 	H5Viewport data_vp;
 	void *compressed_data;  /* experimental! */
@@ -64,7 +67,8 @@ void _destroy_ChunkDataBuffer(
 
 int _init_ChunkDataBuffer(
 	ChunkDataBuffer *chunk_data_buf,
-	const H5DSetDescriptor *h5dset
+	const H5DSetDescriptor *h5dset,
+	int use_Rtype
 );
 
 int _load_chunk(

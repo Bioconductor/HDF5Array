@@ -11,149 +11,147 @@
 #include <limits.h>  /* for INT_MAX */
 
 
-/* Make sure to keep normalize_native_type_id()
-   and normalized_native_type_id2str() in sync! */
-#define	COMPARE1_TYPE_WITH(predef_type_id) \
+/* Make sure to keep map_native_type_to_predef_type() and
+   predef_native_type_as_string() in sync! */
+#define	RETURN_PREDEF_TYPE_IF(predef_type_id) \
 	if (H5Tequal(native_type_id, predef_type_id) > 0) \
 		return predef_type_id;
-static hid_t normalize_native_type_id(hid_t native_type_id)
+static hid_t map_native_type_to_predef_type(hid_t native_type_id)
 {
 	/* See H5Tpublic.h for authoritative list of native types.
 	   Note that the list published at
 	     https://portal.hdfgroup.org/display/HDF5/Predefined+Datatypes
 	   might be incomplete or out-of-sync with H5Tpublic.h. */
-	COMPARE1_TYPE_WITH(H5T_NATIVE_SCHAR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UCHAR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_SCHAR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UCHAR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_SHORT)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_USHORT)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_LONG)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_ULONG)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_LLONG)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_ULLONG)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_FLOAT)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_DOUBLE)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_CHAR)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_SCHAR)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UCHAR)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_SHORT)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_USHORT)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_LONG)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_ULONG)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_LLONG)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_ULLONG)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_FLOAT)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_DOUBLE)
 #ifdef H5T_NATIVE_LDOUBLE
-	COMPARE1_TYPE_WITH(H5T_NATIVE_LDOUBLE)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_LDOUBLE)
 #endif
-	COMPARE1_TYPE_WITH(H5T_NATIVE_B8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_B16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_B32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_B64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_OPAQUE)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_HADDR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_HSIZE)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_HSSIZE)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_HERR)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_HBOOL)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_B8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_B16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_B32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_B64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_OPAQUE)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_HADDR)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_HSIZE)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_HSSIZE)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_HERR)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_HBOOL)
 
 	/* C9x integer types */
 
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST8)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_LEAST8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_LEAST8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_FAST8)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_FAST8)
 
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST16)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_LEAST16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_LEAST16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_FAST16)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_FAST16)
 
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST32)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_LEAST32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_LEAST32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_FAST32)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_FAST32)
 
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_LEAST64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_LEAST64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_INT_FAST64)
-	COMPARE1_TYPE_WITH(H5T_NATIVE_UINT_FAST64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_LEAST64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_LEAST64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_FAST64)
+	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_FAST64)
 
-	PRINT_TO_ERRMSG_BUF("failed to normalize native type id %ld",
-			    native_type_id);
+	PRINT_TO_ERRMSG_BUF("failed to map native type id %ld "
+			    "to predef type id", native_type_id);
 	return -1;
 }
 
-/* Make sure to keep normalize_native_type_id()
-   and normalized_native_type_id2str() in sync! */
-#define	COMPARE2_TYPE_WITH(predef_type_id) \
+/* Make sure to keep map_native_type_to_predef_type() and
+   predef_native_type_as_string() in sync! */
+#define	RETURN_TYPE_STRING_IF(predef_type_id) \
 	if (native_type_id == predef_type_id) \
-		return #predef_type_id;
-static const char *normalized_native_type_id2str(hid_t native_type_id)
+		return #predef_type_id;  /* stringize 'predef_type_id' */
+static const char *predef_native_type_as_string(hid_t native_type_id)
 {
 	static char s[50];
 
-	COMPARE2_TYPE_WITH(H5T_NATIVE_SCHAR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UCHAR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_SCHAR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UCHAR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_SHORT)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_USHORT)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_LONG)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_ULONG)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_LLONG)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_ULLONG)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_FLOAT)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_DOUBLE)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_CHAR)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_SCHAR)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UCHAR)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_SHORT)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_USHORT)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_LONG)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_ULONG)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_LLONG)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_ULLONG)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_FLOAT)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_DOUBLE)
 #ifdef H5T_NATIVE_LDOUBLE
-	COMPARE2_TYPE_WITH(H5T_NATIVE_LDOUBLE)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_LDOUBLE)
 #endif
-	COMPARE2_TYPE_WITH(H5T_NATIVE_B8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_B16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_B32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_B64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_OPAQUE)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_HADDR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_HSIZE)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_HSSIZE)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_HERR)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_HBOOL)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_B8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_B16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_B32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_B64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_OPAQUE)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_HADDR)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_HSIZE)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_HSSIZE)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_HERR)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_HBOOL)
 
 	/* C9x integer types */
 
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST8)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_LEAST8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_LEAST8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_FAST8)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_FAST8)
 
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST16)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_LEAST16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_LEAST16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_FAST16)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_FAST16)
 
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST32)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_LEAST32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_LEAST32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_FAST32)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_FAST32)
 
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_LEAST64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_LEAST64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_INT_FAST64)
-	COMPARE2_TYPE_WITH(H5T_NATIVE_UINT_FAST64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_LEAST64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_LEAST64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_INT_FAST64)
+	RETURN_TYPE_STRING_IF(H5T_NATIVE_UINT_FAST64)
 
-	/* Should never happen if normalized_native_type_id2str()
-	   is kept in sync with normalize_native_type_id(). */
+	/* Should never happen if predef_native_type_as_string()
+	   is kept in sync with map_native_type_to_predef_type(). */
 	sprintf(s, "unknown native type (%ld)", native_type_id);
 	return s;
 }
@@ -174,6 +172,8 @@ static const char *H5class2str(H5T_class_t H5class)
 	    case H5T_ENUM:      return "H5T_ENUM";
 	    case H5T_VLEN:      return "H5T_VLEN";
 	    case H5T_ARRAY:     return "H5T_ARRAY";
+	/* Only to avoid gcc warning about enumeration value not handled
+	   in switch. */
 	    default: break;
 	}
 	sprintf(s, "unknown (%d)", H5class);
@@ -189,6 +189,8 @@ static const char *H5layout2str(H5D_layout_t H5layout)
 	    case H5D_CONTIGUOUS: return "H5D_CONTIGUOUS";
 	    case H5D_CHUNKED:    return "H5D_CHUNKED";
 	    case H5D_VIRTUAL:    return "H5D_VIRTUAL";
+	/* Only to avoid gcc warning about enumeration value not handled
+	   in switch. */
 	    default: break;
 	}
 	sprintf(s, "unknown (%d)", H5layout);
@@ -437,6 +439,8 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t H5size,
 				"dataset class is H5T_STRING");
 		*Rtype = STRSXP;
 		return 0;
+	/* Only to avoid gcc warning about enumeration value not handled
+	   in switch. */
 	    default: break;
 	}
 	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
@@ -444,7 +448,7 @@ static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t H5size,
 	return -1;
 }
 
-static size_t get_ans_elt_size_from_Rtype(SEXPTYPE Rtype, size_t H5size)
+static size_t get_Rtype_size(SEXPTYPE Rtype, size_t H5size)
 {
 	switch (Rtype) {
 	    case LGLSXP: case INTSXP: return sizeof(int);
@@ -477,12 +481,12 @@ void _destroy_H5DSetDescriptor(H5DSetDescriptor *h5dset)
 		free(h5dset->h5chunkdim);
 	if (h5dset->h5dim != NULL)
 		free(h5dset->h5dim);
-	if (h5dset->plist_id != -1)
-		H5Pclose(h5dset->plist_id);
-	if (h5dset->space_id != -1)
-		H5Sclose(h5dset->space_id);
-	if (h5dset->type_id != -1)
-		H5Tclose(h5dset->type_id);
+	if (h5dset->h5plist_id != -1)
+		H5Pclose(h5dset->h5plist_id);
+	if (h5dset->h5space_id != -1)
+		H5Sclose(h5dset->h5space_id);
+	if (h5dset->h5type_id != -1)
+		H5Tclose(h5dset->h5type_id);
 	if (h5dset->storage_mode_attr != NULL)
 		free(h5dset->storage_mode_attr);
 	if (h5dset->h5name != NULL)
@@ -494,12 +498,13 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		     int as_int, int get_Rtype_only)
 {
 	char *h5name, *storage_mode_attr;
-	hid_t type_id, native_type_id, space_id, plist_id, tmp;
-	H5T_class_t H5class;
-	size_t H5size, ans_elt_size;
+	hid_t h5type_id, native_type_id, h5space_id, h5plist_id, tmp;
+	H5T_class_t h5class;
+	size_t h5type_size, Rtype_size, native_type_size;
 	SEXPTYPE Rtype;
 	int as_na_attr, ndim, *h5nchunk, h5along;
 	hsize_t *h5dim, *h5chunkdim, d, chunkd, nchunk;
+	H5D_layout_t h5layout;
 	htri_t ret;
 	CharAE *buf;
 
@@ -509,9 +514,9 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	   or close. */
 	h5dset->h5name = NULL;
 	h5dset->storage_mode_attr = NULL;
-	h5dset->type_id = -1;
-	h5dset->space_id = -1;
-	h5dset->plist_id = -1;
+	h5dset->h5type_id = -1;
+	h5dset->h5space_id = -1;
+	h5dset->h5plist_id = -1;
 	h5dset->h5dim = NULL;
 	h5dset->h5chunkdim = NULL;
 	h5dset->h5nchunk = NULL;
@@ -543,48 +548,35 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->storage_mode_attr = storage_mode_attr;
 	}
 
-	/* Set member 'type_id'. */
-	type_id = H5Dget_type(dset_id);
-	if (type_id < 0) {
+	/* Set member 'h5type_id'. */
+	h5type_id = H5Dget_type(dset_id);
+	if (h5type_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		goto on_error;
 	}
-	h5dset->type_id = type_id;
+	h5dset->h5type_id = h5type_id;
 
-	/* Set member 'native_type_id'.
-	   Gosh, it really sucks that H5Tget_native_type() doesn't actually
-	   return the id of a predefined native type like H5T_NATIVE_INT.
-	   Instead it returns a stupid random type id that cannot be
-	   compared directly with the predefined ones using something
-	   like the == operator. Nope, you need to compare with H5Tequal()!
-	   And to make the matter even worse, the documentation for
-	   H5Tget_native_type() doesn't say anything about this! */
-	tmp = H5Tget_native_type(type_id, H5T_DIR_DEFAULT);
-	if (tmp < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Tget_native_type() returned an error");
-		goto on_error;
-	}
-	native_type_id = normalize_native_type_id(tmp);
-	H5Tclose(tmp);
-	if (native_type_id < 0)
-		goto on_error;
-	h5dset->native_type_id = native_type_id;
-
-	/* Set member 'H5class'. */
-	H5class = H5Tget_class(type_id);
-	if (H5class == H5T_NO_CLASS) {
+	/* Set member 'h5class'. */
+	h5class = H5Tget_class(h5dset->h5type_id);
+	if (h5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		goto on_error;
 	}
-	h5dset->H5class = H5class;
-
-	/* Set member 'H5size'. */
-	H5size = H5Tget_size(type_id);
-	if (H5size == 0) {
-		PRINT_TO_ERRMSG_BUF("H5Tget_size() returned 0");
+	if (h5class == H5T_STRING &&
+	    H5Tis_variable_str(h5dset->h5type_id) != 0) {
+		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
+				    "is not supported at the moment");
 		goto on_error;
 	}
-	h5dset->H5size = H5size;
+	h5dset->h5class = h5class;
+
+	/* Set member 'h5type_size'. */
+	h5type_size = H5Tget_size(h5dset->h5type_id);
+	if (h5type_size == 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_size(h5type_id) returned 0");
+		goto on_error;
+	}
+	h5dset->h5type_size = h5type_size;
 
 	/* Set member 'Rtype'. */
 	if (h5dset->storage_mode_attr != NULL) {
@@ -592,18 +584,52 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 					      as_int, &Rtype) < 0)
 			goto on_error;
 	} else {
-		if (map_H5class_to_Rtype(H5class, as_int, H5size, &Rtype) < 0)
+		if (map_H5class_to_Rtype(h5dset->h5class, as_int,
+					 h5dset->h5type_size, &Rtype) < 0)
 			goto on_error;
-	}
-	if (Rtype == STRSXP && H5Tis_variable_str(type_id) != 0) {
-		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
-				    "is not supported at the moment");
-		goto on_error;
 	}
 	h5dset->Rtype = Rtype;
 
 	if (get_Rtype_only)
 		return 0;
+
+	/* Set member 'Rtype_size'. */
+	Rtype_size = get_Rtype_size(h5dset->Rtype, h5dset->h5type_size);
+	if (Rtype_size == 0)
+		goto on_error;
+	h5dset->Rtype_size = Rtype_size;
+
+	if (h5dset->h5class != H5T_STRING) {
+		/* Set member 'native_type_id'.
+		   Gosh, it really sucks that H5Tget_native_type() doesn't
+		   actually return the id of a predefined native type like
+		   H5T_NATIVE_INT. Instead it returns a stupid random type
+		   id that cannot be compared directly with the predefined
+		   ones using something like the == operator. Nope, you need
+		   to compare with H5Tequal()! And to make the matter even
+		   worse, the documentation for H5Tget_native_type() doesn't
+		   say anything about this! */
+		tmp = H5Tget_native_type(h5dset->h5type_id, H5T_DIR_DEFAULT);
+		if (tmp < 0) {
+			PRINT_TO_ERRMSG_BUF("H5Tget_native_type() "
+					    "returned an error");
+			goto on_error;
+		}
+		native_type_id = map_native_type_to_predef_type(tmp);
+		H5Tclose(tmp);
+		if (native_type_id < 0)
+			goto on_error;
+		h5dset->native_type_id = native_type_id;
+
+		/* Set member 'native_type_size'. */
+		native_type_size = H5Tget_size(h5dset->native_type_id);
+		if (native_type_size == 0) {
+			PRINT_TO_ERRMSG_BUF("H5Tget_size(native_type_id) "
+					    "returned 0");
+			goto on_error;
+		}
+		h5dset->native_type_size = native_type_size;
+	}
 
 	/* Set member 'as_na_attr'. */
 	ret = get_h5attrib_intval(dset_id, "as.na", &as_na_attr);
@@ -617,16 +643,16 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->as_na_attr = ret == 2 ? as_na_attr : 0;
 
-	/* Set member 'space_id'. */
-	space_id = H5Dget_space(dset_id);
-	if (space_id < 0) {
+	/* Set member 'h5space_id'. */
+	h5space_id = H5Dget_space(dset_id);
+	if (h5space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
 		goto on_error;
 	}
-	h5dset->space_id = space_id;
+	h5dset->h5space_id = h5space_id;
 
 	/* Set member 'ndim'. */
-	ndim = H5Sget_simple_extent_ndims(space_id);
+	ndim = H5Sget_simple_extent_ndims(h5dset->h5space_id);
 	if (ndim < 0) {
 		PRINT_TO_ERRMSG_BUF(
 			"H5Sget_simple_extent_ndims() returned an error");
@@ -634,34 +660,39 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->ndim = ndim;
 
-	/* Set member 'plist_id'. */
-	plist_id = H5Dget_create_plist(dset_id);
-	if (plist_id < 0) {
+	/* Set member 'h5plist_id'. */
+	h5plist_id = H5Dget_create_plist(dset_id);
+	if (h5plist_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
 		goto on_error;
 	}
-	h5dset->plist_id = plist_id;
+	h5dset->h5plist_id = h5plist_id;
 
 	/* Set member 'h5dim'. */
 	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
-	if (H5Sget_simple_extent_dims(space_id, h5dim, NULL) != ndim) {
+	if (H5Sget_simple_extent_dims(h5space_id, h5dim, NULL) != ndim) {
 		PRINT_TO_ERRMSG_BUF("H5Sget_simple_extent_dims() returned "
 				    "an unexpected value");
 		goto on_error;
 	}
 	h5dset->h5dim = h5dim;
 
-	/* Set member 'H5layout'. */
-	h5dset->H5layout = H5Pget_layout(plist_id);
+	/* Set member 'h5layout'. */
+	h5layout = H5Pget_layout(h5dset->h5plist_id);
+	if (h5layout < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Pget_layout() returned an error");
+		goto on_error;
+	}
+	h5dset->h5layout = h5layout;
 
 	/* Set member 'h5chunkdim'. */
-	if (h5dset->H5layout == H5D_CHUNKED) {
+	if (h5dset->h5layout == H5D_CHUNKED) {
 		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
 		if (h5chunkdim == NULL)
 			goto on_error;
-		if (H5Pget_chunk(plist_id, ndim, h5chunkdim) != ndim) {
+		if (H5Pget_chunk(h5plist_id, ndim, h5chunkdim) != ndim) {
 			PRINT_TO_ERRMSG_BUF("H5Pget_chunk() returned "
 					    "an unexpected value");
 			goto on_error;
@@ -669,10 +700,10 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->h5chunkdim = h5chunkdim;
 	} else if (h5dset->Rtype == STRSXP) {
 		/* Even though the dataset is contiguous, we treat it as
-		   if it was made of a single chunk. This is so we can
-		   use h5mread() methods 4 or 5 on it, which work only
-		   on chunked data and are the only methods that know
-		   how to handle string data. */
+		   if it was made of a single chunk. This is so that we
+		   can use h5mread() method 4 on it, which works only on
+		   chunked data and is the only method that knows how to
+		   handle string data. */
 		h5dset->h5chunkdim = h5dset->h5dim;
 	}
 
@@ -704,12 +735,6 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		}
 		h5dset->h5nchunk = h5nchunk;
 	}
-
-	/* Set member 'ans_elt_size'. */
-	ans_elt_size = get_ans_elt_size_from_Rtype(Rtype, H5size);
-	if (ans_elt_size == 0)
-		goto on_error;
-	h5dset->ans_elt_size = ans_elt_size;
 
 	return 0;
 
@@ -850,31 +875,41 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	}
 	Rprintf("\n");
 
-	Rprintf("- type_id = %ld\n", h5dset->type_id);
+	Rprintf("- h5type_id = %ld\n", h5dset->h5type_id);
 
-	Rprintf("- native_type = %s\n",
-		normalized_native_type_id2str(h5dset->native_type_id));
+	Rprintf("- h5class = %s\n", H5class2str(h5dset->h5class));
 
-	Rprintf("- H5class = %s\n", H5class2str(h5dset->H5class));
-
-	Rprintf("- H5size = %lu\n", h5dset->H5size);
+	Rprintf("- h5type_size = %lu\n", h5dset->h5type_size);
 
 	Rprintf("- Rtype = \"%s\"\n", CHAR(type2str(h5dset->Rtype)));
 
+	Rprintf("- Rtype_size = %lu\n", h5dset->Rtype_size);
+
+	if (h5dset->h5class != H5T_STRING) {
+		Rprintf("- native_type_id = %s\n",
+			predef_native_type_as_string(h5dset->native_type_id));
+		Rprintf("- native_type_size = %lu\n", h5dset->native_type_size);
+	} else {
+		Rprintf("- native_type_id = %s\n", "none     "
+			" (not set when h5class is H5T_STRING)");
+		Rprintf("- native_type_size = %s\n", "none"
+			" (not set when h5class is H5T_STRING)");
+	}
+
 	Rprintf("- as_na_attr = %d\n", h5dset->as_na_attr);
 
-	Rprintf("- space_id = %ld\n", h5dset->space_id);
+	Rprintf("- h5space_id = %ld\n", h5dset->h5space_id);
 
 	Rprintf("- ndim = %d\n", h5dset->ndim);
 
-	Rprintf("- plist_id = %ld\n", h5dset->plist_id);
+	Rprintf("- h5plist_id = %ld\n", h5dset->h5plist_id);
 
 	Rprintf("- h5dim =");
 	for (h5along = 0; h5along < h5dset->ndim; h5along++)
 		Rprintf(" %llu", h5dset->h5dim[h5along]);
 	Rprintf("\n");
 
-	Rprintf("- H5layout = %s\n", H5layout2str(h5dset->H5layout));
+	Rprintf("- h5layout = %s\n", H5layout2str(h5dset->h5layout));
 
 	Rprintf("- h5chunkdim =");
 	if (h5dset->h5chunkdim == NULL) {
@@ -883,7 +918,7 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 		for (h5along = 0; h5along < h5dset->ndim; h5along++)
 			Rprintf(" %llu",
 				h5dset->h5chunkdim[h5along]);
-		if (h5dset->H5layout != H5D_CHUNKED &&
+		if (h5dset->h5layout != H5D_CHUNKED &&
 		    h5dset->h5chunkdim == h5dset->h5dim)
 			Rprintf(" (artificially set to h5dim)");
 		Rprintf("\n");
@@ -892,8 +927,6 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 			Rprintf(" %d", h5dset->h5nchunk[h5along]);
 		Rprintf("\n");
 	}
-
-	Rprintf("- ans_elt_size = %lu\n", h5dset->ans_elt_size);
 
 	return R_NilValue;
 }
