@@ -558,11 +558,11 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_length = data_length;
 
 	/* Set members 'data_type_id' and 'data_type_size'. */
-	if (h5dset->h5class == H5T_STRING || use_Rtype) {
-		data_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-						       h5dset->h5type_id);
-		if (data_type_id < 0)
-			return -1;
+	if (h5dset->h5class == H5T_STRING) {
+		data_type_id = h5dset->h5type_id;
+		data_type_size = h5dset->h5type_size;
+	} else if (use_Rtype) {
+		data_type_id = h5dset->native_type_id_for_Rtype;
 		data_type_size = h5dset->Rtype_size;
 	} else {
 		data_type_id = h5dset->native_type_id;

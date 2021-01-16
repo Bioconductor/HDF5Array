@@ -12,7 +12,7 @@
 typedef struct {
 	/* Core members (always set). */
 	hid_t dset_id;
-	char *h5name;  /* canonical name as retrieved by H5Iget_name() */
+	char *h5name;  // canonical name as retrieved by H5Iget_name()
 	char *storage_mode_attr;
 	hid_t h5type_id;
 	H5T_class_t h5class;
@@ -21,8 +21,9 @@ typedef struct {
 
 	/* Additional members (not set when 'get_Rtype_only' is set to 1). */
 	size_t Rtype_size;
-	hid_t native_type_id;     /* set only when h5class != H5T_STRING */
-	size_t native_type_size;  /* set only when h5class != H5T_STRING */
+	hid_t native_type_id;            // set only when h5class != H5T_STRING
+	size_t native_type_size;         // set only when h5class != H5T_STRING
+	hid_t native_type_id_for_Rtype;  // set only when h5class != H5T_STRING
 	int as_na_attr;
 	hid_t h5space_id;
 	int ndim;
@@ -44,11 +45,6 @@ int _get_h5attrib_strval(
 	hid_t dset_id,
 	const char *attr_name,
 	CharAE *buf
-);
-
-hid_t _get_mem_type_for_Rtype(
-	SEXPTYPE Rtype,
-	hid_t type_id
 );
 
 void _destroy_H5DSetDescriptor(

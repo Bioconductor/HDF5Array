@@ -156,11 +156,11 @@ static const char *predef_native_type_as_string(hid_t native_type_id)
 	return s;
 }
 
-static const char *H5class2str(H5T_class_t H5class)
+static const char *H5class2str(H5T_class_t h5class)
 {
 	static char s[32];
 
-	switch (H5class) {
+	switch (h5class) {
 	    case H5T_INTEGER:   return "H5T_INTEGER";
 	    case H5T_FLOAT:     return "H5T_FLOAT";
 	    case H5T_STRING:    return "H5T_STRING";
@@ -176,7 +176,7 @@ static const char *H5class2str(H5T_class_t H5class)
 	   in switch. */
 	    default: break;
 	}
-	sprintf(s, "unknown (%d)", H5class);
+	sprintf(s, "unknown (%d)", h5class);
 	return s;
 }
 
@@ -376,14 +376,40 @@ static int get_h5attrib_intval(hid_t dset_id, const char *attr_name, int *val)
 
 
 /****************************************************************************
- * _init_H5DSetDescriptor() / _destroy_H5DSetDescriptor()
+ * Handle Rtype
  */
 
-static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
-				     SEXPTYPE *Rtype)
+/* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
+   support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
+static int map_numeric_h5class_to_Rtype(H5T_class_t h5class, size_t h5size,
+		SEXPTYPE *Rtype)
+{
+	switch (h5class) {
+	    case H5T_INTEGER:
+		if (h5size <= sizeof(char)) {
+			*Rtype = RAWSXP;
+		} else if (h5size <= sizeof(int)) {
+			*Rtype = INTSXP;
+		} else {
+			*Rtype = REALSXP;
+		}
+		return 0;
+	    case H5T_FLOAT:
+		*Rtype = REALSXP;
+		return 0;
+	/* Only to avoid gcc warning about enumeration value not handled
+	   in switch. */
+	    default: break;
+	}
+	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
+			    H5class2str(h5class));
+	return -1;
+}
+
+static int map_storage_mode_to_Rtype(const char *storage_mode, SEXPTYPE *Rtype)
 {
 	if (strcmp(storage_mode, "logical") == 0) {
-		*Rtype = as_int ? INTSXP : LGLSXP;
+		*Rtype = LGLSXP;
 		return 0;
 	}
 	if (strcmp(storage_mode, "integer") == 0) {
@@ -392,85 +418,88 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, int as_int,
 	}
 	if (strcmp(storage_mode, "double") == 0 ||
 	    strcmp(storage_mode, "numeric") == 0) {
-		*Rtype = as_int ? INTSXP : REALSXP;
+		*Rtype = REALSXP;
 		return 0;
 	}
 	if (strcmp(storage_mode, "character") == 0) {
-		if (as_int)
-			warning("'as.integer' is ignored when the dataset to "
-				"read has a \"storage.mode\" attribute set "
-				"to \"character\"");
-		*Rtype = STRSXP;
+		warning("dataset has a \"storage.mode\" attribute "
+			"set to \"character\" -- we ignore it");
 		return 0;
 	}
 	if (strcmp(storage_mode, "raw") == 0) {
-		*Rtype = as_int ? INTSXP : RAWSXP;
+		*Rtype = RAWSXP;
 		return 0;
 	}
-	PRINT_TO_ERRMSG_BUF("the dataset to read has a \"storage.mode\" "
+	PRINT_TO_ERRMSG_BUF("dataset has a \"storage.mode\" "
 			    "attribute set to unsupported value: \"%s\"",
 			    storage_mode);
 	return -1;
 }
 
-/* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
-   support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
-static int map_H5class_to_Rtype(H5T_class_t H5class, int as_int, size_t H5size,
-				SEXPTYPE *Rtype)
+static int set_Rtype(H5T_class_t h5class, size_t h5type_size,
+		int as_int, const char *storage_mode, SEXPTYPE *Rtype)
 {
-	switch (H5class) {
-	    case H5T_INTEGER:
-		if (as_int) {
-			*Rtype = INTSXP;
-		} else if (H5size <= sizeof(char)) {
-			*Rtype = RAWSXP;
-		} else if (H5size <= sizeof(int)) {
-			*Rtype = INTSXP;
-		} else {
-			*Rtype = REALSXP;
-		}
-		return 0;
-	    case H5T_FLOAT:
-		*Rtype = as_int ? INTSXP : REALSXP;
-		return 0;
-	    case H5T_STRING:
+	int ret;
+
+	if (h5class == H5T_STRING) {
 		if (as_int)
 			warning("'as.integer' is ignored when "
 				"dataset class is H5T_STRING");
 		*Rtype = STRSXP;
+		if (storage_mode == NULL
+		 || strcmp(storage_mode, "character") == 0)
+			return 0;
+		warning("dataset class is H5T_STRING but it has a "
+			"\"storage.mode\" attribute set to %s -- we ignore it",
+			storage_mode);
 		return 0;
-	/* Only to avoid gcc warning about enumeration value not handled
-	   in switch. */
-	    default: break;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
-			    H5class2str(H5class));
-	return -1;
+	ret = map_numeric_h5class_to_Rtype(h5class, h5type_size, Rtype);
+	if (ret < 0)
+		return -1;
+	if (as_int) {
+		/* We override the *Rtype value set earlier by
+		   map_numeric_h5class_to_Rtype() but calling
+		   map_numeric_h5class_to_Rtype() still had the merit
+		   of checking that 'h5class' is a supported class. */
+		*Rtype = INTSXP;
+		return 0;
+	}
+	if (storage_mode == NULL)
+		return 0;
+	return map_storage_mode_to_Rtype(storage_mode, Rtype);
 }
 
-static size_t get_Rtype_size(SEXPTYPE Rtype, size_t H5size)
+static size_t get_Rtype_size(SEXPTYPE Rtype, size_t h5size)
 {
 	switch (Rtype) {
 	    case LGLSXP: case INTSXP: return sizeof(int);
 	    case REALSXP:             return sizeof(double);
-	    case STRSXP:              return H5size;
+	    case STRSXP:              return h5size;
 	    case RAWSXP:              return sizeof(char);
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
+	PRINT_TO_ERRMSG_BUF("unsupported Rtype: %s", CHAR(type2str(Rtype)));
 	return 0;
 }
 
-hid_t _get_mem_type_for_Rtype(SEXPTYPE Rtype, hid_t type_id)
+/* Must NOT be called on STRSXP! */
+static hid_t map_Rtype_to_native_type(SEXPTYPE Rtype)
 {
 	switch (Rtype) {
 	    case LGLSXP: case INTSXP: return H5T_NATIVE_INT;
 	    case REALSXP:             return H5T_NATIVE_DOUBLE;
-	    case STRSXP:              return type_id;
 	    case RAWSXP:              return H5T_NATIVE_UCHAR;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported type: %s", CHAR(type2str(Rtype)));
+	/* Should never happen. */
+	PRINT_TO_ERRMSG_BUF("failed to map Rtype %s to a native type",
+			    CHAR(type2str(Rtype)));
 	return -1;
 }
+
+
+/****************************************************************************
+ * _init_H5DSetDescriptor() / _destroy_H5DSetDescriptor()
+ */
 
 void _destroy_H5DSetDescriptor(H5DSetDescriptor *h5dset)
 {
@@ -498,7 +527,8 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		     int as_int, int get_Rtype_only)
 {
 	char *h5name, *storage_mode_attr;
-	hid_t h5type_id, native_type_id, h5space_id, h5plist_id, tmp;
+	hid_t h5type_id, native_type_id, native_type_id_for_Rtype,
+	      h5space_id, h5plist_id, tmp;
 	H5T_class_t h5class;
 	size_t h5type_size, Rtype_size, native_type_size;
 	SEXPTYPE Rtype;
@@ -579,15 +609,10 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	h5dset->h5type_size = h5type_size;
 
 	/* Set member 'Rtype'. */
-	if (h5dset->storage_mode_attr != NULL) {
-		if (map_storage_mode_to_Rtype(h5dset->storage_mode_attr,
-					      as_int, &Rtype) < 0)
-			goto on_error;
-	} else {
-		if (map_H5class_to_Rtype(h5dset->h5class, as_int,
-					 h5dset->h5type_size, &Rtype) < 0)
-			goto on_error;
-	}
+	ret = set_Rtype(h5dset->h5class, h5dset->h5type_size,
+			as_int, h5dset->storage_mode_attr, &Rtype);
+	if (ret < 0)
+		goto on_error;
 	h5dset->Rtype = Rtype;
 
 	if (get_Rtype_only)
@@ -629,6 +654,13 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 			goto on_error;
 		}
 		h5dset->native_type_size = native_type_size;
+
+		/* Set member 'native_type_id_for_Rtype'. */
+		native_type_id_for_Rtype =
+			map_Rtype_to_native_type(h5dset->Rtype);
+		if (native_type_id_for_Rtype < 0)
+			goto on_error;
+		h5dset->native_type_id_for_Rtype = native_type_id_for_Rtype;
 	}
 
 	/* Set member 'as_na_attr'. */
@@ -889,10 +921,15 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 		Rprintf("- native_type_id = %s\n",
 			predef_native_type_as_string(h5dset->native_type_id));
 		Rprintf("- native_type_size = %lu\n", h5dset->native_type_size);
+		Rprintf("- native_type_id_for_Rtype = %s\n",
+			predef_native_type_as_string(
+				h5dset->native_type_id_for_Rtype));
 	} else {
-		Rprintf("- native_type_id = %s\n", "none     "
+		Rprintf("- native_type_id = %s\n", "none          "
 			" (not set when h5class is H5T_STRING)");
-		Rprintf("- native_type_size = %s\n", "none"
+		Rprintf("- native_type_size = %s\n", "none        "
+			" (not set when h5class is H5T_STRING)");
+		Rprintf("- native_type_id_for_Rtype = %s\n", "none"
 			" (not set when h5class is H5T_STRING)");
 	}
 

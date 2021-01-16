@@ -232,7 +232,7 @@ static int set_h5selection(const H5DSetDescriptor *h5dset, int method,
 
 static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 		SEXP starts, SEXP counts, const int *ans_dim,
-		hid_t mem_type_id, hid_t mem_space_id, void *mem)
+		hid_t mem_space_id, void *mem)
 {
 	int ret;
 
@@ -240,7 +240,8 @@ static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 	if (ret < 0)
 		return -1;
 	return _read_h5selection(h5dset,
-				 mem_type_id, mem_space_id, mem,
+				 h5dset->native_type_id_for_Rtype,
+				 mem_space_id, mem,
 				 NULL);
 }
 
@@ -259,7 +260,7 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 		SEXP starts, SEXP counts,
 		const int *midx, int moved_along,
 		H5Viewport *h5dset_vp,
-		hid_t mem_type_id, hid_t mem_space_id, void *mem,
+		hid_t mem_space_id, void *mem,
 		H5Viewport *mem_vp)
 {
 	int ndim, along, h5along, i;
@@ -284,13 +285,14 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 	}
 	update_h5dset_vp(ndim, midx, moved_along, starts, counts, h5dset_vp);
 	return _read_H5Viewport(h5dset, h5dset_vp,
-				mem_type_id, mem_space_id, mem,
+				h5dset->native_type_id_for_Rtype,
+				mem_space_id, mem,
 				mem_vp);
 }
 
 static int read_data_3(const H5DSetDescriptor *h5dset,
 		SEXP starts, SEXP counts, const int *ans_dim,
-		hid_t mem_type_id, hid_t mem_space_id, void *mem)
+		hid_t mem_space_id, void *mem)
 {
 	int ndim, moved_along, ret;
 	H5Viewport h5dset_vp, mem_vp;
@@ -324,7 +326,7 @@ static int read_data_3(const H5DSetDescriptor *h5dset,
 		ret = read_hyperslab(h5dset, starts, counts,
 				     midx_buf->elts, moved_along,
 				     &h5dset_vp,
-				     mem_type_id, mem_space_id, mem,
+				     mem_space_id, mem,
 				     &mem_vp);
 		if (ret < 0)
 			break;
@@ -391,7 +393,7 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 	LLongAE *last_chip_start_buf;
 	SEXP ans, reduced;
 	void *mem;
-	hid_t mem_type_id, mem_space_id;
+	hid_t mem_space_id;
 	int nprotect = 0;
 
 	ndim = h5dset->ndim;
@@ -434,11 +436,6 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 		if (mem == NULL)
 			goto on_error;
 
-		mem_type_id = _get_mem_type_for_Rtype(h5dset->Rtype,
-						      h5dset->h5type_id);
-		if (mem_type_id < 0)
-			goto on_error;
-
 		mem_space_id = _create_mem_space(ndim, ans_dim);
 		if (mem_space_id < 0)
 			goto on_error;
@@ -446,11 +443,11 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 		if (method <= 2) {
 			ret = read_data_1_2(h5dset, method,
 					starts, counts, ans_dim,
-					mem_type_id, mem_space_id, mem);
+					mem_space_id, mem);
 		} else {
 			ret = read_data_3(h5dset,
 					starts, counts, ans_dim,
-					mem_type_id, mem_space_id, mem);
+					mem_space_id, mem);
 		}
 		H5Sclose(mem_space_id);
 		if (ret < 0)
