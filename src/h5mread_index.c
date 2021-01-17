@@ -15,19 +15,9 @@
 
 
 /****************************************************************************
- * read_data_4_5()
+ * read_selected_chunk_data()
  *
- * method 4: One call to _read_H5Viewport() or _read_h5chunk() (wrappers for
- * H5Dread() or H5Dread_chunk(), respectively) per chunk touched by the
- * user-supplied array selection.
- *
- * More precisely, walk over the chunks touched by 'index'. For each chunk:
- *   - Make one call to _read_H5Viewport() or _read_h5chunk() to load the
- *     **entire** chunk data to an intermediate buffer.
- *   - Copy the user-selected data from the intermediate buffer to 'ans'.
- *
- * method 5: Like read_data_4_5() but bypasses the intermediate buffer if a
- * chunk is fully selected.
+ * Workhorse behind read_data_4_5()
  */
 
 static void init_in_offset_and_out_offset(int ndim, SEXP index,
@@ -108,93 +98,272 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
-static int load_val_to_array(const H5DSetDescriptor *h5dset,
-		const void *in, size_t in_offset,
-		void *out, size_t out_offset)
+static inline void copy_string_to_character_array(
+		const H5DSetDescriptor *h5dset,
+		const char *in, size_t in_offset,
+		SEXP ans, size_t ans_offset)
 {
-	switch (h5dset->Rtype) {
-	    case LGLSXP: {
-		int val = ((int *) in)[in_offset];
-		LOGICAL(out)[out_offset] = val;
-	    } break;
-	    case INTSXP: {
-		int val = ((int *) in)[in_offset];
-		INTEGER(out)[out_offset] = val;
-	    } break;
-	    case REALSXP: {
-		double val = ((double *) in)[in_offset];
-		REAL(out)[out_offset] = val;
-	    } break;
-	    case STRSXP: {
-		const char *val = ((char *) in) +
-				  in_offset * h5dset->h5type_size;
-		int val_len;
-		for (val_len = 0; val_len < h5dset->h5type_size; val_len++)
-			if (val[val_len] == 0)
-				break;
-		int is_na = h5dset->as_na_attr &&
-			    val_len == 2 && val[0] == 'N' && val[1] == 'A';
-		if (is_na) {
-			SET_STRING_ELT(out, out_offset, NA_STRING);
-		} else {
-			SEXP out_elt = PROTECT(mkCharLen(val, val_len));
-			SET_STRING_ELT(out, out_offset, out_elt);
-			UNPROTECT(1);
-		}
-	    } break;
-	    case RAWSXP: {
-		char val = ((char *) in)[in_offset];
-		RAW(out)[out_offset] = val;
-	    } break;
-	    default:
-		PRINT_TO_ERRMSG_BUF("unsupported type: %s",
-				    CHAR(type2str(h5dset->Rtype)));
+	const char *s;
+	int s_len, is_na;
+	SEXP ans_elt;
+
+	s = in + in_offset * h5dset->h5type_size;
+	for (s_len = 0; s_len < h5dset->h5type_size; s_len++)
+		if (s[s_len] == 0)
+			break;
+	is_na = h5dset->as_na_attr && s_len == 2 && s[0] == 'N' && s[1] == 'A';
+	if (is_na) {
+		SET_STRING_ELT(ans, ans_offset, NA_STRING);
+	} else {
+		ans_elt = PROTECT(mkCharLen(s, s_len));
+		SET_STRING_ELT(ans, ans_offset, ans_elt);
+		UNPROTECT(1);
+	}
+	return;
+}
+
+static inline int copy_val_to_int_array(hid_t in_type,
+		const void *in, size_t in_offset,
+		int *out, size_t out_offset)
+{
+	int val;
+
+	if (in_type == H5T_NATIVE_CHAR) {
+		val = ((char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SCHAR) {
+		val = ((signed char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UCHAR) {
+		val = ((unsigned char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SHORT) {
+		val = ((short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_USHORT) {
+		val = ((unsigned short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_INT) {
+		val = ((int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UINT) {
+		val = ((unsigned int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LONG) {
+		val = ((long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULONG) {
+		val = ((unsigned long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LLONG) {
+		val = ((long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULLONG) {
+		val = ((unsigned long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_FLOAT) {
+		val = ((float *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_DOUBLE) {
+		val = ((double *) in)[in_offset];
+#ifdef H5T_NATIVE_LDOUBLE
+	} else if (in_type == H5T_NATIVE_LDOUBLE) {
+		val = ((long double *) in)[in_offset];
+#endif
+	} else {
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
 		return -1;
 	}
+	out[out_offset] = val;
 	return 0;
 }
 
-static int copy_selected_chunk_data_to_ans(
-		const H5DSetDescriptor *h5dset, SEXP index,
-		const H5Viewport *h5dset_vp,
-		const void *in,
-		const H5Viewport *mem_vp, int *inner_midx_buf,
-		const int *ans_dim, SEXP ans)
+static inline int copy_val_to_double_array(hid_t in_type,
+		const void *in, size_t in_offset,
+		double *out, size_t out_offset)
 {
-	int ndim, inner_moved_along, ret;
-	size_t in_offset, out_offset;
-	long long int num_elts;
+	double val;
 
+	if (in_type == H5T_NATIVE_CHAR) {
+		val = ((char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SCHAR) {
+		val = ((signed char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UCHAR) {
+		val = ((unsigned char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SHORT) {
+		val = ((short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_USHORT) {
+		val = ((unsigned short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_INT) {
+		val = ((int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UINT) {
+		val = ((unsigned int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LONG) {
+		val = ((long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULONG) {
+		val = ((unsigned long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LLONG) {
+		val = ((long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULLONG) {
+		val = ((unsigned long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_FLOAT) {
+		val = ((float *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_DOUBLE) {
+		val = ((double *) in)[in_offset];
+#ifdef H5T_NATIVE_LDOUBLE
+	} else if (in_type == H5T_NATIVE_LDOUBLE) {
+		val = ((long double *) in)[in_offset];
+#endif
+	} else {
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
+	}
+	out[out_offset] = val;
+	return 0;
+}
+
+static inline int copy_val_to_Rbyte_array(hid_t in_type,
+		const void *in, size_t in_offset,
+		Rbyte *out, size_t out_offset)
+{
+	Rbyte val;
+
+	if (in_type == H5T_NATIVE_CHAR) {
+		val = ((char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SCHAR) {
+		val = ((signed char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UCHAR) {
+		val = ((unsigned char *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_SHORT) {
+		val = ((short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_USHORT) {
+		val = ((unsigned short *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_INT) {
+		val = ((int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_UINT) {
+		val = ((unsigned int *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LONG) {
+		val = ((long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULONG) {
+		val = ((unsigned long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_LLONG) {
+		val = ((long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_ULLONG) {
+		val = ((unsigned long long *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_FLOAT) {
+		val = ((float *) in)[in_offset];
+	} else if (in_type == H5T_NATIVE_DOUBLE) {
+		val = ((double *) in)[in_offset];
+#ifdef H5T_NATIVE_LDOUBLE
+	} else if (in_type == H5T_NATIVE_LDOUBLE) {
+		val = ((long double *) in)[in_offset];
+#endif
+	} else {
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
+	}
+	out[out_offset] = val;
+	return 0;
+}
+
+static long long int copy_selected_chunk_data_to_character_array(
+		const ChunkIterator *chunk_iter, int *inner_midx_buf,
+		const char *in, size_t in_offset,
+		const int *ans_dim, SEXP ans, size_t ans_offset)
+{
+	const H5DSetDescriptor *h5dset;
+	int ndim, inner_moved_along;
+	long long int nvals;
+
+	h5dset = chunk_iter->h5dset;
 	ndim = h5dset->ndim;
-	init_in_offset_and_out_offset(ndim, index,
-			ans_dim, mem_vp,
-			h5dset_vp, h5dset->h5chunkdim,
-			&in_offset, &out_offset);
-	/* Walk on the selected elements in current chunk. */
-	num_elts = 0;
+	nvals = 0;
 	while (1) {
-		ret = load_val_to_array(h5dset, in, in_offset, ans, out_offset);
-		if (ret < 0)
-			return ret;
-		num_elts++;
-		inner_moved_along = _next_midx(ndim, mem_vp->dim,
+		copy_string_to_character_array(h5dset, in, in_offset,
+					       ans, ans_offset);
+		nvals++;
+		inner_moved_along = _next_midx(ndim,
+					       chunk_iter->mem_vp.dim,
 					       inner_midx_buf);
 		if (inner_moved_along == ndim)
 			break;
 		update_in_offset_and_out_offset(ndim,
 				inner_midx_buf, inner_moved_along,
-				index,
-				ans_dim, mem_vp,
+				chunk_iter->index,
+				ans_dim, &chunk_iter->mem_vp,
 				h5dset->h5chunkdim,
-				&in_offset, &out_offset);
+				&in_offset, &ans_offset);
 	};
-	//printf("# nb of selected elements in current chunk = %lld\n",
-	//       num_elts);
-	return 0;
+	return nvals;
 }
 
-/*
-  WARNING: 'use.H5Dread_chunk=TRUE' is not working properly on some datasets:
+#define	DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_NO_CASTING(type)	 \
+static long long int copy_selected_ ## type ## _chunk_data_to_array(	 \
+		const ChunkIterator *chunk_iter, int *inner_midx_buf,	 \
+		const type *in, size_t in_offset,			 \
+		const int *ans_dim, type *out, size_t out_offset)	 \
+{									 \
+	const H5DSetDescriptor *h5dset;					 \
+	int ndim, inner_moved_along;					 \
+	long long int nvals;						 \
+									 \
+	h5dset = chunk_iter->h5dset;					 \
+	ndim = h5dset->ndim;						 \
+	nvals = 0;							 \
+	while (1) {							 \
+		out[out_offset] = in[in_offset];			 \
+		nvals++;						 \
+		inner_moved_along = _next_midx(ndim,			 \
+					       chunk_iter->mem_vp.dim,	 \
+					       inner_midx_buf);		 \
+		if (inner_moved_along == ndim)				 \
+			break;						 \
+		update_in_offset_and_out_offset(ndim,			 \
+				inner_midx_buf, inner_moved_along,	 \
+				chunk_iter->index,			 \
+				ans_dim, &chunk_iter->mem_vp,		 \
+				h5dset->h5chunkdim,			 \
+				&in_offset, &out_offset);		 \
+	};								 \
+	return nvals;							 \
+}
+
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_NO_CASTING(int)
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_NO_CASTING(double)
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_NO_CASTING(Rbyte)
+
+#define	DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_CASTING(type)	 \
+static long long int copy_selected_chunk_data_to_ ## type ## _array(	 \
+		const ChunkIterator *chunk_iter, int *inner_midx_buf,	 \
+		const ChunkDataBuffer *chunk_data_buf, size_t in_offset, \
+		const int *ans_dim, type *out, size_t out_offset)	 \
+{									 \
+	const H5DSetDescriptor *h5dset;					 \
+	int ndim, inner_moved_along, ret;				 \
+	long long int nvals;						 \
+									 \
+	h5dset = chunk_iter->h5dset;					 \
+	ndim = h5dset->ndim;						 \
+	nvals = 0;							 \
+	while (1) {							 \
+		ret = copy_val_to_ ## type ## _array(			 \
+				chunk_data_buf->data_type_id,		 \
+				chunk_data_buf->data, in_offset,	 \
+				out, out_offset);			 \
+		if (ret < 0)						 \
+			return -1;					 \
+		nvals++;						 \
+		inner_moved_along = _next_midx(ndim,			 \
+					       chunk_iter->mem_vp.dim,	 \
+					       inner_midx_buf);		 \
+		if (inner_moved_along == ndim)				 \
+			break;						 \
+		update_in_offset_and_out_offset(ndim,			 \
+				inner_midx_buf, inner_moved_along,	 \
+				chunk_iter->index,			 \
+				ans_dim, &chunk_iter->mem_vp,		 \
+				h5dset->h5chunkdim,			 \
+				&in_offset, &out_offset);		 \
+	};								 \
+	return nvals;							 \
+}
+
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_CASTING(int)
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_CASTING(double)
+DEFINE_COPY_SELECTED_CHUNK_DATA_FUNCTION_WITH_CASTING(Rbyte)
+
+/* First load the **entire** chunk to intermediate buffer 'chunk_data_buf',
+   then copy the user-selected chunk data from the intermediate buffer
+   to 'ans'.
+   WARNING: 'use.H5Dread_chunk=TRUE' is not working properly on some datasets:
       library(HDF5Array)
       library(ExperimentHub)
       hub <- ExperimentHub()
@@ -204,14 +373,116 @@ static int copy_selected_chunk_data_to_ans(
       h5mread(fname0, "mm10/barcodes", list(1),
               method=4L, use.H5Dread_chunk=TRUE)
       # [1] "AAAAAAAAAAAAAAAAAAAA"
-  Looks like the chunk data has been shuffled (transposed in that case)
-  before being written to disk in order to improve compression.
-  TODO: Investigate this further. I suspect we need to check whether a
-  "Data shuffling filter" (H5Z_FILTER_SHUFFLE) was used at creation time.
-  Check H5Pget_filter() for how to know whether this filter was used or not.
-  There should be a way to retrieve information about how the data was
-  shuffled.
+   Looks like the chunk data has been shuffled (transposed in that case)
+   before being written to disk in order to improve compression.
+   TODO: Investigate this further. I suspect we need to check whether a
+   "Data shuffling filter" (H5Z_FILTER_SHUFFLE) was used at creation time.
+   Check H5Pget_filter() for how to know whether this filter was used or not.
+   There should be a way to retrieve information about how the data was
+   shuffled. */
+static int read_selected_chunk_data(
+		const ChunkIterator *chunk_iter,
+		ChunkDataBuffer *chunk_data_buf,
+		int use_H5Dread_chunk,
+		int *inner_midx_buf,
+		const int *ans_dim, SEXP ans)
+{
+	int ret, copy_without_type_casting;
+	long long int nvals;
+	const H5DSetDescriptor *h5dset;
+	size_t in_offset, out_offset;
+	void *out;
+
+	ret = _load_chunk(chunk_iter, chunk_data_buf, use_H5Dread_chunk);
+	if (ret < 0)
+		return -1;
+	h5dset = chunk_iter->h5dset;
+	init_in_offset_and_out_offset(h5dset->ndim, chunk_iter->index,
+			ans_dim, &chunk_iter->mem_vp,
+			&chunk_iter->h5dset_vp, h5dset->h5chunkdim,
+			&in_offset, &out_offset);
+	if (h5dset->Rtype == STRSXP) {
+		nvals = copy_selected_chunk_data_to_character_array(
+				chunk_iter, inner_midx_buf,
+				chunk_data_buf->data, in_offset,
+				ans_dim, ans, out_offset);
+		//printf("%lld elements copied from current chunk\n", nvals);
+		return 0;
+	}
+	copy_without_type_casting = chunk_data_buf->data_type_id ==
+				    h5dset->native_type_id_for_Rtype;
+	//printf("copying selected chunk data %s type casting ... ",
+	//       copy_without_type_casting ? "WITHOUT" : "WITH");
+	switch (h5dset->Rtype) {
+	    case INTSXP: case LGLSXP:
+		out = h5dset->Rtype == INTSXP ? INTEGER(ans) : LOGICAL(ans);
+		if (copy_without_type_casting) {
+			nvals = copy_selected_int_chunk_data_to_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf->data, in_offset,
+					ans_dim, out, out_offset);
+		} else {
+			nvals = copy_selected_chunk_data_to_int_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf, in_offset,
+					ans_dim, out, out_offset);
+		}
+		break;
+	    case REALSXP:
+		out = REAL(ans);
+		if (copy_without_type_casting) {
+			nvals = copy_selected_double_chunk_data_to_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf->data, in_offset,
+					ans_dim, out, out_offset);
+		} else {
+			nvals = copy_selected_chunk_data_to_double_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf, in_offset,
+					ans_dim, out, out_offset);
+		}
+		break;
+	    case RAWSXP:
+		out = RAW(ans);
+		if (copy_without_type_casting) {
+			nvals = copy_selected_Rbyte_chunk_data_to_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf->data, in_offset,
+					ans_dim, out, out_offset);
+		} else {
+			nvals = copy_selected_chunk_data_to_Rbyte_array(
+					chunk_iter, inner_midx_buf,
+					chunk_data_buf, in_offset,
+					ans_dim, out, out_offset);
+		}
+		break;
+	    default:
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
+	}
+	if (nvals < 0)
+		return -1;
+	//printf("ok (%lld value%s copied)\n", nvals, nvals == 1 ? "" : "s");
+	return 0;
+}
+
+
+/****************************************************************************
+ * read_data_4_5()
+ *
+ * method 4: One call to _read_H5Viewport() or _read_h5chunk() (wrappers for
+ * H5Dread() or H5Dread_chunk(), respectively) per chunk touched by the
+ * user-supplied array selection.
+ *
+ * More precisely, walk over the chunks touched by 'index'. For each chunk:
+ *   - Make one call to _read_H5Viewport() or _read_h5chunk() to load the
+ *     **entire** chunk data to an intermediate buffer.
+ *   - Copy the user-selected data from the intermediate buffer to 'ans'.
+ *
+ * method 5: Like method 4 but bypasses the intermediate buffer if a
+ * chunk is fully selected.
  */
+
 static int read_data_4_5(ChunkIterator *chunk_iter,
 		const int *ans_dim, SEXP ans,
 		int method, int use_H5Dread_chunk)
@@ -239,7 +510,7 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 	if (mem_space_id < 0)
 		return -1;
 
-	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset, 1);
+	ret = _init_ChunkDataBuffer(&chunk_data_buf, h5dset, 0);
 	if (ret < 0) {
 		H5Sclose(mem_space_id);
 		return ret;
@@ -249,32 +520,24 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 		if (ret < 0)
 			break;
 		//_print_tchunk_info(chunk_iter);
-		direct_load = method == 5 &&
-			      _tchunk_is_fully_selected(ndim,
-					&chunk_iter->h5dset_vp,
-					&chunk_iter->mem_vp);
+		direct_load = method == 5 && _tchunk_is_fully_selected(ndim,
+							&chunk_iter->h5dset_vp,
+							&chunk_iter->mem_vp);
 		if (direct_load) {
 			/* Load the chunk **directly** into 'ans' (no
 			   intermediate buffer). */
 			ret = _read_H5Viewport(h5dset,
-				&chunk_iter->h5dset_vp,
-				h5dset->native_type_id_for_Rtype,
-				mem_space_id, mem,
-				&chunk_iter->mem_vp);
+					&chunk_iter->h5dset_vp,
+					h5dset->native_type_id_for_Rtype,
+					mem_space_id, mem,
+					&chunk_iter->mem_vp);
 		} else {
 			/* Load the **entire** chunk to an intermediate
 			   buffer then copy the user-selected chunk data
 			   from the intermediate buffer to 'ans'. */
-			ret = _load_chunk(chunk_iter, &chunk_data_buf,
-					  use_H5Dread_chunk);
-			if (ret < 0)
-				break;
-			ret = copy_selected_chunk_data_to_ans(
-					chunk_iter->h5dset,
-					chunk_iter->index,
-					&chunk_iter->h5dset_vp,
-					chunk_data_buf.data,
-					&chunk_iter->mem_vp,
+			ret = read_selected_chunk_data(chunk_iter,
+					&chunk_data_buf,
+					use_H5Dread_chunk,
 					inner_midx_buf->elts,
 					ans_dim, ans);
 		}
