@@ -183,6 +183,34 @@ static void update_h5dset_vp_mem_vp(const H5DSetDescriptor *h5dset,
 
 /****************************************************************************
  * read_h5chunk()
+ *
+ * Based on H5Dread_chunk(), which is NOT listed here for some mysterious
+ * reasons: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html
+ *
+ * Header file for declaration: hdf5-1.10.3/src/H5Dpublic.h
+ *
+ * See hdf5-1.10.3/test/direct_chunk.c for plenty of examples.
+ *
+ * Call stack for H5Dread_chunk()
+ *   H5Dread_chunk                (H5Dio.c)
+ *     H5D__chunk_direct_read     (H5Dchunk.c)
+ *       H5F_block_read           (H5Fio.c)
+ *         H5PB_read              (H5PB.c)
+ *           H5F__accum_read      (H5Faccum.c)
+ *             or
+ *           H5FD_read            (H5FDint.c)
+ *             ??
+ *
+ * Call stack for H5Dread()
+ *   H5Dread                      (H5Dio.c)
+ *     H5D__read                  (H5Dio.c)
+ *       H5D__chunk_read          (H5Dchunk.c)
+ *         H5D__select_read
+ *           or
+ *         H5D__scatgath_read     (H5Dscatgath.c)
+ *           H5D__gather_file     (H5Dscatgath.c)
+ *       call ser_read member of a H5D_layout_ops_t object
+ *            ??
  */
 
 static int uncompress_chunk_data(const void *compressed_chunk_data,
@@ -258,34 +286,24 @@ static void print_chunk_data(void *data, size_t data_length, size_t data_size)
 
 #define	CHUNK_COMPRESSION_OVERHEAD 8  // empirical (increase if necessary)
 
-/*
- * Unfortunately H5Dread_chunk() is NOT listed here:
- *   https://support.hdfgroup.org/HDF5/doc/RM/RM_H5D.html
- * Header file for declaration:
- *   hdf5-1.10.3/src/H5Dpublic.h
- * See hdf5-1.10.3/test/direct_chunk.c for plenty of examples.
- *
- * Call stack for H5Dread_chunk()
- *   H5Dread_chunk                (H5Dio.c)
- *     H5D__chunk_direct_read     (H5Dchunk.c)
- *       H5F_block_read           (H5Fio.c)
- *         H5PB_read              (H5PB.c)
- *           H5F__accum_read      (H5Faccum.c)
- *             or
- *           H5FD_read            (H5FDint.c)
- *             ??
- *
- * Call stack for H5Dread()
- *   H5Dread                      (H5Dio.c)
- *     H5D__read                  (H5Dio.c)
- *       H5D__chunk_read          (H5Dchunk.c)
- *         H5D__select_read
- *           or
- *         H5D__scatgath_read     (H5Dscatgath.c)
- *           H5D__gather_file     (H5Dscatgath.c)
- *       call ser_read member of a H5D_layout_ops_t object
- *            ??
- */
+/* WARNING: read_h5chunk() is not ready yet! It is NOT working properly on
+   some datasets:
+      library(HDF5Array)
+      library(ExperimentHub)
+      hub <- ExperimentHub()
+      fname0 <- hub[["EH1039"]]
+      h5mread(fname0, "mm10/barcodes", list(1), method=4L)
+      # [1] "AAACCTGAGATAGGAG-1"
+      h5mread(fname0, "mm10/barcodes", list(1),
+              method=4L, use.H5Dread_chunk=TRUE)
+      # [1] "AAAAAAAAAAAAAAAAAAAA"
+   Looks like the chunk data has been shuffled (transposed in that case)
+   before being written to disk in order to improve compression.
+   TODO: Investigate this further. I suspect we need to check whether a
+   "Data shuffling filter" (H5Z_FILTER_SHUFFLE) was used at creation time.
+   Check H5Pget_filter() for how to know whether this filter was used or not.
+   There should be a way to retrieve information about how the data was
+   shuffled. */
 static int read_h5chunk(hid_t dset_id,
 		const H5Viewport *h5chunk_vp,
 		ChunkDataBuffer *chunk_data_buf)
@@ -450,15 +468,11 @@ int _next_chunk(ChunkIterator *chunk_iter)
 void _print_tchunk_info(const ChunkIterator *chunk_iter)
 {
 	int ndim, along, h5along, i;
-	long long int total_num_tchunks, tchunkidx;
-
-	ndim = chunk_iter->h5dset->ndim;
-	total_num_tchunks = 1;
-	for (along = 0; along < ndim; along++)
-		total_num_tchunks *= chunk_iter->num_tchunks[along];
+	long long int tchunkidx;
 
 	Rprintf("processing chunk %lld/%lld: [",
-		chunk_iter->tchunk_rank + 1, total_num_tchunks);
+		chunk_iter->tchunk_rank + 1, chunk_iter->total_num_tchunks);
+	ndim = chunk_iter->h5dset->ndim;
 	for (along = 0; along < ndim; along++) {
 		i = chunk_iter->tchunk_midx_buf[along] + 1;
 		if (along != 0)
