@@ -188,8 +188,8 @@ stopifnot(identical(a, b))
 fname1 <- hub[["EH1040"]]
 h5ls(fname1)  # "counts" is a 2D dataset
 
-index <- list(sample(  27998, 250),
-              sample(1306127, 250))
+set.seed(33)
+index <- list(sample(27998, 300), sample(1306127, 450))
 ## h5mread() is about 2x faster than h5read():
 system.time(a <- h5mread(fname1, "counts", index))
 system.time(b <- h5read(fname1, "counts", index=index))
@@ -202,8 +202,7 @@ stopifnot(identical(a, sparse2dense(sas)))
 ## The bigger the selection, the greater the speedup between
 ## h5read() and h5mread():
 \dontrun{
-  index <- list(sample(  27998, 1000),
-                sample(1306127, 1000))
+  index <- list(sample(27998, 1000), sample(1306127, 1000))
   ## h5mread() about 8x faster than h5read() (20s vs 2m30s):
   system.time(a <- h5mread(fname1, "counts", index))
   system.time(b <- h5read(fname1, "counts", index=index))

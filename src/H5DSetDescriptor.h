@@ -17,13 +17,14 @@ typedef struct {
 	hid_t h5type_id;
 	H5T_class_t h5class;
 	size_t h5type_size;
+	int h5type_signedness;          // set only when h5class == H5T_INTEGER
 	SEXPTYPE Rtype;
 
 	/* Additional members (not set when 'get_Rtype_only' is set to 1). */
 	size_t Rtype_size;
-	hid_t native_type_id;            // set only when h5class != H5T_STRING
-	size_t native_type_size;         // set only when h5class != H5T_STRING
-	hid_t native_type_id_for_Rtype;  // set only when h5class != H5T_STRING
+	hid_t native_type_id;           // set only when h5class != H5T_STRING
+	size_t native_type_size;        // set only when h5class != H5T_STRING
+	hid_t native_type_id_for_Rtype; // set only when h5class != H5T_STRING
 	int as_na_attr;
 	hid_t h5space_id;
 	int ndim;

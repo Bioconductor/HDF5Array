@@ -91,7 +91,7 @@ static SEXP make_nzindex_from_bufs(const IntAEAE *nzindex_bufs)
 	nzindex_nrow = IntAE_get_nelt(nzindex_bufs->elts[0]);
 	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see
 	   NZDATA_MAXLENGTH above) otherwise earlier calls to
-	   copy_selected_chunk_data_to_nzbuf() (see below) would
+	   copy_selected_chunk_data_to_nzbufs() (see below) would
 	   have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzindex_nrow, ndim));
 	out_p = INTEGER(nzindex);
@@ -138,7 +138,7 @@ static SEXP NOT_USED_make_nzindex_from_buf(const IntAE *nzindex_buf,
 	}
 	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see
 	   NZDATA_MAXLENGTH above) otherwise earlier calls to
-	   copy_selected_chunk_data_to_nzbuf() (see below) would
+	   copy_selected_chunk_data_to_nzbufs() (see below) would
 	   have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	in_p = nzindex_buf->elts;
@@ -214,7 +214,7 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 
 	/* 'nzindex_nrow' is guaranteed to be <= INT_MAX (see
 	   NZDATA_MAXLENGTH above) otherwise earlier calls to
-	   copy_selected_chunk_data_to_nzbuf() (see below) would
+	   copy_selected_chunk_data_to_nzbufs() (see below) would
 	   have raised an error. */
 	nzindex = PROTECT(allocMatrix(INTSXP, (int) nzdata_len, ndim));
 	out_p = INTEGER(nzindex);
@@ -236,7 +236,7 @@ static SEXP NOT_USED_make_nzindex_from_bufs(const IntAEAE *nzindex_bufs,
 
 
 /****************************************************************************
- * copy_selected_chunk_data_to_nzbuf()
+ * copy_selected_chunk_data_to_nzbufs()
  */
 
 static inline void append_array_index_to_nzindex_bufs(
@@ -328,92 +328,92 @@ static long long int copy_selected_string_chunk_data_to_CharAEAE_buf(
 
 /* The "fast walk" method cannot be used on a truncated chunk! It works
    properly only if the chunk data spans the full chunk data buffer
-   ('chunk_data_buf->data', passed to the 'in' pointer), that is, if the
-   current chunk is a full-size chunk and not a "truncated" chunk (a.k.a.
-   "partial edge chunk" in HDF5's terminology). */
-#define	ARGS_AND_BODY_OF_COPY_FUNCTION(in_type, nzdatabuf_type)(	 \
-		const ChunkIterator *chunk_iter, int *inner_midx_buf,	 \
-		const in_type *in,					 \
-		IntAEAE *nzindex_bufs, nzdatabuf_type *nzdata_buf)	 \
-{									 \
-	const H5DSetDescriptor *h5dset;					 \
-	int ndim, fast_walk, inner_moved_along;				 \
-	in_type val;							 \
-	size_t in_offset;						 \
-									 \
-	h5dset = chunk_iter->h5dset;					 \
-	ndim = h5dset->ndim;						 \
-	walk_fast = _tchunk_is_fully_selected(ndim,			 \
-				&chunk_iter->h5dset_vp,			 \
-				&chunk_iter->mem_vp)			 \
-		&& ! _tchunk_is_truncated(h5dset,			 \
-				&chunk_iter->h5dset_vp);		 \
-	if (fast_walk) {						 \
-		while (1) {						 \
-			val = *in;					 \
-			if (val != (in_type) 0) {			 \
-				if (nzdata_buf->_nelt >=		 \
-				    NZDATA_MAXLENGTH)			 \
-				{					 \
-					PRINT_TO_ERRMSG_BUF(		 \
-						"too many non-zero "	 \
-						"values to load");	 \
-					return -1;			 \
-				}					 \
-				nzdatabuf_type ## _fast_append(		 \
-						nzdata_buf, val);	 \
-				append_array_index_to_nzindex_bufs(	 \
-						&chunk_iter->mem_vp,	 \
-						inner_midx_buf,		 \
-						nzindex_bufs);		 \
-			}						 \
-			inner_moved_along = _next_midx(ndim,		 \
-						chunk_iter->mem_vp.dim,	 \
-						inner_midx_buf);	 \
-			if (inner_moved_along == ndim)			 \
-				break;					 \
-			in++;						 \
-		};							 \
-	} else {							 \
-		_init_in_offset(ndim,					 \
-				chunk_iter->index,			 \
-				h5dset->h5chunkdim,			 \
-				&chunk_iter->mem_vp,			 \
-				&chunk_iter->h5dset_vp,			 \
-				&in_offset);				 \
-		while (1) {						 \
-			val = in[in_offset];				 \
-			if (val != (in_type) 0) {			 \
-				if (nzdata_buf->_nelt >=		 \
-				    NZDATA_MAXLENGTH)			 \
-				{					 \
-					PRINT_TO_ERRMSG_BUF(		 \
-						"too many non-zero "	 \
-						"values to load");	 \
-					return -1;			 \
-				}					 \
-				nzdatabuf_type ## _fast_append(		 \
-						nzdata_buf, val);	 \
-				append_array_index_to_nzindex_bufs(	 \
-						&chunk_iter->mem_vp,	 \
-						inner_midx_buf,		 \
-						nzindex_bufs);		 \
-			}						 \
-			inner_moved_along = _next_midx(ndim,		 \
-						chunk_iter->mem_vp.dim,	 \
-						inner_midx_buf);	 \
-			if (inner_moved_along == ndim)			 \
-				break;					 \
-			_update_in_offset(ndim,				 \
-					chunk_iter->index,		 \
-					h5dset->h5chunkdim,		 \
-					&chunk_iter->mem_vp,		 \
-					inner_midx_buf,			 \
-					inner_moved_along,		 \
-					&in_offset);			 \
-		};							 \
-	}								 \
-	return (long long int) nzdatabuf_type ## _get_nelt(nzdata_buf);	 \
+   (this is 'chunk_data_buf->data' and it gets passed to the 'in' pointer),
+   that is, if the current chunk is a full-size chunk and not a "truncated"
+   chunk (a.k.a. "partial edge chunk" in HDF5's terminology). */
+#define	ARGS_AND_BODY_OF_COPY_FUNCTION(in_type, nzdatabuf_type)(	\
+		const ChunkIterator *chunk_iter, int *inner_midx_buf,	\
+		const in_type *in,					\
+		IntAEAE *nzindex_bufs, nzdatabuf_type *nzdata_buf)	\
+{									\
+	const H5DSetDescriptor *h5dset;					\
+	int ndim, do_fast_walk, inner_moved_along;			\
+	in_type val;							\
+	size_t in_offset;						\
+									\
+	h5dset = chunk_iter->h5dset;					\
+	ndim = h5dset->ndim;						\
+	do_fast_walk = _tchunk_is_fully_selected(ndim,			\
+				&chunk_iter->h5dset_vp,			\
+				&chunk_iter->mem_vp)			\
+			&& ! _tchunk_is_truncated(h5dset,		\
+				&chunk_iter->h5dset_vp);		\
+	if (do_fast_walk) {						\
+		while (1) {						\
+			val = *in;					\
+			if (val != (in_type) 0) {			\
+				if (nzdata_buf->_nelt >=		\
+				    NZDATA_MAXLENGTH)			\
+				{					\
+					PRINT_TO_ERRMSG_BUF(		\
+						"too many non-zero "	\
+						"values to load");	\
+					return -1;			\
+				}					\
+				nzdatabuf_type ## _fast_append(		\
+						nzdata_buf, val);	\
+				append_array_index_to_nzindex_bufs(	\
+						&chunk_iter->mem_vp,	\
+						inner_midx_buf,		\
+						nzindex_bufs);		\
+			}						\
+			inner_moved_along = _next_midx(ndim,		\
+						chunk_iter->mem_vp.dim,	\
+						inner_midx_buf);	\
+			if (inner_moved_along == ndim)			\
+				break;					\
+			in++;						\
+		};							\
+	} else {							\
+		_init_in_offset(ndim,					\
+				chunk_iter->index,			\
+				h5dset->h5chunkdim,			\
+				&chunk_iter->mem_vp,			\
+				&chunk_iter->h5dset_vp,			\
+				&in_offset);				\
+		while (1) {						\
+			val = in[in_offset];				\
+			if (val != (in_type) 0) {			\
+				if (nzdata_buf->_nelt >=		\
+				    NZDATA_MAXLENGTH)			\
+				{					\
+					PRINT_TO_ERRMSG_BUF(		\
+						"too many non-zero "	\
+						"values to load");	\
+					return -1;			\
+				}					\
+				nzdatabuf_type ## _fast_append(		\
+						nzdata_buf, val);	\
+				append_array_index_to_nzindex_bufs(	\
+						&chunk_iter->mem_vp,	\
+						inner_midx_buf,		\
+						nzindex_bufs);		\
+			}						\
+			inner_moved_along = _next_midx(ndim,		\
+						chunk_iter->mem_vp.dim,	\
+						inner_midx_buf);	\
+			if (inner_moved_along == ndim)			\
+				break;					\
+			_update_in_offset(ndim,				\
+					chunk_iter->index,		\
+					h5dset->h5chunkdim,		\
+					&chunk_iter->mem_vp,		\
+					inner_midx_buf,			\
+					inner_moved_along,		\
+					&in_offset);			\
+		};							\
+	}								\
+	return (long long int) nzdatabuf_type ## _get_nelt(nzdata_buf);	\
 }
 
 /* copy_selected_XXX_chunk_data_to_IntAE_buf() functions: copy ints and
@@ -464,7 +464,7 @@ static long long int copy_selected_float_chunk_data_to_DoubleAE_buf
 static long long int copy_selected_uchar_chunk_data_to_CharAE_buf
 	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned char, CharAE)
 
-static int copy_selected_chunk_data_to_nzbuf(
+static int copy_selected_chunk_data_to_nzbufs(
 		const ChunkIterator *chunk_iter,
 		ChunkDataBuffer *chunk_data_buf,
 		int *inner_midx_buf,
@@ -700,7 +700,7 @@ static int read_data_7(ChunkIterator *chunk_iter,
 		//double dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
 		//printf("- load chunk: %3.3f ms\n", dt);
 
-		ret = copy_selected_chunk_data_to_nzbuf(
+		ret = copy_selected_chunk_data_to_nzbufs(
 				chunk_iter,
 				&chunk_data_buf,
 				inner_midx_buf->elts,
