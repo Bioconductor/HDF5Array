@@ -47,11 +47,12 @@ static void init_in_offset_and_out_offset(int ndim, SEXP index,
 }
 
 static inline void update_in_offset_and_out_offset(int ndim,
-			const int *inner_midx, int inner_moved_along,
-			SEXP index,
-			const int *out_dim, const H5Viewport *out_vp,
-			const hsize_t *h5chunkdim,
-			size_t *in_offset, size_t *out_offset)
+		SEXP index,
+		const hsize_t *h5chunkdim,
+		const H5Viewport *out_vp,
+		const int *inner_midx, int inner_moved_along,
+		const int *out_dim,
+		size_t *in_offset, size_t *out_offset)
 {
 	SEXP start;
 	int i1, i0, along, h5along, di;
@@ -120,7 +121,7 @@ static inline void copy_string_to_character_Rarray(
 	return;
 }
 
-static long long int copy_selected_chunk_data_to_character_Rarray(
+static long long int copy_selected_string_chunk_data_to_character_Rarray(
 		const ChunkIterator *chunk_iter, int *inner_midx_buf,
 		const char *in, size_t in_offset,
 		const int *Rarray_dim, SEXP Rarray, size_t Rarray_offset)
@@ -142,92 +143,96 @@ static long long int copy_selected_chunk_data_to_character_Rarray(
 		if (inner_moved_along == ndim)
 			break;
 		update_in_offset_and_out_offset(ndim,
-				inner_midx_buf, inner_moved_along,
 				chunk_iter->index,
-				Rarray_dim, &chunk_iter->mem_vp,
 				h5dset->h5chunkdim,
+				&chunk_iter->mem_vp,
+				inner_midx_buf,
+				inner_moved_along,
+				Rarray_dim,
 				&in_offset, &Rarray_offset);
 	};
 	return nvals;
 }
 
-#define	ARGS_AND_BODY_FOR_COPY_FUNCTION(in_type, out_type)(		 \
-		const ChunkIterator *chunk_iter, int *inner_midx_buf,	 \
-		const in_type *in, size_t in_offset,			 \
-		const int *out_dim, out_type *out, size_t out_offset)	 \
-{									 \
-	const H5DSetDescriptor *h5dset;					 \
-	int ndim, inner_moved_along;					 \
-	long long int nvals;						 \
-									 \
-	h5dset = chunk_iter->h5dset;					 \
-	ndim = h5dset->ndim;						 \
-	nvals = 0;							 \
-	while (1) {							 \
-		out[out_offset] = in[in_offset];			 \
-		nvals++;						 \
-		inner_moved_along = _next_midx(ndim,			 \
-					       chunk_iter->mem_vp.dim,	 \
-					       inner_midx_buf);		 \
-		if (inner_moved_along == ndim)				 \
-			break;						 \
-		update_in_offset_and_out_offset(ndim,			 \
-				inner_midx_buf, inner_moved_along,	 \
-				chunk_iter->index,			 \
-				out_dim, &chunk_iter->mem_vp,		 \
-				h5dset->h5chunkdim,			 \
-				&in_offset, &out_offset);		 \
-	};								 \
-	return nvals;							 \
+#define	ARGS_AND_BODY_OF_COPY_FUNCTION(in_type, out_type)(		\
+		const ChunkIterator *chunk_iter, int *inner_midx_buf,	\
+		const in_type *in, size_t in_offset,			\
+		const int *out_dim, out_type *out, size_t out_offset)	\
+{									\
+	const H5DSetDescriptor *h5dset;					\
+	int ndim, inner_moved_along;					\
+	long long int nvals;						\
+									\
+	h5dset = chunk_iter->h5dset;					\
+	ndim = h5dset->ndim;						\
+	nvals = 0;							\
+	while (1) {							\
+		out[out_offset] = in[in_offset];			\
+		nvals++;						\
+		inner_moved_along = _next_midx(ndim,			\
+					chunk_iter->mem_vp.dim,		\
+					inner_midx_buf);		\
+		if (inner_moved_along == ndim)				\
+			break;						\
+		update_in_offset_and_out_offset(ndim,			\
+				chunk_iter->index,			\
+				h5dset->h5chunkdim,			\
+				&chunk_iter->mem_vp,			\
+				inner_midx_buf,				\
+				inner_moved_along,			\
+				out_dim,				\
+				&in_offset, &out_offset);		\
+	};								\
+	return nvals;							\
 }
 
-/* Fast copy functions from int to int and from any smaller standard
-   native type to int. */
+/* copy_selected_XXX_chunk_data_to_int_array() functions: copy ints and
+   any smaller standard native type to an array of ints. */
 static long long int copy_selected_int_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(int, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(int, int)
 static long long int copy_selected_char_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(char, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(char, int)
 static long long int copy_selected_schar_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(signed char, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(signed char, int)
 static long long int copy_selected_uchar_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned char, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned char, int)
 static long long int copy_selected_short_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(short, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(short, int)
 static long long int copy_selected_ushort_chunk_data_to_int_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned short, int)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned short, int)
 
-/* Fast copy functions from double to double and from any smaller standard
-   native type to double. */
+/* copy_selected_XXX_chunk_data_to_double_array() functions: copy doubles
+   and any smaller standard native type to an array of doubles. */
 static long long int copy_selected_double_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(double, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(double, double)
 static long long int copy_selected_char_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(char, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(char, double)
 static long long int copy_selected_schar_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(signed char, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(signed char, double)
 static long long int copy_selected_uchar_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned char, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned char, double)
 static long long int copy_selected_short_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(short, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(short, double)
 static long long int copy_selected_ushort_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned short, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned short, double)
 static long long int copy_selected_int_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(int, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(int, double)
 static long long int copy_selected_uint_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned int, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned int, double)
 static long long int copy_selected_long_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(long, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(long, double)
 static long long int copy_selected_ulong_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned long, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned long, double)
 static long long int copy_selected_llong_chunk_data_to_double_array // be safe
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(long long, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(long long, double)
 static long long int copy_selected_ullong_chunk_data_to_double_array // be safe
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned long long, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned long long, double)
 static long long int copy_selected_float_chunk_data_to_double_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(float, double)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(float, double)
 
-/* Fast copy function from unsigned char to unsigned char (a.k.a Rbyte). */
+/* Copy unsigned chars (a.k.a Rbytes) to an array of unsigned chars. */
 static long long int copy_selected_uchar_chunk_data_to_uchar_array
-	ARGS_AND_BODY_FOR_COPY_FUNCTION(unsigned char, unsigned char)
+	ARGS_AND_BODY_OF_COPY_FUNCTION(unsigned char, unsigned char)
 
 static int copy_selected_chunk_data_to_Rarray(
 		const ChunkIterator *chunk_iter,
@@ -252,12 +257,13 @@ static int copy_selected_chunk_data_to_Rarray(
 			&in_offset, &out_offset);
 	if (h5dset->Rtype == STRSXP) {
 		//printf("- copying selected chunk character data ... ");
-		nvals = copy_selected_chunk_data_to_character_Rarray(
+		nvals = copy_selected_string_chunk_data_to_character_Rarray(
 				chunk_iter, inner_midx_buf,
 				chunk_data_buf->data, in_offset,
 				Rarray_dim, Rarray, out_offset);
 		//dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
-		//printf("ok (%lld chunk values copied in %3.2f ms)\n", nvals, dt);
+		//printf("ok (%lld value%s copied in %3.3f ms)\n",
+		//       nvals, nvals == 1 ? "" : "s", dt);
 		return 0;
 	}
 	copy_without_type_casting = chunk_data_buf->data_type_id ==
@@ -273,36 +279,45 @@ static int copy_selected_chunk_data_to_Rarray(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_CHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_CHAR) {
 			nvals = copy_selected_char_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_SCHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_SCHAR) {
 			nvals = copy_selected_schar_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_UCHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_UCHAR) {
 			nvals = copy_selected_uchar_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_SHORT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_SHORT) {
 			nvals = copy_selected_short_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_USHORT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_USHORT) {
 			nvals = copy_selected_ushort_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else {
-			PRINT_TO_ERRMSG_BUF("unsupported dataset type");
-			return -1;
+			break;
 		}
-		break;
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
 	    case REALSXP:
 		out = REAL(Rarray);
 		if (copy_without_type_casting) {
@@ -310,71 +325,94 @@ static int copy_selected_chunk_data_to_Rarray(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_CHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_CHAR) {
 			nvals = copy_selected_char_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_SCHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_SCHAR) {
 			nvals = copy_selected_schar_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_UCHAR) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_UCHAR) {
 			nvals = copy_selected_uchar_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_SHORT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_SHORT) {
 			nvals = copy_selected_short_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_USHORT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_USHORT) {
 			nvals = copy_selected_ushort_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_INT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_INT) {
 			nvals = copy_selected_int_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_UINT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_UINT) {
 			nvals = copy_selected_uint_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_LONG) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_LONG) {
 			nvals = copy_selected_long_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_ULONG) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_ULONG) {
 			nvals = copy_selected_ulong_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_LLONG) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_LLONG) {
 			nvals = copy_selected_llong_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_ULLONG) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_ULLONG) {
 			nvals = copy_selected_ullong_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else if (chunk_data_buf->data_type_id == H5T_NATIVE_FLOAT) {
+			break;
+		}
+		if (chunk_data_buf->data_type_id == H5T_NATIVE_FLOAT) {
 			nvals = copy_selected_float_chunk_data_to_double_array(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else {
-			PRINT_TO_ERRMSG_BUF("unsupported dataset type");
-			return -1;
+			break;
 		}
-		break;
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
 	    case RAWSXP:
 		out = RAW(Rarray);
 		if (copy_without_type_casting) {
@@ -382,11 +420,10 @@ static int copy_selected_chunk_data_to_Rarray(
 					chunk_iter, inner_midx_buf,
 					chunk_data_buf->data, in_offset,
 					Rarray_dim, out, out_offset);
-		} else {
-			PRINT_TO_ERRMSG_BUF("unsupported dataset type");
-			return -1;
+			break;
 		}
-		break;
+		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
+		return -1;
 	    default:
 		PRINT_TO_ERRMSG_BUF("unsupported dataset type");
 		return -1;
@@ -394,7 +431,7 @@ static int copy_selected_chunk_data_to_Rarray(
 	if (nvals < 0)
 		return -1;
 	//dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
-	//printf("ok (%lld value%s copied in %3.2f ms)\n",
+	//printf("ok (%lld value%s copied in %3.3f ms)\n",
 	//       nvals, nvals == 1 ? "" : "s", dt);
 	return 0;
 }
@@ -475,7 +512,7 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 			if (ret < 0)
 				return -1;
 			//double dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
-			//printf("- load chunk:  %2.3f ms\n", dt);
+			//printf("- load chunk: %3.3f ms\n", dt);
 
 			ret = copy_selected_chunk_data_to_Rarray(
 					chunk_iter,
