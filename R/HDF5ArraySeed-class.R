@@ -139,14 +139,6 @@ setValidity2("HDF5ArraySeed", .validate_HDF5ArraySeed)
 ### Does NOT access the file.
 setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
 
-normarg_path <- function(path, what1, what2)
-{
-    if (!isSingleString(path))
-        stop(wmsg(what1, " must be a single string specifying the path ",
-                  "to the file where the ", what2, " is located"))
-    file_path_as_absolute(path)  # return absolute path in canonical form
-}
-
 ### Return a fake value (of the correct type) if the dataset is empty i.e.
 ### if at least one of its dimensions is 0.
 .read_h5dataset_first_val <- function(filepath, name, dim)

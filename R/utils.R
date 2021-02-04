@@ -6,6 +6,15 @@
 ###
 
 
+normarg_path <- function(path, what1, what2)
+{
+    if (!isSingleString(path))
+        stop(wmsg(what1, " must be a single string specifying the path ",
+                  "to the file where the ", what2, " is located"))
+    file_path_as_absolute(path)  # return absolute path in canonical form
+}
+
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Detect and trim trailing slahes in a character vector
 ###

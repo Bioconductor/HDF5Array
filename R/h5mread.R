@@ -15,6 +15,12 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
                     as.integer=FALSE, as.sparse=FALSE,
                     method=0L, use.H5Dread_chunk=FALSE)
 {
+    filepath <- normarg_path(filepath, "'filepath'", "HDF5 dataset")
+    if (!isSingleString(name))
+        stop(wmsg("'name' must be a single string specifying ",
+                  "the name of the dataset in the HDF5 file"))
+    if (name == "")
+        stop(wmsg("'name' cannot be the empty string"))
     if (!isTRUEorFALSE(as.sparse))
         stop(wmsg("'as.sparse' must be TRUE or FALSE"))
     if (is.null(starts)) {
