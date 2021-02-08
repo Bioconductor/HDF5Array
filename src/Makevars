@@ -1,8 +1,32 @@
 ## This file uses GNU make syntax $(shell ...) so we need to
 ## have "SystemRequirements: GNU make" in the DESCRIPTION file.
-## See Rhtslib's vignette for details.
 
-RHDF5LIB_LIBS=$(shell echo 'Rhdf5lib::pkgconfig("PKG_C_HL_LIBS")'|\
-    "${R_HOME}/bin/R" --vanilla --slave)
+OBJECTS = \
+    lzf/lzf/lzf_c.o \
+    lzf/lzf/lzf_d.o \
+    lzf/lzf_filter.o \
+    S4Vectors_stubs.o \
+    global_errmsg_buf.o \
+    uaselection.o \
+    H5DSetDescriptor.o \
+    h5mread_helpers.o \
+    h5mread_startscounts.o \
+    ChunkIterator.o \
+    h5mread_index.o \
+    h5mread_sparse.o \
+    h5mread.o \
+    h5summarize.o \
+    h5dimscales.o \
+    R_init_HDF5Array.o
+
+RHDF5LIB_LIBS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e \
+    'Rhdf5lib::pkgconfig("PKG_C_HL_LIBS")')
+
 PKG_LIBS=$(RHDF5LIB_LIBS)
+PKG_CPPFLAGS=-Ilzf/lzf
+
+all: $(SHLIB)
+
+clean:
+	rm -f $(OBJECTS) HDF5Array.so
 
