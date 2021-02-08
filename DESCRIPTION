@@ -14,7 +14,7 @@ biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 URL: https://bioconductor.org/packages/HDF5Array
 BugReports: https://github.com/Bioconductor/HDF5Array/issues
 Version: 1.19.2
-License: Artistic-2.0
+License: Artistic-2.0 + file src/lzf/LICENSE.txt
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
