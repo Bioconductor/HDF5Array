@@ -5,35 +5,19 @@
 \alias{TENxMatrixSeed-class}
 \alias{TENxMatrixSeed}
 
-\alias{path,TENxMatrixSeed-method}
-\alias{path<-,TENxMatrixSeed-method}
-\alias{dim,TENxMatrixSeed-method}
-\alias{dimnames,TENxMatrixSeed-method}
-\alias{extract_array,TENxMatrixSeed-method}
-\alias{chunkdim,TENxMatrixSeed-method}
-
-\alias{show,TENxMatrixSeed-method}
-
-% sparsity
-
-\alias{sparsity,TENxMatrixSeed-method}
-\alias{is_sparse,TENxMatrixSeed-method}
-\alias{extract_sparse_array,TENxMatrixSeed-method}
-\alias{read_sparse_block,TENxMatrixSeed-method}
-\alias{extractNonzeroDataByCol,TENxMatrixSeed-method}
-
-\alias{coerce,TENxMatrixSeed,dgCMatrix-method}
-\alias{coerce,TENxMatrixSeed,sparseMatrix-method}
-
 \title{TENxMatrixSeed objects}
 
 \description{
-  TENxMatrixSeed is a low-level helper class for representing a pointer
-  to an HDF5-based sparse matrix like one used by 10x Genomics for the
-  1.3 Million Brain Cell Dataset.
-  TENxMatrixSeed objects are not intended to be used directly. Most
-  end users should create and manipulate \link{TENxMatrix} objects
-  instead. See \code{?\link{TENxMatrix}} for more information.
+  TENxMatrixSeed is a low-level helper class that is a direct extension
+  of the \link{H5SparseMatrixSeed} class. It is used to represent a
+  pointer to an HDF5 sparse matrix that is stored in the CSR/CSC/Yale
+  format ("Compressed Sparse Row") and follows the 10x Genomics convention
+  for storing the dimensions of the matrix.
+
+  Note that a TENxMatrixSeed object is not intended to be used directly.
+  Most end users will typically create and manipulate a higher-level
+  \link{TENxMatrix} object instead. See \code{?\link{TENxMatrix}} for
+  more information.
 }
 
 \usage{
@@ -48,29 +32,39 @@ TENxMatrixSeed(filepath, group="mm10")
 }
 
 \details{
-  No operation can be performed directly on a TENxMatrixSeed object.
-  It first needs to be wrapped in a \link[DelayedArray]{DelayedMatrix}
-  object. The result of this wrapping is a \link{TENxMatrix} object
-  (a \link{TENxMatrix} object is just a TENxMatrixSeed object wrapped
-  in a \link[DelayedArray]{DelayedMatrix} object).
+  A TENxMatrixSeed object supports the same limited set of methods as
+  an \link{H5SparseMatrixSeed} object. See \code{?\link{H5SparseMatrixSeed}}
+  for the details.
 }
 
 \value{
   \code{TENxMatrixSeed()} returns a TENxMatrixSeed object.
+}
 
-  See \code{?\link{TENxMatrix}} for the value returned by \code{sparsity()}
-  and \code{extractNonzeroDataByCol()}.
+\section{TENxMatrixSeed vs TENxMatrix objects}{
+  In order to have access to the full set of operations that are available
+  for \link[DelayedArray]{DelayedMatrix} objects, a TENxMatrixSeed object
+  first needs to be wrapped in a \link[DelayedArray]{DelayedMatrix} object,
+  typically by calling the \code{\link[DelayedArray]{DelayedArray}()}
+  constructor on it.
+
+  This is what the \code{\link{TENxMatrix}()} constructor function does.
+
+  Note that the result of this wrapping is a \link{TENxMatrix} object,
+  which is just a TENxMatrixSeed object wrapped in a
+  \link[DelayedArray]{DelayedMatrix} object.
 }
 
 \seealso{
   \itemize{
     \item \link{TENxMatrix} objects.
 
-    \item The \pkg{\link[rhdf5]{rhdf5}} package on top of which
-          TENxMatrixSeed objects are implemented.
+    \item \link{H5SparseMatrixSeed} objects.
 
     \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
           \pkg{TENxBrainData} package).
+
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
   }
 }
 
@@ -94,7 +88,11 @@ seed <- TENxMatrixSeed(fname, "mm10")
 seed
 path(seed)
 dim(seed)
+is_sparse(seed)
 sparsity(seed)
+
+DelayedArray(seed)
+stopifnot(class(DelayedArray(seed)) == "TENxMatrix")
 }
 \keyword{classes}
 \keyword{methods}

@@ -23,32 +23,123 @@
 \description{
   HDF5ArraySeed is a low-level helper class for representing a
   pointer to an HDF5 dataset.
-  HDF5ArraySeed objects are not intended to be used directly. Most
-  end users should create and manipulate \link{HDF5Array} objects
-  instead. See \code{?\link{HDF5Array}} for more information.
+
+  Note that an HDF5ArraySeed object is not intended to be used directly.
+  Most end users will typically create and manipulate a higher-level
+  \link{HDF5Array} object instead. See \code{?\link{HDF5Array}} for
+  more information.
 }
 
 \usage{
-## Constructor function:
+## --- Constructor function ---
+
 HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
+
+## --- Accessors --------------
+
+\S4method{path}{HDF5ArraySeed}(object)
+
+\S4method{path}{HDF5ArraySeed}(object) <- value
+
+\S4method{dim}{HDF5ArraySeed}(x)
+
+\S4method{dimnames}{HDF5ArraySeed}(x)
+
+\S4method{type}{HDF5ArraySeed}(x)
+
+\S4method{is_sparse}{HDF5ArraySeed}(x)
+
+\S4method{is_sparse}{HDF5ArraySeed}(x) <- value
+
+\S4method{chunkdim}{HDF5ArraySeed}(x)
+
+## --- Data extraction --------
+
+\S4method{extract_array}{HDF5ArraySeed}(x, index)
+
+\S4method{extract_sparse_array}{HDF5ArraySeed}(x, index)
 }
 
 \arguments{
-  \item{filepath, name, as.sparse, type}{
-    See \code{?\link{HDF5Array}} for a description of these arguments.
+  \item{filepath}{
+    The path (as a single string) to the HDF5 file where the dataset
+    is located.
+  }
+  \item{name}{
+    The name of the dataset in the HDF5 file.
+  }
+  \item{as.sparse}{
+    Whether the HDF5 dataset should be flagged as sparse or not, that is,
+    whether it should be considered sparse (and treated as such) or not.
+    Note that HDF5 doesn't natively support sparse storage at the moment
+    so HDF5 datasets cannot be stored in a sparse format, only in a dense
+    one. However a dataset stored in a dense format can still contain a lot
+    of zeroes. Using \code{as.sparse=TRUE} on such dataset will enable
+    some optimizations that can lead to a lower memory footprint (and
+    possibly better performance) when operating on the HDF5Array.
+
+    IMPORTANT NOTE: If the dataset is in the 10x Genomics format (i.e. if
+    it uses the HDF5-based sparse matrix representation from 10x Genomics),
+    you should use the \code{\link{TENxMatrix}()} constructor instead of
+    the \code{HDF5Array()} constructor.
+  }
+  \item{type}{
+    By default the \code{\link[DelayedArray]{type}} of the returned
+    object is inferred from the H5 datatype of the HDF5 dataset.
+    This can be overridden by specifying the \code{type} argument.
+    The specified type must be an \emph{R atomic type} (e.g.
+    \code{"integer"}) or \code{"list"}.
+  }
+  \item{object, x}{
+    An HDF5ArraySeed object or derivative.
+  }
+  \item{value}{
+    For the \code{path()} setter: The new path (as a single string) to the
+    HDF5 file where the dataset is located.
+
+    For the \code{is_sparse()} setter: \code{TRUE} or \code{FALSE}.
+  }
+  \item{index}{
+    See \code{?\link[DelayedArray]{extract_array}} in the \pkg{DelayedArray}
+    package.
   }
 }
 
 \details{
-  No operation can be performed directly on an HDF5ArraySeed object.
-  It first needs to be wrapped in a \link[DelayedArray]{DelayedArray}
-  object. The result of this wrapping is an \link{HDF5Array} object
-  (an \link{HDF5Array} object is just an HDF5ArraySeed object wrapped
-  in a \link[DelayedArray]{DelayedArray} object).
+  The HDF5ArraySeed class has one direct subclass: \link{Dense_H5ADMatrixSeed}.
+  See \code{?\link{Dense_H5ADMatrixSeed}} for more information.
+
+  Note that the implementation of HDF5ArraySeed objects follows the widely
+  adopted convention of transposing an HDF5 dataset when loading it into R.
+
+  Finally note that an HDF5ArraySeed object supports a very limited set
+  of methods:
+  \itemize{
+    \item \code{path()}: Returns the path to the HDF5 file where the dataset
+          is located.
+    \item \code{dim()}, \code{dimnames()}.
+    \item \code{type()}, \code{is_sparse()}, \code{chunkdim()},
+          \code{extract_array()}, \code{extract_sparse_array()}: These generics
+          are defined and documented in the \pkg{DelayedArrray} package.
+  }
 }
 
 \value{
-  An HDF5ArraySeed object.
+  \code{HDF5ArraySeed()} returns an HDF5ArraySeed object.
+}
+
+\section{HDF5ArraySeed vs HDF5Array objects}{
+  In order to have access to the full set of operations that are available
+  for \link[DelayedArray]{DelayedArray} objects, an HDF5ArraySeed object
+  first needs to be wrapped in a \link[DelayedArray]{DelayedArray} object,
+  typically by calling the \code{\link[DelayedArray]{DelayedArray}()}
+  constructor on it.
+
+  This is what the \code{\link{HDF5Array}()} constructor function does.
+
+  Note that the result of this wrapping is an \link{HDF5Array} object,
+  which is just an HDF5ArraySeed object wrapped in a
+  \link[DelayedArray]{DelayedArray} object.
 }
 
 \seealso{
@@ -80,6 +171,9 @@ seed2
 ## Alternatively:
 is_sparse(seed1) <- TRUE
 seed1  # same as 'seed2'
+
+DelayedArray(seed1)
+stopifnot(class(DelayedArray(seed1)) == "HDF5Array")
 }
 \keyword{classes}
 \keyword{methods}

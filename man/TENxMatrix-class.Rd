@@ -7,11 +7,6 @@
 
 \alias{DelayedArray,TENxMatrixSeed-method}
 
-% sparsity
-
-\alias{sparsity}
-\alias{extractNonzeroDataByCol}
-
 \alias{sparsity,TENxMatrix-method}
 \alias{read_sparse_block,TENxMatrix-method}
 \alias{extractNonzeroDataByCol,TENxMatrix-method}
@@ -22,25 +17,19 @@
 \title{10x Genomics datasets as DelayedMatrix objects}
 
 \description{
-  The 1.3 Million Brain Cell Dataset and other datasets published by
-  10x Genomics use an HDF5-based sparse matrix representation instead
-  of the conventional (i.e. dense) HDF5 representation.
+  A 10x Genomics dataset like the "1.3 Million Brain Cell Dataset" is an
+  HDF5 sparse matrix stored in CSR/CSC/Yale format ("Compressed Sparse Row").
 
   The TENxMatrix class is a \link[DelayedArray]{DelayedMatrix} subclass
-  for representing an HDF5-based sparse matrix like one used by
-  10x Genomics for the 1.3 Million Brain Cell Dataset.
+  for representing and operating on this kind of dataset.
 
   All the operations available for \link[DelayedArray]{DelayedMatrix}
   objects work on TENxMatrix objects.
 }
 
 \usage{
-## Constructor functions:
+## Constructor function:
 TENxMatrix(filepath, group="mm10")
-
-## sparsity() and a convenient data extractor:
-sparsity(x)
-extractNonzeroDataByCol(x, j)
 }
 
 \arguments{
@@ -51,39 +40,31 @@ extractNonzeroDataByCol(x, j)
   \item{group}{
     The name of the group in the HDF5 file containing the 10x Genomics data.
   }
-  \item{x}{
-    A TENxMatrix (or \link{TENxMatrixSeed}) object.
-  }
-  \item{j}{
-    An integer vector containing valid column indices.
-  }
 }
 
 \value{
-  \code{TENxMatrix}: A TENxMatrix object.
+  \code{TENxMatrix()} returns a TENxMatrix object.
+}
 
-  \code{sparsity}: The number of zero-valued matrix elements in the
-  object divided by its total number of elements (a.k.a. its length).
-
-  \code{extractNonzeroDataByCol}: A \link[IRanges]{NumericList} or
-  \link[IRanges]{IntegerList} object \emph{parallel} to \code{j} i.e.
-  with one list element per column index in \code{j}. The row indices
-  of the values are not returned. Furthermore, the values within a given
-  list element can be returned in any order. In particular you should not
-  assume that they are ordered by ascending row index.
+\details{
+  In addition to all the methods defined for
+  \link[DelayedArray]{DelayedMatrix} objects, TENxMatrix objects
+  support the following specialized methods: \code{sparsity()} and
+  \code{extractNonzeroDataByCol()}. See \code{?\link{H5SparseMatrixSeed}}
+  for more information about what these methods do.
 }
 
 \note{
-  If your dataset uses the HDF5-based sparse matrix representation from
-  10x Genomics, use the \code{TENxMatrix()} constructor.
+  If your dataset uses the HDF5 sparse matrix representation from
+  10x Genomics, use the \code{TENxMatrix()} constructor documented here.
 
-  If your dataset uses the conventional (i.e. dense) HDF5 representation,
-  use the \code{\link{HDF5Array}()} constructor.
+  But if your dataset uses the conventional (a.k.a. dense) HDF5
+  representation, use the \code{\link{HDF5Array}()} constructor instead.
 }
 
 \seealso{
   \itemize{
-    \item \link{HDF5Array} objects for representing conventional (i.e.
+    \item \link{HDF5Array} objects for representing conventional (a.k.a.
           dense) HDF5 datasets as \link[DelayedArray]{DelayedArray} objects.
 
     \item \link[DelayedArray]{DelayedMatrix} objects in the \pkg{DelayedArray}

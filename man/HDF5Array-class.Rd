@@ -22,7 +22,7 @@
 
 \description{
   The HDF5Array class is a \link[DelayedArray]{DelayedArray} subclass
-  for representing a conventional (i.e. dense) HDF5 dataset.
+  for representing a conventional (a.k.a. dense) HDF5 dataset.
 
   All the operations available for \link[DelayedArray]{DelayedArray}
   objects work on HDF5Array objects.
@@ -34,51 +34,26 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 }
 
 \arguments{
-  \item{filepath}{
-    The path (as a single string) to the HDF5 file where the dataset
-    is located.
-  }
-  \item{name}{
-    The name of the dataset in the HDF5 file.
-  }
-  \item{as.sparse}{
-    Whether the HDF5 dataset should be flagged as sparse or not, that is,
-    whether it should be considered sparse (and treated as such) or not.
-    Note that HDF5 doesn't natively support sparse storage at the moment
-    so HDF5 datasets cannot be stored in a sparse format, only in a dense
-    one. However a dataset stored in a dense format can still contain a lot
-    of zeroes. Using \code{as.sparse=TRUE} on such dataset will enable
-    some optimizations that can lead to a lower memory footprint (and
-    possibly better performance) when operating on the HDF5Array.
-
-    IMPORTANT NOTE: If the dataset is in the 10x Genomics format (i.e. if
-    it uses the HDF5-based sparse matrix representation from 10x Genomics),
-    you should use the \code{\link{TENxMatrix}()} constructor instead of
-    the \code{HDF5Array()} constructor.
-  }
-  \item{type}{
-    By default the \code{\link[DelayedArray]{type}} of the returned
-    object is inferred from the H5 datatype of the HDF5 dataset.
-    This can be overridden by specifying the \code{type} argument.
-    The specified type must be an \emph{R atomic type} (e.g.
-    \code{"integer"}) or \code{"list"}.
+  \item{filepath, name, as.sparse, type}{
+    These arguments are passed down to the \code{\link{HDF5ArraySeed}()}
+    constructor function. See \code{?\link{HDF5ArraySeed}} for the details.
   }
 }
 
 \value{
-  An HDF5Array object.
+  \code{HDF5Array()} returns an HDF5Array object.
 }
 
 \note{
-  The 1.3 Million Brain Cell Dataset and other datasets published by
-  10x Genomics use an HDF5-based sparse matrix representation instead of
-  the conventional (i.e. dense) HDF5 representation.
+  The "1.3 Million Brain Cell Dataset" and other datasets published by
+  10x Genomics use an HDF5-based sparse matrix representation instead
+  of the conventional (a.k.a. dense) HDF5 representation.
 
-  If your dataset uses the conventional (i.e. dense) HDF5 representation,
-  use the \code{HDF5Array()} constructor.
+  If your dataset uses the conventional (a.k.a. dense) HDF5 representation,
+  use the \code{HDF5Array()} constructor documented here.
 
-  If your dataset uses the HDF5-based sparse matrix representation from
-  10x Genomics, use the \code{\link{TENxMatrix}()} constructor.
+  But if your dataset uses the HDF5 sparse matrix representation from
+  10x Genomics, use the \code{\link{TENxMatrix}()} constructor instead.
 }
 
 \seealso{

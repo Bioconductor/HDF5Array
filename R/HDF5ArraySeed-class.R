@@ -6,9 +6,9 @@
 setClass("HDF5ArraySeed",
     contains="Array",
     representation(
-        ## ----------------- user supplied slots -----------------
+      ## ----------------- user supplied slots -----------------
 
-        ## Absolute path to the HDF5 file so the object doesn't break
+        ## Absolute path to the HDF5 file so the object won't break
         ## when the user changes the working directory (e.g. with setwd()).
         ## The path must also be in its canonical form so comparing
         ## paths from different objects is meaningful (required by
@@ -25,14 +25,11 @@ setClass("HDF5ArraySeed",
         ## NA or the desired type. Slot added in HDF5Array 1.15.6.
         type="character",
 
-        ## ------------ automatically populated slots ------------
+      ## ------------ automatically populated slots ------------
 
         dim="integer",
-
         chunkdim="integer_OR_NULL",
-
-        ## First value in the dataset.
-        first_val="ANY"
+        first_val="ANY"  # first value in the dataset
     ),
     prototype(
         as_sparse=FALSE,

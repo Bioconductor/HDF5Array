@@ -25,7 +25,7 @@
 \description{
   The 1.3 Million Brain Cell Dataset and other datasets published by
   10x Genomics use an HDF5-based sparse matrix representation instead
-  of the conventional (i.e. dense) HDF5 representation.
+  of the conventional (a.k.a. dense) HDF5 representation.
 
   \code{writeTENxMatrix} writes a matrix-like object to this format.
 
