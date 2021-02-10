@@ -102,12 +102,14 @@ static inline void copy_string_to_character_Rarray(
 		const char *in, size_t in_offset,
 		SEXP Rarray, size_t Rarray_offset)
 {
+	size_t h5type_size;
 	const char *s;
 	int s_len, is_na;
 	SEXP Rarray_elt;
 
-	s = in + in_offset * h5dset->h5type_size;
-	for (s_len = 0; s_len < h5dset->h5type_size; s_len++)
+	h5type_size = h5dset->h5type->h5type_size;
+	s = in + in_offset * h5type_size;
+	for (s_len = 0; s_len < h5type_size; s_len++)
 		if (s[s_len] == 0)
 			break;
 	is_na = h5dset->as_na_attr && s_len == 2 && s[0] == 'N' && s[1] == 'A';
@@ -242,6 +244,7 @@ static int copy_selected_chunk_data_to_Rarray(
 {
 	const H5DSetDescriptor *h5dset;
 	size_t in_offset, out_offset;
+	SEXPTYPE Rtype;
 	long long int nvals;
 	int copy_without_type_casting;
 	void *out;
@@ -255,7 +258,8 @@ static int copy_selected_chunk_data_to_Rarray(
 			Rarray_dim, &chunk_iter->mem_vp,
 			&chunk_iter->h5dset_vp, h5dset->h5chunkdim,
 			&in_offset, &out_offset);
-	if (h5dset->Rtype == STRSXP) {
+	Rtype = h5dset->h5type->Rtype;
+	if (Rtype == STRSXP) {
 		//printf("- copying selected chunk character data ... ");
 		nvals = copy_selected_string_chunk_data_to_character_Rarray(
 				chunk_iter, inner_midx_buf,
@@ -267,13 +271,12 @@ static int copy_selected_chunk_data_to_Rarray(
 		return 0;
 	}
 	copy_without_type_casting = chunk_data_buf->data_type_id ==
-				    h5dset->native_type_id_for_Rtype;
+				    h5dset->h5type->native_type_id_for_Rtype;
 	//printf("- copying selected chunk data %s type casting ... ",
 	//       copy_without_type_casting ? "WITHOUT" : "WITH");
-	switch (h5dset->Rtype) {
+	switch (Rtype) {
 	    case INTSXP: case LGLSXP:
-		out = h5dset->Rtype == INTSXP ? INTEGER(Rarray) :
-						LOGICAL(Rarray);
+		out = Rtype == INTSXP ? INTEGER(Rarray) : LOGICAL(Rarray);
 		if (copy_without_type_casting) {
 			nvals = copy_selected_int_chunk_data_to_int_array(
 					chunk_iter, inner_midx_buf,
@@ -497,10 +500,10 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 			/* Load the chunk **directly** into 'Rarray' (no
 			   intermediate buffer). */
 			ret = _read_H5Viewport(h5dset,
-					&chunk_iter->h5dset_vp,
-					h5dset->native_type_id_for_Rtype,
-					out_space_id, out,
-					&chunk_iter->mem_vp);
+				&chunk_iter->h5dset_vp,
+				h5dset->h5type->native_type_id_for_Rtype,
+				out_space_id, out,
+				&chunk_iter->mem_vp);
 		} else {
 			/* Load the **entire** chunk to an intermediate
 			   buffer then copy the user-selected chunk data
@@ -700,7 +703,7 @@ static int direct_load_selected_chunk_data(
 	if (ret < 0)
 		return ret;
 	ret = _read_h5selection(h5dset,
-				h5dset->native_type_id_for_Rtype,
+				h5dset->h5type->native_type_id_for_Rtype,
 				out_space_id, out,
 				&chunk_iter->mem_vp);
 	return ret;
@@ -783,7 +786,7 @@ SEXP _h5mread_index(const H5DSetDescriptor *h5dset, SEXP index,
 	ndim = h5dset->ndim;
 	for (along = 0, ans_len = 1; along < ndim; along++)
 		ans_len *= ans_dim[along];
-	ans = PROTECT(allocVector(h5dset->Rtype, ans_len));
+	ans = PROTECT(allocVector(h5dset->h5type->Rtype, ans_len));
 
 	if (method <= 5) {
 		/* methods 4 and 5 */

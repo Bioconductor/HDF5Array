@@ -240,7 +240,7 @@ static int read_data_1_2(const H5DSetDescriptor *h5dset, int method,
 	if (ret < 0)
 		return -1;
 	return _read_h5selection(h5dset,
-				 h5dset->native_type_id_for_Rtype,
+				 h5dset->h5type->native_type_id_for_Rtype,
 				 mem_space_id, mem,
 				 NULL);
 }
@@ -285,7 +285,7 @@ static int read_hyperslab(const H5DSetDescriptor *h5dset,
 	}
 	update_h5dset_vp(ndim, midx, moved_along, starts, counts, h5dset_vp);
 	return _read_H5Viewport(h5dset, h5dset_vp,
-				h5dset->native_type_id_for_Rtype,
+				h5dset->h5type->native_type_id_for_Rtype,
 				mem_space_id, mem,
 				mem_vp);
 }
@@ -428,7 +428,7 @@ SEXP _h5mread_startscounts(const H5DSetDescriptor *h5dset,
 		}
 	}
 
-	ans = PROTECT(allocVector(h5dset->Rtype, (R_xlen_t) ans_len));
+	ans = PROTECT(allocVector(h5dset->h5type->Rtype, (R_xlen_t) ans_len));
 	nprotect++;
 
 	if (ans_len != 0) {

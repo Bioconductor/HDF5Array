@@ -151,7 +151,7 @@ static SEXP NOT_USED_make_nzindex_from_buf(const IntAE *nzindex_buf,
 	return nzindex;
 }
 
-static int copy_nzindex_and_nzdata_to_ans(const H5DSetDescriptor *h5dset,
+static int copy_nzindex_and_nzdata_to_ans(SEXPTYPE Rtype,
 		const IntAEAE *nzindex_bufs, const void *nzdata_buf, SEXP ans)
 {
 	SEXP ans_elt;
@@ -163,7 +163,7 @@ static int copy_nzindex_and_nzdata_to_ans(const H5DSetDescriptor *h5dset,
 	if (ans_elt == R_NilValue)  /* should never happen */
 		return -1;
 	/* Move the data in 'nzdata_buf' to an atomic vector. */
-	ans_elt = PROTECT(make_nzdata_from_buf(nzdata_buf, h5dset->Rtype));
+	ans_elt = PROTECT(make_nzdata_from_buf(nzdata_buf, Rtype));
 	SET_VECTOR_ELT(ans, 2, ans_elt);
 	UNPROTECT(1);
 	if (ans_elt == R_NilValue)  /* should never happen */
@@ -285,11 +285,12 @@ static long long int copy_selected_string_chunk_data_to_CharAEAE_buf(
 {
 	const H5DSetDescriptor *h5dset;
 	int ndim, ret, inner_moved_along;
-	size_t in_offset;
+	size_t h5type_size, in_offset;
 	const char *s;
 
 	h5dset = chunk_iter->h5dset;
 	ndim = h5dset->ndim;
+	h5type_size = h5dset->h5type->h5type_size;
 	_init_in_offset(ndim,
 			chunk_iter->index,
 			h5dset->h5chunkdim,
@@ -297,9 +298,8 @@ static long long int copy_selected_string_chunk_data_to_CharAEAE_buf(
 			&chunk_iter->h5dset_vp,
 			&in_offset);
 	while (1) {
-		s = in + in_offset * h5dset->h5type_size;
-		ret = CharAEAE_append_if_nonzero(nzdata_buf, s,
-						 h5dset->h5type_size);
+		s = in + in_offset * h5type_size;
+		ret = CharAEAE_append_if_nonzero(nzdata_buf, s, h5type_size);
 		if (ret < 0) {
 			PRINT_TO_ERRMSG_BUF("too many non-zero "
 					    "values to load");
@@ -479,7 +479,7 @@ static int copy_selected_chunk_data_to_nzbufs(
 
 	//t0 = clock();
 	h5dset = chunk_iter->h5dset;
-	if (h5dset->Rtype == STRSXP) {
+	if (h5dset->h5type->Rtype == STRSXP) {
 		//printf("- copying selected chunk character data ... ");
 		nvals = copy_selected_string_chunk_data_to_CharAEAE_buf(
 				chunk_iter, inner_midx_buf,
@@ -493,10 +493,10 @@ static int copy_selected_chunk_data_to_nzbufs(
 		return 0;
 	}
 	copy_without_type_casting = chunk_data_buf->data_type_id ==
-				    h5dset->native_type_id_for_Rtype;
+				    h5dset->h5type->native_type_id_for_Rtype;
 	//printf("- copying selected chunk data %s type casting ... ",
 	//       copy_without_type_casting ? "WITHOUT" : "WITH");
-	switch (h5dset->Rtype) {
+	switch (h5dset->h5type->Rtype) {
 	    case INTSXP: case LGLSXP:
 		if (copy_without_type_casting) {
 			nvals = copy_selected_int_chunk_data_to_IntAE_buf(
@@ -739,7 +739,7 @@ SEXP _h5mread_sparse(const H5DSetDescriptor *h5dset, SEXP index, int *ans_dim)
 
 	ndim = h5dset->ndim;
 	nzindex_bufs = new_IntAEAE(ndim, ndim);
-	nzdata_buf = new_nzdata_buf(h5dset->Rtype);
+	nzdata_buf = new_nzdata_buf(h5dset->h5type->Rtype);
 	if (nzdata_buf == NULL)  /* should never happen */
 		return R_NilValue;
 
@@ -750,7 +750,8 @@ SEXP _h5mread_sparse(const H5DSetDescriptor *h5dset, SEXP index, int *ans_dim)
 
 	ans = PROTECT(NEW_LIST(3));
 	//clock_t t0 = clock();
-	ret = copy_nzindex_and_nzdata_to_ans(h5dset, nzindex_bufs, nzdata_buf,
+	ret = copy_nzindex_and_nzdata_to_ans(h5dset->h5type->Rtype,
+					     nzindex_bufs, nzdata_buf,
 					     ans);
 	UNPROTECT(1);
 	if (ret < 0)

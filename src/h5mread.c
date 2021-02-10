@@ -43,7 +43,7 @@ static int select_method(const H5DSetDescriptor *h5dset,
 		PRINT_TO_ERRMSG_BUF("'method' must be >= 0 and <= 6");
 		return -1;
 	}
-	if (h5dset->Rtype == STRSXP) {
+	if (h5dset->h5type->Rtype == STRSXP) {
 		if (counts != R_NilValue) {
 			PRINT_TO_ERRMSG_BUF("'counts' must be NULL when "
 					    "reading string data");
@@ -197,14 +197,17 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ans != R_NilValue) {
 		PROTECT(ans);
 		if (as_sparse) {
-			if (h5dset.Rtype == LGLSXP)
+			if (h5dset.h5type->Rtype == LGLSXP) {
 				fix_logical_NAs(VECTOR_ELT(ans, 2));
-			else if (h5dset.Rtype == STRSXP && h5dset.as_na_attr)
+			} else if (h5dset.h5type->Rtype == STRSXP &&
+				   h5dset.as_na_attr)
+			{
 				set_character_NAs(VECTOR_ELT(ans, 2));
+			}
 			/* Final 'ans' is 'list(ans_dim, nzindex, nzdata)'. */
 			SET_VECTOR_ELT(ans, 0, ans_dim);
 		} else {
-			if (h5dset.Rtype == LGLSXP)
+			if (h5dset.h5type->Rtype == LGLSXP)
 				fix_logical_NAs(ans);
 			SET_DIM(ans, ans_dim);
 		}

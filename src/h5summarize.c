@@ -502,8 +502,8 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	/* Set one of 'int_OP' or 'double_OP' to NULL and the other one to
 	   an IntOP or DoubleOP function. Also initializes 'init' with 1 or
 	   2 ints or doubles. */
-	select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init);
-	//select_OP(opcode, h5dset->Rtype, &int_OP, &double_OP, init2);
+	select_OP(opcode, h5dset->h5type->Rtype, &int_OP, &double_OP, init);
+	//select_OP(opcode, h5dset->h5type->Rtype, &int_OP, &double_OP, init2);
 
 	ndim = h5dset->ndim;
 	inner_midx_buf = new_IntAE(ndim, ndim, 0);
@@ -604,7 +604,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 	_destroy_ChunkIterator(&chunk_iter);
 	if (ret < 0)
 		return R_NilValue;
-	return init2SEXP(opcode, h5dset->Rtype, init, status);
+	return init2SEXP(opcode, h5dset->h5type->Rtype, init, status);
 }
 
 /* --- .Call ENTRY POINT --- */
@@ -642,7 +642,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		H5Fclose(file_id);
 		error(_HDF5Array_global_errmsg_buf());
 	}
-	ret = check_Rtype(h5dset.Rtype, opcode);
+	ret = check_Rtype(h5dset.h5type->Rtype, opcode);
 	if (ret < 0) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);

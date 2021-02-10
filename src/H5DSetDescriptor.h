@@ -5,26 +5,34 @@
 #include "S4Vectors_interface.h"
 #include "hdf5.h"
 
-/* A data structure for handling an HDF5 dataset. Collect various information
-   about the dataset. What is collected is basically the union of the things
-   needed by functions C_h5mread(), C_h5getdimscales(), and C_h5setdimscales().
- */
+/* A data structure for handling an H5 type that is mapped to an R type (only
+   H5 types of class H5T_INTEGER, H5T_FLOAT, or H5T_STRING are mapped to an
+   R type at the moment. */
 typedef struct {
 	/* Core members (always set). */
-	hid_t dset_id;
-	char *h5name;  // canonical name as retrieved by H5Iget_name()
-	char *storage_mode_attr;
 	hid_t h5type_id;
 	H5T_class_t h5class;
 	size_t h5type_size;
 	int h5type_signedness;          // set only when h5class == H5T_INTEGER
 	SEXPTYPE Rtype;
 
-	/* Additional members (not set when 'get_Rtype_only' is set to 1). */
+	/* Members below will be set only when new_H5TypeDescriptor() is
+	   called with 'get_Rtype_only' set to 0. */
 	size_t Rtype_size;
 	hid_t native_type_id;           // set only when h5class != H5T_STRING
 	size_t native_type_size;        // set only when h5class != H5T_STRING
 	hid_t native_type_id_for_Rtype; // set only when h5class != H5T_STRING
+} H5TypeDescriptor;
+
+/* A data structure for handling an HDF5 dataset. Collect various information
+   about the dataset. What is collected is basically the union of the things
+   needed by functions C_h5mread(), C_h5getdimscales(), and C_h5setdimscales().
+ */
+typedef struct {
+	hid_t dset_id;
+	char *h5name;  // canonical name as retrieved by H5Iget_name()
+	char *storage_mode_attr;
+	H5TypeDescriptor *h5type;
 	int as_na_attr;
 	hid_t h5space_id;
 	int ndim;

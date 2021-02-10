@@ -552,6 +552,7 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	size_t data_length, data_type_size;
 	hid_t data_type_id;
 	int h5along;
+	const H5TypeDescriptor *h5type;
 
 	if (h5dset->h5chunkdim == NULL) {
 		PRINT_TO_ERRMSG_BUF("'h5dset->h5chunkdim' is NULL");
@@ -572,21 +573,22 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_length = data_length;
 
 	/* Set members 'data_type_id' and 'data_type_size'. */
-	if (h5dset->h5class == H5T_STRING) {
-		data_type_id = h5dset->h5type_id;
-		data_type_size = h5dset->h5type_size;
+	h5type = h5dset->h5type;
+	if (h5type->h5class == H5T_STRING) {
+		data_type_id = h5type->h5type_id;
+		data_type_size = h5type->h5type_size;
 	} else if (use_Rtype ||
-		   h5dset->native_type_size >= h5dset->Rtype_size)
+		   h5type->native_type_size >= h5type->Rtype_size)
 	{
 		/* Copying data from 'chunk_data_buf' to final R array will
 		   require NO type casting. */
-		data_type_id = h5dset->native_type_id_for_Rtype;
-		data_type_size = h5dset->Rtype_size;
+		data_type_id = h5type->native_type_id_for_Rtype;
+		data_type_size = h5type->Rtype_size;
 	} else {
 		/* Copying data from 'chunk_data_buf' to final R array will
 		   require type casting. */
-		data_type_id = h5dset->native_type_id;
-		data_type_size = h5dset->native_type_size;
+		data_type_id = h5type->native_type_id;
+		data_type_size = h5type->native_type_size;
 	}
 	chunk_data_buf->data_type_id = data_type_id;
 	chunk_data_buf->data_type_size = data_type_size;
