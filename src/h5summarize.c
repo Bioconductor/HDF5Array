@@ -611,9 +611,10 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		   SEXP op, SEXP na_rm, SEXP verbose)
 {
-	int as_int, opcode, narm0, verbose0, ret;
+	int as_int, opcode, narm0, verbose0, ret, is_supported;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
+	const H5TypeDescriptor *h5type;
 	SEXP ans;
 
 	/* Check 'as_integer'. */
@@ -642,7 +643,22 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		H5Fclose(file_id);
 		error(_HDF5Array_global_errmsg_buf());
 	}
-	ret = check_Rtype(h5dset.h5type->Rtype, opcode);
+
+	h5type = h5dset.h5type;
+	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
+	if (!is_supported) {
+		_destroy_H5DSetDescriptor(&h5dset);
+		H5Dclose(dset_id);
+		H5Fclose(file_id);
+		PRINT_TO_ERRMSG_BUF(
+			"h5summarize() does not support this type "
+			"of dataset yet, sorry. You can\n  "
+			"use 'H5DSetDescriptor(filepath, name)' "
+			"to see details about the dataset.");
+		error(_HDF5Array_global_errmsg_buf());
+	}
+
+	ret = check_Rtype(h5type->Rtype, opcode);
 	if (ret < 0) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);

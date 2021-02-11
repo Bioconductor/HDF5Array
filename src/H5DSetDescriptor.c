@@ -156,6 +156,26 @@ static const char *predef_native_type_as_string(hid_t native_type_id)
 	return s;
 }
 
+/* Gosh, it really sucks that H5Tget_native_type() doesn't actually return
+   the id of a predefined native type like H5T_NATIVE_INT. Instead it returns
+   a stupid random type id that cannot be compared directly with the
+   predefined ones using something like ==. Nope, you need to compare with
+   H5Tequal()! And to make the matter even worse, the documentation for
+   H5Tget_native_type() doesn't say anything about this! */
+static hid_t map_h5type_to_predef_native_type(hid_t h5type_id)
+{
+	hid_t native_type_id, predef_native_type_id;
+
+	native_type_id = H5Tget_native_type(h5type_id, H5T_DIR_DEFAULT);
+	if (native_type_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_native_type() returned an error");
+		return -1;
+	}
+	predef_native_type_id = map_native_type_to_predef_type(native_type_id);
+	H5Tclose(native_type_id);
+	return predef_native_type_id;
+}
+
 static const char *H5class2str(H5T_class_t h5class)
 {
 	static char s[32];
@@ -381,11 +401,8 @@ static int get_h5attrib_intval(hid_t dset_id, const char *attr_name, int *val)
  * Handle Rtype
  */
 
-/* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
-   support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
 static int map_numeric_h5class_to_Rtype(H5T_class_t h5class,
-		size_t h5type_size, int h5type_signedness,
-		SEXPTYPE *Rtype)
+		size_t h5type_size, int h5type_signedness, SEXPTYPE *Rtype)
 {
 	switch (h5class) {
 	    case H5T_INTEGER:
@@ -396,33 +413,31 @@ static int map_numeric_h5class_to_Rtype(H5T_class_t h5class,
 		} else {
 			*Rtype = REALSXP;
 		}
-		return 0;
+		return 1;
 	    case H5T_FLOAT:
 		*Rtype = REALSXP;
-		return 0;
+		return 1;
 	/* Only to avoid gcc warning about enumeration value not handled
 	   in switch. */
 	    default: break;
 	}
-	PRINT_TO_ERRMSG_BUF("unsupported dataset class: %s",
-			    H5class2str(h5class));
-	return -1;
+	return 0;
 }
 
 static int map_storage_mode_to_Rtype(const char *storage_mode, SEXPTYPE *Rtype)
 {
 	if (strcmp(storage_mode, "logical") == 0) {
 		*Rtype = LGLSXP;
-		return 0;
+		return 1;
 	}
 	if (strcmp(storage_mode, "integer") == 0) {
 		*Rtype = INTSXP;
-		return 0;
+		return 1;
 	}
 	if (strcmp(storage_mode, "double") == 0 ||
 	    strcmp(storage_mode, "numeric") == 0) {
 		*Rtype = REALSXP;
-		return 0;
+		return 1;
 	}
 	if (strcmp(storage_mode, "character") == 0) {
 		warning("dataset has a \"storage.mode\" attribute "
@@ -431,19 +446,22 @@ static int map_storage_mode_to_Rtype(const char *storage_mode, SEXPTYPE *Rtype)
 	}
 	if (strcmp(storage_mode, "raw") == 0) {
 		*Rtype = RAWSXP;
-		return 0;
+		return 1;
 	}
-	PRINT_TO_ERRMSG_BUF("dataset has a \"storage.mode\" "
-			    "attribute set to unsupported value: \"%s\"",
-			    storage_mode);
-	return -1;
+	warning("dataset has a \"storage.mode\" attribute "
+		"set to unsupported value \"%s\" -- we ignore it",
+		storage_mode);
+	return 0;
 }
 
-static int set_Rtype(H5T_class_t h5class,
+/* See hdf5-1.10.3/src/H5Tpublic.h for the list of datatype classes. We only
+   support H5T_INTEGER, H5T_FLOAT, and H5T_STRING for now. */
+static int map_h5type_to_Rtype(H5T_class_t h5class,
 		size_t h5type_size, int h5type_signedness,
-		int as_int, const char *storage_mode, SEXPTYPE *Rtype)
+		int as_int, const char *storage_mode,
+		SEXPTYPE *Rtype)
 {
-	int ret;
+	int Rtype_is_set;
 
 	if (h5class == H5T_STRING) {
 		if (as_int)
@@ -452,28 +470,21 @@ static int set_Rtype(H5T_class_t h5class,
 		*Rtype = STRSXP;
 		if (storage_mode == NULL
 		 || strcmp(storage_mode, "character") == 0)
-			return 0;
+			return 1;
 		warning("dataset class is H5T_STRING but it has a "
 			"\"storage.mode\" attribute set to %s -- we ignore it",
 			storage_mode);
-		return 0;
+		return 1;
 	}
-	ret = map_numeric_h5class_to_Rtype(h5class,
-					   h5type_size, h5type_signedness,
-					   Rtype);
-	if (ret < 0)
-		return -1;
 	if (as_int) {
-		/* We override the *Rtype value set earlier by
-		   map_numeric_h5class_to_Rtype() but calling
-		   map_numeric_h5class_to_Rtype() still had the merit
-		   of checking that 'h5class' is a supported class. */
 		*Rtype = INTSXP;
-		return 0;
+		return 1;
 	}
+	Rtype_is_set = map_numeric_h5class_to_Rtype(h5class,
+					h5type_size, h5type_signedness, Rtype);
 	if (storage_mode == NULL)
-		return 0;
-	return map_storage_mode_to_Rtype(storage_mode, Rtype);
+		return Rtype_is_set;
+	return map_storage_mode_to_Rtype(storage_mode, Rtype) || Rtype_is_set;
 }
 
 static size_t get_Rtype_size(SEXPTYPE Rtype, size_t h5type_size)
@@ -489,7 +500,7 @@ static size_t get_Rtype_size(SEXPTYPE Rtype, size_t h5type_size)
 }
 
 /* Must NOT be called on STRSXP! */
-static hid_t map_Rtype_to_native_type(SEXPTYPE Rtype)
+static hid_t map_Rtype_to_predef_native_type(SEXPTYPE Rtype)
 {
 	switch (Rtype) {
 	    case LGLSXP: case INTSXP: return H5T_NATIVE_INT;
@@ -509,8 +520,39 @@ static hid_t map_Rtype_to_native_type(SEXPTYPE Rtype)
  * print_H5TypeDescriptor()
  */
 
+#define	MAX_SUPPORTED_NESTED_DEPTH 100
+static int nested_depth = 0;
+static char margin[4 * MAX_SUPPORTED_NESTED_DEPTH + 1];
+static void set_margin()
+{
+	int indent, i;
+
+	indent = 4 * nested_depth;
+	for (i = 0; i < indent; i++)
+		margin[i] = ' ';
+	margin[indent] = '\0';
+}
+
+static void destroy_H5TMemberDescriptor(H5TMemberDescriptor *h5tmember);
+
+static H5TMemberDescriptor *new_H5TMemberDescriptor(hid_t h5type_id, int i,
+						    H5T_class_t h5class,
+						    int get_Rtype_only);
+
+static void print_H5TMemberDescriptor(H5TMemberDescriptor *h5tmember);
+
 static void destroy_H5TypeDescriptor(H5TypeDescriptor *h5type)
 {
+	int i;
+
+	if (h5type->num_h5tmembers != 0) {
+		for (i = 0; i < h5type->num_h5tmembers; i++) {
+			if (h5type->h5tmembers[i] != NULL)
+			    destroy_H5TMemberDescriptor(h5type->h5tmembers[i]);
+		}
+		free(h5type->h5tmembers);
+	}
+
 	free(h5type);
 	return;
 }
@@ -521,9 +563,8 @@ static H5TypeDescriptor *new_H5TypeDescriptor(
 		int get_Rtype_only)
 {
 	H5TypeDescriptor *h5type;
-	int h5type_signedness, ret;
-	SEXPTYPE Rtype;
-	hid_t native_type_id, native_type_id_for_Rtype, tmp;
+	int num_h5tmembers, i, signedness;
+	hid_t native_type_id, native_type_id_for_Rtype;
 	size_t native_type_size;
 
 	h5type = (H5TypeDescriptor *) malloc(sizeof(H5TypeDescriptor));
@@ -533,80 +574,117 @@ static H5TypeDescriptor *new_H5TypeDescriptor(
 		return NULL;
 	}
 
-	/* Set member 'h5type_id'. */
+	/* Initialize H5TypeDescriptor struct members that control
+	   what destroy_H5TypeDescriptor() needs to free or close. */
+	h5type->num_h5tmembers = 0;
+
+	/* Set struct member 'h5type_id'. */
 	h5type->h5type_id = h5type_id;
 
-	/* Set member 'h5class'. */
+	/* Set struct member 'h5class'. */
 	h5type->h5class = H5Tget_class(h5type_id);
 	if (h5type->h5class == H5T_NO_CLASS) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_class() returned an error");
 		goto on_error;
 	}
-	if (h5type->h5class == H5T_STRING &&
-	    H5Tis_variable_str(h5type_id) != 0)
-	{
-		PRINT_TO_ERRMSG_BUF("reading variable-length string data "
-				    "is not supported at the moment");
-		goto on_error;
-	}
 
-	/* Set member 'h5type_size'. */
+	/* Set struct member 'h5type_size'. */
 	h5type->h5type_size = H5Tget_size(h5type_id);
 	if (h5type->h5type_size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size(h5type_id) returned 0");
 		goto on_error;
 	}
 
+	/* Initialize struct member 'Rtype_is_set'. It might or might not
+	   get updated below. */
+	h5type->Rtype_is_set = 0;
+
+	if (h5type->h5class == H5T_COMPOUND || h5type->h5class == H5T_ENUM) {
+		/* Set struct members 'num_h5tmembers' and 'h5tmembers'. */
+		num_h5tmembers = H5Tget_nmembers(h5type_id);
+		if (num_h5tmembers < 0) {
+			PRINT_TO_ERRMSG_BUF("H5Tget_nmembers() "
+					    "returned an error");
+			goto on_error;
+		}
+		if (num_h5tmembers == 0)
+			return h5type;
+		if (nested_depth == MAX_SUPPORTED_NESTED_DEPTH) {
+			PRINT_TO_ERRMSG_BUF("Wow, this HDF5 dataset has a "
+					    "type with more than %d levels of "
+					    "nested members! This is nuts.",
+					    MAX_SUPPORTED_NESTED_DEPTH);
+			goto on_error;
+		}
+		h5type->h5tmembers = (H5TMemberDescriptor **)
+			malloc(num_h5tmembers * sizeof(H5TMemberDescriptor *));
+		if (h5type->h5tmembers == NULL) {
+			PRINT_TO_ERRMSG_BUF("failed to allocate "
+					    "memory for 'h5tmembers'");
+			goto on_error;
+		}
+		nested_depth++;
+		for (i = 0; i < num_h5tmembers; i++) {
+			h5type->h5tmembers[i] =
+				new_H5TMemberDescriptor(h5type_id, i,
+							h5type->h5class,
+							get_Rtype_only);
+			if (h5type->h5tmembers[i] == NULL)
+				goto on_error;
+			h5type->num_h5tmembers++;
+		}
+		nested_depth--;
+		return h5type;
+	}
+
 	if (h5type->h5class == H5T_INTEGER) {
-		/* Set member 'h5type_signedness'. */
-		h5type_signedness = H5Tget_sign(h5type_id);
-		if (h5type_signedness < 0) {
+		/* Set struct member 'signedness'. */
+		signedness = H5Tget_sign(h5type_id);
+		if (signedness < 0) {
 			PRINT_TO_ERRMSG_BUF("H5Tget_sign() returned an error");
 			goto on_error;
 		}
-		h5type->h5type_signedness = h5type_signedness;
+		h5type->signedness = signedness;
 	}
 
-	/* Set member 'Rtype'. */
-	ret = set_Rtype(h5type->h5class,
-			h5type->h5type_size, h5type->h5type_signedness,
-			as_int, storage_mode, &Rtype);
-	if (ret < 0)
-		goto on_error;
-	h5type->Rtype = Rtype;
+	/* Set struct members 'Rtype_is_set' and 'Rtype'. */
+	h5type->Rtype_is_set = map_h5type_to_Rtype(h5type->h5class,
+					h5type->h5type_size, h5type->signedness,
+					as_int, storage_mode, &h5type->Rtype);
 
 	if (get_Rtype_only)
 		return h5type;
 
-	/* Set member 'Rtype_size'. */
-	h5type->Rtype_size = get_Rtype_size(h5type->Rtype, h5type->h5type_size);
-	if (h5type->Rtype_size == 0)
-		goto on_error;
+	if (h5type->h5class == H5T_STRING) {
+		/* Set struct member 'is_variable_str'. */
+		h5type->is_variable_str = H5Tis_variable_str(h5type_id);
+		if (h5type->is_variable_str < 0) {
+			PRINT_TO_ERRMSG_BUF("H5Tis_variable_str() "
+					    "returned an error");
+			goto on_error;
+		}
+	} else {
+		h5type->is_variable_str = 0;
+	}
 
-	if (h5type->h5class == H5T_STRING)
+	if (h5type->Rtype_is_set) {
+		/* Set struct member 'Rtype_size'. */
+		h5type->Rtype_size = get_Rtype_size(h5type->Rtype,
+						    h5type->h5type_size);
+		if (h5type->Rtype_size == 0)
+			goto on_error;
+	}
+
+	if (h5type->h5class != H5T_INTEGER && h5type->h5class != H5T_FLOAT)
 		return h5type;
 
-	/* Set member 'native_type_id'.
-	   Gosh, it really sucks that H5Tget_native_type() doesn't
-	   actually return the id of a predefined native type like
-	   H5T_NATIVE_INT. Instead it returns a stupid random type
-	   id that cannot be compared directly with the predefined
-	   ones using something like the == operator. Nope, you need
-	   to compare with H5Tequal()! And to make the matter even
-	   worse, the documentation for H5Tget_native_type() doesn't
-	   say anything about this! */
-	tmp = H5Tget_native_type(h5type_id, H5T_DIR_DEFAULT);
-	if (tmp < 0) {
-		PRINT_TO_ERRMSG_BUF("H5Tget_native_type() returned an error");
-		goto on_error;
-	}
-	native_type_id = map_native_type_to_predef_type(tmp);
-	H5Tclose(tmp);
+	/* Set struct member 'native_type_id'. */
+	native_type_id = map_h5type_to_predef_native_type(h5type_id);
 	if (native_type_id < 0)
 		goto on_error;
 	h5type->native_type_id = native_type_id;
 
-	/* Set member 'native_type_size'. */
+	/* Set struct member 'native_type_size'. */
 	native_type_size = H5Tget_size(h5type->native_type_id);
 	if (native_type_size == 0) {
 		PRINT_TO_ERRMSG_BUF("H5Tget_size(native_type_id) returned 0");
@@ -614,11 +692,14 @@ static H5TypeDescriptor *new_H5TypeDescriptor(
 	}
 	h5type->native_type_size = native_type_size;
 
-	/* Set member 'native_type_id_for_Rtype'. */
-	native_type_id_for_Rtype = map_Rtype_to_native_type(h5type->Rtype);
-	if (native_type_id_for_Rtype < 0)
-		goto on_error;
-	h5type->native_type_id_for_Rtype = native_type_id_for_Rtype;
+	if (h5type->Rtype_is_set) {
+		/* Set struct member 'native_type_id_for_Rtype'. */
+		native_type_id_for_Rtype =
+			map_Rtype_to_predef_native_type(h5type->Rtype);
+		if (native_type_id_for_Rtype < 0)
+			goto on_error;
+		h5type->native_type_id_for_Rtype = native_type_id_for_Rtype;
+	}
 
 	return h5type;
 
@@ -629,36 +710,177 @@ static H5TypeDescriptor *new_H5TypeDescriptor(
 
 static void print_H5TypeDescriptor(H5TypeDescriptor *h5type)
 {
-	Rprintf("- h5type:\n");
-	Rprintf("  - h5type_id = %ld\n", h5type->h5type_id);
-	Rprintf("  - h5class = %s\n", H5class2str(h5type->h5class));
-	Rprintf("  - h5type_size = %lu\n", h5type->h5type_size);
-	if (h5type->h5class == H5T_INTEGER) {
-		Rprintf("  - h5type_signedness = %s\n",
-			h5type->h5type_signedness == H5T_SGN_NONE ?
-			"unsigned" : "signed");
-	} else {
-		Rprintf("  - h5type_signedness = none        "
-			"(set only when h5class is H5T_INTEGER)\n");
+	int i;
+	const char *what;
+	const char *k, *v;
+
+	Rprintf("%s- h5type:\n", margin);
+	Rprintf("%s  * h5type_id = %ld\n", margin, h5type->h5type_id);
+	Rprintf("%s  * h5class = %s\n", margin, H5class2str(h5type->h5class));
+	Rprintf("%s  * h5type_size = %lu\n", margin, h5type->h5type_size);
+	Rprintf("%s  * Rtype_is_set = %d\n", margin, h5type->Rtype_is_set);
+
+	if (h5type->num_h5tmembers != 0) {
+		what = h5type->h5class == H5T_COMPOUND ? "compound" : "enum";
+		for (i = 0; i < h5type->num_h5tmembers; i++) {
+			Rprintf("%s  o %s type member #%d/%d:\n", margin,
+				what, i + 1, h5type->num_h5tmembers);
+			print_H5TMemberDescriptor(h5type->h5tmembers[i]);
+		}
+		return;
 	}
-	Rprintf("  - Rtype = \"%s\"\n", CHAR(type2str(h5type->Rtype)));
-	Rprintf("  - Rtype_size = %lu\n", h5type->Rtype_size);
-	if (h5type->h5class != H5T_STRING) {
-		Rprintf("  - native_type_id = %s\n",
-			predef_native_type_as_string(h5type->native_type_id));
-		Rprintf("  - native_type_size = %lu\n",
-			h5type->native_type_size);
-		Rprintf("  - native_type_id_for_Rtype = %s\n",
-			predef_native_type_as_string(
-				h5type->native_type_id_for_Rtype));
+
+	/* signedness */
+	if (h5type->h5class != H5T_INTEGER) {
+		v = "none (h5class is not H5T_INTEGER)";
 	} else {
-		Rprintf("  - native_type_id = none           "
-			"(set only when h5class is **not** H5T_STRING)\n");
-		Rprintf("  - native_type_size = none         "
-			"(set only when h5class is **not** H5T_STRING)\n");
-		Rprintf("  - native_type_id_for_Rtype = none "
-			"(set only when h5class is **not** H5T_STRING)\n");
+		v = h5type->signedness == H5T_SGN_NONE ? "unsigned" : "signed";
 	}
+	Rprintf("%s  * signedness = %s\n", margin, v);
+
+	/* Rtype */
+	if (h5type->Rtype_is_set) {
+		v = CHAR(type2str(h5type->Rtype));
+		Rprintf("%s  * Rtype = \"%s\"\n", margin, v);
+	} else {
+		Rprintf("%s  * Rtype = none\n", margin);
+	}
+
+	/* is_variable_str */
+	k = "is_variable_str";
+	if (h5type->h5class == H5T_STRING) {
+		Rprintf("%s  * %s = %s\n", margin, k,
+			h5type->is_variable_str ? "yes" : "no");
+	} else {
+		Rprintf("%s  * %s = %d\n", margin, k, h5type->is_variable_str);
+	}
+
+	/* Rtype_size */
+	k = "Rtype_size";
+	if (h5type->Rtype_is_set) {
+		Rprintf("%s  * %s = %lu\n", margin, k, h5type->Rtype_size);
+	} else {
+		Rprintf("%s  * %s = none\n", margin, k);
+	}
+
+	if (h5type->h5class != H5T_INTEGER && h5type->h5class != H5T_FLOAT) {
+		Rprintf("%s  * native_type_id, native_type_size, "
+			"and native_type_id_for_Rtype\n", margin);
+		Rprintf("%s    are not set because h5class is not "
+			"H5T_INTEGER or H5T_FLOAT\n", margin);
+		return;
+	}
+
+	/* native_type_id */
+	Rprintf("%s  * native_type_id = %s\n", margin,
+		predef_native_type_as_string(h5type->native_type_id));
+
+	/* native_type_size */
+	Rprintf("%s  * native_type_size = %lu\n", margin,
+		h5type->native_type_size);
+
+	/* native_type_id_for_Rtype */
+	if (h5type->Rtype_is_set) {
+		v = predef_native_type_as_string(
+			h5type->native_type_id_for_Rtype);
+	} else {
+		v = "none (Rtype is not set)";
+	}
+	Rprintf("%s  * native_type_id_for_Rtype = %s\n", margin, v);
+	return;
+}
+
+
+/****************************************************************************
+ * destroy_H5TMemberDescriptor()
+ * new_H5TMemberDescriptor()
+ * print_H5TMemberDescriptor()
+ */
+
+static void destroy_H5TMemberDescriptor(H5TMemberDescriptor *h5tmember)
+{
+	if (h5tmember->h5type != NULL) {
+		H5Tclose(h5tmember->h5type->h5type_id);
+		destroy_H5TypeDescriptor(h5tmember->h5type);
+	}
+
+	if (h5tmember->name != NULL)
+		H5free_memory(h5tmember->name);
+
+	free(h5tmember);
+	return;
+}
+
+static H5TMemberDescriptor *new_H5TMemberDescriptor(hid_t h5type_id, int i,
+						    H5T_class_t h5class,
+						    int get_Rtype_only)
+{
+	H5TMemberDescriptor *h5tmember;
+	hid_t member_h5type_id;
+
+	h5tmember =
+		(H5TMemberDescriptor *) malloc(sizeof(H5TMemberDescriptor));
+	if (h5tmember == NULL) {
+		PRINT_TO_ERRMSG_BUF("failed to allocate memory "
+				    "for H5TMemberDescriptor");
+		return NULL;
+	}
+
+	/* Initialize H5TMemberDescriptor struct members that control
+	   what destroy_H5TMemberDescriptor() needs to free or close. */
+	h5tmember->name = NULL;
+	h5tmember->h5type = NULL;
+
+	/* Set struct member 'name'. */
+	h5tmember->name = H5Tget_member_name(h5type_id, i);
+	if (h5tmember->name == NULL) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_member_name() returned an error");
+		goto on_error;
+	}
+
+	if (h5class == H5T_ENUM)
+		return h5tmember;
+
+	/* Set struct member 'h5class'. */
+	h5tmember->h5class = H5Tget_member_class(h5type_id, i);
+	if (h5tmember->h5class < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_member_class() returned an error");
+		goto on_error;
+	}
+
+	/* Set struct member 'h5type'. */
+	member_h5type_id = H5Tget_member_type(h5type_id, i);
+	if (member_h5type_id < 0) {
+		PRINT_TO_ERRMSG_BUF("H5Tget_member_type() returned an error");
+		goto on_error;
+	}
+	h5tmember->h5type = new_H5TypeDescriptor(member_h5type_id,
+						 0, NULL,
+						 get_Rtype_only);
+	if (h5tmember->h5type == NULL)
+		goto on_error;
+
+	return h5tmember;
+
+    on_error:
+	destroy_H5TMemberDescriptor(h5tmember);
+	return NULL;
+}
+
+static void print_H5TMemberDescriptor(H5TMemberDescriptor *h5tmember)
+{
+	nested_depth++;
+	set_margin();
+	Rprintf("%s- name = \"%s\"\n", margin, h5tmember->name);
+	if (h5tmember->h5type != NULL) {
+		/* These struct members are set for a compound H5 member, but
+		   not for an enumeration H5 member. */
+		Rprintf("%s- member h5class = %s\n", margin,
+			H5class2str(h5tmember->h5class));
+		print_H5TypeDescriptor(h5tmember->h5type);
+	}
+	nested_depth--;
+	set_margin();
 	return;
 }
 
@@ -671,21 +893,28 @@ void _destroy_H5DSetDescriptor(H5DSetDescriptor *h5dset)
 {
 	if (h5dset->h5nchunk != NULL)
 		free(h5dset->h5nchunk);
+
 	if (h5dset->h5chunkdim != NULL &&
 	    h5dset->h5chunkdim != h5dset->h5dim)
 		free(h5dset->h5chunkdim);
+
 	if (h5dset->h5dim != NULL)
 		free(h5dset->h5dim);
+
 	if (h5dset->h5plist_id != -1)
 		H5Pclose(h5dset->h5plist_id);
+
 	if (h5dset->h5space_id != -1)
 		H5Sclose(h5dset->h5space_id);
+
 	if (h5dset->h5type != NULL) {
 		H5Tclose(h5dset->h5type->h5type_id);
 		destroy_H5TypeDescriptor(h5dset->h5type);
 	}
+
 	if (h5dset->storage_mode_attr != NULL)
 		free(h5dset->storage_mode_attr);
+
 	if (h5dset->h5name != NULL)
 		free(h5dset->h5name);
 	return;
@@ -703,8 +932,8 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	htri_t ret;
 	CharAE *buf;
 
-	/* Initialize the members that _destroy_H5DSetDescriptor() will free
-	   or close. */
+	/* Initialize H5DSetDescriptor struct members that control
+	   what _destroy_H5DSetDescriptor() needs to free or close. */
 	h5dset->h5name = NULL;
 	h5dset->storage_mode_attr = NULL;
 	h5dset->h5type = NULL;
@@ -714,16 +943,16 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	h5dset->h5chunkdim = NULL;
 	h5dset->h5nchunk = NULL;
 
-	/* Set member 'dset_id'. */
+	/* Set struct member 'dset_id'. */
 	h5dset->dset_id = dset_id;
 
-	/* Set member 'h5name'. */
+	/* Set struct member 'h5name'. */
 	h5name = get_h5name(dset_id);
 	if (h5name == NULL)
 		goto on_error;
 	h5dset->h5name = h5name;
 
-	/* Set member 'storage_mode_attr'. */
+	/* Set struct member 'storage_mode_attr'. */
 	buf = new_CharAE(0);
 	ret = _get_h5attrib_strval(dset_id, "storage.mode", buf);
 	if (ret < 0)
@@ -744,14 +973,14 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->storage_mode_attr = storage_mode_attr;
 	}
 
-	/* Set member 'h5type'. */
+	/* Set struct member 'h5type'. */
 	h5type_id = H5Dget_type(dset_id);
 	if (h5type_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_type() returned an error");
 		goto on_error;
 	}
-	h5type = new_H5TypeDescriptor(h5type_id, as_int,
-				      h5dset->storage_mode_attr,
+	h5type = new_H5TypeDescriptor(h5type_id,
+				      as_int, h5dset->storage_mode_attr,
 				      get_Rtype_only);
 	if (h5type == NULL)
 		goto on_error;
@@ -760,7 +989,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	if (get_Rtype_only)
 		return 0;
 
-	/* Set member 'as_na_attr'. */
+	/* Set struct member 'as_na_attr'. */
 	ret = get_h5attrib_intval(dset_id, "as.na", &as_na_attr);
 	if (ret < 0)
 		goto on_error;
@@ -772,7 +1001,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->as_na_attr = ret == 2 ? as_na_attr : 0;
 
-	/* Set member 'h5space_id'. */
+	/* Set struct member 'h5space_id'. */
 	h5space_id = H5Dget_space(dset_id);
 	if (h5space_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_space() returned an error");
@@ -780,7 +1009,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->h5space_id = h5space_id;
 
-	/* Set member 'ndim'. */
+	/* Set struct member 'ndim'. */
 	ndim = H5Sget_simple_extent_ndims(h5dset->h5space_id);
 	if (ndim < 0) {
 		PRINT_TO_ERRMSG_BUF(
@@ -789,7 +1018,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->ndim = ndim;
 
-	/* Set member 'h5plist_id'. */
+	/* Set struct member 'h5plist_id'. */
 	h5plist_id = H5Dget_create_plist(dset_id);
 	if (h5plist_id < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Dget_create_plist() returned an error");
@@ -797,7 +1026,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->h5plist_id = h5plist_id;
 
-	/* Set member 'h5dim'. */
+	/* Set struct member 'h5dim'. */
 	h5dim = _alloc_hsize_t_buf(ndim, 0, "'h5dim'");
 	if (h5dim == NULL)
 		goto on_error;
@@ -808,7 +1037,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->h5dim = h5dim;
 
-	/* Set member 'h5layout'. */
+	/* Set struct member 'h5layout'. */
 	h5layout = H5Pget_layout(h5dset->h5plist_id);
 	if (h5layout < 0) {
 		PRINT_TO_ERRMSG_BUF("H5Pget_layout() returned an error");
@@ -816,7 +1045,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	}
 	h5dset->h5layout = h5layout;
 
-	/* Set member 'h5chunkdim'. */
+	/* Set struct member 'h5chunkdim'. */
 	if (h5dset->h5layout == H5D_CHUNKED) {
 		h5chunkdim = _alloc_hsize_t_buf(ndim, 0, "'h5chunkdim'");
 		if (h5chunkdim == NULL)
@@ -827,7 +1056,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 			goto on_error;
 		}
 		h5dset->h5chunkdim = h5chunkdim;
-	} else if (h5dset->h5type->Rtype == STRSXP) {
+	} else if (h5type->Rtype == STRSXP) {
 		/* Even though the dataset is contiguous, we treat it as
 		   if it was made of a single chunk. This is so that we
 		   can use h5mread() method 4 on it, which works only on
@@ -836,7 +1065,7 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 		h5dset->h5chunkdim = h5dset->h5dim;
 	}
 
-	/* Set member 'h5nchunk'. */
+	/* Set struct member 'h5nchunk'. */
 	if (h5dset->h5chunkdim != NULL) {
 		h5nchunk = (int *) malloc(ndim * sizeof(int));
 		if (h5nchunk == NULL) {
@@ -872,52 +1101,6 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 	return -1;
 }
 
-/*
-static void print_compound_details(const H5DSetDescriptor *h5dset)
-{
-	int nmembers;
-	char *member_name;
-	hid_t member_h5type_id;
-	H5T_class_t member_h5class;
-	size_t member_h5type_size;
-
-	nmembers = H5Tget_nmembers(h5dset->h5type->h5type_id);
-	Rprintf("- nmembers = %d\n", nmembers);
-
-	for (int i = 0; i < nmembers; i++) {
-		Rprintf("  - member[%d]:\n", i);
-
-		member_name = H5Tget_member_name(h5dset->h5type->h5type_id, i);
-		if (member_name == NULL) {
-			error("H5Tget_member_name() returned an error");
-		}
-		Rprintf("      name = \"%s\"\n", member_name);
-		H5free_memory(member_name);
-
-		member_h5type_id = H5Tget_member_type(h5dset->h5type->h5type_id, i);
-		if (member_h5type_id < 0) {
-			error("H5Tget_member_type() returned an error");
-		}
-		Rprintf("      h5type_id = %ld\n", member_h5type_id);
-
-		member_h5class = H5Tget_member_class(h5dset->h5type->h5type_id, i);
-		if (member_h5class < 0) {
-			error("H5Tget_member_class() returned an error");
-		}
-		Rprintf("      h5class = %s\n", H5class2str(member_h5class));
-
-		member_h5type_size = H5Tget_size(member_h5type_id);
-		if (member_h5type_size == 0) {
-			error("H5Tget_size(member_h5type_id) returned 0");
-		}
-		Rprintf("      h5type_size = %lu\n", member_h5type_size);
-
-		H5Tclose(member_h5type_id);
-	}
-
-	return;
-}
-*/
 
 /****************************************************************************
  * Convenience wrappers to H5Fopen() and H5Dopen(), with argument checking
@@ -1050,6 +1233,8 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 	}
 	Rprintf("\n");
 
+	nested_depth = 0;
+	set_margin();
 	print_H5TypeDescriptor(h5dset->h5type);
 
 	Rprintf("- as_na_attr = %d\n", h5dset->as_na_attr);
@@ -1098,9 +1283,10 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 /* --- .Call ENTRY POINT --- */
 SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 {
-	int as_int, ret;
+	int as_int, ret, is_supported;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
+	const H5TypeDescriptor *h5type;
 	SEXPTYPE Rtype;
 
 	/* Check 'as_integer'. */
@@ -1116,7 +1302,20 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 	H5Fclose(file_id);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
-	Rtype = h5dset.h5type->Rtype;
+
+	h5type = h5dset.h5type;
+	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
+	if (!is_supported) {
+		_destroy_H5DSetDescriptor(&h5dset);
+		PRINT_TO_ERRMSG_BUF(
+			"h5mread() does not support this type "
+			"of dataset yet, sorry. You can\n  "
+			"use 'H5DSetDescriptor(filepath, name)' "
+			"to see details about the dataset.");
+		error(_HDF5Array_global_errmsg_buf());
+	}
+
+	Rtype = h5type->Rtype;
 	_destroy_H5DSetDescriptor(&h5dset);
 	return ScalarString(type2str(Rtype));
 }

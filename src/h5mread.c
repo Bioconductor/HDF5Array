@@ -157,12 +157,25 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 {
 	SEXP ans, ans_dim;
 	H5DSetDescriptor h5dset;
-	int ret;
+	const H5TypeDescriptor *h5type;
+	int is_supported, ret;
 
 	ans = R_NilValue;
 
 	if (_init_H5DSetDescriptor(&h5dset, dset_id, as_int, 0) < 0)
 		return ans;
+
+	h5type = h5dset.h5type;
+	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
+	if (!is_supported) {
+		_destroy_H5DSetDescriptor(&h5dset);
+		PRINT_TO_ERRMSG_BUF(
+			"h5mread() does not support this type "
+			"of dataset yet, sorry. You can\n  "
+			"use 'H5DSetDescriptor(filepath, name)' "
+			"to see details about the dataset.");
+		return ans;
+	}
 
 	ret = _shallow_check_uaselection(h5dset.ndim, starts, counts);
 	if (ret < 0)
@@ -197,9 +210,9 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	if (ans != R_NilValue) {
 		PROTECT(ans);
 		if (as_sparse) {
-			if (h5dset.h5type->Rtype == LGLSXP) {
+			if (h5type->Rtype == LGLSXP) {
 				fix_logical_NAs(VECTOR_ELT(ans, 2));
-			} else if (h5dset.h5type->Rtype == STRSXP &&
+			} else if (h5type->Rtype == STRSXP &&
 				   h5dset.as_na_attr)
 			{
 				set_character_NAs(VECTOR_ELT(ans, 2));
@@ -207,7 +220,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 			/* Final 'ans' is 'list(ans_dim, nzindex, nzdata)'. */
 			SET_VECTOR_ELT(ans, 0, ans_dim);
 		} else {
-			if (h5dset.h5type->Rtype == LGLSXP)
+			if (h5type->Rtype == LGLSXP)
 				fix_logical_NAs(ans);
 			SET_DIM(ans, ans_dim);
 		}
