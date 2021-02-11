@@ -611,7 +611,7 @@ static SEXP h5summarize(const H5DSetDescriptor *h5dset, SEXP index,
 SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		   SEXP op, SEXP na_rm, SEXP verbose)
 {
-	int as_int, opcode, narm0, verbose0, ret, is_supported;
+	int as_int, opcode, narm0, verbose0, ret;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
 	const H5TypeDescriptor *h5type;
@@ -645,8 +645,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	}
 
 	h5type = h5dset.h5type;
-	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
-	if (!is_supported) {
+	if (!h5type->Rtype_is_set) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);
 		H5Fclose(file_id);

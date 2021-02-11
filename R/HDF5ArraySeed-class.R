@@ -15,7 +15,7 @@ setClass("HDF5ArraySeed",
         ## quickResaveHDF5SummarizedExperiment()).
         filepath="character",
 
-        ## Name of the dataset in the HDF5 file.
+        ## Name of dataset in the HDF5 file.
         name="character",
 
         ## Whether the HDF5 dataset should be considered sparse (and treated
@@ -155,8 +155,8 @@ setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
 setReplaceMethod("path", "HDF5ArraySeed",
     function(object, value)
     {
-        new_filepath <- normarg_path(value, "the supplied path",
-                                            "HDF5 dataset")
+        new_filepath <- normarg_h5_filepath(value, what1="the supplied path",
+                                                   what2="the HDF5 dataset")
 
         ## Check dim compatibility.
         new_dim <- h5dim(new_filepath, object@name)
@@ -307,15 +307,8 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 
 HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
 {
-    ## Check 'filepath'.
-    filepath <- normarg_path(filepath, "'filepath'", "HDF5 dataset")
-
-    ## Check 'name'.
-    if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying ",
-                  "the name of the dataset in the HDF5 file"))
-    if (name == "")
-        stop(wmsg("'name' cannot be the empty string"))
+    filepath <- normarg_h5_filepath(filepath)
+    name <- normarg_h5_name(name)
 
     ## Check 'as.sparse'.
     if (!isTRUEorFALSE(as.sparse))

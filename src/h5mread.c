@@ -158,7 +158,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 	SEXP ans, ans_dim;
 	H5DSetDescriptor h5dset;
 	const H5TypeDescriptor *h5type;
-	int is_supported, ret;
+	int ret;
 
 	ans = R_NilValue;
 
@@ -166,8 +166,7 @@ static SEXP h5mread(hid_t dset_id, SEXP starts, SEXP counts, int noreduce,
 		return ans;
 
 	h5type = h5dset.h5type;
-	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
-	if (!is_supported) {
+	if (!h5type->Rtype_is_set) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		PRINT_TO_ERRMSG_BUF(
 			"h5mread() does not support this type "

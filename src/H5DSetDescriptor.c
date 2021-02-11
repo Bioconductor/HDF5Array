@@ -667,7 +667,7 @@ static H5TypeDescriptor *new_H5TypeDescriptor(
 		h5type->is_variable_str = 0;
 	}
 
-	if (h5type->Rtype_is_set) {
+	if (h5type->Rtype_is_set && h5type->is_variable_str == 0) {
 		/* Set struct member 'Rtype_size'. */
 		h5type->Rtype_size = get_Rtype_size(h5type->Rtype,
 						    h5type->h5type_size);
@@ -756,12 +756,8 @@ static void print_H5TypeDescriptor(H5TypeDescriptor *h5type)
 	}
 
 	/* Rtype_size */
-	k = "Rtype_size";
-	if (h5type->Rtype_is_set) {
-		Rprintf("%s  * %s = %lu\n", margin, k, h5type->Rtype_size);
-	} else {
-		Rprintf("%s  * %s = none\n", margin, k);
-	}
+	if (h5type->Rtype_is_set && h5type->is_variable_str == 0)
+		Rprintf("%s  * Rtype_size = %lu\n", margin, h5type->Rtype_size);
 
 	if (h5type->h5class != H5T_INTEGER && h5type->h5class != H5T_FLOAT) {
 		Rprintf("%s  * native_type_id, native_type_size, "
@@ -1283,7 +1279,7 @@ SEXP C_show_H5DSetDescriptor_xp(SEXP xp)
 /* --- .Call ENTRY POINT --- */
 SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 {
-	int as_int, ret, is_supported;
+	int as_int, ret;
 	hid_t file_id, dset_id;
 	H5DSetDescriptor h5dset;
 	const H5TypeDescriptor *h5type;
@@ -1304,8 +1300,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 		error(_HDF5Array_global_errmsg_buf());
 
 	h5type = h5dset.h5type;
-	is_supported = h5type->Rtype_is_set && !h5type->is_variable_str;
-	if (!is_supported) {
+	if (!h5type->Rtype_is_set) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		PRINT_TO_ERRMSG_BUF(
 			"h5mread() does not support this type "

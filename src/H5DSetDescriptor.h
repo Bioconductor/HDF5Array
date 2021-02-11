@@ -23,8 +23,11 @@ typedef struct h5type_descriptor {
 	/* Struct members below will be set only if h5class is **not**
 	   H5T_COMPOUND or H5T_ENUM, and when new_H5TypeDescriptor() is
 	   called with 'get_Rtype_only' set to 0. */
+
 	int is_variable_str;		// set to 0 if h5class != H5T_STRING
-	size_t Rtype_size;		// set only if Rtype is set
+
+	size_t Rtype_size;		// set only if Rtype is set and
+					// is_variable_str == 0
 
 	/* Struct members below will be set only if h5class is H5T_INTEGER
 	   or H5T_FLOAT, and when new_H5TypeDescriptor() is called

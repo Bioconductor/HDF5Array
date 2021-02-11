@@ -388,11 +388,11 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 	chunk_iter->index = index;
 	ndim = h5dset->ndim;
 
-	/* Initialize the members that _destroy_ChunkIterator() will free
-	   or close. */
+	/* Initialize ChunkIterator struct members that control
+	   what _destroy_ChunkIterator() needs to free or close. */
 	chunk_iter->h5dset_vp.h5off = NULL;
 
-	/* Set members 'breakpoint_bufs' and 'tchunkidx_bufs'.
+	/* Set struct members 'breakpoint_bufs' and 'tchunkidx_bufs'.
 	   Also populate 'selection_dim' if not set to NULL. */
 	chunk_iter->breakpoint_bufs = new_IntAEAE(ndim, ndim);
 	chunk_iter->tchunkidx_bufs = new_LLongAEAE(ndim, ndim);
@@ -402,13 +402,13 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 	if (ret < 0)
 		goto on_error;
 
-	/* Set members 'num_tchunks' and 'total_num_tchunks'. */
+	/* Set struct members 'num_tchunks' and 'total_num_tchunks'. */
 	chunk_iter->num_tchunks = new_IntAE(ndim, ndim, 0)->elts;
 	chunk_iter->total_num_tchunks = set_num_tchunks(h5dset, index,
 						chunk_iter->tchunkidx_bufs,
 						chunk_iter->num_tchunks);
 
-	/* Allocate members 'h5dset_vp' and 'mem_vp'. */
+	/* Allocate struct members 'h5dset_vp' and 'mem_vp'. */
 	ret = alloc_h5dset_vp_mem_vp(ndim,
 				&chunk_iter->h5dset_vp,
 				&chunk_iter->mem_vp,
@@ -417,10 +417,10 @@ int _init_ChunkIterator(ChunkIterator *chunk_iter,
 	if (ret < 0)
 		goto on_error;
 
-	/* Set member 'tchunk_midx_buf'. */
+	/* Set struct member 'tchunk_midx_buf'. */
 	chunk_iter->tchunk_midx_buf = new_IntAE(ndim, ndim, 0)->elts;
 
-	/* Set member 'tchunk_rank'. */
+	/* Set struct member 'tchunk_rank'. */
 	chunk_iter->tchunk_rank = -1;
 	return 0;
 
@@ -559,20 +559,20 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 		return -1;
 	}
 
-	/* Initialize the members that _destroy_ChunkDataBuffer() will free
-	   or close. */
+	/* Initialize ChunkDataBuffer struct members that control
+	   what _destroy_ChunkDataBuffer() needs to free or close. */
 	chunk_data_buf->data_space_id = -1;
 	chunk_data_buf->data = NULL;
 	chunk_data_buf->data_vp.h5off = NULL;
 	chunk_data_buf->compressed_data = NULL;
 
-	/* Set member 'data_length'. */
+	/* Set struct member 'data_length'. */
 	data_length = 1;
 	for (h5along = 0; h5along < h5dset->ndim; h5along++)
 		data_length *= h5dset->h5chunkdim[h5along];
 	chunk_data_buf->data_length = data_length;
 
-	/* Set members 'data_type_id' and 'data_type_size'. */
+	/* Set struct members 'data_type_id' and 'data_type_size'. */
 	h5type = h5dset->h5type;
 	if (h5type->h5class == H5T_STRING) {
 		data_type_id = h5type->h5type_id;
@@ -593,7 +593,7 @@ int _init_ChunkDataBuffer(ChunkDataBuffer *chunk_data_buf,
 	chunk_data_buf->data_type_id = data_type_id;
 	chunk_data_buf->data_type_size = data_type_size;
 
-	/* Set member 'data_size'. */
+	/* Set struct member 'data_size'. */
 	chunk_data_buf->data_size = data_length * data_type_size;
 	return 0;
 }
@@ -658,6 +658,18 @@ int _load_chunk(const ChunkIterator *chunk_iter,
 				   &chunk_iter->h5dset_vp,
 				   chunk_data_buf);
 	}
+	return ret;
+}
+
+int _reclaim_vlen_bufs(ChunkDataBuffer *chunk_data_buf)
+{
+	int ret;
+
+	ret = H5Dvlen_reclaim(chunk_data_buf->data_type_id,
+			      chunk_data_buf->data_space_id,
+			      H5P_DEFAULT, chunk_data_buf->data);
+	if (ret < 0)
+		PRINT_TO_ERRMSG_BUF("H5Dvlen_reclaim() returned an error");
 	return ret;
 }
 

@@ -97,6 +97,28 @@ static inline void update_in_offset_and_out_offset(int ndim,
 	return;
 }
 
+static inline void copy_vlen_string_to_character_Rarray(
+		const H5DSetDescriptor *h5dset,
+		const char * const *in, size_t in_offset,
+		SEXP Rarray, size_t Rarray_offset)
+{
+	const char *s;
+	int is_na;
+	SEXP Rarray_elt;
+
+	/* Variable length strings are always null-terminated. */
+	s = in[in_offset];
+	is_na = h5dset->as_na_attr && s[0] == 'N' && s[1] == 'A' && s[2] == 0;
+	if (is_na) {
+		SET_STRING_ELT(Rarray, Rarray_offset, NA_STRING);
+	} else {
+		Rarray_elt = PROTECT(mkChar(s));
+		SET_STRING_ELT(Rarray, Rarray_offset, Rarray_elt);
+		UNPROTECT(1);
+	}
+	return;
+}
+
 static inline void copy_string_to_character_Rarray(
 		const H5DSetDescriptor *h5dset,
 		const char *in, size_t in_offset,
@@ -125,7 +147,7 @@ static inline void copy_string_to_character_Rarray(
 
 static long long int copy_selected_string_chunk_data_to_character_Rarray(
 		const ChunkIterator *chunk_iter, int *inner_midx_buf,
-		const char *in, size_t in_offset,
+		const void *in, size_t in_offset,
 		const int *Rarray_dim, SEXP Rarray, size_t Rarray_offset)
 {
 	const H5DSetDescriptor *h5dset;
@@ -136,7 +158,13 @@ static long long int copy_selected_string_chunk_data_to_character_Rarray(
 	ndim = h5dset->ndim;
 	nvals = 0;
 	while (1) {
-		copy_string_to_character_Rarray(h5dset, in, in_offset,
+		if (h5dset->h5type->is_variable_str)
+			copy_vlen_string_to_character_Rarray(h5dset,
+						in, in_offset,
+						Rarray, Rarray_offset);
+		else
+			copy_string_to_character_Rarray(h5dset,
+						in, in_offset,
 						Rarray, Rarray_offset);
 		nvals++;
 		inner_moved_along = _next_midx(ndim,
@@ -513,7 +541,7 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 					&chunk_data_buf,
 					use_H5Dread_chunk);
 			if (ret < 0)
-				return -1;
+				break;
 			//double dt = (1.0 * clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
 			//printf("- load chunk: %3.3f ms\n", dt);
 
@@ -522,6 +550,10 @@ static int read_data_4_5(ChunkIterator *chunk_iter,
 					&chunk_data_buf,
 					inner_midx_buf->elts,
 					Rarray_dim, Rarray);
+			if (ret < 0)
+				break;
+			if (h5dset->h5type->is_variable_str)
+				_reclaim_vlen_bufs(&chunk_data_buf);
 		}
 		if (ret < 0)
 			break;

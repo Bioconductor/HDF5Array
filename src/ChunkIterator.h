@@ -48,7 +48,9 @@ int _next_chunk(
 	ChunkIterator *chunk_iter
 );
 
-void _print_tchunk_info(const ChunkIterator *chunk_iter);
+void _print_tchunk_info(
+	const ChunkIterator *chunk_iter
+);
 
 int _tchunk_is_truncated(
 	const H5DSetDescriptor *h5dset,
@@ -75,6 +77,10 @@ int _load_chunk(
 	const ChunkIterator *chunk_iter,
 	ChunkDataBuffer *chunk_data_buf,
 	int use_H5Dread_chunk
+);
+
+int _reclaim_vlen_bufs(
+	ChunkDataBuffer *chunk_data_buf
 );
 
 #endif  /* _CHUNKITERATOR_H_ */

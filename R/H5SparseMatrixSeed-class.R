@@ -45,8 +45,8 @@ setMethod("path", "H5SparseMatrixSeed", function(object) object@filepath)
 setReplaceMethod("path", "H5SparseMatrixSeed",
     function(object, value)
     {
-        new_filepath <- normarg_path(value, "the supplied path",
-                                            "sparse matrix")
+        new_filepath <- normarg_h5_filepath(value, what1="the supplied path",
+                                                   what2="the sparse matrix")
         old_filepath <- path(object)
         if (new_filepath != old_filepath)
             stop(wmsg("changing the path of a ", class(object), " object ",
@@ -133,12 +133,10 @@ read_h5sparse_component <- function(filepath, group, name,
 
 H5SparseMatrixSeed <- function(filepath, group)
 {
-    filepath <- normarg_path(filepath, "'filepath'", "sparse matrix")
-    if (!isSingleString(group))
-        stop(wmsg("'group' must be a single string specifying the name of ",
-                  "the group in the HDF5 file that stores the sparse matrix"))
-    if (group == "")
-        stop(wmsg("'group' cannot be the empty string"))
+    filepath <- normarg_h5_filepath(filepath, what2="the sparse matrix")
+    group <- normarg_h5_name(group, what1="'group'",
+                                    what2="the name of the group",
+                                    what3=" that stores the sparse matrix")
 
     ## dim
     dim <- .read_h5sparse_dim(filepath, group)
