@@ -40,6 +40,33 @@ h5exists <- function(filepath, name)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### h5isdataset() and h5isgroup()
+###
+
+h5isdataset <- function(filepath, name)
+{
+    fid <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
+    on.exit(H5Fclose(fid))
+    did <- try(H5Dopen(fid, name), silent=TRUE)
+    ans <- !inherits(did, "try-error")
+    if (ans)
+        H5Dclose(did)
+    ans
+}
+
+h5isgroup <- function(filepath, name)
+{
+    fid <- H5Fopen(filepath, flags="H5F_ACC_RDONLY")
+    on.exit(H5Fclose(fid))
+    gid <- try(H5Gopen(fid, name), silent=TRUE)
+    ans <- !inherits(gid, "try-error")
+    if (ans)
+        H5Gclose(gid)
+    ans
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### h5dim() and h5chunkdim()
 ###
 

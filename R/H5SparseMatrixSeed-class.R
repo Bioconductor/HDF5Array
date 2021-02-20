@@ -104,13 +104,15 @@ read_h5sparse_component <- function(filepath, group, name,
                       h5sparse_format, "\". Only the \"csr\" format is ",
                       "supported at the moment."))
         }
-        h5sparse_shape <- h5attrs$h5sparse_shape
-        if (is.null(h5sparse_shape))
+        shape <- h5attrs$shape
+        if (is.null(shape))
+            shape <- h5attrs$h5sparse_shape
+        if (is.null(shape))
             stop(wmsg("Group '", group, "' in HDF5 file '", filepath,"' ",
-                      "contains no 'shape' dataset and has no ",
-                      "'h5sparse_shape' attribute. The dimensions ",
-                      "of the sparse matrix can't be determined."))
-        ans <- rev(as.integer(h5sparse_shape))
+                      "contains no 'shape' dataset and has no 'shape' ",
+                      "or 'h5sparse_shape' attribute. As a consequence, the ",
+                      "dimensions of the sparse matrix can't be determined."))
+        ans <- rev(as.integer(shape))
     }
     ans
 }

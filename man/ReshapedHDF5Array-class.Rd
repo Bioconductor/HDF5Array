@@ -54,7 +54,8 @@ ReshapedHDF5Array(filepath, name, dim, type=NA)
 }
 
 \value{
-  A ReshapedHDF5Array object.
+  A ReshapedHDF5Array (or ReshapedHDF5Matrix) object. (Note that
+  ReshapedHDF5Matrix extends ReshapedHDF5Array.)
 }
 
 \seealso{

@@ -5,8 +5,7 @@
 \alias{H5ADMatrix-class}
 \alias{H5ADMatrix}
 
-\alias{DelayedArray,Dense_H5ADMatrixSeed-method}
-\alias{DelayedArray,Sparse_H5ADMatrixSeed-method}
+\alias{DelayedArray,H5ADMatrixSeed-method}
 
 \alias{sparsity,H5ADMatrix-method}
 \alias{read_sparse_block,H5ADMatrix-method}
@@ -30,12 +29,16 @@
 
 \usage{
 ## Constructor function:
-H5ADMatrix(filepath)
+H5ADMatrix(filepath, name="X")
 }
 
 \arguments{
   \item{filepath}{
     The path (as a single string) to the \code{.h5ad} file.
+  }
+  \item{name}{
+    The name of the dataset or group in the \code{.h5ad} file that stores
+    the matrix.
   }
 }
 

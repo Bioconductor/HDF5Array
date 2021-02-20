@@ -14,30 +14,22 @@ setClass("H5ADMatrix",
 ### Constructor
 ###
 
-### We must define the 2 methods here. If we define a single method
-### for the union class (H5ADMatrixSeed), calling DelayedArray() on
-### a Dense_H5ADMatrixSeed object will return an HDF5Matrix object.
-### That's because method dispatch will choose the DelayedArray() method
-### for HDF5MatrixSeed objects over the method for H5ADMatrixSeed objects.
-setMethod("DelayedArray", "Dense_H5ADMatrixSeed",
-    function(seed) new_DelayedArray(seed, Class="H5ADMatrix")
-)
-setMethod("DelayedArray", "Sparse_H5ADMatrixSeed",
+setMethod("DelayedArray", "H5ADMatrixSeed",
     function(seed) new_DelayedArray(seed, Class="H5ADMatrix")
 )
 
 ### Works directly on a Dense_H5ADMatrixSeed or Sparse_H5ADMatrixSeed object,
 ### in which case it must be called with a single argument.
-H5ADMatrix <- function(filepath)
+H5ADMatrix <- function(filepath, name="X")
 {
     if (is(filepath, "H5ADMatrixSeed")) {
-        #if (!missing(group))
-        #    stop(wmsg("H5ADMatrix() must be called with a single argument ",
-        #              "when passed a Dense_H5ADMatrixSeed or ",
-        #              "Sparse_H5ADMatrixSeed object"))
+        if (!missing(name))
+            stop(wmsg("H5ADMatrix() must be called with a single argument ",
+                      "when passed a Dense_H5ADMatrixSeed or ",
+                      "Sparse_H5ADMatrixSeed object"))
         seed <- filepath
     } else {
-        seed <- H5ADMatrixSeed(filepath)
+        seed <- H5ADMatrixSeed(filepath, name=name)
     }
     DelayedArray(seed)
 }

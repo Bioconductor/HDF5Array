@@ -61,34 +61,8 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 }
 
 \arguments{
-  \item{filepath}{
-    The path (as a single string) to the HDF5 file where the dataset
-    is located.
-  }
-  \item{name}{
-    The name of the dataset in the HDF5 file.
-  }
-  \item{as.sparse}{
-    Whether the HDF5 dataset should be flagged as sparse or not, that is,
-    whether it should be considered sparse (and treated as such) or not.
-    Note that HDF5 doesn't natively support sparse storage at the moment
-    so HDF5 datasets cannot be stored in a sparse format, only in a dense
-    one. However a dataset stored in a dense format can still contain a lot
-    of zeroes. Using \code{as.sparse=TRUE} on such dataset will enable
-    some optimizations that can lead to a lower memory footprint (and
-    possibly better performance) when operating on the HDF5Array.
-
-    IMPORTANT NOTE: If the dataset is in the 10x Genomics format (i.e. if
-    it uses the HDF5-based sparse matrix representation from 10x Genomics),
-    you should use the \code{\link{TENxMatrix}()} constructor instead of
-    the \code{HDF5Array()} constructor.
-  }
-  \item{type}{
-    By default the \code{\link[DelayedArray]{type}} of the returned
-    object is inferred from the H5 datatype of the HDF5 dataset.
-    This can be overridden by specifying the \code{type} argument.
-    The specified type must be an \emph{R atomic type} (e.g.
-    \code{"integer"}) or \code{"list"}.
+  \item{filepath, name, as.sparse, type}{
+    See \code{?\link{HDF5Array}} for a description of these arguments.
   }
   \item{object, x}{
     An HDF5ArraySeed object or derivative.

@@ -1,6 +1,10 @@
 \name{H5ADMatrixSeed-class}
 \docType{class}
 
+\alias{class:H5ADMatrixSeed}
+\alias{H5ADMatrixSeed-class}
+\alias{H5ADMatrixSeed}
+
 \alias{class:Dense_H5ADMatrixSeed}
 \alias{Dense_H5ADMatrixSeed-class}
 \alias{Dense_H5ADMatrixSeed}
@@ -8,10 +12,6 @@
 \alias{class:Sparse_H5ADMatrixSeed}
 \alias{Sparse_H5ADMatrixSeed-class}
 \alias{Sparse_H5ADMatrixSeed}
-
-\alias{class:H5ADMatrixSeed}
-\alias{H5ADMatrixSeed-class}
-\alias{H5ADMatrixSeed}
 
 \title{H5ADMatrixSeed objects}
 
@@ -21,8 +21,8 @@
   H5ADMatrixSeed is a low-level helper class used to represent a pointer
   to a matrix stored in a \code{.h5ad} file.
 
-  It is a union class with two members, Dense_H5ADMatrixSeed and
-  Sparse_H5ADMatrixSeed:
+  It is a virtual class with two concrete subclasses, Dense_H5ADMatrixSeed
+  and Sparse_H5ADMatrixSeed:
   \itemize{
     \item The Dense_H5ADMatrixSeed class is used when the matrix is stored
           as a conventional HDF5 dataset in the \code{.h5ad} file. It is
@@ -42,12 +42,12 @@
 
 \usage{
 ## Constructor function:
-H5ADMatrixSeed(filepath)
+H5ADMatrixSeed(filepath, name="X")
 }
 
 \arguments{
-  \item{filepath}{
-    See \code{?\link{H5ADMatrix}} for a description of this argument.
+  \item{filepath, name}{
+    See \code{?\link{H5ADMatrix}} for a description of these arguments.
   }
 }
 

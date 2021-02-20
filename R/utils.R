@@ -40,8 +40,10 @@ add_prefix_to_basename <- function(name, prefix=".")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### A simple mechanism to lock/unlock a file so processes can get temporary
-### exclusive access to it
+### A simple/naive/imperfect mechanism to lock/unlock a file so processes can
+### get temporary exclusive access to it
+###
+### TODO: Use filelock::lock() and filelock::unlock() instead of this.
 ###
 
 .locked_path <- function(filepath)
