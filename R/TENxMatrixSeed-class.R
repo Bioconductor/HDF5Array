@@ -3,7 +3,7 @@
 ### -------------------------------------------------------------------------
 
 
-setClass("TENxMatrixSeed", contains="H5SparseMatrixSeed")
+setClass("TENxMatrixSeed", contains="CSC_H5SparseMatrixSeed")
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

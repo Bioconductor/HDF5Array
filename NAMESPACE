@@ -24,12 +24,30 @@ exportClasses(
     ReshapedHDF5ArraySeed,
     ReshapedHDF5Array, ReshapedHDF5Matrix,
     HDF5RealizationSink,
-    H5SparseMatrixSeed,
+    H5SparseMatrixSeed, CSC_H5SparseMatrixSeed, CSR_H5SparseMatrixSeed,
     TENxMatrixSeed,
     TENxMatrix,
     TENxRealizationSink,
-    Dense_H5ADMatrixSeed, Sparse_H5ADMatrixSeed, H5ADMatrixSeed,
+    H5ADMatrixSeed,
+    Dense_H5ADMatrixSeed, CSC_H5ADMatrixSeed, CSR_H5ADMatrixSeed,
     H5ADMatrix
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Export S3 methods
+###
+
+S3method(t, CSC_H5SparseMatrixSeed)
+S3method(t, CSR_H5SparseMatrixSeed)
+
+### We also export them thru the export() directive so that (a) they can be
+### called directly, (b) tab-completion on the name of the generic shows them,
+### and (c) methods() doesn't asterisk them.
+
+export(
+    t.CSC_H5SparseMatrixSeed,
+    t.CSR_H5SparseMatrixSeed
 )
 
 
@@ -39,7 +57,7 @@ exportClasses(
 
 exportMethods(
     ## Methods for generics defined in the base package:
-    dim, dimnames,
+    dim, dimnames, t,
 
     ## Methods for generics defined in the methods package:
     coerce, show,
@@ -90,16 +108,16 @@ export(
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Export S4 generics defined in HDF5Array + export corresponding methods
+### Export S4 generics defined in HDF5Array and corresponding methods
 ###
 
 export(
-    ## TENxMatrix-class.R:
-    extractNonzeroDataByCol
+    ## H5SparseMatrixSeed-class.R:
+    extractNonzeroDataByCol, extractNonzeroDataByRow
 )
 
 ### Exactly the same list as above.
 exportMethods(
-    extractNonzeroDataByCol
+    extractNonzeroDataByCol, extractNonzeroDataByRow
 )
 

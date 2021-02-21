@@ -10,6 +10,7 @@
 \alias{sparsity,H5ADMatrix-method}
 \alias{read_sparse_block,H5ADMatrix-method}
 \alias{extractNonzeroDataByCol,H5ADMatrix-method}
+\alias{extractNonzeroDataByRow,H5ADMatrix-method}
 
 \alias{coerce,H5ADMatrix,dgCMatrix-method}
 \alias{coerce,H5ADMatrix,sparseMatrix-method}

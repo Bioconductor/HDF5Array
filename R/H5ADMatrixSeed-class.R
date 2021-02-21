@@ -8,11 +8,15 @@ setClass("H5ADMatrixSeed", contains="Array", representation("VIRTUAL"))
 setClass("Dense_H5ADMatrixSeed",
     contains=c("H5ADMatrixSeed", "HDF5ArraySeed")
 )
-setClass("Sparse_H5ADMatrixSeed",
-    contains=c("H5ADMatrixSeed", "H5SparseMatrixSeed")
+setClass("CSC_H5ADMatrixSeed",
+    contains=c("H5ADMatrixSeed", "CSC_H5SparseMatrixSeed")
+)
+setClass("CSR_H5ADMatrixSeed",
+    contains=c("H5ADMatrixSeed", "CSR_H5SparseMatrixSeed")
 )
 
-### Returns either a Dense_H5ADMatrixSeed or Sparse_H5ADMatrixSeed object.
+### Returns an H5ADMatrixSeed derivative (can be either a Dense_H5ADMatrixSeed,
+### or a CSC_H5SparseMatrixSeed, or a CSR_H5SparseMatrixSeed object).
 H5ADMatrixSeed <- function(filepath, name="X")
 {
     if (!isSingleString(filepath))
@@ -28,14 +32,18 @@ H5ADMatrixSeed <- function(filepath, name="X")
         stop(wmsg("'name' cannot be the empty string"))
 
     if (h5isdataset(filepath, name)) {
-        ans <- HDF5ArraySeed(filepath, name)
-        if (length(dim(ans)) != 2L)
+        ans0 <- HDF5ArraySeed(filepath, name)
+        if (length(dim(ans0)) != 2L)
             stop(wmsg("Dataset '", name, "' in file '", filepath, "' does ",
                       "not have exactly 2 dimensions."))
-        ans <- new2("Dense_H5ADMatrixSeed", ans)
+        ans <- new2("Dense_H5ADMatrixSeed", ans0)
     } else if (h5isgroup(filepath, name)) {
-        ans <- H5SparseMatrixSeed(filepath, name)
-        ans <- new2("Sparse_H5ADMatrixSeed", ans)
+        ans0 <- H5SparseMatrixSeed(filepath, name)
+        if (is(ans0, "CSC_H5SparseMatrixSeed"))
+            ans_class <- "CSC_H5ADMatrixSeed"
+        else
+            ans_class <- "CSR_H5ADMatrixSeed"
+        ans <- new2(ans_class, ans0)
     } else {
         stop(wmsg("file '", filepath, "' contains no dataset or group ",
                   "named '", name, "'"))
