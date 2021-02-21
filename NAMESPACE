@@ -40,6 +40,8 @@ exportClasses(
 
 S3method(t, CSC_H5SparseMatrixSeed)
 S3method(t, CSR_H5SparseMatrixSeed)
+S3method(t, CSC_H5ADMatrixSeed)
+S3method(t, CSR_H5ADMatrixSeed)
 
 ### We also export them thru the export() directive so that (a) they can be
 ### called directly, (b) tab-completion on the name of the generic shows them,
@@ -47,7 +49,9 @@ S3method(t, CSR_H5SparseMatrixSeed)
 
 export(
     t.CSC_H5SparseMatrixSeed,
-    t.CSR_H5SparseMatrixSeed
+    t.CSR_H5SparseMatrixSeed,
+    t.CSC_H5ADMatrixSeed,
+    t.CSR_H5ADMatrixSeed
 )
 
 

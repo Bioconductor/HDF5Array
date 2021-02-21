@@ -15,6 +15,34 @@ setClass("CSR_H5ADMatrixSeed",
     contains=c("H5ADMatrixSeed", "CSR_H5SparseMatrixSeed")
 )
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Transposition
+###
+
+### S3/S4 combo for t.CSC_H5ADMatrixSeed
+t.CSC_H5ADMatrixSeed <- function(x)
+{
+    x <- callNextMethod()
+    class(x) <- "CSR_H5ADMatrixSeed"
+    x
+}
+setMethod("t", "CSC_H5ADMatrixSeed", t.CSC_H5ADMatrixSeed)
+
+### S3/S4 combo for t.CSR_H5ADMatrixSeed
+t.CSR_H5ADMatrixSeed <- function(x)
+{
+    x <- callNextMethod()
+    class(x) <- "CSC_H5ADMatrixSeed"
+    x
+}
+setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Constructor
+###
+
 ### Returns an H5ADMatrixSeed derivative (can be either a Dense_H5ADMatrixSeed,
 ### or a CSC_H5SparseMatrixSeed, or a CSR_H5SparseMatrixSeed object).
 H5ADMatrixSeed <- function(filepath, name="X")

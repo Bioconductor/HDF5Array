@@ -45,8 +45,8 @@ setClass("CSR_H5SparseMatrixSeed", contains="H5SparseMatrixSeed")
 ### S3/S4 combo for t.CSC_H5SparseMatrixSeed
 t.CSC_H5SparseMatrixSeed <- function(x)
 {
-    class(x) <- "CSR_H5SparseMatrixSeed"
     x@dim <- rev(x@dim)
+    class(x) <- "CSR_H5SparseMatrixSeed"
     x
 }
 setMethod("t", "CSC_H5SparseMatrixSeed", t.CSC_H5SparseMatrixSeed)
@@ -54,8 +54,8 @@ setMethod("t", "CSC_H5SparseMatrixSeed", t.CSC_H5SparseMatrixSeed)
 ### S3/S4 combo for t.CSR_H5SparseMatrixSeed
 t.CSR_H5SparseMatrixSeed <- function(x)
 {
-    class(x) <- "CSC_H5SparseMatrixSeed"
     x@dim <- rev(x@dim)
+    class(x) <- "CSC_H5SparseMatrixSeed"
     x
 }
 setMethod("t", "CSR_H5SparseMatrixSeed", t.CSR_H5SparseMatrixSeed)
