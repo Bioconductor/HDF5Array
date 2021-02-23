@@ -17,6 +17,8 @@
 \alias{CSR_H5ADMatrixSeed-class}
 \alias{CSR_H5ADMatrixSeed}
 
+\alias{dimnames,Dense_H5ADMatrixSeed-method}
+
 \alias{t.CSC_H5ADMatrixSeed}
 \alias{t,CSC_H5ADMatrixSeed-method}
 \alias{t.CSR_H5ADMatrixSeed}

@@ -112,7 +112,7 @@ export(
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Export S4 generics defined in HDF5Array and corresponding methods
+### Export S4 generics defined in HDF5Array, and corresponding methods
 ###
 
 export(
