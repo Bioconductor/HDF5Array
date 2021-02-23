@@ -5,6 +5,17 @@
 ### An alternative to rhdf5::h5read() -- STILL EXPERIMENTAL!
 ###
 
+### The R type returned by h5mread() is determined by arguments 'filepath',
+### 'name', and 'as.integer'.
+get_h5mread_returned_type <- function(filepath, name, as.integer=FALSE)
+{
+    filepath <- normarg_h5_filepath(filepath)
+    name <- normarg_h5_name(name)
+
+    .Call2("C_get_h5mread_returned_type", filepath, name, as.integer,
+           PACKAGE="HDF5Array")
+}
+
 ### When both 'starts' and 'counts' are specified, the selection must be
 ### strictly ascending along each dimension.
 ### By default the user-supplied selection is checked and reduced (if it

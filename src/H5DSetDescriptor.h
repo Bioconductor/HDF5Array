@@ -113,11 +113,5 @@ SEXP C_new_H5DSetDescriptor_xp(
 
 SEXP C_show_H5DSetDescriptor_xp(SEXP xp);
 
-SEXP C_get_h5mread_returned_type(
-	SEXP filepath,
-	SEXP name,
-	SEXP as_integer
-);
-
 #endif  /* _H5DSETDESCRIPTOR_H_ */
 

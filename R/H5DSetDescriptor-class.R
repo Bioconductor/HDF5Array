@@ -35,11 +35,3 @@ setMethod("show", "H5DSetDescriptor",
         .Call2("C_show_H5DSetDescriptor_xp", object@xp, PACKAGE="HDF5Array")
 )
 
-### The R type returned by h5mread() is determined by arguments 'filepath',
-### 'name', and 'as.integer'.
-get_h5mread_returned_type <- function(filepath, name, as.integer=FALSE)
-{
-    .Call2("C_get_h5mread_returned_type", filepath, name, as.integer,
-           PACKAGE="HDF5Array")
-}
-

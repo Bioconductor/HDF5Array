@@ -3,6 +3,12 @@
 
 #include <Rdefines.h>
 
+SEXP C_get_h5mread_returned_type(
+	SEXP filepath,
+	SEXP name,
+	SEXP as_integer
+);
+
 SEXP C_h5mread(
 	SEXP filepath,
 	SEXP name,

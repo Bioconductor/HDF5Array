@@ -19,10 +19,11 @@ setClass("CSR_H5ADMatrixSeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### dimnames() method for Dense_H5ADMatrixSeed objects (overwrite method for
-### HDF5Array objects)
+### dimnames() method for Dense_H5ADMatrixSeed objects
 ###
 
+### We overwrite the method for HDF5ArraySeed objects with a method that
+### accesses the slot, not the file.
 setMethod("dimnames", "Dense_H5ADMatrixSeed",
     function(x) DelayedArray:::simplify_NULL_dimnames(x@dimnames)
 )

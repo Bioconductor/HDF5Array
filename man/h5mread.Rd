@@ -5,8 +5,8 @@
 \alias{H5DSetDescriptor}
 \alias{destroy_H5DSetDescriptor}
 \alias{show,H5DSetDescriptor-method}
-\alias{get_h5mread_returned_type}
 
+\alias{get_h5mread_returned_type}
 \alias{h5mread}
 
 \title{An alternative to \code{rhdf5::h5read}}

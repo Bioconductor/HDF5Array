@@ -13,6 +13,58 @@
 
 #include "hdf5.h"
 
+
+/****************************************************************************
+ * C_get_h5mread_returned_type()
+ *
+ * The R type returned by h5mread() is determined by arguments 'filepath',
+ * 'name', and 'as_integer'.
+ */
+
+/* --- .Call ENTRY POINT --- */
+SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
+{
+	int as_int, ret;
+	hid_t file_id, dset_id;
+	H5DSetDescriptor h5dset;
+	const H5TypeDescriptor *h5type;
+	SEXPTYPE Rtype;
+
+	/* Check 'as_integer'. */
+	if (!(IS_LOGICAL(as_integer) && LENGTH(as_integer) == 1))
+		error("'as_integer' must be TRUE or FALSE");
+	as_int = LOGICAL(as_integer)[0];
+
+	file_id = _get_file_id(filepath, 1);
+	dset_id = _get_dset_id(file_id, name, filepath);
+	ret = _init_H5DSetDescriptor(&h5dset, dset_id, as_int, 1);
+	/* It's ok to close 'dset_id' **before** destroying its descriptor. */
+	H5Dclose(dset_id);
+	H5Fclose(file_id);
+	if (ret < 0)
+		error(_HDF5Array_global_errmsg_buf());
+
+	h5type = h5dset.h5type;
+	if (!h5type->Rtype_is_set) {
+		_destroy_H5DSetDescriptor(&h5dset);
+		PRINT_TO_ERRMSG_BUF(
+			"h5mread() does not support this type "
+			"of dataset yet, sorry. You can\n  "
+			"use 'H5DSetDescriptor(filepath, name)' "
+			"to see details about the dataset.");
+		error(_HDF5Array_global_errmsg_buf());
+	}
+
+	Rtype = h5type->Rtype;
+	_destroy_H5DSetDescriptor(&h5dset);
+	return ScalarString(type2str(Rtype));
+}
+
+
+/****************************************************************************
+ * C_h5mread()
+ */
+
 /* Return -1 on error. */
 static int select_method(const H5DSetDescriptor *h5dset,
 			 SEXP starts, SEXP counts, int as_sparse, int method)

@@ -83,8 +83,8 @@ exportMethods(
 ###
 
 export(
-    H5DSetDescriptor, destroy_H5DSetDescriptor, get_h5mread_returned_type,
-    h5mread,
+    H5DSetDescriptor, destroy_H5DSetDescriptor,
+    get_h5mread_returned_type, h5mread,
     h5mread_from_reshaped,
     set_h5dimnames, get_h5dimnames, h5writeDimnames, h5readDimnames,
     HDF5ArraySeed,
