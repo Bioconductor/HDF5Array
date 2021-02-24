@@ -18,6 +18,7 @@ import(rhdf5)
 ###
 
 exportClasses(
+    H5FileID, H5File, character_OR_H5File,
     H5DSetDescriptor,
     HDF5ArraySeed,
     HDF5Array, HDF5Matrix,
@@ -38,6 +39,12 @@ exportClasses(
 ### Export S3 methods
 ###
 
+S3method(close, H5FileID)
+S3method(close, H5File)
+
+S3method(open, H5FileID)
+S3method(open, H5File)
+
 S3method(t, CSC_H5SparseMatrixSeed)
 S3method(t, CSR_H5SparseMatrixSeed)
 S3method(t, CSC_H5ADMatrixSeed)
@@ -48,6 +55,12 @@ S3method(t, CSR_H5ADMatrixSeed)
 ### and (c) methods() doesn't asterisk them.
 
 export(
+    close.H5FileID,
+    close.H5File,
+
+    open.H5FileID,
+    open.H5File,
+
     t.CSC_H5SparseMatrixSeed,
     t.CSR_H5SparseMatrixSeed,
     t.CSC_H5ADMatrixSeed,
@@ -83,6 +96,7 @@ exportMethods(
 ###
 
 export(
+    H5FileID, H5File,
     H5DSetDescriptor, destroy_H5DSetDescriptor,
     get_h5mread_returned_type, h5mread,
     h5mread_from_reshaped,

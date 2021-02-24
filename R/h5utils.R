@@ -6,6 +6,10 @@
 ###
 
 
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### normarg_h5_filepath() and normarg_h5_name()
+###
+
 normarg_h5_filepath <- function(path, what1="'filepath'", what2="the dataset")
 {
     if (!isSingleString(path))

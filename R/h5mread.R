@@ -9,7 +9,10 @@
 ### 'name', and 'as.integer'.
 get_h5mread_returned_type <- function(filepath, name, as.integer=FALSE)
 {
-    filepath <- normarg_h5_filepath(filepath)
+    if (!is(filepath, "H5File")) {
+        filepath <- H5File(filepath)
+        on.exit(close(filepath))
+    }
     name <- normarg_h5_name(name)
 
     .Call2("C_get_h5mread_returned_type", filepath, name, as.integer,
@@ -26,7 +29,10 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
                     as.integer=FALSE, as.sparse=FALSE,
                     method=0L, use.H5Dread_chunk=FALSE)
 {
-    filepath <- normarg_h5_filepath(filepath)
+    if (!is(filepath, "H5File")) {
+        filepath <- H5File(filepath)
+        on.exit(close(filepath))
+    }
     name <- normarg_h5_name(name)
 
     if (!isTRUEorFALSE(as.sparse))

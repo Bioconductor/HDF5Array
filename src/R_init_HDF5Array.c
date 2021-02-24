@@ -1,27 +1,36 @@
 #include <R_ext/Rdynload.h>
 
-#include "lzf/lzf_filter.h"  /* for register_lzf() */
-
-#include "uaselection.h"
+#include "H5File.h"
 #include "H5DSetDescriptor.h"
+#include "uaselection.h"
 #include "h5mread.h"
 #include "h5dimscales.h"
 #include "h5summarize.h"
 
+#include "lzf/lzf_filter.h"  /* for register_lzf() */
+
 #define CALLMETHOD_DEF(fun, numArgs) {#fun, (DL_FUNC) &fun, numArgs}
 
 static const R_CallMethodDef callMethods[] = {
+
+/* H5File.c */
+	CALLMETHOD_DEF(C_h5openlocalfile, 2),
+	CALLMETHOD_DEF(C_h5openS3file, 2),
+	CALLMETHOD_DEF(C_h5closefile, 1),
+	CALLMETHOD_DEF(C_set_H5FileID_xp_ID, 2),
+	CALLMETHOD_DEF(C_get_H5FileID_xp_ID, 1),
+	CALLMETHOD_DEF(C_new_H5FileID_xp, 1),
+
+/* H5DSetDescriptor.c */
+	CALLMETHOD_DEF(C_destroy_H5DSetDescriptor_xp, 1),
+	CALLMETHOD_DEF(C_new_H5DSetDescriptor_xp, 3),
+	CALLMETHOD_DEF(C_show_H5DSetDescriptor_xp, 1),
 
 /* uaselection.c */
 	CALLMETHOD_DEF(C_check_uaselection, 3),
 	CALLMETHOD_DEF(C_check_ordered_uaselection, 3),
 	CALLMETHOD_DEF(C_reduce_uaselection, 3),
 	CALLMETHOD_DEF(C_map_starts_to_chunks, 3),
-
-/* H5DSetDescriptor.c */
-	CALLMETHOD_DEF(C_destroy_H5DSetDescriptor_xp, 1),
-	CALLMETHOD_DEF(C_new_H5DSetDescriptor_xp, 3),
-	CALLMETHOD_DEF(C_show_H5DSetDescriptor_xp, 1),
 
 /* h5mread.c */
 	CALLMETHOD_DEF(C_get_h5mread_returned_type, 3),

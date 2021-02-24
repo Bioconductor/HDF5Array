@@ -23,7 +23,7 @@ setMethod("DelayedArray", "H5ADMatrixSeed",
 H5ADMatrix <- function(filepath, name="X")
 {
     if (is(filepath, "H5ADMatrixSeed")) {
-        if (!missing(name))
+        if (!identical(name, "X"))
             stop(wmsg("H5ADMatrix() must be called with a single argument ",
                       "when passed an H5ADMatrixSeed derivative"))
         seed <- filepath

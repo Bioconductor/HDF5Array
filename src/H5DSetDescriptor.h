@@ -92,11 +92,6 @@ int _init_H5DSetDescriptor(
 	int Rtype_only
 );
 
-hid_t _get_file_id(
-	SEXP filepath,
-	int readonly
-);
-
 hid_t _get_dset_id(
 	hid_t file_id,
 	SEXP name,

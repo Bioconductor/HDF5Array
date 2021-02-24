@@ -1,8 +1,8 @@
 #ifndef _H5MREAD_HELPERS_H_
 #define _H5MREAD_HELPERS_H_
 
-#include "uaselection.h"
 #include "H5DSetDescriptor.h"
+#include "uaselection.h"
 #include "hdf5.h"
 
 /* A data structure for representing a viewport on a HDF5 dataset. */

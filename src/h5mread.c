@@ -4,9 +4,10 @@
  ****************************************************************************/
 #include "h5mread.h"
 
+#include "H5File.h"
 #include "global_errmsg_buf.h"
-#include "uaselection.h"
 #include "H5DSetDescriptor.h"
+#include "uaselection.h"
 #include "h5mread_startscounts.h"
 #include "h5mread_index.h"
 #include "h5mread_sparse.h"
@@ -35,12 +36,13 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 		error("'as_integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	ret = _init_H5DSetDescriptor(&h5dset, dset_id, as_int, 1);
 	/* It's ok to close 'dset_id' **before** destroying its descriptor. */
 	H5Dclose(dset_id);
-	H5Fclose(file_id);
+	if (!isObject(filepath))
+		H5Fclose(file_id);
 	if (ret < 0)
 		error(_HDF5Array_global_errmsg_buf());
 
@@ -320,13 +322,14 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		error("'use.H5Dread_chunk' must be TRUE or FALSE");
 	use_H5Dread_chunk0 = LOGICAL(use_H5Dread_chunk)[0];
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	ans = PROTECT(h5mread(dset_id, starts, counts, noreduce0,
 			      as_int, as_sparse0,
 			      method0, use_H5Dread_chunk0));
 	H5Dclose(dset_id);
-	H5Fclose(file_id);
+	if (!isObject(filepath))
+		H5Fclose(file_id);
 	UNPROTECT(1);
 	if (ans == R_NilValue)
 		error(_HDF5Array_global_errmsg_buf());

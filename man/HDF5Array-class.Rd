@@ -86,6 +86,9 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
     \item \link{TENxMatrix} objects for representing 10x Genomics
           datasets as \link[DelayedArray]{DelayedMatrix} objects.
 
+    \item \link{H5ADMatrix} objects for representing the matrices stored in
+          \code{.h5ad} files as \link[DelayedArray]{DelayedMatrix} objects.
+
     \item \link{ReshapedHDF5Array} objects for representing HDF5 datasets
           as \link[DelayedArray]{DelayedArray} objects with a user-supplied
           upfront virtual reshaping.

@@ -4,6 +4,7 @@
  ****************************************************************************/
 #include "H5DSetDescriptor.h"
 
+#include "H5File.h"
 #include "global_errmsg_buf.h"
 
 #include <stdlib.h>  /* for malloc, free */
@@ -262,7 +263,7 @@ static char *get_h5name(hid_t obj_id)
 }
 
 /* Get the value (expected to be a string) of a given attribute of class
-   H5T_STRING. Return:
+   H5T_STRING. The function returns:
     -1: if an error occurs;
      0: if dataset 'dset_id' has no attribute with the name specified
         in 'attr_name';
@@ -331,7 +332,7 @@ int _get_h5attrib_strval(hid_t dset_id, const char *attr_name, CharAE *val)
 }
 
 /* Get the value (expected to be a single int) of a given attribute of
-   class H5T_INTEGER. Return:
+   class H5T_INTEGER. The function returns:
     -1: if an error occurs;
      0: if dataset 'dset_id' has no attribute with the name specified
         in 'attr_name';
@@ -1099,34 +1100,12 @@ int _init_H5DSetDescriptor(H5DSetDescriptor *h5dset, hid_t dset_id,
 
 
 /****************************************************************************
- * Convenience wrappers to H5Fopen() and H5Dopen(), with argument checking
+ * _get_dset_id()
  *
- * These are called at the very beginning of the various .Call entry points
- * where they are used (and before any resource is allocated) so it's ok to
- * error() immediately in case of error.
+ * Always called at the very beginning of the various .Call entry points
+ * before any resource is allocated so it's ok to error() immediately in
+ * case of error i.e. no need to use the PRINT_TO_ERRMSG_BUF() mechanism.
  */
-
-hid_t _get_file_id(SEXP filepath, int readonly)
-{
-	SEXP filepath0;
-	herr_t ret;
-	unsigned int flags;
-	hid_t file_id;
-
-	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
-		error("'filepath' must be a single string");
-	filepath0 = STRING_ELT(filepath, 0);
-	if (filepath0 == NA_STRING)
-		error("'filepath' cannot be NA");
-	ret = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
-	if (ret < 0)
-		error("H5Eset_auto() returned an error");
-	flags = readonly ? H5F_ACC_RDONLY : H5F_ACC_RDWR;
-	file_id = H5Fopen(CHAR(filepath0), flags, H5P_DEFAULT);
-	if (file_id < 0)
-		error("failed to open file '%s'", CHAR(filepath0));
-	return file_id;
-}
 
 hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
 {
@@ -1140,9 +1119,10 @@ hid_t _get_dset_id(hid_t file_id, SEXP name, SEXP filepath)
 		error("'name' cannot be NA");
 	dset_id = H5Dopen(file_id, CHAR(name0), H5P_DEFAULT);
 	if (dset_id < 0) {
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		error("failed to open dataset '%s' from file '%s'",
-		      CHAR(name0), CHAR(STRING_ELT(filepath, 0)));
+		      CHAR(name0), _get_file_string(filepath));
 	}
 	return dset_id;
 }
@@ -1183,22 +1163,25 @@ SEXP C_new_H5DSetDescriptor_xp(SEXP filepath, SEXP name, SEXP as_integer)
 		error("'as_integer' must be TRUE or FALSE");
 	as_int = LOGICAL(as_integer)[0];
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 
 	h5dset = (H5DSetDescriptor *) malloc(sizeof(H5DSetDescriptor));
 	if (h5dset == NULL) {
 		H5Dclose(dset_id);
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		error("C_new_H5DSetDescriptor_xp(): malloc() failed");
 	}
 
 	if (_init_H5DSetDescriptor(h5dset, dset_id, as_int, 0) < 0) {
 		H5Dclose(dset_id);
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		error(_HDF5Array_global_errmsg_buf());
 	}
-	H5Fclose(file_id);
+	if (!isObject(filepath))
+		H5Fclose(file_id);
 	//printf("H5DSetDescriptor struct created at address %p\n", h5dset);
 
 	return R_MakeExternalPtr(h5dset, R_NilValue, R_NilValue);

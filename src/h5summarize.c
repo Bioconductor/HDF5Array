@@ -4,6 +4,7 @@
  ****************************************************************************/
 #include "h5summarize.h"
 
+#include "H5File.h"
 #include "global_errmsg_buf.h"
 #include "uaselection.h"
 #include "h5mread_helpers.h"
@@ -635,12 +636,13 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		error("'verbose' must be TRUE or FALSE");
 	verbose0 = LOGICAL(verbose)[0];
 
-	file_id = _get_file_id(filepath, 1);
+	file_id = _get_file_id(filepath, 1);  /* read-only */
 	dset_id = _get_dset_id(file_id, name, filepath);
 	ret = _init_H5DSetDescriptor(&h5dset, dset_id, as_int, 0);
 	if (ret < 0) {
 		H5Dclose(dset_id);
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		error(_HDF5Array_global_errmsg_buf());
 	}
 
@@ -648,7 +650,8 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	if (!h5type->Rtype_is_set) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		PRINT_TO_ERRMSG_BUF(
 			"h5summarize() does not support this type "
 			"of dataset yet, sorry. You can\n  "
@@ -661,7 +664,8 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 	if (ret < 0) {
 		_destroy_H5DSetDescriptor(&h5dset);
 		H5Dclose(dset_id);
-		H5Fclose(file_id);
+		if (!isObject(filepath))
+			H5Fclose(file_id);
 		error(_HDF5Array_global_errmsg_buf());
 	}
 
@@ -670,7 +674,8 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 
 	_destroy_H5DSetDescriptor(&h5dset);
 	H5Dclose(dset_id);
-	H5Fclose(file_id);
+	if (!isObject(filepath))
+		H5Fclose(file_id);
 	UNPROTECT(1);
 	if (ans == R_NilValue)
 		error(_HDF5Array_global_errmsg_buf());

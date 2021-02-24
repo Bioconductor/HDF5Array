@@ -16,7 +16,10 @@ setClass("H5DSetDescriptor",
 
 H5DSetDescriptor <- function(filepath, name, as.integer=FALSE)
 {
-    filepath <- normarg_h5_filepath(filepath)
+    if (!is(filepath, "H5File")) {
+        filepath <- H5File(filepath)
+        on.exit(close(filepath))
+    }
     name <- normarg_h5_name(name)
 
     xp <- .Call2("C_new_H5DSetDescriptor_xp", filepath, name, as.integer,

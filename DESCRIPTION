@@ -25,6 +25,7 @@ Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 	h5vcData, ExperimentHub, TENxBrainData, zellkonverter, GenomicFeatures,
 	BiocStyle
 Collate: utils.R
+	H5File-class.R
 	H5DSetDescriptor-class.R
 	uaselection.R
 	h5mread.R
