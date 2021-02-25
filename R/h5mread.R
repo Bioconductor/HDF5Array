@@ -10,7 +10,7 @@
 get_h5mread_returned_type <- function(filepath, name, as.integer=FALSE)
 {
     if (!is(filepath, "H5File")) {
-        filepath <- H5File(filepath)
+        filepath <- H5File(filepath, .no_rhdf5_h5id=TRUE)
         on.exit(close(filepath))
     }
     name <- normarg_h5_name(name)
@@ -30,7 +30,7 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
                     method=0L, use.H5Dread_chunk=FALSE)
 {
     if (!is(filepath, "H5File")) {
-        filepath <- H5File(filepath)
+        filepath <- H5File(filepath, .no_rhdf5_h5id=TRUE)
         on.exit(close(filepath))
     }
     name <- normarg_h5_name(name)

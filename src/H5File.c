@@ -315,10 +315,10 @@ SEXP C_new_H5FileID_xp(SEXP ID)
 
 static hid_t get_H5File_file_id(SEXP x)
 {
-	SEXP h5fid, xp, ID;
+	SEXP HDF5Array_h5id, xp, ID;
 
-	h5fid = GET_SLOT(x, install("h5fid"));
-	xp = GET_SLOT(h5fid, install("xp"));
+	HDF5Array_h5id = GET_SLOT(x, install("HDF5Array_h5id"));
+	xp = GET_SLOT(HDF5Array_h5id, install("xp"));
 	ID = get_xp_tag(xp);
 	return ID_to_file_id(ID);
 }

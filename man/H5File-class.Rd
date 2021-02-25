@@ -36,7 +36,7 @@
 
 \usage{
 ## Constructor function:
-H5File(filepath, s3=FALSE, s3credentials=NULL)
+H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
 }
 
 \arguments{
@@ -53,6 +53,9 @@ H5File(filepath, s3=FALSE, s3credentials=NULL)
     files stored in a private Amazon S3 bucket.
     See \code{?\link[rhdf5]{H5P_FILE_ACCESS}} in the \pkg{rhdf5} package
     for more information.
+  }
+  \item{.no_rhdf5_h5id}{
+    For internal use.
   }
 }
 

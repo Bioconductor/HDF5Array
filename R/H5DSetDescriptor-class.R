@@ -17,7 +17,7 @@ setClass("H5DSetDescriptor",
 H5DSetDescriptor <- function(filepath, name, as.integer=FALSE)
 {
     if (!is(filepath, "H5File")) {
-        filepath <- H5File(filepath)
+        filepath <- H5File(filepath, .no_rhdf5_h5id=TRUE)
         on.exit(close(filepath))
     }
     name <- normarg_h5_name(name)

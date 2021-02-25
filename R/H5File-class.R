@@ -11,18 +11,26 @@
 ### The .h5closefile() function returns NULL.
 ###
 
-.h5openlocalfile <- function(filepath, readonly=TRUE)
+.h5openlocalfile <- function(filepath, readonly=TRUE, use.rhdf5=FALSE)
 {
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying ",
                   "the path to an HDF5 file"))
     if (!isTRUEorFALSE(readonly))
         stop(wmsg("'readonly' must be TRUE or FALSE"))
+    if (!isTRUEorFALSE(use.rhdf5))
+        stop(wmsg("'use.rhdf5' must be TRUE or FALSE"))
+
     filepath <- file_path_as_absolute(filepath)
-    .Call2("C_h5openlocalfile", filepath, readonly, PACKAGE="HDF5Array")
+    if (use.rhdf5) {
+        flags <- if (readonly) "H5F_ACC_RDONLY" else "H5F_ACC_RDWR"
+        rhdf5::H5Fopen(filepath, flags)@ID
+    } else {
+        .Call2("C_h5openlocalfile", filepath, readonly, PACKAGE="HDF5Array")
+    }
 }
 
-.h5openS3file <- function(filepath, s3credentials=NULL)
+.h5openS3file <- function(filepath, s3credentials=NULL, use.rhdf5=FALSE)
 {
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying ",
@@ -39,28 +47,51 @@
         stop(wmsg("'s3credentials' must be NULL or a list of 3 strings: ",
                   "(1) aws_region, (2) secret_id, (3) secret_key"))
     }
-    .Call2("C_h5openS3file", filepath, auth, aws_region, secret_id, secret_key,
-                             PACKAGE="HDF5Array")
+    if (!isTRUEorFALSE(use.rhdf5))
+        stop(wmsg("'use.rhdf5' must be TRUE or FALSE"))
+
+    if (use.rhdf5) {
+        fapl_id <- rhdf5::H5Pcreate("H5P_FILE_ACCESS")
+        on.exit(rhdf5::H5Pclose(fapl_id))
+        rhdf5::H5Pset_fapl_ros3(fapl_id, s3credentials)
+        loc <- rhdf5:::h5checktypeOrOpenLocS3(filepath, readonly=TRUE,
+                                              fapl=fapl_id, native=FALSE)
+        loc$H5Identifier@ID
+    } else {
+        .Call2("C_h5openS3file", filepath, auth,
+                                 aws_region, secret_id, secret_key,
+                                 PACKAGE="HDF5Array")
+    }
 }
 
-.h5openfile <- function(filepath, s3=FALSE, s3credentials=NULL)
+.h5openfile <- function(filepath, s3=FALSE, s3credentials=NULL, use.rhdf5=FALSE)
 {
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying ",
                   "the path or URL to an HDF5 file"))
     if (!isTRUEorFALSE(s3))
         stop(wmsg("'s3' must be TRUE or FALSE"))
+
     if (s3) {
-        ID <- .h5openS3file(filepath, s3credentials=s3credentials)
+        ID <- .h5openS3file(filepath, s3credentials=s3credentials,
+                                      use.rhdf5=use.rhdf5)
     } else {
-        ID <- .h5openlocalfile(filepath, readonly=TRUE)
+        ID <- .h5openlocalfile(filepath, readonly=TRUE, use.rhdf5=use.rhdf5)
     }
     ID
 }
 
-.h5closefile <- function(ID)
+.h5closefile <- function(ID, use.rhdf5=FALSE)
 {
-    .Call2("C_h5closefile", ID, PACKAGE="HDF5Array")
+    if (!isTRUEorFALSE(use.rhdf5))
+        stop(wmsg("'use.rhdf5' must be TRUE or FALSE"))
+
+    if (use.rhdf5) {
+        fid <- new("H5IdComponent", ID=ID, native=FALSE)
+        rhdf5:::H5Fclose(fid)
+    } else {
+        .Call2("C_h5closefile", ID, PACKAGE="HDF5Array")
+    }
 }
 
 
@@ -94,60 +125,68 @@
 ### H5FileID objects
 ###
 
-.open_H5FileID_xp <- function(xp, filepath, s3=FALSE, s3credentials=NULL)
+.open_H5FileID_xp <- function(xp, filepath, s3=FALSE, s3credentials=NULL,
+                                            use.rhdf5=FALSE)
 {
     ID <- .get_H5FileID_xp_ID(xp)
     if (!(is.null(ID) || is.na(ID))) {
-        ## H5FileID object is already open and needs to be closed first.
+        ## H5FileID object is already open.
         return(FALSE)
     }
-    ID <- .h5openfile(filepath, s3=s3, s3credentials=s3credentials)
+    ID <- .h5openfile(filepath, s3=s3, s3credentials=s3credentials,
+                                use.rhdf5=use.rhdf5)
     .set_H5FileID_xp_ID(xp, ID)
     TRUE
 }
 
-.close_H5FileID_xp <- function(xp)
+.close_H5FileID_xp <- function(xp, use.rhdf5=FALSE)
 {
     ID <- .get_H5FileID_xp_ID(xp)
     if (is.null(ID) || is.na(ID)) {
-        ## H5FileID object is already closed and needs to be opened first.
+        ## H5FileID object is already closed.
         return(FALSE)
     }
-    .h5closefile(ID)
+    .h5closefile(ID, use.rhdf5=use.rhdf5)
     .set_H5FileID_xp_ID(xp, NA_character_)
     TRUE
 }
 
 setClass("H5FileID",
     representation(
-        xp="externalptr"
+        xp="externalptr",
+        from_rhdf5="logical"
+    ),
+    prototype(
+        #xp=.new_H5FileID_xp(NA_character_),  # cannot be called at load time!
+        from_rhdf5=FALSE
     )
-    #prototype(
-    #    xp=.new_H5FileID_xp(NA_character_)  # cannot be called at load time!
-    #)
 )
 
 open.H5FileID <- function(con, ...)
 {
-    .open_H5FileID_xp(con@xp, ...)
+    .open_H5FileID_xp(con@xp, ..., use.rhdf5=con@from_rhdf5)
 }
 
 close.H5FileID <- function(con, ...)
 {
-    .close_H5FileID_xp(con@xp, ...)
+    .close_H5FileID_xp(con@xp, ..., use.rhdf5=con@from_rhdf5)
 }
 
-H5FileID <- function(filepath, s3=FALSE, s3credentials=NULL)
+H5FileID <- function(filepath, s3=FALSE, s3credentials=NULL, use.rhdf5=FALSE)
 {
-    ID <- .h5openfile(filepath, s3=s3, s3credentials=s3credentials)
+    ID <- .h5openfile(filepath, s3=s3, s3credentials=s3credentials,
+                                use.rhdf5=use.rhdf5)
     xp <- .new_H5FileID_xp(ID)
-    reg.finalizer(xp, .close_H5FileID_xp, onexit=TRUE)
-    new2("H5FileID", xp=xp)
+    reg.finalizer(xp,
+                  function(e) .close_H5FileID_xp(e, use.rhdf5=use.rhdf5),
+                  onexit=TRUE)
+    new2("H5FileID", xp=xp, from_rhdf5=use.rhdf5)
 }
 
 setMethod("show", "H5FileID",
     function(object)
-        cat("H5FileID: ", .get_H5FileID_xp_ID(object@xp), "\n", sep="")
+        cat("H5FileID: ", .get_H5FileID_xp_ID(object@xp),
+            if (object@from_rhdf5) " (from rhdf5)" else "", "\n", sep="")
 )
 
 
@@ -155,30 +194,58 @@ setMethod("show", "H5FileID",
 ### H5File objects
 ###
 
+### Unfortunately, because HDF5Array and rhdf5 are both **statically** linked
+### to the hdf5 library (libhdf5.a in the Rhdf5lib package), h5 ids returned
+### by calls to H5Fopen() in HDF5Array's C code cannot be used in rhdf5's
+### calls to the hdf5 lib and vice versa. This is a huge bummer!
+### We work around this by storing two h5 ids in an H5File object, one that
+### is compatible with HDF5Array (i.e. it can be used in HDF5Array's calls
+### to the hdf5 lib) and one that is compatible with rhdf5 (i.e. it can be
+### used in hdf5's calls to the hdf5 lib). Note that the latter is only needed
+### for a few R functions (e.g. HDF5Array::h5ls()) defined in HDF5Array that
+### call rhdf5's C code. Yes, you are allowed to call this an ugly hack!
 setClass("H5File",
     representation(
-        h5fid="H5FileID",
         filepath="character",
-        s3="logical"
+        s3="logical",
+        HDF5Array_h5id="H5FileID",  # compatible with HDF5Array
+        no_rhdf5_h5id="logical",    # TRUE or FALSE
+        rhdf5_h5id="H5FileID"       # compatible with rhdf5
     )
 )
 
 open.H5File <- function(con, ...)
 {
-    open(con@h5fid, con@filepath, s3=con@s3, ...)
+    if (!con@no_rhdf5_h5id)
+        open(con@rhdf5_h5id, con@filepath, s3=con@s3, ...)
+    open(con@HDF5Array_h5id, con@filepath, s3=con@s3, ...)
 }
 
 close.H5File <- function(con, ...)
 {
-    close(con@h5fid, ...)
+    if (!con@no_rhdf5_h5id)
+        close(con@rhdf5_h5id, ...)
+    close(con@HDF5Array_h5id, ...)
 }
 
-H5File <- function(filepath, s3=FALSE, s3credentials=NULL)
+H5File <- function(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
 {
-    h5fid <- H5FileID(filepath, s3=s3, s3credentials=s3credentials)
+    if (!isTRUEorFALSE(.no_rhdf5_h5id))
+        stop(wmsg("'.no_rhdf5_h5id' must be TRUE or FALSE"))
+
+    HDF5Array_h5id <- H5FileID(filepath, s3=s3, s3credentials=s3credentials)
+    if (.no_rhdf5_h5id) {
+        rhdf5_h5id <- new("H5FileID")
+    } else {
+        rhdf5_h5id <- H5FileID(filepath, s3=s3, s3credentials=s3credentials,
+                                         use.rhdf5=TRUE)
+    }
     if (!s3)
         filepath <- file_path_as_absolute(filepath)
-    new2("H5File", h5fid=h5fid, filepath=filepath, s3=s3)
+    new2("H5File", filepath=filepath, s3=s3,
+                   HDF5Array_h5id=HDF5Array_h5id,
+                   no_rhdf5_h5id=.no_rhdf5_h5id,
+                   rhdf5_h5id=rhdf5_h5id)
 }
 
 
