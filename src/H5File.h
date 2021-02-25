@@ -8,7 +8,13 @@ hid_t _h5openlocalfile(SEXP filepath, int readonly);
 
 SEXP C_h5openlocalfile(SEXP filepath, SEXP readonly);
 
-SEXP C_h5openS3file(SEXP filepath, SEXP s3credentials);
+SEXP C_h5openS3file(
+	SEXP filepath,
+	SEXP auth,
+	SEXP aws_region,
+	SEXP secret_id,
+	SEXP secret_key
+);
 
 SEXP C_h5closefile(SEXP ID);
 

@@ -19,7 +19,7 @@
     if (!isTRUEorFALSE(readonly))
         stop(wmsg("'readonly' must be TRUE or FALSE"))
     filepath <- file_path_as_absolute(filepath)
-    .Call("C_h5openlocalfile", filepath, readonly, PACKAGE="HDF5Array")
+    .Call2("C_h5openlocalfile", filepath, readonly, PACKAGE="HDF5Array")
 }
 
 .h5openS3file <- function(filepath, s3credentials=NULL)
@@ -27,7 +27,20 @@
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying ",
                   "the URL to an HDF5 file located on S3"))
-    .Call("C_h5openS3file", filepath, s3credentials, PACKAGE="HDF5Array")
+    if (is.null(s3credentials)) {
+        auth <- FALSE
+        aws_region <- secret_id <- secret_key <- ""
+    } else if (is.list(s3credentials) && length(s3credentials) == 3L) {
+        auth <- TRUE
+        aws_region <- s3credentials[[1L]]
+        secret_id <- s3credentials[[2L]]
+        secret_key <- s3credentials[[3L]]
+    } else {
+        stop(wmsg("'s3credentials' must be NULL or a list of 3 strings: ",
+                  "(1) aws_region, (2) secret_id, (3) secret_key"))
+    }
+    .Call2("C_h5openS3file", filepath, auth, aws_region, secret_id, secret_key,
+                             PACKAGE="HDF5Array")
 }
 
 .h5openfile <- function(filepath, s3=FALSE, s3credentials=NULL)
@@ -47,7 +60,7 @@
 
 .h5closefile <- function(ID)
 {
-    .Call("C_h5closefile", ID, PACKAGE="HDF5Array")
+    .Call2("C_h5closefile", ID, PACKAGE="HDF5Array")
 }
 
 

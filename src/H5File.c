@@ -135,10 +135,112 @@ SEXP C_h5openlocalfile(SEXP filepath, SEXP readonly)
  *     ID <- loc$H5Identifier@ID
  */
 
-SEXP C_h5openS3file(SEXP filepath, SEXP s3credentials)
+#ifdef H5_HAVE_ROS3_VFD
+static int set_fapl_ros3(hid_t fapl_id, int auth,
+					const char *aws_region,
+					const char *secret_id,
+					const char *secret_key)
 {
-	error("'s3=TRUE' is not supported yet");
-	return R_NilValue;
+	H5FD_ros3_fapl_t fapl;
+	int n;
+
+	/* See Rhdf5lib/src/hdf5/src/H5FDros3.h for the definition of
+	   the H5FD_ros3_fapl_t struct. */
+	fapl.version = H5FD_CURR_ROS3_FAPL_T_VERSION;
+	fapl.authenticate = (hbool_t) auth;
+	n = snprintf(fapl.aws_region, H5FD_ROS3_MAX_REGION_LEN + 1,
+		     "%s", aws_region);
+	if (n < 0 || n > H5FD_ROS3_MAX_REGION_LEN)
+		return -1;
+	n = snprintf(fapl.secret_id, H5FD_ROS3_MAX_SECRET_ID_LEN + 1,
+		     "%s", secret_id);
+	if (n < 0 || n > H5FD_ROS3_MAX_SECRET_ID_LEN)
+		return -1;
+	n = snprintf(fapl.secret_key, H5FD_ROS3_MAX_SECRET_KEY_LEN + 1,
+		     "%s", secret_key);
+	if (n < 0 || n > H5FD_ROS3_MAX_SECRET_KEY_LEN)
+		return -1;
+	return H5Pset_fapl_ros3(fapl_id, &fapl);
+}
+#endif
+
+static hid_t h5openS3file(const char *url, int auth,
+					   const char *aws_region,
+					   const char *secret_id,
+					   const char *secret_key)
+{
+#ifdef H5_HAVE_ROS3_VFD
+	int ret;
+	hid_t fapl_id, file_id;
+
+	ret = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+	if (ret < 0)
+		error("H5Eset_auto() returned an error");
+
+	fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+	if (fapl_id < 0)
+		error("H5Pcreate() returned an error");
+	ret = set_fapl_ros3(fapl_id, auth, aws_region, secret_id, secret_key);
+	if (ret < 0) {
+		H5Pclose(fapl_id);
+		error("set_fapl_ros3() returned an error");
+	}
+	file_id = H5Fopen(url, H5F_ACC_RDONLY, fapl_id);
+	H5Pclose(fapl_id);
+	if (file_id < 0)
+		error("failed to open file '%s'", url);
+	return file_id;
+#else
+	error("Rhdf5lib was not compiled with support for the S3 VFD");
+#endif
+	return 0;
+}
+
+SEXP C_h5openS3file(SEXP filepath, SEXP auth,
+		    SEXP aws_region, SEXP secret_id, SEXP secret_key)
+{
+	SEXP filepath0, aws_region0, secret_id0, secret_key0;
+	int auth0;
+	hid_t file_id;
+
+	/* Check 'filepath'. */
+	if (!(IS_CHARACTER(filepath) && LENGTH(filepath) == 1))
+		error("'filepath' must be a single string");
+	filepath0 = STRING_ELT(filepath, 0);
+	if (filepath0 == NA_STRING)
+		error("'filepath' cannot be NA");
+
+	/* Check 'auth'. */
+	if (!(IS_LOGICAL(auth) && LENGTH(auth) == 1))
+		error("'auth' must be TRUE or FALSE");
+	auth0 = LOGICAL(auth)[0];
+
+	/* Check 'aws_region'. */
+	if (!(IS_CHARACTER(aws_region) && LENGTH(aws_region) == 1))
+		error("'aws_region' must be a single string");
+	aws_region0 = STRING_ELT(aws_region, 0);
+	if (aws_region0 == NA_STRING)
+		error("'aws_region' cannot be NA");
+
+	/* Check 'secret_id'. */
+	if (!(IS_CHARACTER(secret_id) && LENGTH(secret_id) == 1))
+		error("'secret_id' must be a single string");
+	secret_id0 = STRING_ELT(secret_id, 0);
+	if (secret_id0 == NA_STRING)
+		error("'secret_id' cannot be NA");
+
+	/* Check 'secret_key'. */
+	if (!(IS_CHARACTER(secret_key) && LENGTH(secret_key) == 1))
+		error("'secret_key' must be a single string");
+	secret_key0 = STRING_ELT(secret_key, 0);
+	if (secret_key0 == NA_STRING)
+		error("'secret_key' cannot be NA");
+
+	file_id = h5openS3file(CHAR(filepath0), auth0,
+						CHAR(aws_region0),
+						CHAR(secret_id0),
+						CHAR(secret_key0));
+	return mkString(hid_to_string(file_id));
 }
 
 

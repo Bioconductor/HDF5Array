@@ -44,16 +44,15 @@ H5File(filepath, s3=FALSE, s3credentials=NULL)
     A single string specifying the path or URL to an HDF5 file.
   }
   \item{s3}{
-    *** NOT SUPPORTED YET! ***
-
-    \code{TRUE} or \code{FALSE}. Should the file argument be
-    treated as a URL to an Amazon S3 bucket, rather than a local file path?
+    \code{TRUE} or \code{FALSE}. Should the \code{filepath} argument be
+    treated as the URL to a file stored in an Amazon S3 bucket, rather than
+    the path to a local file?
   }
   \item{s3credentials}{
-    *** NOT SUPPORTED YET! ***
-
-    A list of length three, providing the credentials for accessing files
-    in a private Amazon S3 bucket.
+    A list of length 3, providing the credentials for accessing
+    files stored in a private Amazon S3 bucket.
+    See \code{?\link[rhdf5]{H5P_FILE_ACCESS}} in the \pkg{rhdf5} package
+    for more information.
   }
 }
 
@@ -67,6 +66,10 @@ H5File(filepath, s3=FALSE, s3credentials=NULL)
 
 \seealso{
   \itemize{
+    \item \link[rhdf5]{H5P_FILE_ACCESS} in the \pkg{rhdf5} package for
+          detailed information about how to pass your S3 credentials
+          to the \code{s3credentials} argument.
+
     \item The \link{HDF5Array} class for representing and operating on
           a conventional (a.k.a. dense) HDF5 dataset.
 
@@ -95,6 +98,17 @@ h5file
 
 h5mread(h5file, "M2", list(1:10, 1:6))
 get_h5mread_returned_type(h5file, "M2")
+
+## With an URL to a file stored in an Amazon S3 bucket:
+public_S3_url <-
+ "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
+h5ls(public_S3_url, s3=TRUE)
+
+h5file2 <- H5File(public_S3_url, s3=TRUE)
+h5file2
+
+h5mread(h5file2, "a1")
+get_h5mread_returned_type(h5file2, "a1")
 }
 \keyword{classes}
 \keyword{methods}

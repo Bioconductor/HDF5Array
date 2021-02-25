@@ -15,7 +15,7 @@ static const R_CallMethodDef callMethods[] = {
 
 /* H5File.c */
 	CALLMETHOD_DEF(C_h5openlocalfile, 2),
-	CALLMETHOD_DEF(C_h5openS3file, 2),
+	CALLMETHOD_DEF(C_h5openS3file, 5),
 	CALLMETHOD_DEF(C_h5closefile, 1),
 	CALLMETHOD_DEF(C_set_H5FileID_xp_ID, 2),
 	CALLMETHOD_DEF(C_get_H5FileID_xp_ID, 1),
