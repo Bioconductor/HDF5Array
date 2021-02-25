@@ -89,7 +89,7 @@ TENxMatrix(filepath, group="mm10")
 
     \item The \link{TENxMatrixSeed} helper class.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
 
     \item \link[IRanges]{NumericList} and \link[IRanges]{IntegerList}
           objects in the \pkg{IRanges} package.
@@ -109,9 +109,7 @@ hub <- ExperimentHub()
 query(hub, "TENxBrainData")
 fname <- hub[["EH1039"]]
 
-## The structure of this HDF5 file can be seen using the h5ls() command
-## from the rhdf5 package:
-library(rhdf5)
+## 'fname' is an HDF5 file. Use h5ls() to list its content:
 h5ls(fname)
 
 ## The 1.3 Million Brain Cell Dataset is represented by the "mm10"

@@ -207,4 +207,4 @@ stopifnot(identical(a, sparse2dense(sas)))
   stopifnot(identical(a, sparse2dense(sas)))
 }
 }
-\keyword{methods}
+\keyword{utilities}

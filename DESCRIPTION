@@ -26,6 +26,7 @@ Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 	BiocStyle
 Collate: utils.R
 	H5File-class.R
+	h5ls.R
 	H5DSetDescriptor-class.R
 	uaselection.R
 	h5mread.R

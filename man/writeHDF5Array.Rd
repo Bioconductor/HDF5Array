@@ -175,7 +175,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     \item \link{HDF5-dump-management} to control the location and
           physical properties of automatically created HDF5 datasets.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -213,9 +213,7 @@ M3 <- writeHDF5Array(M3, h5file, name="M3", chunkdim=c(5, 5))
 M3
 chunkdim(M3)
 
-library(rhdf5)
 library(h5vcData)
-
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
 h5ls(tally_file)

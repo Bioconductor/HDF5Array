@@ -126,7 +126,7 @@ get_h5dimnames(filepath, name)
           \code{h5readDimnames} uses internally to read the dimnames
           from the HDF5 file.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
 
     \item \link{HDF5Array} objects.
   }
@@ -136,7 +136,7 @@ get_h5dimnames(filepath, name)
 ## ---------------------------------------------------------------------
 ## BASIC EXAMPLE
 ## ---------------------------------------------------------------------
-library(rhdf5)  # for h5write() and h5ls()
+library(rhdf5)  # for h5write()
 
 m0 <- matrix(1:60, ncol=5)
 colnames(m0) <- LETTERS[1:5]
@@ -238,4 +238,4 @@ stopifnot(identical(
     h5readDimnames(h5file, "M4", as.character=TRUE)
 ))
 }
-\keyword{methods}
+\keyword{utilities}

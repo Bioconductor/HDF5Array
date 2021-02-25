@@ -110,7 +110,7 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
     \item The \link{HDF5ArraySeed} helper class.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -120,7 +120,6 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 ## ---------------------------------------------------------------------
 
 toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
-library(rhdf5)  # for h5ls()
 h5ls(toy_h5)
 
 HDF5Array(toy_h5, "M2")

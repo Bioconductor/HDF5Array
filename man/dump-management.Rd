@@ -144,7 +144,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   combination.
 
   \code{lsHDF5DumpFile()} is a just convenience wrapper for
-  \code{rhdf5::\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
+  \code{\link{h5ls}(getHDF5DumpFile())}.
 }
 
 \value{
@@ -207,8 +207,8 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
 
     \item \link{HDF5Array} objects.
 
-    \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package,
-          on which \code{lsHDF5DumpFile} is based.
+    \item The \code{\link{h5ls}} function on which \code{lsHDF5DumpFile}
+          is based.
 
     \item \code{\link[DelayedArray]{makeCappedVolumeBox}} in the
           \pkg{DelayedArray} package.
@@ -261,4 +261,4 @@ showHDF5DumpLog()
 dump_log <- suppressMessages(showHDF5DumpLog())
 dump_log
 }
-\keyword{methods}
+\keyword{utilities}

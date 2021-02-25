@@ -78,7 +78,7 @@ ReshapedHDF5Array(filepath, name, dim, type=NA)
 
     \item The \link{ReshapedHDF5ArraySeed} helper class.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -86,8 +86,6 @@ ReshapedHDF5Array(filepath, name, dim, type=NA)
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
-
-library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 ## Pick up "Coverages" dataset for Human chromosome 16 and collapse its

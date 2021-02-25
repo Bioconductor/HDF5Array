@@ -3,6 +3,9 @@
 ### -------------------------------------------------------------------------
 
 
+.ID_to_H5IdComponent <- function(ID) new("H5IdComponent", ID=ID, native=FALSE)
+
+
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### .h5openfile() / .h5closefile()
 ###
@@ -87,7 +90,7 @@
         stop(wmsg("'use.rhdf5' must be TRUE or FALSE"))
 
     if (use.rhdf5) {
-        fid <- new("H5IdComponent", ID=ID, native=FALSE)
+        fid <- .ID_to_H5IdComponent(ID)
         rhdf5:::H5Fclose(fid)
     } else {
         .Call2("C_h5closefile", ID, PACKAGE="HDF5Array")
@@ -125,11 +128,13 @@
 ### H5FileID objects
 ###
 
+.ID_is_closed <- function(ID) { is.null(ID) || is.na(ID) }
+
 .open_H5FileID_xp <- function(xp, filepath, s3=FALSE, s3credentials=NULL,
                                             use.rhdf5=FALSE)
 {
     ID <- .get_H5FileID_xp_ID(xp)
-    if (!(is.null(ID) || is.na(ID))) {
+    if (!.ID_is_closed(ID)) {
         ## H5FileID object is already open.
         return(FALSE)
     }
@@ -142,7 +147,7 @@
 .close_H5FileID_xp <- function(xp, use.rhdf5=FALSE)
 {
     ID <- .get_H5FileID_xp_ID(xp)
-    if (is.null(ID) || is.na(ID)) {
+    if (.ID_is_closed(ID)) {
         ## H5FileID object is already closed.
         return(FALSE)
     }
@@ -185,8 +190,18 @@ H5FileID <- function(filepath, s3=FALSE, s3credentials=NULL, use.rhdf5=FALSE)
 
 setMethod("show", "H5FileID",
     function(object)
-        cat("H5FileID: ", .get_H5FileID_xp_ID(object@xp),
-            if (object@from_rhdf5) " (from rhdf5)" else "", "\n", sep="")
+    {
+        ID <- .get_H5FileID_xp_ID(object@xp)
+        explain <- ""
+        if (!is.null(ID)) {
+            if (is.na(ID)) {
+                explain <- " (was closed)"
+            } else if (object@from_rhdf5) {
+                explain <- " (from rhdf5)"
+            }
+        }
+        cat("H5FileID: ", ID, explain, "\n", sep="")
+    }
 )
 
 
@@ -213,6 +228,8 @@ setClass("H5File",
         rhdf5_h5id="H5FileID"       # compatible with rhdf5
     )
 )
+
+setMethod("path", "H5File", function(object) object@filepath)
 
 open.H5File <- function(con, ...)
 {
@@ -247,6 +264,33 @@ H5File <- function(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
                    no_rhdf5_h5id=.no_rhdf5_h5id,
                    rhdf5_h5id=rhdf5_h5id)
 }
+
+setMethod("show", "H5File",
+    function(object)
+    {
+        ID <- .get_H5FileID_xp_ID(object@HDF5Array_h5id@xp)
+        if (.ID_is_closed(ID))
+            cat("CLOSED ")
+        cat("H5File object", if (object@s3) " for a file on S3" else "",
+            ":\n", sep="")
+        cat("  path: ", path(object), "\n", sep="")
+    }
+)
+
+setAs("H5File", "H5IdComponent",
+    function(from)
+    {
+        if (from@no_rhdf5_h5id)
+            stop(wmsg("This H5File object is not compatible with rhdf5. ",
+                      "Maybe it was created with ",
+                      "'H5File(..., .no_rhdf5_h5id=TRUE)'?"))
+        h5id <- from@rhdf5_h5id
+        ID <- .get_H5FileID_xp_ID(h5id@xp)
+        if (.ID_is_closed(ID))
+            stop(wmsg("H5File object is closed"))
+        .ID_to_H5IdComponent(ID)
+    }
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

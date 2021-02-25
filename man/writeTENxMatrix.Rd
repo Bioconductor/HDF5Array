@@ -97,7 +97,7 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
     \item \link{HDF5-dump-management} to control the location and
           physical properties of automatically created HDF5 datasets.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -115,9 +115,7 @@ sparsity(M0)
 
 path(M0)  # same as 'out_file'
 
-## Use the h5ls() command from the rhdf5 package to see the structure of
-## the file:
-library(rhdf5)
+## Use h5ls() to list the content of this HDF5 file:
 h5ls(path(M0))
 
 ## ---------------------------------------------------------------------

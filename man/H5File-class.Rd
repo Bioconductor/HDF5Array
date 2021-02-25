@@ -13,8 +13,11 @@
 \alias{H5File-class}
 \alias{H5File}
 
+\alias{path,H5File-method}
 \alias{open.H5File}
 \alias{close.H5File}
+\alias{show,H5File-method}
+\alias{coerce,H5File,H5IdComponent-method}
 
 \alias{class:character_OR_H5File}
 \alias{character_OR_H5File-class}
@@ -29,8 +32,6 @@
 \title{H5File objects}
 
 \description{
-  *** WORK-IN-PROGRESS! ***
-
   The H5File class provides a formal representation of an HDF5 file.
 }
 
@@ -87,17 +88,15 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
           and \link{H5ADMatrix} objects, for (almost) all their data
           reading needs.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
 \examples{
 toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
-library(rhdf5)  # for h5ls()
-h5ls(toy_h5)
-
 h5file <- H5File(toy_h5)
-h5file
+h5ls(h5file)
+path(h5file)
 
 h5mread(h5file, "M2", list(1:10, 1:6))
 get_h5mread_returned_type(h5file, "M2")
@@ -105,10 +104,8 @@ get_h5mread_returned_type(h5file, "M2")
 ## With an URL to a file stored in an Amazon S3 bucket:
 public_S3_url <-
  "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
-h5ls(public_S3_url, s3=TRUE)
-
 h5file2 <- H5File(public_S3_url, s3=TRUE)
-h5file2
+h5ls(h5file2)
 
 h5mread(h5file2, "a1")
 get_h5mread_returned_type(h5file2, "a1")

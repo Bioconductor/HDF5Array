@@ -120,7 +120,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
   \itemize{
     \item \link{HDF5Array} objects.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -128,8 +128,6 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
-
-library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 name <- "/ExampleStudy/16/Coverages"  # name of the dataset of interest

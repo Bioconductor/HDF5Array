@@ -57,19 +57,6 @@ static int valid_ID(SEXP ID, hid_t *file_id)
 	return 2;
 }
 
-static hid_t ID_to_file_id(SEXP ID)
-{
-	int ret;
-	hid_t file_id;
-
-	ret = valid_ID(ID, &file_id);
-	if (ret == 0)
-		error("invalid H5FileID object (invalid 'ID')");
-	if (ret == 1)
-		error("H5FileID object is closed");
-	return file_id;
-}
-
 
 /****************************************************************************
  * C_h5openlocalfile()
@@ -312,6 +299,19 @@ SEXP C_new_H5FileID_xp(SEXP ID)
 /****************************************************************************
  * _get_file_id()
  */
+
+static hid_t ID_to_file_id(SEXP ID)
+{
+	int ret;
+	hid_t file_id;
+
+	ret = valid_ID(ID, &file_id);
+	if (ret == 0)
+		error("invalid H5File object (invalid 'ID')");
+	if (ret == 1)
+		error("H5File object is closed");
+	return file_id;
+}
 
 static hid_t get_H5File_file_id(SEXP x)
 {

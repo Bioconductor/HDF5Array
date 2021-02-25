@@ -94,4 +94,4 @@ h5mread_from_reshaped(path(A2), "A2", dim=c(10, 15, 1000),
 h5mread_from_reshaped(path(A2), "A2", dim=c(150, 1000),
                       starts=list(71:110, 999:1000))
 }
-\keyword{methods}
+\keyword{utilities}

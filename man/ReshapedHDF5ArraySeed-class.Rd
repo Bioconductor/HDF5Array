@@ -47,7 +47,7 @@ ReshapedHDF5ArraySeed(filepath, name, dim, type=NA)
   \itemize{
     \item \link{ReshapedHDF5Array} objects.
 
-    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
 }
 
@@ -55,8 +55,6 @@ ReshapedHDF5ArraySeed(filepath, name, dim, type=NA)
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
                           package="h5vcData")
-
-library(rhdf5)  # for h5ls()
 h5ls(tally_file)
 
 ## Collapse the first 2 dimensions:
