@@ -9,7 +9,7 @@
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### .h5openfile() / .h5closefile()
 ###
-### The .h5open*file() functions return an h5 id (hid_t value) as a string.
+### The .h5open*file() functions return an h5 ID (hid_t value) as a string.
 ###
 ### The .h5closefile() function returns NULL.
 ###
@@ -208,20 +208,31 @@ setMethod("show", "H5FileID",
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### H5File objects
 ###
-
 ### Unfortunately, because HDF5Array and rhdf5 are both **statically** linked
-### to the hdf5 library (libhdf5.a in the Rhdf5lib package), h5 ids returned
+### to the hdf5 library (libhdf5.a in the Rhdf5lib package), h5 IDs returned
 ### by calls to H5Fopen() in HDF5Array's C code cannot be used in rhdf5's
 ### calls to the hdf5 lib and vice versa. This is a huge bummer!
-### We work around this by storing two h5 ids in an H5File object, one that
-### is compatible with HDF5Array (i.e. it can be used in HDF5Array's calls
-### to the hdf5 lib) and one that is compatible with rhdf5 (i.e. it can be
-### used in hdf5's calls to the hdf5 lib). Note that the latter is only needed
-### for a few R functions (e.g. HDF5Array::h5ls()) defined in HDF5Array that
-### call rhdf5's C code. Yes, you are allowed to call this an ugly hack!
+###
+### We work around this with a crazy hack: we store **two** h5 IDs in an
+### H5File object:
+###   - The 1st h5 ID is compatible with HDF5Array, that is, it's made by
+###     HDF5Array for HDF5Array (so it can be used in HDF5Array's calls to
+###     the hdf5 lib).
+###   - The 2nd h5 ID is compatible with rhdf5, that is, it's made by rhdf5
+###     for rhdf5 (so it can be used in hdf5's calls to the hdf5 lib).
+###     Note that this ID is only needed by HDF5Array functions that call
+###     rhdf5's C code (only HDF5Array::h5ls() at the moment).
+###
+### One drawback of this hack is that a call to H5File(..., s3=TRUE, ...)
+### needs to authenticate twice so takes twice longer.
+###
+
 setClass("H5File",
     representation(
-        filepath="character",
+        filepath="character",       # URL or **absolute** path to a local HDF5
+                                    # file so the object won't break when the
+                                    # user changes the working directory (e.g.
+                                    # with setwd()).
         s3="logical",
         HDF5Array_h5id="H5FileID",  # compatible with HDF5Array
         no_rhdf5_h5id="logical",    # TRUE or FALSE

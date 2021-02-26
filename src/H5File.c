@@ -31,11 +31,11 @@ static const char *hid_to_string(hid_t hid)
 	return buf;
 }
 
-/* 'ID' must be a string representing a plausible h5 id (i.e. non-negative
+/* 'ID' must be a string representing a plausible h5 ID (i.e. non-negative
    hid_t value), or NA_character_. The function returns:
      0: if 'ID' is invalid;
      1: if 'ID' is NA_character_;
-     2: if 'ID' is a string representing a plausible h5 id, in which
+     2: if 'ID' is a string representing a plausible h5 ID, in which
         case the ID converted to hid_t is stored in '*file_id' (but
         only if 'file_id' is not NULL).
 */
@@ -80,10 +80,17 @@ hid_t _h5openlocalfile(SEXP filepath, int readonly)
 	if (ret < 0)
 		error("H5Eset_auto() returned an error");
 
+	ret = H5Fis_hdf5(CHAR(filepath0));
+	if (ret < 0)
+		error("H5Fis_hdf5() returned an error");
+	if (ret == 0)
+		error("file '%s' does not exist or is not in the HDF5 format",
+		      CHAR(filepath0));
+
 	flags = readonly ? H5F_ACC_RDONLY : H5F_ACC_RDWR;
 	file_id = H5Fopen(CHAR(filepath0), flags, H5P_DEFAULT);
 	if (file_id < 0)
-		error("failed to open file '%s'", CHAR(filepath0));
+		error("failed to open HDF5 file '%s'", CHAR(filepath0));
 
 	return file_id;
 }
@@ -330,12 +337,13 @@ static SEXP get_H5File_filepath(SEXP x)
 
 /* 'filepath' can be a single string or an H5File object:
      - If a single string, it's considered to be the path to a local HDF5
-       file. The file is opened and its h5 id returned.
-     - If an H5File object, the h5 id is extracted from the object.
+       file. The file is opened and its h5 ID returned.
+     - If an H5File object, the h5 ID is extracted from the object.
 */
 hid_t _get_file_id(SEXP filepath, int readonly)
 {
 	const char *class;
+	int ret;
 
 	if (!isObject(filepath))
 		return _h5openlocalfile(filepath, readonly);
@@ -346,6 +354,11 @@ hid_t _get_file_id(SEXP filepath, int readonly)
 	if (!readonly)
 		error("H5File objects are read-only and cannot be "
 		      "accessed in read/write mode at the moment");
+
+	ret = H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+	if (ret < 0)
+		error("H5Eset_auto() returned an error");
+
 	return get_H5File_file_id(filepath);
 }
 

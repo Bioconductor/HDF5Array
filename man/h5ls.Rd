@@ -45,5 +45,7 @@ h5ls(toy_h5)
 
 h5file <- H5File(toy_h5)
 h5ls(h5file)
+
+## See '?H5File' for more examples.
 }
 \keyword{utilities}

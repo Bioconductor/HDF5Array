@@ -8,12 +8,12 @@ setClass("HDF5ArraySeed",
     representation(
       ## ----------------- user supplied slots -----------------
 
-        ## Absolute path to the HDF5 file so the object won't break
-        ## when the user changes the working directory (e.g. with setwd()).
-        ## The path must also be in its canonical form so comparing
-        ## paths from different objects is meaningful (required by
-        ## quickResaveHDF5SummarizedExperiment()).
-        filepath="character",
+        ## H5File object or **absolute** path to a local HDF5 file so the
+        ## object won't break when the user changes the working directory
+        ## (e.g. with setwd()). The path must also be in its canonical
+        ## form so comparing paths from different objects is meaningful
+        ## (required by quickResaveHDF5SummarizedExperiment()).
+        filepath="character_OR_H5File",
 
         ## Name of dataset in the HDF5 file.
         name="character",
@@ -46,38 +46,48 @@ setClass("HDF5ArraySeed",
 ### is accessible and "as expected".
 validate_HDF5ArraySeed_dataset <- function(x)
 {
-    ## Check that 'x' points to an HDF5 file that is accessible.
-    if (!file.exists(x@filepath))
-        return(paste0("points to an HDF5 file that does not exist: ",
-                      x@filepath))
-    if (dir.exists(x@filepath))
-        return(paste0("points to a directory ('", x@filepath, "') ",
-                      "instead of an HDF5 file"))
-    h5_content <- try(h5ls(x@filepath), silent=TRUE)
-    if (inherits(h5_content, "try-error"))
-        return(paste0("points to an invalid HDF5 file: ", x@filepath))
-    if (x@filepath != file_path_as_absolute(x@filepath))
-        return(paste0("uses a non-absolute/non-canonical path ",
-                      "('", x@filepath, "') to point to the HDF5 file"))
+    if (is(x@filepath, "H5File")) {
+        ## TODO: Implement the H5File case.
+        ## Note that using 'validObject(x@filepath)' won't be enough
+        ## because a closed H5File object is considered valid.
+        ## validate_HDF5ArraySeed_dataset() wants to make sure that
+        ## the H5File object is opened and has a working file ID.
+    } else {
+        ## 'x@filepath' is expected to be the **absolute** path to a
+        ## local HDF5 file.
 
-    ## Check that 'x' points to an HDF5 dataset that is accessible.
-    h5_dim <- try(h5dim(x@filepath, x@name), silent=TRUE)
-    if (inherits(h5_dim, "try-error"))
-        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                      "that does not exist in HDF5 file: ", x@filepath))
+        ## Check that 'x' points to an HDF5 file that is accessible.
+        if (!file.exists(x@filepath))
+            return(paste0("points to an HDF5 file that does not exist: ",
+                          x@filepath))
+        if (dir.exists(x@filepath))
+            return(paste0("points to a directory ('", x@filepath, "') ",
+                          "instead of an HDF5 file"))
+        h5_content <- try(h5ls(x@filepath), silent=TRUE)
+        if (inherits(h5_content, "try-error"))
+            return(paste0("points to an invalid HDF5 file: ", x@filepath))
+        if (x@filepath != file_path_as_absolute(x@filepath))
+            return(paste0("uses a non-absolute/non-canonical path ",
+                          "('", x@filepath, "') to point to the HDF5 file"))
 
-    ## Check that 'x' points to an HDF5 dataset that has the
-    ## expected dimensions and chunk dimensions.
-    if (!identical(h5_dim, x@dim))
-        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                      "in HDF5 file '", x@filepath, "' ",
-                      "that does not have the expected dimensions"))
-    h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
-    if (!identical(h5_chunkdim, x@chunkdim))
-        return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                      "in HDF5 file '", x@filepath, "' ",
-                      "that does not have the expected chunk dimensions"))
+        ## Check that 'x' points to an HDF5 dataset that exists.
+        h5_dim <- try(h5dim(x@filepath, x@name), silent=TRUE)
+        if (inherits(h5_dim, "try-error"))
+            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                          "that does not exist in HDF5 file: ", x@filepath))
 
+        ## Check that 'x' points to an HDF5 dataset that has the
+        ## expected dimensions and chunk dimensions.
+        if (!identical(h5_dim, x@dim))
+            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                          "in HDF5 file '", x@filepath, "' ",
+                          "that does not have the expected dimensions"))
+        h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
+        if (!identical(h5_chunkdim, x@chunkdim))
+            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
+                          "in HDF5 file '", x@filepath, "' ",
+                          "that does not have the expected chunk dimensions"))
+    }
     TRUE
 }
 
@@ -85,8 +95,8 @@ validate_HDF5ArraySeed_dataset <- function(x)
 {
     ## 'filepath' slot.
     x_filepath <- x@filepath
-    if (!isSingleString(x_filepath))
-        return("'filepath' slot must be a single string")
+    if (!(is(x_filepath, "H5File") || isSingleString(x_filepath)))
+        return("'filepath' slot must be an H5File object or a single string")
 
     ## 'name' slot.
     x_name <- x@name
@@ -111,8 +121,8 @@ validate_HDF5ArraySeed_dataset <- function(x)
             return(msg)
     }
 
-    ## Check that 'x' points to an HDF5 dataset that is accessible
-    ## and "as expected".
+    ## Check that 'x' points to an HDF5 dataset that exists, is working,
+    ## and has the expected geometry.
     msg <- validate_HDF5ArraySeed_dataset(x)
     if (!isTRUE(msg))
         return(paste0("object ", msg))
@@ -134,7 +144,15 @@ setValidity2("HDF5ArraySeed", .validate_HDF5ArraySeed)
 ###
 
 ### Does NOT access the file.
-setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
+setMethod("path", "HDF5ArraySeed",
+    function(object)
+    {
+        filepath <- object@filepath
+        if (is(filepath, "H5File"))
+            filepath <- path(filepath)
+        filepath
+    }
+)
 
 ### Return a fake value (of the correct type) if the dataset is empty i.e.
 ### if at least one of its dimensions is 0.
@@ -145,7 +163,7 @@ setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
         val <- vector(type, 1L)  # fake value
     } else {
         index <- rep.int(list(1L), length(dim))
-        ans <- h5read2(filepath, name, index)
+        ans <- h5mread(filepath, name, index)
         stopifnot(length(ans) == 1L)  # sanity check
         val <- ans[[1L]]  # drop any attribute
     }
@@ -155,29 +173,34 @@ setMethod("path", "HDF5ArraySeed", function(object) object@filepath)
 setReplaceMethod("path", "HDF5ArraySeed",
     function(object, value)
     {
-        new_filepath <- normarg_h5_filepath(value, what1="the supplied path",
-                                                   what2="the HDF5 dataset")
-
-        ## Check dim compatibility.
-        new_dim <- h5dim(new_filepath, object@name)
-        object_dim <- object@dim
-        if (!identical(new_dim, object_dim)) {
-            new_dim_in1string <- paste0(new_dim, collapse=" x ")
-            dim_in1string <- paste0(object_dim, collapse=" x ")
-            stop(wmsg("dimensions (", new_dim_in1string, ") ",
-                      "of HDF5 dataset '", object@name, "' ",
-                      "from file '", value, "' are not ",
-                      "as expected (", dim_in1string, ")"))
+        if (is(value, "H5File")) {
+            new_filepath <- value
+            value <- path(value)
+            ## Check dim compatibility.
+            ## TODO: Implement this.
+        } else {
+            new_filepath <- normarg_h5_filepath(value,
+                                                what1="the supplied path",
+                                                what2="the HDF5 dataset")
+            ## Check dim compatibility.
+            new_dim <- h5dim(new_filepath, object@name)
+            object_dim <- object@dim
+            if (!identical(new_dim, object_dim)) {
+                new_dim_in1string <- paste0(new_dim, collapse=" x ")
+                dim_in1string <- paste0(object_dim, collapse=" x ")
+                stop(wmsg("dimensions (", new_dim_in1string, ") ",
+                          "of HDF5 dataset '", object@name, "' ",
+                          "from file '", value, "' are not ",
+                          "as expected (", dim_in1string, ")"))
+            }
         }
-
         ## Check first val compatibility.
         new_first_val <- .read_h5dataset_first_val(new_filepath,
                                                    object@name,
                                                    object_dim)
         if (!identical(new_first_val, object@first_val))
             stop(wmsg("first value in HDF5 dataset '", object@name, "' ",
-                      "from file '", value, "' is not ",
-                      "as expected"))
+                      "from file '", value, "' is not as expected"))
 
         ## Set new path.
         object@filepath <- new_filepath
@@ -201,7 +224,7 @@ setMethod("type", "HDF5ArraySeed",
             return(type(x@first_val))
         type <- x@type
         if (is.na(type))
-            type <- get_h5mread_returned_type(path(x), x@name)
+            type <- get_h5mread_returned_type(x@filepath, x@name)
         type
     }
 )
@@ -221,7 +244,7 @@ setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 ### Does access the file!
 setMethod("dimnames", "HDF5ArraySeed",
-    function(x) h5readDimnames(path(x), x@name, as.character=TRUE)
+    function(x) h5readDimnames(x@filepath, x@name, as.character=TRUE)
 )
 
 
@@ -229,16 +252,32 @@ setMethod("dimnames", "HDF5ArraySeed",
 ### extract_array()
 ###
 
+### A thin wrapper around h5mread().
+### TODO: Maybe we no longer need this. I mean, this is used in the
+### extract_array() and extract_sparse_array() methods for HDF5ArraySeed
+### objects but the 'index' passed to these methods should never contain
+### RangeNSBS objects. So it's probably ok to get rid of this and to just
+### use h5mread() instead.
+.h5mread2 <- function(filepath, name, index=NULL,
+                      as.integer=FALSE, as.sparse=FALSE)
+{
+    if (!is.null(index))
+        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
+    h5mread(filepath, name, starts=index,
+            as.integer=as.integer, as.sparse=as.sparse)
+}
+
+
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
     ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
     ## the "type" slot.
     if (!.hasSlot(x, "type"))
-        return(h5read2(path(x), x@name, index))
+        return(.h5mread2(x@filepath, x@name, index))
     ## If the user requested a specific type when HDF5ArraySeed object 'x'
     ## was constructed then we must return an array of that type.
     as_int <- !is.na(x@type) && x@type == "integer"
-    ans <- h5read2(path(x), x@name, index, as.integer=as_int)
+    ans <- .h5mread2(x@filepath, x@name, index, as.integer=as_int)
     if (!is.na(x@type) && typeof(ans) != x@type)
         storage.mode(ans) <- x@type
     ans
@@ -277,12 +316,13 @@ setReplaceMethod("is_sparse", "HDF5ArraySeed",
     ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
     ## the "type" slot.
     if (!.hasSlot(x, "type"))
-        return(h5read2(path(x), x@name, index, as.sparse=TRUE))
+        return(.h5mread2(x@filepath, x@name, index, as.sparse=TRUE))
     ## If the user requested a specific type when HDF5ArraySeed object 'x'
     ## was constructed then we must return a SparseArraySeed object of
     ## that type.
     as_int <- !is.na(x@type) && x@type == "integer"
-    ans <- h5read2(path(x), x@name, index, as.integer=as_int, as.sparse=TRUE)
+    ans <- .h5mread2(x@filepath, x@name, index, as.integer=as_int,
+                                         as.sparse=TRUE)
     if (!is.na(x@type) && typeof(ans) != x@type)
         storage.mode(ans@nzdata) <- x@type
     ans
@@ -307,7 +347,8 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 
 HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
 {
-    filepath <- normarg_h5_filepath(filepath)
+    if (!is(filepath, "H5File"))
+        filepath <- normarg_h5_filepath(filepath)
     name <- normarg_h5_name(name)
 
     ## Check 'as.sparse'.

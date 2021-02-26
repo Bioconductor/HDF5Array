@@ -32,7 +32,8 @@
 \title{H5File objects}
 
 \description{
-  The H5File class provides a formal representation of an HDF5 file.
+  The H5File class provides a formal representation of an HDF5
+  file (local or remote).
 }
 
 \usage{
@@ -56,12 +57,44 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
     for more information.
   }
   \item{.no_rhdf5_h5id}{
-    For internal use.
+    For internal use only. Don't use.
   }
 }
 
 \details{
-  COMING SOON...
+  IMPORTANT NOTE ABOUT H5File OBJECTS AND PARALLEL EVALUATION
+
+  The short story is that H5File objects cannot be used in the context
+  of parallel evaluation at the moment.
+
+  Here is why:
+
+  H5File objects contain an identifier to an open connection to the HDF5
+  file. This identifier becomes invalid in the 2 following situations:
+  \itemize{
+    \item After serialization/deserialization, that is, after loading
+          a serialized H5File object with \code{\link{readRDS}()} or
+          \code{\link{load}()}.
+    \item In the context of parallel evaluation, when using the
+          \link[BiocParallel]{SnowParam} parallelization backend.
+          This is because, unlike the \link[BiocParallel]{MulticoreParam}
+          backend which used a system \code{fork}, the
+          \link[BiocParallel]{SnowParam} backend uses
+          serialization/deserialization to transmit the object
+          to the workers.
+  }
+  In both cases, the connection to the file is lost and any attempt to
+  read data from the H5File object will fail. Note that the above also
+  happens to any H5File object that got serialized indirectly i.e. as
+  part of a bigger object. For example, if an \link{HDF5Array} object
+  was constructed from an H5File object, then it contains the H5File
+  object and therefore
+  \code{\link[DelayedArray]{blockApply}(..., BPPARAM=SnowParam(4))}
+  cannot be used on it.
+
+  Furthermore, even if sometimes an H5File object \emph{seems} to work
+  fine with the \link[BiocParallel]{MulticoreParam} parallelization
+  backend, this is highly unreliable and must be avoided.
 }
 
 \value{
@@ -89,19 +122,29 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
           reading needs.
 
     \item \code{\link{h5ls}} to list the content of an HDF5 file.
+
+    \item \code{\link[BiocParallel]{bplapply}},
+          \code{\link[BiocParallel]{MulticoreParam}}, and
+          \code{\link[BiocParallel]{SnowParam}}, in the
+          \pkg{BiocParallel} package.
   }
 }
 
 \examples{
+## ---------------------------------------------------------------------
+## A. BASIC USAGE
+## ---------------------------------------------------------------------
+
+## With a local file:
 toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
-h5file <- H5File(toy_h5)
-h5ls(h5file)
-path(h5file)
+h5file1 <- H5File(toy_h5)
+h5ls(h5file1)
+path(h5file1)
 
-h5mread(h5file, "M2", list(1:10, 1:6))
-get_h5mread_returned_type(h5file, "M2")
+h5mread(h5file1, "M2", list(1:10, 1:6))
+get_h5mread_returned_type(h5file1, "M2")
 
-## With an URL to a file stored in an Amazon S3 bucket:
+## With a file stored in an Amazon S3 bucket:
 public_S3_url <-
  "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
 h5file2 <- H5File(public_S3_url, s3=TRUE)
@@ -109,6 +152,41 @@ h5ls(h5file2)
 
 h5mread(h5file2, "a1")
 get_h5mread_returned_type(h5file2, "a1")
+
+## ---------------------------------------------------------------------
+## B. H5File OBJECTS AND PARALLEL EVALUATION
+## ---------------------------------------------------------------------
+## H5File objects cannot be used in the context of parallel evaluation
+## at the moment!
+
+library(BiocParallel)
+
+FUN1 <- function(i, h5file, name)
+    sum(HDF5Array::h5mread(h5file, name, list(i, NULL)))
+
+FUN2 <- function(i, h5file, name)
+    sum(HDF5Array::h5mread(h5file, name, list(i, NULL, NULL)))
+
+## With the SnowParam parallelization backend, the H5File object
+## does NOT work on the workers:
+\dontrun{
+## ERROR!
+res1 <- bplapply(1:150, FUN1, h5file1, "M2", BPPARAM=SnowParam(3))
+## ERROR!
+res2 <- bplapply(1:5, FUN2, h5file2, "a1", BPPARAM=SnowParam(3))
+}
+
+## With the MulticoreParam parallelization backend, the H5File object
+## might seem to work on the workers. However this is highly unreliable
+## and must be avoided:
+\dontrun{
+if (.Platform$OS.type != "windows") {
+  ## UNRELIABLE!
+  res1 <- bplapply(1:150, FUN1, h5file1, "M2", BPPARAM=MulticoreParam(3))
+  ## UNRELIABLE!
+  res2 <- bplapply(1:5, FUN2, h5file2, "a1", BPPARAM=MulticoreParam(3))
+}
+}
 }
 \keyword{classes}
 \keyword{methods}

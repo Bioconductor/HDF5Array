@@ -17,7 +17,14 @@ h5mread_from_reshaped(filepath, name, dim, starts, noreduce=FALSE,
 \arguments{
   \item{filepath}{
     The path (as a single string) to the HDF5 file where the dataset
-    to read from is located.
+    to read from is located, or an \link{H5File} object.
+
+    Note that you must create and use an \link{H5File} object if the HDF5
+    file to access is stored in an Amazon S3 bucket. See \code{?\link{H5File}}
+    for how to do this.
+
+    Also please note that \link{H5File} objects must NOT be used in the
+    context of parallel evaluation at the moment.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
@@ -62,6 +69,8 @@ h5mread_from_reshaped(filepath, name, dim, starts, noreduce=FALSE,
 
 \seealso{
   \itemize{
+    \item \link{H5File} objects.
+
     \item \code{\link{h5mread}}.
   }
 }

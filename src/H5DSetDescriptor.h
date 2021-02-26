@@ -48,7 +48,8 @@ typedef struct h5tmember_descriptor {
 
 /* A data structure for handling an HDF5 dataset. Collect various information
    about the dataset. What is collected is basically the union of the things
-   needed by functions C_h5mread(), C_h5getdimscales(), and C_h5setdimscales().
+   needed by functions C_h5getdimscales(), C_h5setdimscales(), C_h5mread(),
+   and C_h5summarize().
  */
 typedef struct h5dset_descriptor_t {
 	hid_t dset_id;

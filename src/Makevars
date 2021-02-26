@@ -9,6 +9,7 @@ OBJECTS = \
     H5File.o \
     global_errmsg_buf.o \
     H5DSetDescriptor.o \
+    h5dimscales.o \
     uaselection.o \
     h5mread_helpers.o \
     h5mread_startscounts.o \
@@ -17,7 +18,6 @@ OBJECTS = \
     h5mread_sparse.o \
     h5mread.o \
     h5summarize.o \
-    h5dimscales.o \
     R_init_HDF5Array.o
 
 RHDF5LIB_LIBS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e \

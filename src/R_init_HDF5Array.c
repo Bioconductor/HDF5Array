@@ -2,9 +2,9 @@
 
 #include "H5File.h"
 #include "H5DSetDescriptor.h"
+#include "h5dimscales.h"
 #include "uaselection.h"
 #include "h5mread.h"
-#include "h5dimscales.h"
 #include "h5summarize.h"
 
 #include "lzf/lzf_filter.h"  /* for register_lzf() */
@@ -26,6 +26,13 @@ static const R_CallMethodDef callMethods[] = {
 	CALLMETHOD_DEF(C_new_H5DSetDescriptor_xp, 3),
 	CALLMETHOD_DEF(C_show_H5DSetDescriptor_xp, 1),
 
+/* h5dimscales.c */
+	CALLMETHOD_DEF(C_h5isdimscale, 2),
+	CALLMETHOD_DEF(C_h5getdimscales, 3),
+	CALLMETHOD_DEF(C_h5setdimscales, 5),
+	CALLMETHOD_DEF(C_h5getdimlabels, 2),
+	CALLMETHOD_DEF(C_h5setdimlabels, 3),
+
 /* uaselection.c */
 	CALLMETHOD_DEF(C_check_uaselection, 3),
 	CALLMETHOD_DEF(C_check_ordered_uaselection, 3),
@@ -35,13 +42,6 @@ static const R_CallMethodDef callMethods[] = {
 /* h5mread.c */
 	CALLMETHOD_DEF(C_get_h5mread_returned_type, 3),
 	CALLMETHOD_DEF(C_h5mread, 9),
-
-/* h5dimscales.c */
-	CALLMETHOD_DEF(C_h5isdimscale, 2),
-	CALLMETHOD_DEF(C_h5getdimscales, 3),
-	CALLMETHOD_DEF(C_h5setdimscales, 5),
-	CALLMETHOD_DEF(C_h5getdimlabels, 2),
-	CALLMETHOD_DEF(C_h5setdimlabels, 3),
 
 /* h5summarize.c */
 	CALLMETHOD_DEF(C_h5summarize, 7),

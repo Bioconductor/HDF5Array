@@ -36,7 +36,14 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 \arguments{
   \item{filepath}{
     The path (as a single string) to the HDF5 file where the dataset
-    is located.
+    is located, or an \link{H5File} object.
+
+    Note that you must create and use an \link{H5File} object if the HDF5
+    file to access is stored in an Amazon S3 bucket. See \code{?\link{H5File}}
+    for how to do this.
+
+    Also please note that \link{H5File} objects must NOT be used in the
+    context of parallel evaluation at the moment.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
@@ -83,6 +90,8 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \seealso{
   \itemize{
+    \item \link{H5File} objects.
+
     \item \link{TENxMatrix} objects for representing 10x Genomics
           datasets as \link[DelayedArray]{DelayedMatrix} objects.
 
@@ -116,15 +125,28 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \examples{
 ## ---------------------------------------------------------------------
-## CONSTRUCTION
+## A. CONSTRUCTION
 ## ---------------------------------------------------------------------
 
+## With a local file:
 toy_h5 <- system.file("extdata", "toy.h5", package="HDF5Array")
 h5ls(toy_h5)
 
 HDF5Array(toy_h5, "M2")
 HDF5Array(toy_h5, "M2", type="integer")
 HDF5Array(toy_h5, "M2", type="complex")
+
+## With a file stored in an Amazon S3 bucket:
+public_S3_url <-
+ "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
+h5file <- H5File(public_S3_url, s3=TRUE)
+h5ls(h5file)
+
+HDF5Array(h5file, "a1")
+
+## ---------------------------------------------------------------------
+## B. BASIC MANIPULATION
+## ---------------------------------------------------------------------
 
 library(h5vcData)
 tally_file <- system.file("extdata", "example.tally.hfs5",
@@ -153,9 +175,8 @@ is_sparse(cvg0)  # TRUE
 is_sparse(cvg) <- TRUE
 cvg  # same as 'cvg0'
 
-## ---------------------------------------------------------------------
-## dim/dimnames
-## ---------------------------------------------------------------------
+## dim/dimnames:
+
 dim(cvg0)
 
 dimnames(cvg0)
@@ -163,8 +184,9 @@ dimnames(cvg0) <- list(paste0("s", 1:6), c("+", "-"), NULL)
 dimnames(cvg0)
 
 ## ---------------------------------------------------------------------
-## SLICING (A.K.A. SUBSETTING)
+## C. SLICING (A.K.A. SUBSETTING)
 ## ---------------------------------------------------------------------
+
 cvg1 <- cvg0[ , , 29000001:29000007]
 cvg1
 
@@ -178,7 +200,7 @@ cvg2
 as.matrix(cvg2)
 
 ## ---------------------------------------------------------------------
-## SummarizedExperiment OBJECTS WITH DELAYED ASSAYS
+## D. SummarizedExperiment OBJECTS WITH DELAYED ASSAYS
 ## ---------------------------------------------------------------------
 
 ## DelayedArray objects can be used inside a SummarizedExperiment object
