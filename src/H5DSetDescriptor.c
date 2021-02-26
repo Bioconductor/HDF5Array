@@ -80,8 +80,8 @@ static hid_t map_native_type_to_predef_type(hid_t native_type_id)
 	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_INT_FAST64)
 	RETURN_PREDEF_TYPE_IF(H5T_NATIVE_UINT_FAST64)
 
-	PRINT_TO_ERRMSG_BUF("failed to map native type id %ld "
-			    "to predef type id", native_type_id);
+	PRINT_TO_ERRMSG_BUF("failed to map native type id %lld "
+			    "to predef type id", (long long) native_type_id);
 	return -1;
 }
 
@@ -153,7 +153,7 @@ static const char *predef_native_type_as_string(hid_t native_type_id)
 
 	/* Should never happen if predef_native_type_as_string()
 	   is kept in sync with map_native_type_to_predef_type(). */
-	sprintf(s, "unknown native type (%ld)", native_type_id);
+	sprintf(s, "unknown native type (%lld)", (long long) native_type_id);
 	return s;
 }
 

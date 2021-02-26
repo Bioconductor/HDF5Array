@@ -324,9 +324,10 @@ static int read_h5chunk(hid_t dset_id,
 				 CHUNK_COMPRESSION_OVERHEAD)
 	{
 		PRINT_TO_ERRMSG_BUF("chunk storage size (%llu) bigger "
-				    "than expected (%lu + %d)",
+				    "than expected (%llu + %d)",
 				    chunk_storage_size,
-				    chunk_data_buf->data_size,
+				    (long long unsigned)
+					chunk_data_buf->data_size,
 				    CHUNK_COMPRESSION_OVERHEAD);
 		return -1;
 	}
