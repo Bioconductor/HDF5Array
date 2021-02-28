@@ -52,38 +52,31 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
 ### Constructor
 ###
 
+.load_h5ad_rownames <- function(filepath, name="var")
+{
+    ok <- try(h5isdataset(filepath, name), silent=TRUE)
+    if (isTRUE(ok)) {
+        ## Must use rhdf5::h5read() for now, until h5mread() knows how
+        ## to read COMPOUND datasets.
+        return(h5read(filepath, name)$index)
+    }
+    ok <- try(h5isgroup(filepath, name), silent=TRUE)
+    if (!isTRUE(ok))
+        return(NULL)
+    ROWNAMES_DATASET <- paste0(name, "/_index")
+    ok <- try(h5isdataset(filepath, ROWNAMES_DATASET), silent=TRUE)
+    if (!isTRUE(ok))
+        return(NULL)
+    h5mread(filepath, ROWNAMES_DATASET)
+}
+
 ### Must return a list of length 2.
 .load_h5ad_dimnames <- function(filepath)
 {
-    ROWNAMES_DATASET <- "/var/_index"
-    COLNAMES_DATASET <- "/obs/_index"
-
-    ok1 <- try(h5isdataset(filepath, ROWNAMES_DATASET), silent=TRUE)
-    ok2 <- try(h5isdataset(filepath, COLNAMES_DATASET), silent=TRUE)
-    if (inherits(ok1, "try-error") || inherits(ok2, "try-error"))
-        stop(wmsg("Cannot read ", filepath, ". Is this a valid HDF5 file?"))
-
-    ans_rownames <- ans_colnames <- NULL
-    if (ok1 || ok2) {
-        if (ok1) {
-            ans_rownames <- h5mread(filepath, ROWNAMES_DATASET)
-        } else {
-            warning(wmsg("could not find rownames (normally stored ",
-                         "in dataset '", ROWNAMES_DATASET, "' ",
-                         "in this .h5ad file"))
-        }
-        if (ok2) {
-            ans_colnames <- h5mread(filepath, COLNAMES_DATASET)
-        } else {
-            warning(wmsg("could not find colnames (normally stored ",
-                         "in dataset '", COLNAMES_DATASET, "' ",
-                         "in this .h5ad file"))
-        }
-    } else {
-        warning(wmsg("could not find dimnames (normally stored ",
-                     "in datasets '", ROWNAMES_DATASET, "' ",
-                     "and '", COLNAMES_DATASET, "') in this .h5ad file"))
-    }
+    ans_rownames <- .load_h5ad_rownames(filepath)
+    ans_colnames <- .load_h5ad_rownames(filepath, name="obs")
+    if (is.null(ans_rownames) && is.null(ans_colnames))
+        warning(wmsg("could not find dimnames in this .h5ad file"))
     list(ans_rownames, ans_colnames)
 }
 
