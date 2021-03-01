@@ -58,7 +58,10 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
     if (isTRUE(ok)) {
         ## Must use rhdf5::h5read() for now, until h5mread() knows how
         ## to read COMPOUND datasets.
-        return(h5read(filepath, name)$index)
+        ans <- h5read(filepath, name)$index
+        if (!is.null(ans))
+            ans <- as.character(ans)
+        return(ans)
     }
     ok <- try(h5isgroup(filepath, name), silent=TRUE)
     if (!isTRUE(ok))
@@ -67,7 +70,7 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
     ok <- try(h5isdataset(filepath, ROWNAMES_DATASET), silent=TRUE)
     if (!isTRUE(ok))
         return(NULL)
-    h5mread(filepath, ROWNAMES_DATASET)
+    as.character(h5mread(filepath, ROWNAMES_DATASET))
 }
 
 ### Must return a list of length 2.
