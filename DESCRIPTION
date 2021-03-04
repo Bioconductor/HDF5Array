@@ -23,7 +23,7 @@ LinkingTo: S4Vectors (>= 0.27.13), Rhdf5lib
 SystemRequirements: GNU make
 Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 	h5vcData, ExperimentHub, TENxBrainData, zellkonverter, GenomicFeatures,
-	BiocStyle
+	RUnit, SingleCellExperiment
 Collate: utils.R
 	H5File-class.R
 	h5ls.R
