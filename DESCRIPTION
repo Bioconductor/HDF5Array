@@ -2,7 +2,7 @@ Package: HDF5Array
 Title: HDF5 backend for DelayedArray objects
 Description: Implement the HDF5Array, TENxMatrix, and H5ADMatrix classes,
 	3 convenient and memory-efficient array-like containers for
-	representing and manipulating either (1) a conventional (a.k.a.
+	representing and manipulating either: (1) a conventional (a.k.a.
 	dense) HDF5 dataset, (2) a 10x Genomics sparse matrix, or (3) the
 	matrix stored in an .h5ad file. These containers are DelayedArray
 	extensions and therefore support all operations (delayed or
@@ -11,7 +11,7 @@ biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 URL: https://bioconductor.org/packages/HDF5Array
 BugReports: https://github.com/Bioconductor/HDF5Array/issues
-Version: 1.19.8
+Version: 1.19.9
 License: Artistic-2.0 + file src/lzf/LICENSE.txt
 Encoding: UTF-8
 Author: Hervé Pagès
