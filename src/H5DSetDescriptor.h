@@ -1,6 +1,15 @@
 #ifndef _H5DSETDESCRIPTOR_H_
 #define _H5DSETDESCRIPTOR_H_
 
+/* Avoid spurious MinGW warnings about %lld format specifier. For example:
+     H5DSetDescriptor.c: In function 'predef_native_type_as_string':
+     H5DSetDescriptor.c:156:37: warning: unknown conversion type character 'l'
+                                         in format [-Wformat=]
+       sprintf(s, "unknown native type (%lld)", (long long) native_type_id);
+                                          ^
+   See https://sourceforge.net/p/mingw-w64/wiki2/gnu%20printf/ for more info. */
+#define __USE_MINGW_ANSI_STDIO 1
+
 #include <Rdefines.h>
 #include "S4Vectors_interface.h"
 #include "hdf5.h"
