@@ -27,21 +27,23 @@
 \title{H5ADMatrixSeed objects}
 
 \description{
-  *** WORK-IN-PROGRESS! ***
+  \code{h5ad} files are HDF5 files used for on-disk representation
+  of AnnData Python objects. See \url{https://anndata.readthedocs.io/}
+  for more information.
 
   H5ADMatrixSeed is a low-level helper class used to represent a pointer
-  to a matrix stored in an \code{.h5ad} file.
+  to the matrix stored in an \code{h5ad} file.
 
   It is a virtual class with three concrete subclasses: Dense_H5ADMatrixSeed,
   CSC_H5ADMatrixSeed, and CSR_H5ADMatrixSeed:
   \itemize{
     \item The Dense_H5ADMatrixSeed class is used when the matrix is stored
-          as a conventional HDF5 dataset in the \code{.h5ad} file. It is
+          as a conventional HDF5 dataset in the \code{h5ad} file. It is
           a direct entension of the \link{HDF5ArraySeed} class.
 
     \item The CSC_H5ADMatrixSeed or CSR_H5ADMatrixSeed classes is used
           when the matrix is stored in the \emph{Compressed Sparse Column}
-          or \emph{Compressed Sparse Row} format in the \code{.h5ad} file.
+          or \emph{Compressed Sparse Row} format in the \code{h5ad} file.
           CSC_H5ADMatrixSeed is a direct entension of
           \link{CSC_H5SparseMatrixSeed}, and CSR_H5ADMatrixSeed a
           direct entension of \link{CSR_H5SparseMatrixSeed}.
@@ -92,11 +94,22 @@ H5ADMatrixSeed(filepath, name="X")
   \link[DelayedArray]{DelayedMatrix} object.
 }
 
+\references{
+  \url{https://anndata.readthedocs.io/} for AnnData Python objects
+  and the \code{h5ad} format.
+}
+
 \seealso{
   \itemize{
     \item \link{H5ADMatrix} objects.
 
     \item \link{HDF5ArraySeed} and \link{H5SparseMatrixSeed} objects.
+
+    \item \code{\link[zellkonverter]{readH5AD}} and
+          \code{\link[zellkonverter]{writeH5AD}} in
+          the \pkg{zellkonverter} package for
+          importing/exporting an \code{h5ad} file as/from a
+          \link[SingleCellExperiment]{SingleCellExperiment} object.
   }
 }
 

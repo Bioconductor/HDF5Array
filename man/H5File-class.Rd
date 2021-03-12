@@ -114,7 +114,7 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
           a 10x Genomics dataset.
 
     \item The \link{H5ADMatrix} class for representing and operating on
-          the matrix stored in an \code{.h5ad} file.
+          the matrix stored in an \code{h5ad} file.
 
     \item The \code{\link{h5mread}} function in this package (\pkg{HDF5Array})
           that is used internally by \link{HDF5Array}, \link{TENxMatrix},

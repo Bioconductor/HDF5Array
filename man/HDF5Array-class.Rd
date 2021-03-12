@@ -96,7 +96,7 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
           datasets as \link[DelayedArray]{DelayedMatrix} objects.
 
     \item \link{H5ADMatrix} objects for representing the matrices stored in
-          \code{.h5ad} files as \link[DelayedArray]{DelayedMatrix} objects.
+          \code{h5ad} files as \link[DelayedArray]{DelayedMatrix} objects.
 
     \item \link{ReshapedHDF5Array} objects for representing HDF5 datasets
           as \link[DelayedArray]{DelayedArray} objects with a user-supplied

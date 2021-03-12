@@ -15,13 +15,15 @@
 \alias{coerce,H5ADMatrix,dgCMatrix-method}
 \alias{coerce,H5ADMatrix,sparseMatrix-method}
 
-\title{.h5ad datasets as DelayedMatrix objects}
+\title{h5ad datasets as DelayedMatrix objects}
 
 \description{
-  *** WORK-IN-PROGRESS! ***
+  \code{h5ad} files are HDF5 files used for on-disk representation
+  of AnnData Python objects. See \url{https://anndata.readthedocs.io/}
+  for more information.
 
   The H5ADMatrix class is a \link[DelayedArray]{DelayedMatrix} subclass
-  for representing and operating on the matrix stored in an \code{.h5ad}
+  for representing and operating on the matrix stored in an \code{h5ad}
   file.
 
   All the operations available for \link[DelayedArray]{DelayedMatrix}
@@ -35,16 +37,21 @@ H5ADMatrix(filepath, name="X")
 
 \arguments{
   \item{filepath}{
-    The path (as a single string) to the \code{.h5ad} file.
+    The path (as a single string) to the \code{h5ad} file.
   }
   \item{name}{
-    The name of the dataset or group in the \code{.h5ad} file that stores
+    The name of the dataset or group in the \code{h5ad} file that stores
     the matrix.
   }
 }
 
 \value{
   \code{H5ADMatrix()} returns an H5ADMatrix object.
+}
+
+\references{
+  \url{https://anndata.readthedocs.io/} for AnnData Python objects
+  and the \code{h5ad} format.
 }
 
 \seealso{
@@ -56,6 +63,12 @@ H5ADMatrix(filepath, name="X")
           package.
 
     \item The \link{H5ADMatrixSeed} helper class.
+
+    \item \code{\link[zellkonverter]{readH5AD}} and
+          \code{\link[zellkonverter]{writeH5AD}} in
+          the \pkg{zellkonverter} package for
+          importing/exporting an \code{h5ad} file as/from a
+          \link[SingleCellExperiment]{SingleCellExperiment} object.
   }
 }
 

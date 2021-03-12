@@ -53,7 +53,7 @@
   for the \emph{Compressed Sparse Column} format and CSR_H5SparseMatrixSeed
   for the \emph{Compressed Sparse Row} format.
   The former is used by 10x Genomics (e.g. "1.3 Million Brain Cell Dataset").
-  \code{.h5ad} files can use one or the other format to store a sparse matrix.
+  \code{h5ad} files can use one or the other format to store a sparse matrix.
 
   Note that an H5SparseMatrixSeed derivative is not intended to be used
   directly. Most end users will typically create and manipulate a
@@ -99,7 +99,7 @@ H5SparseMatrixSeed(filepath, group)
 \arguments{
   \item{filepath}{
     The path (as a single string) to the HDF5 file (\code{.h5} or
-    \code{.h5ad}) where the sparse matrix is located.
+    \code{h5ad}) where the sparse matrix is located.
   }
   \item{group}{
     The name of the group in the HDF5 file that stores the sparse matrix.

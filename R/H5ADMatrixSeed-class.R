@@ -79,7 +79,7 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
     ans_rownames <- .load_h5ad_rownames(filepath)
     ans_colnames <- .load_h5ad_rownames(filepath, name="obs")
     if (is.null(ans_rownames) && is.null(ans_colnames))
-        warning(wmsg("could not find dimnames in this .h5ad file"))
+        warning(wmsg("could not find dimnames in this h5ad file"))
     list(ans_rownames, ans_colnames)
 }
 
