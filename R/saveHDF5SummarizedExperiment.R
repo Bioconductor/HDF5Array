@@ -48,7 +48,7 @@
 ### these objects so we must use direct slot access instead of the path()
 ### setter to do this. This is because the latter is intended for the end user
 ### so it makes sure that the path replacement is not breaking the object.
-.shorten_assay2h5_links <- function(assays)
+shorten_assay2h5_links <- function(assays)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -67,7 +67,7 @@
 ### that all the HDF5ArraySeed objects point to HDF5 datasets that are
 ### accessible and "as expected".
 ### Restore all the file paths to their absolute canonical form.
-.restore_absolute_assay2h5_links <- function(assays, dir)
+restore_absolute_assay2h5_links <- function(assays, dir)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -104,7 +104,7 @@
 
 .serialize_HDF5SummarizedExperiment <- function(x, rds_path, verbose)
 {
-    x@assays <- .shorten_assay2h5_links(x@assays)
+    x@assays <- shorten_assay2h5_links(x@assays)
     if (verbose)
         message("Serialize ", class(x), " object to ",
                 ifelse(file.exists(rds_path), "existing ", ""),
@@ -112,7 +112,7 @@
     saveRDS(x, file=rds_path)
 }
 
-.write_h5_assays <- function(assays, h5_path, chunkdim, level,
+write_h5_assays <- function(assays, h5_path, chunkdim, level,
                                      as.sparse, verbose)
 {
     nassay <- length(assays)
@@ -158,13 +158,13 @@
     if (!isTRUEorFALSE(verbose))
         stop(wmsg("'verbose' must be TRUE or FALSE"))
 
-    x@assays <- .write_h5_assays(x@assays, h5_path, chunkdim, level,
+    x@assays <- write_h5_assays(x@assays, h5_path, chunkdim, level,
                                            as.sparse, verbose)
     .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
     invisible(x)
 }
 
-### Does a lot of checking (via .restore_absolute_assay2h5_links()) on
+### Does a lot of checking (via restore_absolute_assay2h5_links()) on
 ### the assays of the SummarizedExperiment object found in 'rds_path' and
 ### fails with an informative error message if they don't look as expected.
 .read_HDF5SummarizedExperiment <- function(rds_path)
@@ -181,7 +181,7 @@
         stop(wmsg("the object serialized in \"", rds_path, "\" is not ",
                   "a SummarizedExperiment object or derivative"))
     dir <- dirname(rds_path)
-    ans@assays <- .restore_absolute_assay2h5_links(ans@assays, dir)
+    ans@assays <- restore_absolute_assay2h5_links(ans@assays, dir)
     ans
 }
 
@@ -190,7 +190,7 @@
 ### saveHDF5SummarizedExperiment() / loadHDF5SummarizedExperiment()
 ###
 
-.create_dir <- function(dir)
+create_dir <- function(dir)
 {
     if (file.exists(dir))
         stop(wmsg("\"", dir, "\" already exists and is a file, ",
@@ -199,7 +199,7 @@
         stop(wmsg("cannot create directory \"", dir, "\""))
 }
 
-.replace_dir <- function(dir, replace)
+replace_dir <- function(dir, replace)
 {
     if (!replace)
         stop(wmsg("Directory \"", dir, "\" already exists. ",
@@ -211,7 +211,7 @@
         stop(wmsg("cannot create directory \"", dir, "\""))
 }
 
-.check_and_delete_files <- function(rds_path, h5_path, replace)
+check_and_delete_files <- function(rds_path, h5_path, replace)
 {
     if (dir.exists(rds_path) || dir.exists(h5_path))
         stop(wmsg("\"", rds_path, "\" and/or \"", h5_path, "\" ",
@@ -256,14 +256,14 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
     verbose <- DelayedArray:::normarg_verbose(verbose)
 
     if (!dir.exists(dir)) {
-        .create_dir(dir)
+        create_dir(dir)
     } else if (prefix == "") {
-        .replace_dir(dir, replace)
+        replace_dir(dir, replace)
     }
     rds_path <- file.path(dir, paste0(prefix, .SE_RDS_BASENAME))
     h5_path <- file.path(dir, paste0(prefix, .ASSAYS_H5_BASENAME))
     if (prefix != "")
-        .check_and_delete_files(rds_path, h5_path, replace)
+        check_and_delete_files(rds_path, h5_path, replace)
 
     .write_HDF5SummarizedExperiment(x, rds_path=rds_path,
                                        h5_path=h5_path,
@@ -278,7 +278,7 @@ saveHDF5SummarizedExperiment <- function(x, dir="my_h5_se", prefix="",
     "()"
 )
 
-.stop_if_bad_dir <- function(dir, prefix)
+stop_if_bad_dir <- function(dir, prefix)
 {
     if (prefix == "") {
         msg <- c("directory \"", dir, "\" does not seem to contain ",
@@ -315,7 +315,7 @@ loadHDF5SummarizedExperiment <- function(dir="my_h5_se", prefix="")
     rds_path <- file.path(dir, paste0(prefix, .SE_RDS_BASENAME))
     ans <- try(.read_HDF5SummarizedExperiment(rds_path), silent=TRUE)
     if (inherits(ans, "try-error"))
-        .stop_if_bad_dir(dir, prefix)
+        stop_if_bad_dir(dir, prefix)
     ans
 }
 

@@ -102,12 +102,12 @@ exportMethods(
 ###
 
 export(
-    .shorten_assay2h5_links,
-    .restore_absolute_assay2h5_links,
+    shorten_assay2h5_links,
+    restore_absolute_assay2h5_links,
     validate_HDF5ArraySeed_dataset,
-    .write_h5_assays,
-    .create_dir,
-    .replace_dir,
-    .check_and_delete_files,
-    .stop_if_bad_dir
+    write_h5_assays,
+    create_dir,
+    replace_dir,
+    check_and_delete_files,
+    stop_if_bad_dir
 )
