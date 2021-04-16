@@ -23,8 +23,13 @@ library(zellkonverter)
 
 test_Dense_H5ADMatrixSeed <- function()
 {
+    ## zellkonverter::writeH5AD() relies on basilisk which isn't supported
+    ## on 32-bit Windows.
+    if (.Platform$OS.type == "windows" && .Platform$r_arch == "i386")
+        return()
+
     sce <- .make_TEST_SCE1()
-    writeH5AD(sce, "test.h5ad", X_name="counts")
+    zellkonverter::writeH5AD(sce, "test.h5ad", X_name="counts")
     on.exit(unlink("test.h5ad"))
 
     seed <- H5ADMatrixSeed("test.h5ad")
@@ -44,8 +49,13 @@ test_Dense_H5ADMatrixSeed <- function()
 
 test_CSR_H5ADMatrixSeed <- function()
 {
+    ## zellkonverter::writeH5AD() relies on basilisk which isn't supported
+    ## on 32-bit Windows.
+    if (.Platform$OS.type == "windows" && .Platform$r_arch == "i386")
+        return()
+
     sce <- .make_TEST_SCE1("dgCMatrix")
-    writeH5AD(sce, "test.h5ad", X_name="counts")
+    zellkonverter::writeH5AD(sce, "test.h5ad", X_name="counts")
     on.exit(unlink("test.h5ad"))
 
     seed <- H5ADMatrixSeed("test.h5ad")
