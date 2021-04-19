@@ -88,7 +88,8 @@ H5ADMatrix(filepath, layer=NULL)
 library(zellkonverter)
 h5ad_file <- system.file("extdata", "krumsiek11.h5ad",
                          package="zellkonverter")
-H5ADMatrix(h5ad_file)
+X <- H5ADMatrix(h5ad_file)
+X
 }
 \keyword{classes}
 \keyword{methods}

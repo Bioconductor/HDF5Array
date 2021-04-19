@@ -98,9 +98,13 @@ H5ADMatrixSeed <- function(filepath, layer=NULL)
             stop(wmsg("'layer' must be a single non-empty string"))
         name <- paste0("/layers/", layer)
     }
-    if (!h5exists(filepath, name))
-        stop(wmsg("HDF5 object \"", name, "\" does not exist ",
-                  "in this HDF5 file. Is this a valid h5ad file?"))
+    if (!h5exists(filepath, name)) {
+        msg <- c("HDF5 object \"", name, "\" does not exist ",
+                 "in this HDF5 file.")
+        if (is.null(layer))
+            msg <- c(msg, " Is this a valid h5ad file?")
+        stop(wmsg(msg))
+    }
     dimnames <- .load_h5ad_dimnames(filepath)
 
     if (h5isdataset(filepath, name)) {
