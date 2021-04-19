@@ -27,12 +27,9 @@
 \title{H5ADMatrixSeed objects}
 
 \description{
-  \code{h5ad} files are HDF5 files used for on-disk representation
-  of AnnData Python objects. See \url{https://anndata.readthedocs.io/}
-  for more information.
-
   H5ADMatrixSeed is a low-level helper class used to represent a pointer
-  to the matrix stored in an \code{h5ad} file.
+  to the central matrix stored of an \code{h5ad} file, or to one of the
+  matrices in the \code{/layers} group.
 
   It is a virtual class with three concrete subclasses: Dense_H5ADMatrixSeed,
   CSC_H5ADMatrixSeed, and CSR_H5ADMatrixSeed:
@@ -57,11 +54,11 @@
 
 \usage{
 ## Constructor function:
-H5ADMatrixSeed(filepath, name="X")
+H5ADMatrixSeed(filepath, layer=NULL)
 }
 
 \arguments{
-  \item{filepath, name}{
+  \item{filepath, layer}{
     See \code{?\link{H5ADMatrix}} for a description of these arguments.
   }
 }
@@ -77,7 +74,8 @@ H5ADMatrixSeed(filepath, name="X")
 
 \value{
   \code{H5ADMatrixSeed()} returns an H5ADMatrixSeed derivative
-  (Dense_H5ADMatrixSeed or CSC_H5ADMatrixSeed or CSR_H5ADMatrixSeed).
+  (Dense_H5ADMatrixSeed or CSC_H5ADMatrixSeed or CSR_H5ADMatrixSeed)
+  of shape #variables x #observations.
 }
 
 \section{H5ADMatrixSeed vs H5ADMatrix objects}{

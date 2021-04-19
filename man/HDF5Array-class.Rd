@@ -22,7 +22,8 @@
 
 \description{
   The HDF5Array class is a \link[DelayedArray]{DelayedArray} subclass
-  for representing a conventional (a.k.a. dense) HDF5 dataset.
+  for representing and operating on a conventional (a.k.a. dense) HDF5
+  dataset.
 
   All the operations available for \link[DelayedArray]{DelayedArray}
   objects work on HDF5Array objects.
@@ -35,8 +36,8 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \arguments{
   \item{filepath}{
-    The path (as a single string) to the HDF5 file where the dataset
-    is located, or an \link{H5File} object.
+    The path (as a single string or \link{H5File} object) to the HDF5 file
+    (\code{.h5} or \code{.h5ad}) where the dataset is located.
 
     Note that you must create and use an \link{H5File} object if the HDF5
     file to access is stored in an Amazon S3 bucket. See \code{?\link{H5File}}
@@ -92,11 +93,15 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
   \itemize{
     \item \link{H5File} objects.
 
+    \item \link{H5SparseMatrix} objects for representing HDF5 sparse matrices
+          as \link[DelayedArray]{DelayedMatrix} objects.
+
+    \item \link{H5ADMatrix} objects for representing h5ad central
+          matrices (or matrices in the \code{/layers} group)
+          as \link[DelayedArray]{DelayedMatrix} objects.
+
     \item \link{TENxMatrix} objects for representing 10x Genomics
           datasets as \link[DelayedArray]{DelayedMatrix} objects.
-
-    \item \link{H5ADMatrix} objects for representing the matrices stored in
-          \code{h5ad} files as \link[DelayedArray]{DelayedMatrix} objects.
 
     \item \link{ReshapedHDF5Array} objects for representing HDF5 datasets
           as \link[DelayedArray]{DelayedArray} objects with a user-supplied
@@ -119,7 +124,8 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
     \item The \link{HDF5ArraySeed} helper class.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link{h5ls}} to list the content of an HDF5 file (\code{.h5}
+          or \code{.h5ad}).
   }
 }
 

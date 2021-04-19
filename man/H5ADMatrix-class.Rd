@@ -15,16 +15,20 @@
 \alias{coerce,H5ADMatrix,dgCMatrix-method}
 \alias{coerce,H5ADMatrix,sparseMatrix-method}
 
-\title{h5ad datasets as DelayedMatrix objects}
+\title{h5ad central matrices (or matrices in the /layers group)
+       as DelayedMatrix objects}
 
 \description{
   \code{h5ad} files are HDF5 files used for on-disk representation
-  of AnnData Python objects. See \url{https://anndata.readthedocs.io/}
-  for more information.
+  of AnnData Python objects. At the very minimum, they contain a central
+  data matrix, named \code{X}, of shape #observations x #variables, and
+  possibly additional data matrices (stored in the HDF5 group \code{/layers})
+  that share the shape and dimnames of \code{X}.
+  See \url{https://anndata.readthedocs.io/} for more information.
 
   The H5ADMatrix class is a \link[DelayedArray]{DelayedMatrix} subclass
-  for representing and operating on the matrix stored in an \code{h5ad}
-  file.
+  for representing and operating on the central matrix of an \code{h5ad}
+  file, or any matrix in its \code{/layers} group.
 
   All the operations available for \link[DelayedArray]{DelayedMatrix}
   objects work on H5ADMatrix objects.
@@ -32,21 +36,26 @@
 
 \usage{
 ## Constructor function:
-H5ADMatrix(filepath, name="X")
+H5ADMatrix(filepath, layer=NULL)
 }
 
 \arguments{
   \item{filepath}{
     The path (as a single string) to the \code{h5ad} file.
   }
-  \item{name}{
-    The name of the dataset or group in the \code{h5ad} file that stores
-    the matrix.
+  \item{layer}{
+    \code{NULL} (the default) or the name of a matrix in the \code{/layers}
+    group. By default (i.e. when \code{layer} is not specified)
+    \code{H5ADMatrix()} returns the central matrix (\code{X}).
   }
 }
 
 \value{
-  \code{H5ADMatrix()} returns an H5ADMatrix object.
+  \code{H5ADMatrix()} returns an H5ADMatrix object of shape #variables x
+  #observations. Note that in Python and HDF5 the shape of this matrix is
+  considered to be #observations x #variables, but in R it is transposed.
+  This follows the widely adopted convention of transposing HDF5 matrices
+  when they get loaded into R.
 }
 
 \references{
@@ -58,6 +67,9 @@ H5ADMatrix(filepath, name="X")
   \itemize{
     \item \link{HDF5Array} objects for representing conventional (a.k.a.
           dense) HDF5 datasets as \link[DelayedArray]{DelayedArray} objects.
+
+    \item \link{H5SparseMatrix} objects for representing HDF5 sparse matrices
+          as \link[DelayedArray]{DelayedMatrix} objects.
 
     \item \link[DelayedArray]{DelayedMatrix} objects in the \pkg{DelayedArray}
           package.

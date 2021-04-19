@@ -27,6 +27,11 @@ normarg_h5_name <- function(name, what1="'name'",
                   what2, " in the HDF5 file", what3))
     if (name == "")
         stop(wmsg(what1, " cannot be the empty string"))
+    if (substr(name, start=1L, stop=1L) == "/") {
+        name <- sub("^/*", "/", name)  # only keep first leading slash
+    } else {
+        name <- paste0("/", name)
+    }
     name
 }
 

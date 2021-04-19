@@ -26,12 +26,13 @@ exportClasses(
     ReshapedHDF5Array, ReshapedHDF5Matrix,
     HDF5RealizationSink,
     H5SparseMatrixSeed, CSC_H5SparseMatrixSeed, CSR_H5SparseMatrixSeed,
-    TENxMatrixSeed,
-    TENxMatrix,
-    TENxRealizationSink,
+    H5SparseMatrix,
     H5ADMatrixSeed,
     Dense_H5ADMatrixSeed, CSC_H5ADMatrixSeed, CSR_H5ADMatrixSeed,
-    H5ADMatrix
+    H5ADMatrix,
+    TENxMatrixSeed,
+    TENxMatrix,
+    TENxRealizationSink
 )
 
 
@@ -118,11 +119,12 @@ export(
     saveHDF5SummarizedExperiment, loadHDF5SummarizedExperiment,
     quickResaveHDF5SummarizedExperiment,
     H5SparseMatrixSeed,
+    H5SparseMatrix,
+    H5ADMatrixSeed,
+    H5ADMatrix,
     TENxMatrixSeed,
     TENxMatrix,
-    TENxRealizationSink, writeTENxMatrix,
-    H5ADMatrixSeed,
-    H5ADMatrix
+    TENxRealizationSink, writeTENxMatrix
 )
 
 

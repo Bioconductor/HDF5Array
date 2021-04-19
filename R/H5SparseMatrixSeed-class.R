@@ -126,7 +126,7 @@ read_h5sparse_component <- function(filepath, group, name,
     if (is.null(shape))
         shape <- h5attrs$h5sparse_shape
     if (is.null(shape))
-        stop(wmsg("Group '", group, "' in HDF5 file '", filepath,"' ",
+        stop(wmsg("Group \"", group, "\" in HDF5 file \"", filepath,"\" ",
                   "contains no 'shape' dataset and has no 'shape' ",
                   "or 'h5sparse_shape' attribute. As a consequence, the ",
                   "dimensions of the sparse matrix can't be determined."))
@@ -148,8 +148,8 @@ read_h5sparse_component <- function(filepath, group, name,
         return("csr")
     ans <- tolower(substr(h5sparse_format, 1L, 3L))
     if (!(ans %in% c("csr", "csc")))
-        stop(wmsg("sparse matrix in group '", group, "' in HDF5 ",
-                  "file '", filepath,"' is stored in unsupported ",
+        stop(wmsg("sparse matrix in group \"", group, "\" in HDF5 ",
+                  "file \"", filepath,"\" is stored in unsupported ",
                   "format \"", h5sparse_format, "\""))
     ans
 }
@@ -171,20 +171,47 @@ read_h5sparse_component <- function(filepath, group, name,
 ### Constructor
 ###
 
+.check_group <- function(filepath, group)
+{
+    if (!h5exists(filepath, group))
+        stop(wmsg("HDF5 group \"", group, "\" does not exist ",
+                  "in this HDF5 file"))
+    if (h5isdataset(filepath, group)) {
+        is_h5ad_X_or_layer <- group == "/X" ||
+                              substr(group, 1L, 8L) == "/layers/"
+        msg1 <- c("\"", group, "\" is an HDF5 dataset, not an HDF5 group, ",
+                  "so it looks like the matrix that you are trying to ",
+                  "access is not stored in a sparse format. Please ",
+                  "consider using the ")
+        if (is_h5ad_X_or_layer) {
+            msg2 <- c("H5ADMatrix() constructor if you are trying ",
+                      "to access the central matrix of an h5ad file. ",
+                      "Otherwise, use the HDF5Array() constructor.")
+        } else {
+            msg2 <- "HDF5Array() constructor to access this dataset."
+        }
+        stop(wmsg(msg1, msg2))
+    }
+    if (!h5isgroup(filepath, group))
+        stop(wmsg("HDF5 object \"", group, "\" is not a group"))
+}
+
 ### Returns an H5SparseMatrixSeed derivative (can be either a
 ### CSC_H5SparseMatrixSeed or CSR_H5SparseMatrixSeed object).
 H5SparseMatrixSeed <- function(filepath, group)
 {
+    ## Check 'filepath' and 'group'.
     filepath <- normarg_h5_filepath(filepath, what2="the sparse matrix")
     group <- normarg_h5_name(group, what1="'group'",
                                     what2="the name of the group",
                                     what3=" that stores the sparse matrix")
+    .check_group(filepath, group)
 
-    ## dim
+    ## Get matrix dimensions.
     dim <- .read_h5sparse_dim(filepath, group)
     stopifnot(length(dim) == 2L)
 
-    ## h5sparse_format
+    ## Get sparse format ("csc" or "csr").
     h5sparse_format <- .read_h5sparse_format(filepath, group)
     if (h5sparse_format == "csr") {
         expected_indptr_length <- dim[[2L]] + 1L
@@ -200,7 +227,7 @@ H5SparseMatrixSeed <- function(filepath, group)
         ans_class <- "CSR_H5SparseMatrixSeed"
     }
 
-    ## indptr_ranges
+    ## Get 'indptr_ranges'.
     data_len <- h5length(filepath, paste0(group, "/data"))
     indices_len <- h5length(filepath, paste0(group, "/indices"))
     stopifnot(data_len == indices_len)

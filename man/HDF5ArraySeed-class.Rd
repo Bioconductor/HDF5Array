@@ -84,7 +84,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
   See \code{?\link{Dense_H5ADMatrixSeed}} for more information.
 
   Note that the implementation of HDF5ArraySeed objects follows the widely
-  adopted convention of transposing an HDF5 dataset when loading it into R.
+  adopted convention of transposing HDF5 matrices when they get loaded into R.
 
   Finally note that an HDF5ArraySeed object supports a very limited set
   of methods:

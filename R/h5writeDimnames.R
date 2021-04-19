@@ -17,19 +17,19 @@ get_h5dimnames <- function(filepath, name)
 .check_filepath_and_name <- function(filepath, name)
 {
     if (h5isdimscale(filepath, name))
-        stop(wmsg("HDF5 dataset '", name, "' contains the dimnames for ",
+        stop(wmsg("HDF5 dataset \"", name, "\" contains the dimnames for ",
                   "another dataset in the HDF5 file so dimnames cannot ",
                   "be set on it"))
     current_h5dimnames <- get_h5dimnames(filepath, name)
     if (!all(is.na(current_h5dimnames))) {
         ds <- current_h5dimnames[!is.na(current_h5dimnames)]
-        stop(wmsg("the dimnames for HDF5 dataset '", name, "' are already ",
-                  "stored in HDF5 file '", filepath, "' (in dataset(s): ",
-                  paste(paste0("'", ds, "'"), collapse=", "), ")"))
+        stop(wmsg("the dimnames for HDF5 dataset \"", name, "\" are already ",
+                  "stored in HDF5 file \"", filepath, "\" (in dataset(s): ",
+                  paste(paste0("\"", ds, "\""), collapse=", "), ")"))
     }
     dimlabels <- h5getdimlabels(filepath, name)
     if (!is.null(dimlabels))
-        stop(wmsg("HDF5 dataset '", name, "' already has dimension labels"))
+        stop(wmsg("HDF5 dataset \"", name, "\" already has dimension labels"))
 }
 
 .validate_h5dimnames_lengths <- function(filepath, name, h5dimnames)
@@ -39,10 +39,10 @@ get_h5dimnames <- function(filepath, name)
         h5dn <- h5dimnames[[along]]
         h5dn_len <- prod(h5dim(filepath, h5dn))
         if (h5dn_len != dim[[along]])
-            return(paste0("length of HDF5 dataset '", h5dn, "' ",
+            return(paste0("length of HDF5 dataset \"", h5dn, "\" ",
                           "(", h5dn_len, ") is not equal to the ",
                           "extent of dimension ", along, " in HDF5 ",
-                          "dataset '", name, "' (", dim[[along]], ")"))
+                          "dataset \"", name, "\" (", dim[[along]], ")"))
     }
     TRUE
 }
@@ -54,15 +54,16 @@ get_h5dimnames <- function(filepath, name)
     if (!is.character(h5dimnames))
         stop(wmsg("'h5dimnames' must be a character vector containing ",
                   "the names of the HDF5 datasets to set as the ",
-                  "dimnames of dataset '", name, "' (one per dimension ",
-                  "in '", name, "')"))
+                  "dimnames of dataset \"", name, "\" (one per dimension ",
+                  "in \"", name, "\")"))
     if (length(h5dimnames) > ndim)
         stop(wmsg("length of 'h5dimnames' must equal the number of ",
-                  "dimensions (", ndim, ") in HDF5 dataset '", name, "'"))
+                  "dimensions (", ndim, ") in HDF5 dataset \"", name, "\""))
     for (along in which(!is.na(h5dimnames))) {
         h5dn <- h5dimnames[[along]]
         if (!h5exists(filepath, h5dn))
-            stop(wmsg("HDF5 dataset '", h5dn, "' does not exist"))
+            stop(wmsg("HDF5 dataset \"", h5dn, "\" does not exist ",
+                      "in this HDF5 file"))
     }
     msg <- .validate_h5dimnames_lengths(filepath, name, h5dimnames)
     if (!isTRUE(msg))
@@ -87,8 +88,8 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     h5dimnames <- get_h5dimnames(filepath, name)
     msg <- .validate_h5dimnames_lengths(filepath, name, h5dimnames)
     if (!isTRUE(msg))
-        return(paste0("invalid dimnames found in HDF5 file '", filepath, "' ",
-                      "for dataset '", name, "': ", msg))
+        return(paste0("invalid dimnames found in HDF5 file \"", filepath, "\" ",
+                      "for dataset \"", name, "\": ", msg))
     TRUE
 }
 
@@ -105,7 +106,7 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     ndim <- length(dim)
     if (length(dimnames) > ndim)
         stop(wmsg("'dimnames' cannot have more list elements than ",
-                  "the number of dimensions in dataset '", name,"'"))
+                  "the number of dimensions in dataset \"", name,"\""))
     not_NULL <- !S4Vectors:::sapply_isNULL(dimnames)
     for (along in which(not_NULL)) {
         dn <- dimnames[[along]]
@@ -116,7 +117,7 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
             stop(wmsg("length of 'dimnames[[", along, "]]' ",
                       "(", length(dn), ") must equal the ",
                       "extent of the corresponding dimension in ",
-                      "HDF5 dataset '", name, "' (", dim[[along]], ")"))
+                      "HDF5 dataset \"", name, "\" (", dim[[along]], ")"))
     }
     dimlabels <- names(dimnames)
     if (!is.null(dimlabels) && any(is.na(dimlabels)))
@@ -147,8 +148,8 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
         if (!is.character(h5dimnames) || length(h5dimnames) != ndim)
             stop(wmsg("'h5dimnames' must be a character vector containing ",
                       "the names of the HDF5 datasets where to write the ",
-                      "dimnames of dataset '", name, "' (one per dimension ",
-                      "in '", name, "')"))
+                      "dimnames of dataset \"", name, "\" (one per dimension ",
+                      "in \"", name, "\")"))
         if (any(not_NULL & is.na(h5dimnames)))
             stop(wmsg("'h5dimnames' cannot have NAs associated with ",
                       "list elements in 'dimnames' that are not NULL"))
@@ -159,7 +160,7 @@ validate_lengths_of_h5dimnames <- function(filepath, name)
     for (along in which(not_NULL)) {
         h5dn <- h5dimnames[[along]]
         if (h5exists(filepath, h5dn))
-            stop(wmsg("HDF5 dataset '", h5dn, "' already exists"))
+            stop(wmsg("HDF5 dataset \"", h5dn, "\" already exists"))
     }
     h5dimnames
 }

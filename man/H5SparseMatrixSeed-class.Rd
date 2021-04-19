@@ -57,9 +57,8 @@
 
   Note that an H5SparseMatrixSeed derivative is not intended to be used
   directly. Most end users will typically create and manipulate a
-  higher-level object like a \link{TENxMatrix} or \link{H5ADMatrix}
-  object instead. See \code{?\link{TENxMatrix}} and \code{?\link{H5ADMatrix}}
-  for more information.
+  higher-level \link{H5SparseMatrix} object instead.
+  See \code{?\link{H5SparseMatrix}} for more information.
 }
 
 \usage{
@@ -97,12 +96,8 @@ H5SparseMatrixSeed(filepath, group)
 }
 
 \arguments{
-  \item{filepath}{
-    The path (as a single string) to the HDF5 file (\code{.h5} or
-    \code{h5ad}) where the sparse matrix is located.
-  }
-  \item{group}{
-    The name of the group in the HDF5 file that stores the sparse matrix.
+  \item{filepath, group}{
+    See \code{?\link{H5SparseMatrix}} for a description of these arguments.
   }
   \item{object, x}{
     An H5SparseMatrixSeed derivative.
@@ -183,7 +178,12 @@ H5SparseMatrixSeed(filepath, group)
 }
 
 \seealso{
-  \link{TENxMatrixSeed} and \link{H5ADMatrixSeed} objects.
+  \itemize{
+    \item \link{H5SparseMatrix} objects.
+
+    \item \code{\link{h5ls}} to list the content of an HDF5 file (\code{.h5}
+          or \code{.h5ad}).
+  }
 }
 
 \examples{

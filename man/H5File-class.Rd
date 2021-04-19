@@ -110,11 +110,15 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
     \item The \link{HDF5Array} class for representing and operating on
           a conventional (a.k.a. dense) HDF5 dataset.
 
-    \item The \link{TENxMatrix} class for representing and operating on
-          a 10x Genomics dataset.
+    \item The \link{H5SparseMatrix} class for representing and operating on
+          an HDF5 sparse matrix.
 
     \item The \link{H5ADMatrix} class for representing and operating on
-          the matrix stored in an \code{h5ad} file.
+          the central matrix of an \code{h5ad} file, or any matrix in
+          its \code{/layers} group.
+
+    \item The \link{TENxMatrix} class for representing and operating on
+          a 10x Genomics dataset.
 
     \item The \code{\link{h5mread}} function in this package (\pkg{HDF5Array})
           that is used internally by \link{HDF5Array}, \link{TENxMatrix},

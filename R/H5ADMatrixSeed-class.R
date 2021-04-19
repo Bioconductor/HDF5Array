@@ -85,26 +85,31 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
 
 ### Returns an H5ADMatrixSeed derivative (can be either a Dense_H5ADMatrixSeed,
 ### or a CSC_H5SparseMatrixSeed, or a CSR_H5SparseMatrixSeed object).
-H5ADMatrixSeed <- function(filepath, name="X")
+H5ADMatrixSeed <- function(filepath, layer=NULL)
 {
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying the ",
-                  "path to the h5ad file where the matrix is located"))
+                  "path to the h5ad file"))
     filepath <- file_path_as_absolute(filepath)
+    if (is.null(layer)) {
+        name <- "/X"
+    } else {
+        if (!isSingleString(layer) || layer == "")
+            stop(wmsg("'layer' must be a single non-empty string"))
+        name <- paste0("/layers/", layer)
+    }
+    if (!h5exists(filepath, name))
+        stop(wmsg("HDF5 object \"", name, "\" does not exist ",
+                  "in this HDF5 file. Is this a valid h5ad file?"))
     dimnames <- .load_h5ad_dimnames(filepath)
-
-    if (!isSingleString(name))
-        stop(wmsg("'name' must be a single string specifying the name of ",
-                  "the dataset or group in the h5ad file that stores the ",
-                  "matrix"))
-    if (name == "")
-        stop(wmsg("'name' cannot be the empty string"))
 
     if (h5isdataset(filepath, name)) {
         ans0 <- HDF5ArraySeed(filepath, name)
         if (length(dim(ans0)) != 2L)
-            stop(wmsg("Dataset '", name, "' in file '", filepath, "' does ",
-                      "not have exactly 2 dimensions."))
+            stop(wmsg("HDF5 dataset \"", name, "\" in file \"", filepath, "\" ",
+                      "does not have exactly 2 dimensions. Please consider ",
+                      "using the HDF5Array() constructor to access this ",
+                      "dataset."))
         ans <- new2("Dense_H5ADMatrixSeed", ans0, dimnames=dimnames)
     } else if (h5isgroup(filepath, name)) {
         ans0 <- H5SparseMatrixSeed(filepath, name)
@@ -114,8 +119,9 @@ H5ADMatrixSeed <- function(filepath, name="X")
             ans_class <- "CSR_H5ADMatrixSeed"
         ans <- new2(ans_class, ans0, dimnames=dimnames)
     } else {
-        stop(wmsg("file '", filepath, "' contains no dataset or group ",
-                  "named '", name, "'"))
+        stop(wmsg("HDF5 object \"", name, "\" in file \"", filepath, "\" ",
+                  "is neither a dataset or a group. Is this a valid ",
+                  "h5ad file?"))
     }
     ans
 }
