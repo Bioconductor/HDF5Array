@@ -95,7 +95,7 @@ H5ADMatrixSeed <- function(filepath, layer=NULL)
         name <- "/X"
     } else {
         if (!isSingleString(layer) || layer == "")
-            stop(wmsg("'layer' must be a single non-empty string"))
+            stop(wmsg("'layer' must be NULL or a single non-empty string"))
         name <- paste0("/layers/", layer)
     }
     if (!h5exists(filepath, name)) {

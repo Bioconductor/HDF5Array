@@ -8,16 +8,21 @@ setClass("H5SparseMatrixSeed",
     representation(
         "VIRTUAL",
 
-      ## ----------------- user supplied slots -----------------
+    ## --------------------- user supplied slots ---------------------
 
-        ## Absolute path to the HDF5 file so the object won't break
-        ## when the user changes the working directory (e.g. with setwd()).
+        ## Absolute path to the HDF5 file so the object won't break when
+        ## the user changes the working directory (e.g. with 'setwd()').
         filepath="character",
 
-        ## Name of the group in the HDF5 file that stores the sparse matrix.
+        ## Name of the group in the HDF5 file where the sparse matrix is
+        ## stored.
         group="character",
 
-      ## ------------ automatically populated slots ------------
+        ## If 'paste0(group, "/data")' is a group, name of a dataset in
+        ## that group. Otherwise, must be set to NULL.
+        subdata="character_OR_NULL",
+
+    ## ---------------- automatically populated slots ----------------
 
         dim="integer",
 
@@ -25,7 +30,7 @@ setClass("H5SparseMatrixSeed",
         ## objects don't support large integer start/end values yet.
         indptr_ranges="data.frame",
 
-      ## --------- populated by specialized subclasses ---------
+    ## ------------- populated by specialized subclasses -------------
 
         dimnames="list"
     ),
@@ -33,6 +38,16 @@ setClass("H5SparseMatrixSeed",
         dimnames=list(NULL, NULL)
     )
 )
+
+.get_data_name <- function(subdata, group=NULL)
+{
+    name <- "data"
+    if (!is.null(subdata))
+        name <- paste0(name, "/", subdata)
+    if (!is.null(group))
+        name <- paste0(group, "/", name)
+    name
+}
 
 setClass("CSC_H5SparseMatrixSeed", contains="H5SparseMatrixSeed")
 setClass("CSR_H5SparseMatrixSeed", contains="H5SparseMatrixSeed")
@@ -157,8 +172,12 @@ read_h5sparse_component <- function(filepath, group, name,
 .read_h5sparse_indptr <- function(filepath, group)
     read_h5sparse_component(filepath, group, "indptr")
 
-.read_h5sparse_data <- function(filepath, group, start=NULL, count=NULL)
-    read_h5sparse_component(filepath, group, "data", start=start, count=count)
+.read_h5sparse_data <-
+    function(filepath, group, subdata, start=NULL, count=NULL)
+{
+    name <- .get_data_name(subdata)
+    read_h5sparse_component(filepath, group, name, start=start, count=count)
+}
 
 ### The row (or column) indices stored in HDF5 dataset "indices" are 0-based
 ### but we return them 1-based.
@@ -196,16 +215,52 @@ read_h5sparse_component <- function(filepath, group, name,
         stop(wmsg("HDF5 object \"", group, "\" is not a group"))
 }
 
+.check_data_and_subdata <- function(filepath, group, subdata)
+{
+    data_fullname <- paste0(group, "/data")
+    if (!h5exists(filepath, data_fullname))
+        stop(wmsg("HDF5 object \"", data_fullname, "\" does not ",
+                  "exist in this HDF5 file. Are you sure that HDF5 ",
+                  "group \"", group, "\" contains a sparse matrix ",
+                  "stored in CSR/CSC/Yale format?"))
+    if (is.null(subdata)) {
+        if (h5isgroup(filepath, data_fullname))
+            stop(wmsg("\"", data_fullname, "\" is an HDF5 group, not an ",
+                      "HDF5 dataset. Please use the 'subdata' argument to ",
+                      "specify the name of the dataset in this group that ",
+                      "contains the matrix data."))
+        if (!h5isdataset(filepath, data_fullname))
+            stop(wmsg("HDF5 object \"", data_fullname, "\" is not a dataset."))
+    } else {
+        if (!isSingleString(subdata) || subdata == "")
+            stop(wmsg("'subdata' must be NULL or a single non-empty string"))
+        if (h5isdataset(filepath, data_fullname))
+            stop(wmsg("\"", data_fullname, "\" is an HDF5 dataset, not an ",
+                      "HDF5 group. Please note that the 'subdata' argument ",
+                      "can be used only when it's a group."))
+        if (!h5isgroup(filepath, data_fullname))
+            stop(wmsg("HDF5 object \"", data_fullname, "\" is not a group."))
+        subdata_fullname <- .get_data_name(subdata, group)
+        if (!h5exists(filepath, subdata_fullname))
+            stop(wmsg("HDF5 object \"", subdata_fullname, "\" does not ",
+                      "exist in this HDF5 file."))
+        if (!h5isdataset(filepath, subdata_fullname))
+            stop(wmsg("HDF5 object \"", subdata_fullname, "\" is ",
+                      "not a dataset."))
+    }
+}
+
 ### Returns an H5SparseMatrixSeed derivative (can be either a
 ### CSC_H5SparseMatrixSeed or CSR_H5SparseMatrixSeed object).
-H5SparseMatrixSeed <- function(filepath, group)
+H5SparseMatrixSeed <- function(filepath, group, subdata=NULL)
 {
-    ## Check 'filepath' and 'group'.
+    ## Check 'filepath', 'group', and 'subdata'.
     filepath <- normarg_h5_filepath(filepath, what2="the sparse matrix")
     group <- normarg_h5_name(group, what1="'group'",
                                     what2="the name of the group",
                                     what3=" that stores the sparse matrix")
     .check_group(filepath, group)
+    .check_data_and_subdata(filepath, group, subdata)
 
     ## Get matrix dimensions.
     dim <- .read_h5sparse_dim(filepath, group)
@@ -228,7 +283,7 @@ H5SparseMatrixSeed <- function(filepath, group)
     }
 
     ## Get 'indptr_ranges'.
-    data_len <- h5length(filepath, paste0(group, "/data"))
+    data_len <- h5length(filepath, .get_data_name(subdata, group))
     indices_len <- h5length(filepath, paste0(group, "/indices"))
     stopifnot(data_len == indices_len)
     indptr <- .read_h5sparse_indptr(filepath, group)
@@ -290,7 +345,7 @@ H5SparseMatrixSeed <- function(filepath, group)
     start <- x@indptr_ranges[j1, "start"]
     count_per_col <- x@indptr_ranges[j12, "width"]
     count <- sum(count_per_col)
-    ans_nzdata <- .read_h5sparse_data(x@filepath, x@group,
+    ans_nzdata <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
                                       start=start, count=count)
     if (!as.sparse)
         return(relist(ans_nzdata, PartitioningByWidth(count_per_col)))
@@ -333,7 +388,8 @@ H5SparseMatrixSeed <- function(filepath, group)
         col_indices <- col_indices[keep_idx]
     }
     ans_nzindex <- cbind(row_indices, col_indices, deparse.level=0L)
-    ans_nzdata <- .read_h5sparse_data(x@filepath, x@group, start=idx2)
+    ans_nzdata <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
+                                      start=idx2)
     SparseArraySeed(dim(x), ans_nzindex, ans_nzdata, check=FALSE)
 }
 
@@ -428,7 +484,8 @@ setMethod(".load_sparse_data", "CSR_H5SparseMatrixSeed",
     ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L)) {
         ## Return an empty matrix.
-        data0 <- .read_h5sparse_data(x@filepath, x@group, start=integer(0))
+        data0 <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
+                                     start=integer(0))
         return(array(data0, dim=ans_dim))
     }
     sas <- .load_sparse_data(x, index)  # I/O
@@ -457,7 +514,7 @@ setMethod("chunkdim", "CSR_H5SparseMatrixSeed", function(x) c(1L, ncol(x)))
 setMethod("sparsity", "H5SparseMatrixSeed",
     function(x)
     {
-        data_len <- h5length(x@filepath, paste0(x@group, "/data"))
+        data_len <- h5length(x@filepath, .get_data_name(x@subdata, x@group))
         1 - data_len / length(x)
     }
 )
@@ -520,7 +577,7 @@ setMethod("read_sparse_block", "H5SparseMatrixSeed",
 {
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
-    data <- .read_h5sparse_data(x@filepath, x@group, start=idx2)
+    data <- .read_h5sparse_data(x@filepath, x@group, x@subdata, start=idx2)
     relist(data, data_indices)
 }
 
@@ -600,7 +657,7 @@ setMethod("extractNonzeroDataByRow", "CSR_H5SparseMatrixSeed",
 {
     row_indices <- .read_h5sparse_indices(from@filepath, from@group)
     indptr <- .read_h5sparse_indptr(from@filepath, from@group)
-    data <- .read_h5sparse_data(from@filepath, from@group)
+    data <- .read_h5sparse_data(from@filepath, from@group, from@subdata)
     sparseMatrix(i=row_indices, p=indptr, x=data, dims=dim(from),
                  dimnames=dimnames(from))
 }
@@ -616,7 +673,7 @@ setAs("CSC_H5SparseMatrixSeed", "sparseMatrix",
 {
     col_indices <- .read_h5sparse_indices(from@filepath, from@group)
     indptr <- .read_h5sparse_indptr(from@filepath, from@group)
-    data <- .read_h5sparse_data(from@filepath, from@group)
+    data <- .read_h5sparse_data(from@filepath, from@group, from@subdata)
     sparseMatrix(j=col_indices, p=indptr, x=data, dims=dim(from),
                  dimnames=dimnames(from))
 }

@@ -64,7 +64,7 @@
 \usage{
 ## --- Constructor function ---
 
-H5SparseMatrixSeed(filepath, group)
+H5SparseMatrixSeed(filepath, group, subdata=NULL)
 
 ## --- Accessors --------------
 
@@ -98,6 +98,9 @@ H5SparseMatrixSeed(filepath, group)
 \arguments{
   \item{filepath, group}{
     See \code{?\link{H5SparseMatrix}} for a description of these arguments.
+  }
+  \item{subdata}{
+    Experimental. Don't use!
   }
   \item{object, x}{
     An H5SparseMatrixSeed derivative.
