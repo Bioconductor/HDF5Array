@@ -7,8 +7,6 @@
 #include "h5mread.h"
 #include "h5summarize.h"
 
-#include "lzf/lzf_filter.h"  /* for register_lzf() */
-
 #define CALLMETHOD_DEF(fun, numArgs) {#fun, (DL_FUNC) &fun, numArgs}
 
 static const R_CallMethodDef callMethods[] = {
@@ -54,12 +52,6 @@ void R_init_HDF5Array(DllInfo *info)
 	int ret;
 
 	R_registerRoutines(info, NULL, callMethods, NULL, NULL);
-
-	/* Register the LZF filter with the hdf5 library. */
-	ret = register_lzf();
-	if (ret < 0)
-		error("failed to register the LZF filter with the hdf5 library");
-
 	return;
 }
 

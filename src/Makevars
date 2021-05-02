@@ -2,9 +2,6 @@
 ## have "SystemRequirements: GNU make" in the DESCRIPTION file.
 
 OBJECTS = \
-    lzf/lzf/lzf_c.o \
-    lzf/lzf/lzf_d.o \
-    lzf/lzf_filter.o \
     S4Vectors_stubs.o \
     H5File.o \
     global_errmsg_buf.o \
@@ -24,7 +21,6 @@ RHDF5LIB_LIBS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e \
     'Rhdf5lib::pkgconfig("PKG_C_HL_LIBS")')
 
 PKG_LIBS=$(RHDF5LIB_LIBS)
-PKG_CPPFLAGS=-Ilzf/lzf
 
 all: $(SHLIB)
 

@@ -13,14 +13,14 @@ biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 URL: https://bioconductor.org/packages/HDF5Array
 BugReports: https://github.com/Bioconductor/HDF5Array/issues
-Version: 1.19.15
-License: Artistic-2.0 + file src/lzf/LICENSE.txt
+Version: 1.19.16
+License: Artistic-2.0
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
 Depends: R (>= 3.4), methods, DelayedArray (>= 0.15.16), rhdf5 (>= 2.31.6)
 Imports: utils, stats, tools, Matrix,
-	BiocGenerics (>= 0.31.5), S4Vectors, IRanges
+	rhdf5filters, BiocGenerics (>= 0.31.5), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.27.13), Rhdf5lib
 SystemRequirements: GNU make
 Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
