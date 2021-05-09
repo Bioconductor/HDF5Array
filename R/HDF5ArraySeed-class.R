@@ -42,66 +42,41 @@ setClass("HDF5ArraySeed",
 ### Validity
 ###
 
-### Check that HDF5ArraySeed object 'x' points to an HDF5 dataset that
-### is accessible and "as expected".
-validate_HDF5ArraySeed_dataset <- function(x)
+### Check that 'x' points to an HDF5 dataset that has the expected dimensions
+### and chunk dimensions.
+validate_HDF5ArraySeed_dataset_geometry <- function(x, what="object")
 {
-    if (is(x@filepath, "H5File")) {
-        ## TODO: Implement the H5File case.
-        ## Note that using 'validObject(x@filepath)' won't be enough
-        ## because a closed H5File object is considered valid.
-        ## validate_HDF5ArraySeed_dataset() wants to make sure that
-        ## the H5File object is opened and has a working file ID.
-    } else {
-        ## 'x@filepath' is expected to be the **absolute** path to a
-        ## local HDF5 file.
-
-        ## Check that 'x' points to an HDF5 file that is accessible.
-        if (!file.exists(x@filepath))
-            return(paste0("points to an HDF5 file that does not exist: ",
-                          x@filepath))
-        if (dir.exists(x@filepath))
-            return(paste0("points to a directory ('", x@filepath, "') ",
-                          "instead of an HDF5 file"))
-        h5_content <- try(h5ls(x@filepath), silent=TRUE)
-        if (inherits(h5_content, "try-error"))
-            return(paste0("points to an invalid HDF5 file: ", x@filepath))
-        if (x@filepath != file_path_as_absolute(x@filepath))
-            return(paste0("uses a non-absolute/non-canonical path ",
-                          "('", x@filepath, "') to point to the HDF5 file"))
-
-        ## Check that 'x' points to an HDF5 dataset that exists.
-        h5_dim <- try(h5dim(x@filepath, x@name), silent=TRUE)
-        if (inherits(h5_dim, "try-error"))
-            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                          "that does not exist in HDF5 file: ", x@filepath))
-
-        ## Check that 'x' points to an HDF5 dataset that has the
-        ## expected dimensions and chunk dimensions.
-        if (!identical(h5_dim, x@dim))
-            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                          "in HDF5 file '", x@filepath, "' ",
-                          "that does not have the expected dimensions"))
-        h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
-        if (!identical(h5_chunkdim, x@chunkdim))
-            return(paste0("points to an HDF5 dataset ('", x@name, "') ",
-                          "in HDF5 file '", x@filepath, "' ",
-                          "that does not have the expected chunk dimensions"))
-    }
+    h5_dim <- h5dim(x@filepath, x@name)
+    if (!identical(h5_dim, x@dim))
+        return(paste0(what, " points to an HDF5 dataset (\"", x@name, "\") ",
+                      "in HDF5 file \"", x@filepath, "\" ",
+                      "that does not have the expected dimensions"))
+    h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
+    if (!identical(h5_chunkdim, x@chunkdim))
+        return(paste0(what, " points to an HDF5 dataset (\"", x@name, "\") ",
+                      "in HDF5 file \"", x@filepath, "\" ",
+                      "that does not have the expected chunk dimensions"))
     TRUE
 }
 
 .validate_HDF5ArraySeed <- function(x)
 {
-    ## 'filepath' slot.
+    ## 'filepath' and 'name' slots.
     x_filepath <- x@filepath
-    if (!(is(x_filepath, "H5File") || isSingleString(x_filepath)))
-        return("'filepath' slot must be an H5File object or a single string")
-
-    ## 'name' slot.
     x_name <- x@name
-    if (!isSingleString(x_name))
-        return("'name' slot must be a single string")
+    if (is(x_filepath, "H5File")) {
+        ## TODO: Implement the H5File case.
+        ## Note that using 'validObject(x@filepath)' won't be enough
+        ## because a closed H5File object is considered valid. We want to make
+        ## sure that the H5File object is opened and has a working file ID.
+    } else {
+        msg <- validate_h5_absolute_path(x_filepath, "'filepath' slot")
+        if (!isTRUE(msg))
+            return(msg)
+        msg <- validate_h5_dataset_name(x_filepath, x_name, "'name' slot")
+        if (!isTRUE(msg))
+            return(msg)
+    }
 
     ## 'as_sparse' slot.
     x_as_sparse <- x@as_sparse
@@ -121,11 +96,13 @@ validate_HDF5ArraySeed_dataset <- function(x)
             return(msg)
     }
 
-    ## Check that 'x' points to an HDF5 dataset that exists, is working,
-    ## and has the expected geometry.
-    msg <- validate_HDF5ArraySeed_dataset(x)
-    if (!isTRUE(msg))
-        return(paste0("object ", msg))
+    if (!is(x_filepath, "H5File")) {
+        ## Check that the dataset has the expected dimensions and
+        ## chunk dimensions.
+        msg <- validate_HDF5ArraySeed_dataset_geometry(x)
+        if (!isTRUE(msg))
+            return(msg)
+    }
 
     ## Check that the dimnames stored in the file are consistent with
     ## the dimensions of the HDF5 dataset.

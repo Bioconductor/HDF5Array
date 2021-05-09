@@ -63,9 +63,8 @@ shorten_assay2h5_links <- function(assays)
 }
 
 ### Check that all the assays are fully HDF5-based (i.e. that all their seeds
-### are HDF5ArraySeed objects), and, via validate_HDF5ArraySeed_dataset(),
-### that all the HDF5ArraySeed objects point to HDF5 datasets that are
-### accessible and "as expected".
+### are HDF5ArraySeed objects), and that all the HDF5ArraySeed objects point
+### to HDF5 datasets that are accessible and "as expected".
 ### Restore all the file paths to their absolute canonical form.
 restore_absolute_assay2h5_links <- function(assays, dir)
 {
@@ -73,23 +72,32 @@ restore_absolute_assay2h5_links <- function(assays, dir)
     for (i in seq_len(nassay)) {
         a <- modify_seeds(getListElement(assays, i),
             function(x) {
+                what <- c("assay ", i, " in the SummarizedExperiment ",
+                          "object to load")
                 if (!is(x, "HDF5ArraySeed"))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load is not HDF5-based"))
+                    stop(wmsg(what, " is not HDF5-based"))
                 h5_path <- file.path(dir, x@filepath)
                 ## file_path_as_absolute() will fail if the file does
                 ## not exist.
                 if (!file.exists(h5_path))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load points to an HDF5 file ",
+                    stop(wmsg(what, " points to an HDF5 file ",
                               "that does not exist: ", h5_path))
                 x@filepath <- file_path_as_absolute(h5_path)
-                ## Check that 'x' points to an HDF5 dataset that is accessible
-                ## and "as expected".
-                msg <- validate_HDF5ArraySeed_dataset(x)
+
+                ## TODO: Looks like we're essentially doing what
+                ## .validate_HDF5ArraySeed() does here so maybe just
+                ## call it instead?
+                msg <- validate_h5_absolute_path(x@filepath,
+                                   paste0("'filepath' slot of ", what))
                 if (!isTRUE(msg))
-                    stop(wmsg("assay ", i, " in the SummarizedExperiment ",
-                              "object to load ", msg))
+                    stop(wmsg(msg))
+                msg <- validate_h5_dataset_name(x@filepath, x@name,
+                                   paste0("'name' slot of ", what))
+                if (!isTRUE(msg))
+                    stop(wmsg(msg))
+                msg <- validate_HDF5ArraySeed_dataset_geometry(x, what)
+                if (!isTRUE(msg))
+                    stop(wmsg(msg))
                 x
             })
         assays <- setListElement(assays, i, a)

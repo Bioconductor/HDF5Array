@@ -7,36 +7,6 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### normarg_h5_filepath() and normarg_h5_name()
-###
-
-normarg_h5_filepath <- function(path, what1="'filepath'", what2="the dataset")
-{
-    if (!isSingleString(path))
-        stop(wmsg(what1, " must be a single string specifying the path ",
-                  "to the HDF5 file where ", what2, " is located"))
-    file_path_as_absolute(path)  # return absolute path in canonical form
-}
-
-normarg_h5_name <- function(name, what1="'name'",
-                                  what2="the name of a dataset",
-                                  what3="")
-{
-    if (!isSingleString(name))
-        stop(wmsg(what1, " must be a single string specifying ",
-                  what2, " in the HDF5 file", what3))
-    if (name == "")
-        stop(wmsg(what1, " cannot be the empty string"))
-    if (substr(name, start=1L, stop=1L) == "/") {
-        name <- sub("^/*", "/", name)  # only keep first leading slash
-    } else {
-        name <- paste0("/", name)
-    }
-    name
-}
-
-
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### h5exists()
 ###
 
@@ -152,6 +122,82 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
         chunkdim <- as.integer(pmin(dim, chunkdim))
     }
     chunkdim
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### normarg_h5_filepath() and normarg_h5_name()
+###
+
+normarg_h5_filepath <- function(path, what1="'filepath'", what2="the dataset")
+{
+    if (!isSingleString(path))
+        stop(wmsg(what1, " must be a single string specifying the path ",
+                  "to the HDF5 file where ", what2, " is located"))
+    file_path_as_absolute(path)  # return absolute path in canonical form
+}
+
+normarg_h5_name <- function(name, what1="'name'",
+                                  what2="the name of a dataset",
+                                  what3="")
+{
+    if (!isSingleString(name))
+        stop(wmsg(what1, " must be a single string specifying ",
+                  what2, " in the HDF5 file", what3))
+    if (name == "")
+        stop(wmsg(what1, " cannot be the empty string"))
+    if (substr(name, start=1L, stop=1L) == "/") {
+        name <- sub("^/*", "/", name)  # only keep first leading slash
+    } else {
+        name <- paste0("/", name)
+    }
+    name
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Used in validity methods
+###
+
+### 'path' is expected to be the **absolute** path to a local HDF5 file.
+validate_h5_absolute_path <- function(path, what="'path'")
+{
+    if (!(isSingleString(path) && nzchar(path)))
+        return(paste0(what, " must be a single non-empty string"))
+
+    ## Check that 'path' points to an HDF5 file that is accessible.
+    if (!file.exists(path))
+        return(paste0(what, " (\"", path, "\") must be the path to ",
+                      "an existing HDF5 file"))
+    if (dir.exists(path))
+        return(paste0(what, " (\"", path, "\") must be the path to ",
+                      "an HDF5 file, not a directory"))
+    h5_content <- try(h5ls(path), silent=TRUE)
+    if (inherits(h5_content, "try-error"))
+        return(paste0(what, " (\"", path, "\") doesn't seem to be ",
+                      "the path to a valid HDF5 file"))
+    if (path != file_path_as_absolute(path))
+        return(paste0(what, " (\"", path, "\") must be the absolute ",
+                      "canonical path the HDF5 file"))
+    TRUE
+}
+
+validate_h5_dataset_name <- function(path, name, what="'name'")
+{
+    if (!(isSingleString(name) && nzchar(name)))
+        return(paste0(what, " must be a single non-empty string"))
+
+    if (!h5exists(path, name))
+        return(paste0(what, " (\"", name, "\") doesn't exist ",
+                      "in HDF5 file \"", path, "\""))
+    if (!h5isdataset(path, name))
+        return(paste0(what, " (\"", name, "\") is not a dataset ",
+                      "in HDF5 file \"", path, "\""))
+    h5_dim <- try(h5dim(path, name), silent=TRUE)
+    if (inherits(h5_dim, "try-error"))
+        return(paste0(what, " (\"", name, "\") is a dataset with ",
+                      "no dimensions in HDF5 file \"", path, "\""))
+    TRUE
 }
 
 

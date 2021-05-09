@@ -154,7 +154,7 @@ exportMethods(
 export(
     shorten_assay2h5_links,
     restore_absolute_assay2h5_links,
-    validate_HDF5ArraySeed_dataset,
+    validate_HDF5ArraySeed_dataset_geometry,
     write_h5_assays,
     create_dir,
     replace_dir,

@@ -3,7 +3,7 @@
 \alias{HDF5Array-internals}
 \alias{shorten_assay2h5_links}
 \alias{restore_absolute_assay2h5_links}
-\alias{validate_HDF5ArraySeed_dataset}
+\alias{validate_HDF5ArraySeed_dataset_geometry}
 \alias{write_h5_assays}
 \alias{create_dir}
 \alias{replace_dir}
