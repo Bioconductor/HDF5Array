@@ -149,13 +149,15 @@ h5mread(h5file1, "M2", list(1:10, 1:6))
 get_h5mread_returned_type(h5file1, "M2")
 
 ## With a file stored in an Amazon S3 bucket:
-public_S3_url <-
- "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
-h5file2 <- H5File(public_S3_url, s3=TRUE)
-h5ls(h5file2)
+if (Sys.info()[["sysname"]] != "Darwin") {
+  public_S3_url <-
+   "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
+  h5file2 <- H5File(public_S3_url, s3=TRUE)
+  h5ls(h5file2)
 
-h5mread(h5file2, "a1")
-get_h5mread_returned_type(h5file2, "a1")
+  h5mread(h5file2, "a1")
+  get_h5mread_returned_type(h5file2, "a1")
+}
 
 ## ---------------------------------------------------------------------
 ## B. H5File OBJECTS AND PARALLEL EVALUATION

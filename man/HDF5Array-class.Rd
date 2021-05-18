@@ -143,12 +143,14 @@ HDF5Array(toy_h5, "M2", type="integer")
 HDF5Array(toy_h5, "M2", type="complex")
 
 ## With a file stored in an Amazon S3 bucket:
-public_S3_url <-
- "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
-h5file <- H5File(public_S3_url, s3=TRUE)
-h5ls(h5file)
+if (Sys.info()[["sysname"]] != "Darwin") {
+    public_S3_url <-
+     "https://rhdf5-public.s3.eu-central-1.amazonaws.com/rhdf5ex_t_float_3d.h5"
+    h5file <- H5File(public_S3_url, s3=TRUE)
+    h5ls(h5file)
 
-HDF5Array(h5file, "a1")
+    HDF5Array(h5file, "a1")
+}
 
 ## ---------------------------------------------------------------------
 ## B. BASIC MANIPULATION
