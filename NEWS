@@ -1,3 +1,28 @@
+CHANGES IN VERSION 1.20.0
+-------------------------
+
+NEW FEATURES
+
+    o Implement the H5SparseMatrix class and H5SparseMatrix() constructor
+      function. H5SparseMatrix is a DelayedMatrix subclass for representing
+      and operating on an HDF5 sparse matrix stored in CSR/CSC/Yale format.
+
+    o Implement the H5ADMatrix class and H5ADMatrix() constructor function.
+      H5ADMatrix is a DelayedMatrix subclass for representing and operating
+      on the central matrix of an ‘h5ad’ file, or any matrix in its '/layers'
+      group.
+
+    o Implement H5File objects. The H5File class provides a formal
+      representation of an HDF5 file (local or remote, including a file
+      stored in an Amazon S3 bucket).
+
+    o HDF5Array objects now work with files on Amazon S3 (via use of H5File()).
+
+BUG FIXES
+
+    o Remove "global counter" files at unload time (commit f7913043).
+
+
 CHANGES IN VERSION 1.18.0
 -------------------------
 
