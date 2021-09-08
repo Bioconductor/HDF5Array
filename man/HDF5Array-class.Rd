@@ -55,7 +55,7 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
     Note that HDF5 doesn't natively support sparse storage at the moment
     so HDF5 datasets cannot be stored in a sparse format, only in a dense
     one. However a dataset stored in a dense format can still contain a lot
-    of zeroes. Using \code{as.sparse=TRUE} on such dataset will enable
+    of zeros. Using \code{as.sparse=TRUE} on such dataset will enable
     some optimizations that can lead to a lower memory footprint (and
     possibly better performance) when operating on the HDF5Array.
 

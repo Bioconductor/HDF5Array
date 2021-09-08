@@ -49,8 +49,6 @@ static const R_CallMethodDef callMethods[] = {
 
 void R_init_HDF5Array(DllInfo *info)
 {
-	int ret;
-
 	R_registerRoutines(info, NULL, callMethods, NULL, NULL);
 	return;
 }

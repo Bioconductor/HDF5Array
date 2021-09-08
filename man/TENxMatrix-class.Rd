@@ -211,22 +211,22 @@ setAutoBlockSize()
 
 ## extractNonzeroDataByCol() provides a convenient and very efficient
 ## way to extract the nonzero data in a compact form:
-nonzeroes <- extractNonzeroDataByCol(oneM, 1:25000)  # takes < 5 sec.
+nonzeros <- extractNonzeroDataByCol(oneM, 1:25000)  # takes < 5 sec.
 
 ## The data is returned as an IntegerList object with one list element
 ## per column and no row indices associated to the values in the object.
 ## Furthermore, the values within a given list element can be returned
 ## in any order:
-nonzeroes
+nonzeros
 
-names(nonzeroes) <- colnames(oneM25k)
+names(nonzeros) <- colnames(oneM25k)
 
 ## This can be used to compute some simple summaries like the library
 ## sizes and the number of genes expressed per cell. For these use
 ## cases, it is a lot more efficient than using colSums(oneM25k) and
 ## colSums(oneM25k != 0):
-lib_sizes3 <- sum(nonzeroes)
-n_exprs3 <- lengths(nonzeroes)
+lib_sizes3 <- sum(nonzeros)
+n_exprs3 <- lengths(nonzeros)
 
 ## Sanity checks:
 stopifnot(all.equal(lib_sizes, lib_sizes3))
