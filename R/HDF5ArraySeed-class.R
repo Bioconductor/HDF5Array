@@ -365,6 +365,25 @@ HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
 setMethod("updateObject", "HDF5ArraySeed",
     function(object, ..., verbose=FALSE)
     {
+        ## The "file" slot was renamed "filepath" in HDF5Array 1.7.3 (commit
+        ## b30f4d4b).
+        if (!.hasSlot(object, "filepath")) {
+            return(new2("HDF5ArraySeed", filepath=object@file,
+                                         name=object@name,
+                                         type=type(object@first_val),
+                                         dim=object@dim,
+                                         first_val=object@first_val,
+                                         check=FALSE))
+        }
+        ## The "chunkdim" slot was added in HDF5Array 1.7.7 (commit ef4c5b47).
+        if (!.hasSlot(object, "chunkdim")) {
+            return(new2("HDF5ArraySeed", filepath=object@filepath,
+                                         name=object@name,
+                                         type=type(object@first_val),
+                                         dim=object@dim,
+                                         first_val=object@first_val,
+                                         check=FALSE))
+        }
         ## The "type" slot was added in HDF5Array 1.15.6.
         if (!.hasSlot(object, "type")) {
             return(new2("HDF5ArraySeed", filepath=object@filepath,
