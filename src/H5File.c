@@ -82,10 +82,9 @@ hid_t _h5openlocalfile(SEXP filepath, int readonly)
 
 	ret = H5Fis_hdf5(CHAR(filepath0));
 	if (ret < 0)
-		error("H5Fis_hdf5() returned an error");
+		error("file '%s' does not exist", CHAR(filepath0));
 	if (ret == 0)
-		error("file '%s' does not exist or is not in the HDF5 format",
-		      CHAR(filepath0));
+		error("file '%s' is not in the HDF5 format", CHAR(filepath0));
 
 	flags = readonly ? H5F_ACC_RDONLY : H5F_ACC_RDWR;
 	file_id = H5Fopen(CHAR(filepath0), flags, H5P_DEFAULT);
