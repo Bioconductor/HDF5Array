@@ -1,3 +1,15 @@
+CHANGES IN VERSION 1.24.0
+-------------------------
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o Improve error reporting in internal helper .h5openlocalfile()
+
+BUG FIXES
+
+    o Make sure updateObject() handles very old HDF5ArraySeed instances.
+
+
 CHANGES IN VERSION 1.22.0
 -------------------------
 
