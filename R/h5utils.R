@@ -67,7 +67,7 @@ h5isgroup <- function(filepath, name)
     H5Dopen(gid, name)
 }
 
-.dim_as_integer <- function(dim, filepath, name, what="dimensions")
+dim_as_integer <- function(dim, filepath, name, what="HDF5 dataset")
 {
     if (is.integer(dim))
         return(dim)
@@ -75,12 +75,14 @@ h5isgroup <- function(filepath, name)
         dim_in1string <- paste0(dim, collapse=" x ")
         if (is(filepath, "H5File"))
             filepath <- path(filepath)
-        stop(wmsg("The ", what, " (", dim_in1string, ") ",
-                  "of HDF5 dataset '", name, "' ",
-                  "from file '", filepath, "' are too big.\n\n",
-                  "The HDF5Array package only supports datasets with ",
-                  "all ", what, " <= 2^31-1 (= ", .Machine$integer.max, ") ",
-                  "at the moment."))
+        stop(wmsg("Dimensions of ", what, " are too big: ", dim_in1string),
+             "\n\n  ",
+             wmsg("(This error is about HDF5 dataset '", name, "' ",
+                  "from file '", filepath, "'.)"),
+             "\n\n  ",
+             wmsg("Please note that the HDF5Array package only ",
+                  "supports datasets where each dimension is ",
+                  "<= '.Machine$integer.max' (= 2**31 - 1)."))
     }
     as.integer(dim)
 }
@@ -95,7 +97,7 @@ h5dim <- function(filepath, name, as.integer=TRUE)
     on.exit(H5Sclose(sid), add=TRUE)
     dim <- H5Sget_simple_extent_dims(sid)$size
     if (as.integer)
-        dim <- .dim_as_integer(dim, filepath, name)
+        dim <- dim_as_integer(dim, filepath, name)
     dim
 }
 
@@ -113,8 +115,8 @@ h5chunkdim <- function(filepath, name, adjust=FALSE)
     ## this though, for consistency with how rhdf5 handles the order of the
     ## dimensions everywhere else (e.g. see ?H5Sget_simple_extent_dims).
     chunkdim <- rev(H5Pget_chunk(pid))
-    chunkdim <- .dim_as_integer(chunkdim, filepath, name,
-                                what="chunk dimensions")
+    chunkdim <- dim_as_integer(chunkdim, filepath, name,
+                               what="HDF5 dataset chunks")
     if (adjust) {
         dim <- h5dim(filepath, name, as.integer=FALSE)
         ## A sanity check that should never fail.

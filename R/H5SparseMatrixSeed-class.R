@@ -145,7 +145,7 @@ read_h5sparse_component <- function(filepath, group, name,
                   "contains no 'shape' dataset and has no 'shape' ",
                   "or 'h5sparse_shape' attribute. As a consequence, the ",
                   "dimensions of the sparse matrix can't be determined."))
-    rev(as.integer(shape))
+    rev(shape)
 }
 
 .read_h5sparse_format <- function(filepath, group)
@@ -265,6 +265,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL)
     ## Get matrix dimensions.
     dim <- .read_h5sparse_dim(filepath, group)
     stopifnot(length(dim) == 2L)
+    dim <- dim_as_integer(dim, filepath, group, what="sparse matrix")
 
     ## Get sparse format ("csc" or "csr").
     h5sparse_format <- .read_h5sparse_format(filepath, group)
