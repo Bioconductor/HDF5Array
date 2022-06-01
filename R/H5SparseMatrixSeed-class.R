@@ -129,6 +129,7 @@ read_h5sparse_component <- function(filepath, group, name,
                                       as.integer=as.integer))
 }
 
+### Returns a numeric vector (integer or double).
 .read_h5sparse_dim <- function(filepath, group)
 {
     if (h5exists(filepath, paste0(group, "/shape"))) {
@@ -145,7 +146,9 @@ read_h5sparse_component <- function(filepath, group, name,
                   "contains no 'shape' dataset and has no 'shape' ",
                   "or 'h5sparse_shape' attribute. As a consequence, the ",
                   "dimensions of the sparse matrix can't be determined."))
-    rev(shape)
+    ## We pass 'shape' thru as.vector() to drop its class attribute in case
+    ## it's an array.
+    rev(as.vector(shape))
 }
 
 .read_h5sparse_format <- function(filepath, group)
