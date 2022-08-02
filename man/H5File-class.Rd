@@ -53,7 +53,7 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
   \item{s3credentials}{
     A list of length 3, providing the credentials for accessing
     files stored in a private Amazon S3 bucket.
-    See \code{?\link[rhdf5]{H5P_FILE_ACCESS}} in the \pkg{rhdf5} package
+    See \code{?\link[rhdf5]{H5Pset_fapl_ros3}} in the \pkg{rhdf5} package
     for more information.
   }
   \item{.no_rhdf5_h5id}{
@@ -103,7 +103,7 @@ H5File(filepath, s3=FALSE, s3credentials=NULL, .no_rhdf5_h5id=FALSE)
 
 \seealso{
   \itemize{
-    \item \link[rhdf5]{H5P_FILE_ACCESS} in the \pkg{rhdf5} package for
+    \item \link[rhdf5]{H5Pset_fapl_ros3} in the \pkg{rhdf5} package for
           detailed information about how to pass your S3 credentials
           to the \code{s3credentials} argument.
 
