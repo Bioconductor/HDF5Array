@@ -128,7 +128,7 @@ library(ExperimentHub)
 hub <- ExperimentHub()
 query(hub, "TENxBrainData")
 fname <- hub[["EH1039"]]
-oneM <- TENxMatrix(fname, "mm10")  # see ?TENxMatrix for the details
+oneM <- TENxMatrix(fname, group="mm10")  # see ?TENxMatrix for the details
 oneM
 
 ## Note that the following transformation preserves sparsity:

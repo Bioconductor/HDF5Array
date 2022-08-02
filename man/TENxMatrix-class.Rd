@@ -29,7 +29,7 @@
 
 \usage{
 ## Constructor function:
-TENxMatrix(filepath, group="mm10")
+TENxMatrix(filepath, group="matrix")
 }
 
 \arguments{
@@ -115,7 +115,7 @@ h5ls(fname)
 ## The 1.3 Million Brain Cell Dataset is represented by the "mm10"
 ## group. We point the TENxMatrix() constructor to this group to
 ## create a TENxMatrix object representing the dataset:
-oneM <- TENxMatrix(fname, "mm10")
+oneM <- TENxMatrix(fname, group="mm10")
 oneM
 
 is(oneM, "DelayedMatrix")  # TRUE

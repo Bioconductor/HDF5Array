@@ -22,7 +22,7 @@
 
 \usage{
 ## Constructor function:
-TENxMatrixSeed(filepath, group="mm10")
+TENxMatrixSeed(filepath, group="matrix")
 }
 
 \arguments{
@@ -82,7 +82,7 @@ h5ls(fname)
 ## The 1.3 Million Brain Cell Dataset is represented by the "mm10"
 ## group. We point the TENxMatrixSeed() constructor to this group
 ## to create a TENxMatrixSeed object representing the dataset:
-seed <- TENxMatrixSeed(fname, "mm10")
+seed <- TENxMatrixSeed(fname, group="mm10")
 seed
 path(seed)
 dim(seed)

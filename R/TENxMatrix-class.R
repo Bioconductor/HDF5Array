@@ -28,7 +28,7 @@ setMethod("DelayedArray", "TENxMatrixSeed",
 
 ### Works directly on a TENxMatrixSeed object, in which case it must be
 ### called with a single argument.
-TENxMatrix <- function(filepath, group="mm10")
+TENxMatrix <- function(filepath, group="matrix")
 {
     if (is(filepath, "TENxMatrixSeed")) {
         if (!missing(group))
