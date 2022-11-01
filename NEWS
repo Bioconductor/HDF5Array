@@ -1,3 +1,21 @@
+CHANGES IN VERSION 1.26.0
+-------------------------
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o Try harder to find and load the matrix rownames of a 10x Genomics dataset.
+      See commit abafbb9e99ad54a64e5013305486b97daa9442bc.
+
+BUG FIXES
+
+    o Handle HDF5 sparse matrices where shape is not an integer vector.
+      When the shape returned by internal helper .read_h5sparse_dim() is a
+      double vector it is now coerced to an integer vector. Integer overflows
+      resulting from this coercion trigger an error with an informative error
+      message.
+      See GitHub issue #48.
+
+
 CHANGES IN VERSION 1.24.0
 -------------------------
 
