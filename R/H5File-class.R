@@ -91,7 +91,7 @@
 
     if (use.rhdf5) {
         fid <- .ID_to_H5IdComponent(ID)
-        rhdf5:::H5Fclose(fid)
+        rhdf5::H5Fclose(fid)
     } else {
         .Call2("C_h5closefile", ID, PACKAGE="HDF5Array")
     }

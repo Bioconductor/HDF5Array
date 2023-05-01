@@ -153,7 +153,8 @@ static const char *predef_native_type_as_string(hid_t native_type_id)
 
 	/* Should never happen if predef_native_type_as_string()
 	   is kept in sync with map_native_type_to_predef_type(). */
-	sprintf(s, "unknown native type (%lld)", (long long) native_type_id);
+	snprintf(s, sizeof(s), "unknown native type (%lld)",
+                               (long long) native_type_id);
 	return s;
 }
 
@@ -197,7 +198,7 @@ static const char *H5class2str(H5T_class_t h5class)
 	   in switch. */
 	    default: break;
 	}
-	sprintf(s, "unknown class (%d)", h5class);
+	snprintf(s, sizeof(s), "unknown class (%d)", h5class);
 	return s;
 }
 
@@ -214,7 +215,7 @@ static const char *H5layout2str(H5D_layout_t H5layout)
 	   in switch. */
 	    default: break;
 	}
-	sprintf(s, "unknown layout (%d)", H5layout);
+	snprintf(s, sizeof(s), "unknown layout (%d)", H5layout);
 	return s;
 }
 

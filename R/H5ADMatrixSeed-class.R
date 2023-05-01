@@ -25,7 +25,7 @@ setClass("CSR_H5ADMatrixSeed",
 ### We overwrite the method for HDF5ArraySeed objects with a method that
 ### accesses the slot, not the file.
 setMethod("dimnames", "Dense_H5ADMatrixSeed",
-    function(x) DelayedArray:::simplify_NULL_dimnames(x@dimnames)
+    function(x) S4Arrays:::simplify_NULL_dimnames(x@dimnames)
 )
 
 

@@ -84,14 +84,14 @@ validate_HDF5ArraySeed_dataset_geometry <- function(x, what="object")
         return("'as_sparse' slot must be TRUE or FALSE")
 
     ## 'dim' slot.
-    msg <- DelayedArray:::validate_dim_slot(x, "dim")
+    msg <- S4Arrays:::validate_dim_slot(x, "dim")
     if (!isTRUE(msg))
         return(msg)
 
     ## 'chunkdim' slot.
     x_chunkdim <- x@chunkdim
     if (!is.null(x_chunkdim)) {
-        msg <- DelayedArray:::validate_dim_slot(x, "chunkdim")
+        msg <- S4Arrays:::validate_dim_slot(x, "chunkdim")
         if (!isTRUE(msg))
             return(msg)
     }
@@ -239,7 +239,7 @@ setMethod("dimnames", "HDF5ArraySeed",
                       as.integer=FALSE, as.sparse=FALSE)
 {
     if (!is.null(index))
-        index <- DelayedArray:::expand_Nindex_RangeNSBS(index)
+        index <- S4Arrays:::expand_Nindex_RangeNSBS(index)
     h5mread(filepath, name, starts=index,
             as.integer=as.integer, as.sparse=as.sparse)
 }

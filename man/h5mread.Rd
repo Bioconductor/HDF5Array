@@ -63,7 +63,7 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
     list element indicates a single position selection along the corresponding
     dimension. Note that in this case the \code{starts} argument is
     equivalent to the \code{index} argument of \code{\link[rhdf5]{h5read}}
-    and \code{\link[DelayedArray]{extract_array}} (with the caveat that
+    and \code{\link[S4Arrays]{extract_array}} (with the caveat that
     \code{\link[rhdf5]{h5read}} doesn't accept empty selections).
 
     Finally note that when \code{counts} is not \code{NULL} then the
@@ -109,7 +109,7 @@ get_h5mread_returned_type(filepath, name, as.integer=FALSE)
 
     \item \code{\link[rhdf5]{h5read}} in the \pkg{rhdf5} package.
 
-    \item \code{\link[DelayedArray]{extract_array}} in the \pkg{DelayedArray}
+    \item \code{\link[S4Arrays]{extract_array}} in the \pkg{S4Arrays}
           package.
 
     \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
