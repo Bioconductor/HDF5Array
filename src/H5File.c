@@ -27,7 +27,7 @@ static const char *hid_to_string(hid_t hid)
 {
 	static char buf[21];
 
-	sprintf(buf, "%lld", (long long) hid);
+	snprintf(buf, sizeof(buf), "%lld", (long long) hid);
 	return buf;
 }
 

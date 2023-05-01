@@ -233,7 +233,7 @@ h5readDimnames <- function(filepath, name, as.character=FALSE)
                    ## explicitly drop the "dim" attribute.
                    as.character(dn)
                } else {
-                   DelayedArray:::set_dim(dn, NULL)
+                   S4Arrays:::set_dim(dn, NULL)
                }
            })
 }

@@ -83,7 +83,7 @@ collapse_dims <- function(dim0, collapse_along)
 h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
                                   as.integer=FALSE, method=0L)
 {
-    dim <- DelayedArray:::normarg_dim(dim)
+    dim <- S4Arrays:::normarg_dim(dim)
     dim0 <- h5dim(filepath, name)
     collapse_along <- find_dims_to_collapse(dim, dim0)
     ndim <- length(dim)
@@ -134,6 +134,6 @@ h5mread_from_reshaped <- function(filepath, name, dim, starts, noreduce=FALSE,
                                        as.integer=as.integer,
                                        method=method)
         })
-    do.call(DelayedArray:::simple_abind, c(tmp, list(along=along1)))
+    do.call(S4Arrays:::simple_abind, c(tmp, list(along=along1)))
 }
 

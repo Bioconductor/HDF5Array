@@ -33,7 +33,7 @@ setMethod("dim", "ReshapedHDF5ArraySeed", function(x) x@reshaped_dim)
 
 .extract_array_from_ReshapedHDF5ArraySeed <- function(x, index)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
+    ans_dim <- S4Arrays:::get_Nindex_lengths(index, dim(x))
     h5mread_from_reshaped(path(x), x@name, x@reshaped_dim, starts=index)
 }
 
@@ -60,7 +60,7 @@ setMethod("chunkdim", "ReshapedHDF5ArraySeed", function(x) x@reshaped_chunkdim)
 ReshapedHDF5ArraySeed <- function(filepath, name, dim, type=NA)
 {
     seed <- HDF5ArraySeed(filepath, name, type=type)
-    reshaped_dim <- DelayedArray:::normarg_dim(dim)
+    reshaped_dim <- S4Arrays:::normarg_dim(dim)
     collapse_along <- find_dims_to_collapse(reshaped_dim, seed@dim)
     if (is.null(seed@chunkdim)) {
         reshaped_chunkdim <- NULL

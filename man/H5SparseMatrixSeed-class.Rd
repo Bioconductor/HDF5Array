@@ -106,11 +106,11 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
     An H5SparseMatrixSeed derivative.
   }
   \item{index}{
-    See \code{?\link[DelayedArray]{extract_array}} in the \pkg{DelayedArray}
+    See \code{?\link[S4Arrays]{extract_array}} in the \pkg{S4Arrays}
     package.
   }
   \item{viewport}{
-    See \code{?\link[DelayedArray]{read_block}} in the \pkg{DelayedArray}
+    See \code{?\link[S4Arrays]{read_block}} in the \pkg{S4Arrays}
     package.
   }
   \item{j}{
@@ -140,7 +140,7 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
     \item \code{chunkdim()}, \code{extract_array()},
           \code{extract_sparse_array()}, \code{read_sparse_block()},
           \code{is_sparse()}: These generics are defined and documented
-          in the \pkg{DelayedArrray} package.
+          in the \pkg{DelayedArray} package.
     \item \code{sparsity()}: Returns the number of zero-valued matrix elements
           in the object divided by its total number of elements (a.k.a. its
           length).

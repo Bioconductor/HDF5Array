@@ -108,7 +108,7 @@ setReplaceMethod("path", "H5SparseMatrixSeed",
 setMethod("dim", "H5SparseMatrixSeed", function(x) x@dim)
 
 setMethod("dimnames", "H5SparseMatrixSeed",
-    function(x) DelayedArray:::simplify_NULL_dimnames(x@dimnames)
+    function(x) S4Arrays:::simplify_NULL_dimnames(x@dimnames)
 )
 
 
@@ -485,7 +485,7 @@ setMethod(".load_sparse_data", "CSR_H5SparseMatrixSeed",
 
 .extract_array_from_H5SparseMatrixSeed <- function(x, index)
 {
-    ans_dim <- DelayedArray:::get_Nindex_lengths(index, dim(x))
+    ans_dim <- S4Arrays:::get_Nindex_lengths(index, dim(x))
     if (any(ans_dim == 0L)) {
         ## Return an empty matrix.
         data0 <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
@@ -631,8 +631,8 @@ setGeneric("extractNonzeroDataByCol", signature="x",
 setMethod("extractNonzeroDataByCol", "CSC_H5SparseMatrixSeed",
     function(x, j)
     {
-        j <- DelayedArray:::normalizeSingleBracketSubscript2(j, ncol(x),
-                                                             colnames(x))
+        j <- S4Arrays:::normalizeSingleBracketSubscript2(j, ncol(x),
+                                                         colnames(x))
         .extract_nonzero_csc_sparse_data_by_col(x, j)
     }
 )
@@ -646,8 +646,8 @@ setGeneric("extractNonzeroDataByRow", signature="x",
 setMethod("extractNonzeroDataByRow", "CSR_H5SparseMatrixSeed",
     function(x, i)
     {
-        i <- DelayedArray:::normalizeSingleBracketSubscript2(i, nrow(x),
-                                                             rownames(x))
+        i <- S4Arrays:::normalizeSingleBracketSubscript2(i, nrow(x),
+                                                         rownames(x))
         .extract_nonzero_csc_sparse_data_by_col(t(x), i)
     }
 )
@@ -697,7 +697,7 @@ setAs("CSR_H5SparseMatrixSeed", "sparseMatrix",
 setMethod("show", "H5SparseMatrixSeed",
     function(object)
     {
-        cat(DelayedArray:::array_as_one_line_summary(object), ":\n", sep="")
+        cat(S4Arrays:::array_as_one_line_summary(object), ":\n", sep="")
         cat("# dirname: ", dirname(object), "\n", sep="")
         cat("# basename: ", basename(object), "\n", sep="")
         cat("# group: ", object@group, "\n", sep="")

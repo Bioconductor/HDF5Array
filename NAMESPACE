@@ -15,6 +15,7 @@ import(rhdf5)
 import(BiocGenerics)
 import(S4Vectors)
 import(IRanges)
+import(S4Arrays)
 import(DelayedArray)
 
 
@@ -88,11 +89,13 @@ exportMethods(
     ## Methods for generics defined in the BiocGenerics package:
     path, "path<-", type, updateObject,
 
+    ## Methods for generics defined in the S4Arrays package:
+    extract_array, is_sparse, "is_sparse<-",
+
     ## Methods for generics defined in the DelayedArray package:
-    extract_array,
-    sparsity, is_sparse, "is_sparse<-", extract_sparse_array,
-    read_sparse_block, write_block,
-    matrixClass, DelayedArray, chunkdim,
+    chunkdim, write_block,
+    sparsity, extract_sparse_array, read_sparse_block,
+    matrixClass, DelayedArray,
     close
 )
 

@@ -74,7 +74,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
     For the \code{is_sparse()} setter: \code{TRUE} or \code{FALSE}.
   }
   \item{index}{
-    See \code{?\link[DelayedArray]{extract_array}} in the \pkg{DelayedArray}
+    See \code{?\link[S4Arrays]{extract_array}} in the \pkg{S4Arrays}
     package.
   }
 }
@@ -92,9 +92,13 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
     \item \code{path()}: Returns the path to the HDF5 file where the dataset
           is located.
     \item \code{dim()}, \code{dimnames()}.
-    \item \code{type()}, \code{is_sparse()}, \code{chunkdim()},
-          \code{extract_array()}, \code{extract_sparse_array()}: These generics
-          are defined and documented in the \pkg{DelayedArrray} package.
+    \item \code{type()}, \code{extract_array()}, \code{is_sparse()},
+          \code{extract_sparse_array()}, \code{chunkdim()}:
+          These generics are defined and documented in other packages e.g.
+          in \pkg{S4Arrays} for \code{\link[S4Arrays]{extract_array}()}
+          and \code{\link[S4Arrays]{is_sparse}()}, and in \pkg{DelayedArray}
+          for \code{\link[DelayedArray]{extract_sparse_array}()} and
+          \code{\link[DelayedArray]{chunkdim}()}.
   }
 }
 
@@ -119,6 +123,14 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 \seealso{
   \itemize{
     \item \link{HDF5Array} objects.
+
+    \item \code{\link[S4Arrays]{type}}, \code{\link[S4Arrays]{extract_array}},
+          and \code{\link[S4Arrays]{is_sparse}}, in the the \pkg{S4Arrays}
+          package.
+
+    \item \code{\link[DelayedArray]{extract_sparse_array}} and
+          \code{\link[DelayedArray]{chunkdim}} in the \pkg{DelayedArray}
+          package.
 
     \item \code{\link{h5ls}} to list the content of an HDF5 file.
   }
