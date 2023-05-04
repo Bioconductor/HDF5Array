@@ -47,13 +47,14 @@
 
 \description{
   H5SparseMatrixSeed is a low-level helper class for representing a
-  pointer to an HDF5 sparse matrix stored in CSR/CSC/Yale format.
+  pointer to a sparse matrix stored in an HDF5 file and compressed
+  using the CSC or CSR layout.
 
   It is a virtual class with two concrete subclasses: CSC_H5SparseMatrixSeed
-  for the \emph{Compressed Sparse Column} format and CSR_H5SparseMatrixSeed
-  for the \emph{Compressed Sparse Row} format.
+  for the \emph{Compressed Sparse Column} layout, and CSR_H5SparseMatrixSeed
+  for the \emph{Compressed Sparse Row} layout.
   The former is used by 10x Genomics (e.g. "1.3 Million Brain Cell Dataset").
-  \code{h5ad} files can use one or the other format to store a sparse matrix.
+  \code{h5ad} files can use one or the other layout to store a sparse matrix.
 
   Note that an H5SparseMatrixSeed derivative is not intended to be used
   directly. Most end users will typically create and manipulate a
@@ -64,7 +65,8 @@
 \usage{
 ## --- Constructor function ---
 
-H5SparseMatrixSeed(filepath, group, subdata=NULL)
+H5SparseMatrixSeed(filepath, group, subdata=NULL,
+                   dim=NULL, sparse.layout=NULL)
 
 ## --- Accessors --------------
 
@@ -102,6 +104,15 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
   \item{subdata}{
     Experimental. Don't use!
   }
+  \item{dim, sparse.layout}{
+    The \code{H5SparseMatrixSeed()} constructor should be able to
+    automatically detect the dimensions and layout of the sparse matrix
+    stored in the HDF5 file, so the user shouldn't need to specify these
+    arguments.
+
+    See Details section below for some rare situations where the user might
+    need to specify them.
+  }
   \item{object, x}{
     An H5SparseMatrixSeed derivative.
   }
@@ -122,17 +133,43 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
 }
 
 \details{
-  Note that the implementation of CSC_H5SparseMatrixSeed and
+  *** Layout in R vs physical layout ***
+
+  The implementation of CSC_H5SparseMatrixSeed and
   CSR_H5SparseMatrixSeed objects follows the usual convention of
-  transposing the HDF5 matrix when loading it into R.
+  transposing the matrix stored in the HDF5 file when loading it into R.
   This means that a CSC_H5SparseMatrixSeed object represents a
-  sparse matrix stored in the CSR format (Compressed Sparse Row)
+  sparse matrix stored physically in the CSR layout (Compressed Sparse Row)
   at the HDF5 level, and a CSR_H5SparseMatrixSeed object represents a
-  sparse matrix stored in the CSC format (Compressed Sparse Column)
+  sparse matrix stored physically in the CSC layout (Compressed Sparse Column)
   at the HDF5 level.
 
-  Finally note that H5SparseMatrixSeed derivatives support a very limited
-  set of methods:
+  *** Automatic detection of the dimensions and layout ***
+
+  The \code{H5SparseMatrixSeed()} constructor should be able to
+  automatically detect the dimensions and layout of the sparse matrix
+  stored in the HDF5 file. However, in some rare situations, the user
+  might want to bypass the detection mechanism, or they might be dealing
+  with a sparse matrix stored in an HDF5 group that doesn't provide this
+  information (e.g. the group only contains the \code{data}, \code{indices},
+  and \code{indptr} components). In which case, they can supply the
+  \code{dim} and \code{sparse.layout} arguments:
+  \itemize{
+    \item \code{dim} must be an integer vector of length 2.
+    \item \code{sparse.layout} must be \code{"CSC"} or \code{"CSR"}.
+  }
+  Note that both values must describe the dimensions and layout of the
+  R object that will be returned, that is, \emph{after} transposition
+  from the physical layout used at the HDF5 level. Also be aware that the
+  supplied values will take precedence over whatever the HDF5 file says,
+  which means that bad things will happen if they don't reflect the actual
+  dimensions and layout of the sparse matrix. Use these arguments only if
+  you know what you are doing!
+
+  *** H5SparseMatrixSeed object vs H5SparseMatrix object ***
+
+  Note that H5SparseMatrixSeed derivatives support a very limited set
+  of methods:
   \itemize{
     \item \code{path()}: Returns the path to the HDF5 file where the sparse
           matrix is located.
@@ -161,7 +198,6 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
           In particular, do NOT assume that they are ordered by ascending
           column index.
   }
-
   In order to have access to the full set of operations that
   are available for \link[DelayedArray]{DelayedMatrix} objects,
   an H5SparseMatrixSeed derivative would first need to be wrapped in

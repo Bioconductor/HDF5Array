@@ -151,7 +151,7 @@ read_h5sparse_component <- function(filepath, group, name,
     rev(as.vector(shape))
 }
 
-.read_h5sparse_format <- function(filepath, group)
+.read_h5sparse_layout <- function(filepath, group)
 {
     if (h5exists(filepath, paste0(group, "/shape"))) {
         ## 10x format
@@ -159,16 +159,16 @@ read_h5sparse_component <- function(filepath, group, name,
     }
     ## h5ad format
     h5attrs <- h5readAttributes(filepath, group)
-    h5sparse_format <- h5attrs[["encoding-type"]]
-    if (is.null(h5sparse_format))
-        h5sparse_format <- h5attrs[["h5sparse_format"]]
-    if (is.null(h5sparse_format))
+    h5sparse_layout <- h5attrs[["encoding-type"]]
+    if (is.null(h5sparse_layout))
+        h5sparse_layout <- h5attrs[["h5sparse_format"]]
+    if (is.null(h5sparse_layout))
         return("csr")
-    ans <- tolower(substr(h5sparse_format, 1L, 3L))
+    ans <- tolower(substr(h5sparse_layout, 1L, 3L))
     if (!(ans %in% c("csr", "csc")))
         stop(wmsg("sparse matrix in group \"", group, "\" in HDF5 ",
                   "file \"", filepath,"\" is stored in unsupported ",
-                  "format \"", h5sparse_format, "\""))
+                  "layout \"", h5sparse_layout, "\""))
     ans
 }
 
@@ -225,7 +225,7 @@ read_h5sparse_component <- function(filepath, group, name,
         stop(wmsg("HDF5 object \"", data_fullname, "\" does not ",
                   "exist in this HDF5 file. Are you sure that HDF5 ",
                   "group \"", group, "\" contains a sparse matrix ",
-                  "stored in CSR/CSC/Yale format?"))
+                  "stored in CSR/CSC/Yale layout?"))
     if (is.null(subdata)) {
         if (h5isgroup(filepath, data_fullname))
             stop(wmsg("\"", data_fullname, "\" is an HDF5 group, not an ",
@@ -253,9 +253,52 @@ read_h5sparse_component <- function(filepath, group, name,
     }
 }
 
+.get_sparse_matrix_dim <- function(filepath, group, dim=NULL)
+{
+    if (is.null(dim)) {
+        dim <- .read_h5sparse_dim(filepath, group)
+        stopifnot(length(dim) == 2L)
+        return(dim_as_integer(dim, filepath, group, what="sparse matrix"))
+    }
+    ## Check user-supplied 'dim'.
+    if (!is.numeric(dim) || length(dim) != 2L || anyNA(dim))
+        stop(wmsg("supplied 'dim' must be an integer vector ",
+                  "of length 2 with no NAs"))
+    if (!is.integer(dim)) {
+        if (any(dim > .Machine$integer.max))
+            stop(wmsg("supplied dimensions are too big (all dimensions ",
+                      "must be <= '.Machine$integer.max' (= 2^31 - 1))"))
+        dim <- as.integer(dim)
+    }
+    if (any(dim < 0L))
+        stop(wmsg("supplied 'dim' cannot contain negative values"))
+    dim
+}
+
+### Must return "CSC" or "CSR".
+.get_sparse_matrix_layout <- function(filepath, group, sparse.layout=NULL)
+{
+    if (is.null(sparse.layout)) {
+        h5sparse_layout <- .read_h5sparse_layout(filepath, group)
+        ## Layout in R will be transposed w.r.t. layout used in h5 file.
+        ans <- switch(h5sparse_layout, `csr`="CSC", `csc`="CSR",
+                      stop(wmsg("unsupported 'h5sparse_layout': ",
+                                h5sparse_layout)))
+        return(ans)
+    }
+    ## Check user-supplied 'sparse.layout'.
+    if (!isSingleString(sparse.layout))
+        stop(wmsg("'sparse.layout' must be a single string"))
+    ans <- toupper(sparse.layout)
+    if (!(ans %in% c("CSC", "CSR")))
+        stop(wmsg("'sparse.layout' must be either \"CSC\" or \"CSR\""))
+    ans
+}
+
 ### Returns an H5SparseMatrixSeed derivative (can be either a
 ### CSC_H5SparseMatrixSeed or CSR_H5SparseMatrixSeed object).
-H5SparseMatrixSeed <- function(filepath, group, subdata=NULL)
+H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
+                               dim=NULL, sparse.layout=NULL)
 {
     ## Check 'filepath', 'group', and 'subdata'.
     filepath <- normarg_h5_filepath(filepath, what2="the sparse matrix")
@@ -266,13 +309,12 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL)
     .check_data_and_subdata(filepath, group, subdata)
 
     ## Get matrix dimensions.
-    dim <- .read_h5sparse_dim(filepath, group)
-    stopifnot(length(dim) == 2L)
-    dim <- dim_as_integer(dim, filepath, group, what="sparse matrix")
+    dim <- .get_sparse_matrix_dim(filepath, group, dim=dim)
 
-    ## Get sparse format ("csc" or "csr").
-    h5sparse_format <- .read_h5sparse_format(filepath, group)
-    if (h5sparse_format == "csr") {
+    ## Get sparse layout to use ("CSC" or "CSR").
+    layout <- .get_sparse_matrix_layout(filepath, group,
+                                        sparse.layout=sparse.layout)
+    if (layout == "CSC") {
         expected_indptr_length <- dim[[2L]] + 1L
         ## Because R has the notions of rows and columns flipped w.r.t.
         ## HDF5, "compressed sparse row" at the HDF5 level translates
