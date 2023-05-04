@@ -98,7 +98,7 @@ h5mread <- function(filepath, name, starts=NULL, counts=NULL, noreduce=FALSE,
             match(starts0[[i]], starts[[i]])
         })
     if (as.sparse) {
-        extract_sparse_array(ans, index)
+        OLD_extract_sparse_array(ans, index)
     } else {
         extract_array(ans, index)
     }

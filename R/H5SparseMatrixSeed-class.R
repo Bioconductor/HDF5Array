@@ -365,7 +365,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL)
 ### .load_sparse_data()
 ###
 ### This internal generic is the workhorse behind the extract_array(),
-### extract_sparse_array(), and read_sparse_block() methods for
+### OLD_extract_sparse_array(), and read_sparse_block() methods for
 ### H5SparseMatrixSeed objects.
 ###
 
@@ -527,25 +527,25 @@ setMethod("sparsity", "H5SparseMatrixSeed",
 ### measured by sparsity().
 setMethod("is_sparse", "H5SparseMatrixSeed", function(x) TRUE)
 
-.extract_sparse_array_from_H5SparseMatrixSeed <- function(x, index)
+.OLD_extract_sparse_array_from_H5SparseMatrixSeed <- function(x, index)
 {
     sas <- .load_sparse_data(x, index)  # I/O
-    extract_sparse_array(sas, index)  # in-memory
+    OLD_extract_sparse_array(sas, index)  # in-memory
 }
 
-setMethod("extract_sparse_array", "H5SparseMatrixSeed",
-    .extract_sparse_array_from_H5SparseMatrixSeed
+setMethod("OLD_extract_sparse_array", "H5SparseMatrixSeed",
+    .OLD_extract_sparse_array_from_H5SparseMatrixSeed
 )
 
 ### The default read_sparse_block() method defined in DelayedArray would
 ### work just fine on an H5SparseMatrixSeed derivative (thanks to the
-### extract_sparse_array() method for H5SparseMatrixSeed objects defined
+### OLD_extract_sparse_array() method for H5SparseMatrixSeed objects defined
 ### above), but we overwrite it with the method below which should be
 ### slightly more efficient. That's because the method below calls
 ### read_sparse_block() on the SparseArraySeed object returned by
 ### .load_sparse_data(), and this should be faster than calling
-### extract_sparse_array() on the same object (which is what the
-### extract_sparse_array() method for H5SparseMatrixSeed objects would
+### OLD_extract_sparse_array() on the same object (which is what the
+### OLD_extract_sparse_array() method for H5SparseMatrixSeed objects would
 ### be doing when called by the default read_sparse_block() method).
 ### Not sure the difference is actually significant enough for this extra
 ### method to be worth it though, because time is really dominated by I/O
@@ -554,9 +554,9 @@ setMethod("extract_sparse_array", "H5SparseMatrixSeed",
 {
     index <- makeNindexFromArrayViewport(viewport, expand.RangeNSBS=TRUE)
     sas <- .load_sparse_data(x, index)  # I/O
-    ## Unlike the extract_sparse_array() method for H5SparseMatrixSeed
+    ## Unlike the OLD_extract_sparse_array() method for H5SparseMatrixSeed
     ## objects defined above, we use read_sparse_block() here, which should
-    ## be faster than using extract_sparse_array().
+    ## be faster than using OLD_extract_sparse_array().
     read_sparse_block(sas, viewport)  # in-memory
 }
 

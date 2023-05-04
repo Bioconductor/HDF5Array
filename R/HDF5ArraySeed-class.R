@@ -231,7 +231,7 @@ setMethod("dimnames", "HDF5ArraySeed",
 
 ### A thin wrapper around h5mread().
 ### TODO: Maybe we no longer need this. I mean, this is used in the
-### extract_array() and extract_sparse_array() methods for HDF5ArraySeed
+### extract_array() and OLD_extract_sparse_array() methods for HDF5ArraySeed
 ### objects but the 'index' passed to these methods should never contain
 ### RangeNSBS objects. So it's probably ok to get rid of this and to just
 ### use h5mread() instead.
@@ -264,7 +264,7 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### is_sparse() and extract_sparse_array()
+### is_sparse() and OLD_extract_sparse_array()
 ###
 
 ### Prior to HDF5Array 1.17.8 HDF5ArraySeed objects didn't have the
@@ -285,10 +285,10 @@ setReplaceMethod("is_sparse", "HDF5ArraySeed",
     }
 )
 
-.extract_sparse_array_from_HDF5ArraySeed <- function(x, index)
+.OLD_extract_sparse_array_from_HDF5ArraySeed <- function(x, index)
 {
     if (!is_sparse(x))
-        stop(wmsg("calling extract_sparse_array() on an HDF5ArraySeed ",
+        stop(wmsg("calling OLD_extract_sparse_array() on an HDF5ArraySeed ",
                   "object is supported only if the object is sparse"))
     ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
     ## the "type" slot.
@@ -305,8 +305,8 @@ setReplaceMethod("is_sparse", "HDF5ArraySeed",
     ans
 }
 
-setMethod("extract_sparse_array", "HDF5ArraySeed",
-    .extract_sparse_array_from_HDF5ArraySeed
+setMethod("OLD_extract_sparse_array", "HDF5ArraySeed",
+    .OLD_extract_sparse_array_from_HDF5ArraySeed
 )
 
 

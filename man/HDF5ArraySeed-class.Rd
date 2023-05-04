@@ -13,7 +13,7 @@
 \alias{extract_array,HDF5ArraySeed-method}
 \alias{is_sparse,HDF5ArraySeed-method}
 \alias{is_sparse<-,HDF5ArraySeed-method}
-\alias{extract_sparse_array,HDF5ArraySeed-method}
+\alias{OLD_extract_sparse_array,HDF5ArraySeed-method}
 \alias{chunkdim,HDF5ArraySeed-method}
 
 \alias{updateObject,HDF5ArraySeed-method}
@@ -57,7 +57,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 
 \S4method{extract_array}{HDF5ArraySeed}(x, index)
 
-\S4method{extract_sparse_array}{HDF5ArraySeed}(x, index)
+\S4method{OLD_extract_sparse_array}{HDF5ArraySeed}(x, index)
 }
 
 \arguments{
@@ -93,11 +93,11 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
           is located.
     \item \code{dim()}, \code{dimnames()}.
     \item \code{type()}, \code{extract_array()}, \code{is_sparse()},
-          \code{extract_sparse_array()}, \code{chunkdim()}:
+          \code{OLD_extract_sparse_array()}, \code{chunkdim()}:
           These generics are defined and documented in other packages e.g.
           in \pkg{S4Arrays} for \code{\link[S4Arrays]{extract_array}()}
           and \code{\link[S4Arrays]{is_sparse}()}, and in \pkg{DelayedArray}
-          for \code{\link[DelayedArray]{extract_sparse_array}()} and
+          for \code{\link[DelayedArray]{OLD_extract_sparse_array}()} and
           \code{\link[DelayedArray]{chunkdim}()}.
   }
 }
@@ -128,7 +128,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
           and \code{\link[S4Arrays]{is_sparse}}, in the the \pkg{S4Arrays}
           package.
 
-    \item \code{\link[DelayedArray]{extract_sparse_array}} and
+    \item \code{\link[DelayedArray]{OLD_extract_sparse_array}} and
           \code{\link[DelayedArray]{chunkdim}} in the \pkg{DelayedArray}
           package.
 

@@ -29,7 +29,7 @@
 \alias{sparsity}
 \alias{sparsity,H5SparseMatrixSeed-method}
 \alias{is_sparse,H5SparseMatrixSeed-method}
-\alias{extract_sparse_array,H5SparseMatrixSeed-method}
+\alias{OLD_extract_sparse_array,H5SparseMatrixSeed-method}
 \alias{read_sparse_block,H5SparseMatrixSeed-method}
 \alias{extractNonzeroDataByCol}
 \alias{extractNonzeroDataByCol,CSC_H5SparseMatrixSeed-method}
@@ -81,7 +81,7 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
 
 \S4method{extract_array}{H5SparseMatrixSeed}(x, index)
 
-\S4method{extract_sparse_array}{H5SparseMatrixSeed}(x, index)
+\S4method{OLD_extract_sparse_array}{H5SparseMatrixSeed}(x, index)
 
 \S4method{read_sparse_block}{H5SparseMatrixSeed}(x, viewport)
 
@@ -138,7 +138,7 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL)
           matrix is located.
     \item \code{dim()}, \code{dimnames()}.
     \item \code{chunkdim()}, \code{extract_array()},
-          \code{extract_sparse_array()}, \code{read_sparse_block()},
+          \code{OLD_extract_sparse_array()}, \code{read_sparse_block()},
           \code{is_sparse()}: These generics are defined and documented
           in the \pkg{DelayedArray} package.
     \item \code{sparsity()}: Returns the number of zero-valued matrix elements
