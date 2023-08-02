@@ -37,7 +37,9 @@ exportClasses(
     H5ADMatrix,
     TENxMatrixSeed,
     TENxMatrix,
-    TENxRealizationSink
+    TENxRealizationSink,
+    H5SeuratMatrixSeed,
+    H5SeuratMatrix
 )
 
 
@@ -129,7 +131,9 @@ export(
     H5ADMatrix,
     TENxMatrixSeed,
     TENxMatrix,
-    TENxRealizationSink, writeTENxMatrix
+    TENxRealizationSink, writeTENxMatrix,
+    H5SeuratMatrixSeed,
+    H5SeuratMatrix
 )
 
 

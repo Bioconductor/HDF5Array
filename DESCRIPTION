@@ -9,8 +9,9 @@ Description: Implement the HDF5Array, H5SparseMatrix, H5ADMatrix, and
 	All these containers are DelayedArray extensions and thus support all
 	operations (delayed or block-processed) supported by DelayedArray
 	objects.
-biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
-	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
+biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing,
+        RNASeq, Coverage, Annotation, GenomeAnnotation, SingleCell,
+        ImmunoOncology
 URL: https://bioconductor.org/packages/HDF5Array
 BugReports: https://github.com/Bioconductor/HDF5Array/issues
 Version: 1.26.0
@@ -18,37 +19,30 @@ License: Artistic-2.0
 Encoding: UTF-8
 Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
-Depends: R (>= 3.4), methods, DelayedArray (>= 0.15.16), rhdf5 (>= 2.31.6)
-Imports: utils, stats, tools, Matrix,
-	rhdf5filters, BiocGenerics (>= 0.31.5), S4Vectors, IRanges
+Depends: R (>= 3.4), methods, DelayedArray (>= 0.15.16), rhdf5 (>=
+        2.31.6)
+Imports: utils, stats, tools, Matrix, rhdf5filters, BiocGenerics (>=
+        0.31.5), S4Vectors, IRanges
 LinkingTo: S4Vectors (>= 0.27.13), Rhdf5lib
 SystemRequirements: GNU make
-Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
-	h5vcData, ExperimentHub, TENxBrainData, zellkonverter, GenomicFeatures,
-	RUnit, SingleCellExperiment
-Collate: utils.R
-	H5File-class.R
-	h5ls.R
-	H5DSetDescriptor-class.R
-	h5utils.R
-	h5dimscales.R
-	uaselection.R
-	h5mread.R
-	h5mread_from_reshaped.R
-	h5writeDimnames.R
-	h5summarize.R
-	HDF5ArraySeed-class.R
-	HDF5Array-class.R
-	ReshapedHDF5ArraySeed-class.R
-	ReshapedHDF5Array-class.R
-	dump-management.R
-	writeHDF5Array.R
-	saveHDF5SummarizedExperiment.R
-	H5SparseMatrixSeed-class.R
-	H5SparseMatrix-class.R
-	H5ADMatrixSeed-class.R
-	H5ADMatrix-class.R
-	TENxMatrixSeed-class.R
-	TENxMatrix-class.R
-	writeTENxMatrix.R
-	zzz.R
+Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>=
+        1.15.1), h5vcData, ExperimentHub, TENxBrainData, zellkonverter,
+        GenomicFeatures, RUnit, SingleCellExperiment
+Collate: utils.R H5File-class.R h5ls.R H5DSetDescriptor-class.R
+        h5utils.R h5dimscales.R uaselection.R h5mread.R
+        h5mread_from_reshaped.R h5writeDimnames.R h5summarize.R
+        HDF5ArraySeed-class.R HDF5Array-class.R
+        ReshapedHDF5ArraySeed-class.R ReshapedHDF5Array-class.R
+        dump-management.R writeHDF5Array.R
+        saveHDF5SummarizedExperiment.R H5SparseMatrixSeed-class.R
+        H5SparseMatrix-class.R H5ADMatrixSeed-class.R
+        H5ADMatrix-class.R TENxMatrixSeed-class.R TENxMatrix-class.R
+        writeTENxMatrix.R H5SeuratMatrixSeed-class.R H5SeuratMatrix-class.R
+        zzz.R
+git_url: https://git.bioconductor.org/packages/HDF5Array
+git_branch: RELEASE_3_16
+git_last_commit: 38b7bd6
+git_last_commit_date: 2022-11-01
+Date/Publication: 2022-11-01
+NeedsCompilation: yes
+Packaged: 2022-11-01 21:44:25 UTC; biocbuild

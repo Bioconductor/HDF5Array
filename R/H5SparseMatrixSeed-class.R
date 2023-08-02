@@ -136,8 +136,12 @@ read_h5sparse_component <- function(filepath, group, name,
         ## 10x format
         return(read_h5sparse_component(filepath, group, "shape"))
     }
-    ## h5ad format
     h5attrs <- h5readAttributes(filepath, group)
+    ## h5seurat format
+    shape <- h5attrs$dims
+    if(!is.null(shape))
+        return(as.vector(shape))
+    ## h5ad format
     shape <- h5attrs$shape
     if (is.null(shape))
         shape <- h5attrs$h5sparse_shape
@@ -157,8 +161,12 @@ read_h5sparse_component <- function(filepath, group, name,
         ## 10x format
         return("csr")
     }
-    ## h5ad format
     h5attrs <- h5readAttributes(filepath, group)
+    ## h5seurat format
+    shape <- h5attrs$dims
+    if(!is.null(shape))
+        return("csr")
+    ## h5ad format
     h5sparse_format <- h5attrs[["encoding-type"]]
     if (is.null(h5sparse_format))
         h5sparse_format <- h5attrs[["h5sparse_format"]]
