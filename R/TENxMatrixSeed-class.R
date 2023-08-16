@@ -12,12 +12,20 @@ setClass("TENxMatrixSeed", contains="CSC_H5SparseMatrixSeed")
 
 .find_rownames_dataset <- function(filepath, group)
 {
-    name <- "genes"
-    if (h5exists(filepath, paste(group, name, sep="/")))
-        return(name)
-    name <- "features/id"
-    if (h5exists(filepath, paste(group, name, sep="/")))
-        return(name)
+    # features is for h5seurat. 
+    candidate <- c("genes", "features", "features/id")
+    for(i in candidate)
+    {
+        #if (h5exists(filepath, paste(group, i, sep="/")))
+        if (h5exists(filepath, file.path(group, i)))
+            return(i)
+    }
+    NULL
+}
+
+.read_h5seurat_component <- function(filepath, name){
+    if (h5exists(filepath, name))
+        return(as.vector(h5mread(filepath, name)))
     NULL
 }
 
@@ -25,6 +33,11 @@ setClass("TENxMatrixSeed", contains="CSC_H5SparseMatrixSeed")
 .load_tenx_rownames <- function(filepath, group)
 {
     name <- .find_rownames_dataset(filepath, group)
+    # h5seurat data location: /path/to/group/../features
+    # Find dataset in altered group
+    if (is.null(name)){
+        group <- gsub('/[^/]+$','',group)
+        name <- .find_rownames_dataset(filepath, group)}
     if (is.null(name))
         return(NULL)
     read_h5sparse_component(filepath, group, name)
@@ -33,9 +46,12 @@ setClass("TENxMatrixSeed", contains="CSC_H5SparseMatrixSeed")
 ### Return the colnames of the matrix.
 .load_tenx_barcodes <- function(filepath, group)
 {
-    if (!h5exists(filepath, paste0(group, "/barcodes")))
-        return(NULL)
-    read_h5sparse_component(filepath, group, "barcodes")
+    if (h5exists(filepath, paste0(group, "/barcodes")))
+        return(read_h5sparse_component(filepath, group, "barcodes"))
+    # h5seurat
+    if (h5exists(filepath, "cell.names"))
+        return(read_h5sparse_component(filepath, '', "cell.names"))
+    NULL
 }
 
 
