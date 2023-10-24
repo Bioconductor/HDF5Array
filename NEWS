@@ -1,3 +1,15 @@
+CHANGES IN VERSION 1.30.0
+-------------------------
+
+NEW FEATURES
+
+    o Add 'dim' and 'sparse.layout' args to H5SparseMatrixSeed().
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o HDF5Array now imports S4Arrays.
+
+
 CHANGES IN VERSION 1.28.0
 -------------------------
 
