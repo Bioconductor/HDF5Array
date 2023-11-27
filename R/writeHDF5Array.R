@@ -179,7 +179,7 @@ setAs("HDF5RealizationSink", "DelayedArray",
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                               H5type=NULL, chunkdim=NULL, level=NULL,
                               as.sparse=NA,
-                              with.dimnames=FALSE, verbose=NA)
+                              with.dimnames=TRUE, verbose=NA)
 {
     if (!(is.logical(as.sparse) && length(as.sparse) == 1L))
         stop(wmsg("'as.sparse' must be NA, TRUE or FALSE"))
@@ -213,7 +213,7 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
 ###
 
 ### Write to current dump.
-.as_HDF5Array <- function(from) writeHDF5Array(from, with.dimnames=TRUE)
+.as_HDF5Array <- function(from) writeHDF5Array(from)
 
 setAs("ANY", "HDF5Array", .as_HDF5Array)
 

@@ -121,7 +121,7 @@ restore_absolute_assay2h5_links <- function(assays, dir)
 }
 
 write_h5_assays <- function(assays, h5_path, chunkdim, level,
-                                     as.sparse, verbose)
+                                    as.sparse, verbose)
 {
     nassay <- length(assays)
     for (i in seq_len(nassay)) {
@@ -133,6 +133,7 @@ write_h5_assays <- function(assays, h5_path, chunkdim, level,
         a <- writeHDF5Array(a, h5_path, h5_name,
                                chunkdim=chunkdim, level=level,
                                as.sparse=as.sparse,
+                               with.dimnames=FALSE,
                                verbose=verbose)
         if (verbose)
             message("Finished writing assay ", i, "/", nassay, " to ",
@@ -167,7 +168,7 @@ write_h5_assays <- function(assays, h5_path, chunkdim, level,
         stop(wmsg("'verbose' must be TRUE or FALSE"))
 
     x@assays <- write_h5_assays(x@assays, h5_path, chunkdim, level,
-                                           as.sparse, verbose)
+                                          as.sparse, verbose)
     .serialize_HDF5SummarizedExperiment(x, rds_path, verbose)
     invisible(x)
 }
