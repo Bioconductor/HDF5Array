@@ -194,7 +194,7 @@ stopifnot(identical(dimnames(m0), h5readDimnames(h5file, "A2")))
 ## following:
 
 ## 1. Write 'm0' to the HDF5 file and ignore the dimnames (for now):
-writeHDF5Array(m0, h5file, "M2")
+writeHDF5Array(m0, h5file, "M2", with.dimnames=FALSE)
 
 ## 2. Use h5writeDimnames() to write 'dimnames(m0)' to the file and
 ##    associate them with the "M2" dataset:

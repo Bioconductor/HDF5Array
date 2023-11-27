@@ -29,7 +29,7 @@
 \usage{
 writeHDF5Array(x, filepath=NULL, name=NULL,
                   H5type=NULL, chunkdim=NULL, level=NULL, as.sparse=NA,
-                  with.dimnames=FALSE, verbose=NA)
+                  with.dimnames=TRUE, verbose=NA)
 }
 
 \arguments{
@@ -96,14 +96,14 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     the returned \link{HDF5Array} object. See man page of the
     \code{\link{HDF5Array}()} constructor for more information.
     In particular this does NOT affect how the data will be laid out
-    to the HDF5 file in any way (HDF5 doesn't natively support sparse
+    in the HDF5 file in any way (HDF5 doesn't natively support sparse
     storage at the moment). In other words, the data will always be
     stored in a dense format, even when \code{as.sparse} is set to
     \code{TRUE}.
   }
   \item{with.dimnames}{
-    By default the dimnames on \code{x} are not written to the HDF5 file.
-    Set \code{with.dimnames} to \code{TRUE} to also have them written.
+    Whether the dimnames on \code{x} should also be written to the HDF5
+    file or not. \code{TRUE} by default.
 
     Note that \code{\link{h5writeDimnames}} is used internally to write
     the dimnames to disk. Setting \code{with.dimnames} to \code{FALSE}
@@ -183,21 +183,20 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
 ## ---------------------------------------------------------------------
 ## WRITE AN ORDINARY ARRAY TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
-m <- matrix(runif(364, min=-1), nrow=26,
-            dimnames=list(letters, LETTERS[1:14]))
+m0 <- matrix(runif(364, min=-1), nrow=26,
+             dimnames=list(letters, LETTERS[1:14]))
 
 h5file <- tempfile(fileext=".h5")
-M1 <- writeHDF5Array(m, h5file, name="M1", chunkdim=c(5, 5))
+M1 <- writeHDF5Array(m0, h5file, name="M1", chunkdim=c(5, 5))
 M1
 chunkdim(M1)
 
-## By default, writeHDF5Array() does not write the dimnames to the HDF5
-## file so they are lost:
-dimnames(M1)   # no dimnames
+## By default, writeHDF5Array() writes the dimnames to the HDF5 file:
+dimnames(M1)   # same as 'dimnames(m0)'
 
-## Set 'with.dimnames' to TRUE to write them to the file:
-M1b <- writeHDF5Array(m, h5file, name="M1b", with.dimnames=TRUE)
-dimnames(M1b)  # dimnames are back
+## Use 'with.dimnames=FALSE' to not write the dimnames to the file:
+M1b <- writeHDF5Array(m0, h5file, name="M1b", with.dimnames=FALSE)
+dimnames(M1b)  # no dimnames
 
 ## With sparse data:
 sm <- rsparsematrix(20, 8, density=0.1)
@@ -208,7 +207,7 @@ is_sparse(M2)  # TRUE
 ## ---------------------------------------------------------------------
 ## WRITE A DelayedArray OBJECT TO AN HDF5 FILE
 ## ---------------------------------------------------------------------
-M3 <- log(t(DelayedArray(m)) + 1)
+M3 <- log(t(DelayedArray(m0)) + 1)
 M3 <- writeHDF5Array(M3, h5file, name="M3", chunkdim=c(5, 5))
 M3
 chunkdim(M3)
