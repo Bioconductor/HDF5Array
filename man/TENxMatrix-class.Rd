@@ -231,6 +231,20 @@ n_exprs3 <- lengths(nonzeros)
 ## Sanity checks:
 stopifnot(all.equal(lib_sizes, lib_sizes3))
 stopifnot(all.equal(n_exprs, n_exprs3))
+
+## ---------------------------------------------------------------------
+## SOME EXAMPLES OF H5SEURAT FORMAT
+## ---------------------------------------------------------------------
+fpath <- system.file('extdata','toy.h5seurat',package="HDF5Array")
+# Read count data of h5seurat dataset.
+group <- '/assays/RNA/counts'
+df.count <- HDF5Array::TENxMatrix(fpath, group)
+df.count[1:10,2:9]
+
+# Read normalized data of h5seurat dataset.
+group <- '/assays/RNA/data'
+df.data <- HDF5Array::TENxMatrix(fpath, group)
+df.data[1:10,2:9]
 }
 \keyword{classes}
 \keyword{methods}
