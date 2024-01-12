@@ -111,7 +111,7 @@ static const long long int *check_dim(SEXP dim)
 	for (i = 0; i < ndim; i++) {
 		ret = get_untrusted_elt(dim, i, &d, "dim", -1);
 		if (ret < 0)
-			error(_HDF5Array_global_errmsg_buf());
+			error("%s", _HDF5Array_global_errmsg_buf());
 		dim_p[i] = d;
 	}
 	return dim_p;
@@ -348,13 +348,13 @@ SEXP C_check_uaselection(SEXP dim, SEXP starts, SEXP counts)
 	ndim = LENGTH(dim);
 	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
 	uaselection_len = _check_uaselection(ndim, dim_p, starts, counts,
 					     uaselection_dim_buf->elts);
 	if (uaselection_len < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	return new_INTEGER_from_IntAE(uaselection_dim_buf);
 }
 
@@ -528,7 +528,7 @@ SEXP C_check_ordered_uaselection(SEXP dim, SEXP starts, SEXP counts)
 	ndim = LENGTH(dim);
 	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
@@ -540,7 +540,7 @@ SEXP C_check_ordered_uaselection(SEXP dim, SEXP starts, SEXP counts)
 				nstart_buf->elts, nchip_buf->elts,
 				last_chip_start_buf->elts);
 	if (uaselection_len < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	return new_INTEGER_from_IntAE(uaselection_dim_buf);
 }
 
@@ -715,7 +715,7 @@ SEXP C_reduce_uaselection(SEXP dim, SEXP starts, SEXP counts)
 	ndim = LENGTH(dim);
 	ret = _shallow_check_uaselection(ndim, starts, counts);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	uaselection_dim_buf = new_IntAE(ndim, ndim, 0);
 	nstart_buf = new_IntAE(ndim, ndim, 0);
@@ -729,7 +729,7 @@ SEXP C_reduce_uaselection(SEXP dim, SEXP starts, SEXP counts)
 				nstart_buf->elts, nchip_buf->elts,
 				last_chip_start_buf->elts);
 	if (uaselection_len < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	if (!_uaselection_can_be_reduced(ndim,
 				       nstart_buf->elts,
 				       nchip_buf->elts))
@@ -920,7 +920,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 	ndim = LENGTH(dim);
 	ret = _shallow_check_uaselection(ndim, starts, R_NilValue);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	if (!(IS_INTEGER(chunkdim) || IS_NUMERIC(chunkdim)))
 		error("'chunkdim' must be an integer vector");
@@ -930,7 +930,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 	for (i = 0; i < ndim; i++) {
 		ret = get_untrusted_elt(chunkdim, i, &chunkd, "chunkdim", -1);
 		if (ret < 0)
-			error(_HDF5Array_global_errmsg_buf());
+			error("%s", _HDF5Array_global_errmsg_buf());
 		if (chunkd < 0)
 			error("'chunkdim' cannot contain negative values");
 		if (chunkd == 0 && dim_p[i] != 0)
@@ -948,7 +948,7 @@ SEXP C_map_starts_to_chunks(SEXP starts, SEXP dim, SEXP chunkdim)
 			nstart_buf->elts,
 			breakpoint_bufs, tchunkidx_bufs);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	ans = PROTECT(NEW_LIST(2));
 	ans_elt = PROTECT(to_integer_LIST(ndim, breakpoint_bufs, starts));

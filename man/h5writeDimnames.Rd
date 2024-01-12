@@ -207,11 +207,11 @@ HDF5Array(h5file, "M2")
 ## Note that at step 2. you can use the extra arguments of
 ## h5writeDimnames() to take full control of where the dimnames
 ## should be stored in the file:
-writeHDF5Array(m0, h5file, "M3")
+writeHDF5Array(m0, h5file, "M3", with.dimnames=FALSE)
 h5writeDimnames(dimnames(m0), h5file, "M3",
-                 group="a_secret_place", h5dimnames=c("NA", "M3_dim2"))
+                group="a_secret_place", h5dimnames=c("NA", "M3_dim2"))
 h5ls(h5file)
-## h5readDimnames() and HDF5Array() still "finds" the dimnames:
+## h5readDimnames() and HDF5Array() still "find" the dimnames:
 h5readDimnames(h5file, "M3")
 HDF5Array(h5file, "M3")
 
@@ -222,7 +222,7 @@ stopifnot(identical(dimnames(m0), dimnames(HDF5Array(h5file, "M3"))))
 ## ---------------------------------------------------------------------
 ## STORE THE DIMNAMES AS NON-CHARACTER TYPES
 ## ---------------------------------------------------------------------
-writeHDF5Array(m0, h5file, "M4")
+writeHDF5Array(m0, h5file, "M4", with.dimnames=FALSE)
 dimnames <- list(1001:1012, as.raw(11:15))
 h5writeDimnames(dimnames, h5file, "M4")
 h5ls(h5file)

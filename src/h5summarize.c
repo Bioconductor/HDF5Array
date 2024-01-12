@@ -643,7 +643,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		H5Dclose(dset_id);
 		if (!isObject(filepath))
 			H5Fclose(file_id);
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	}
 
 	h5type = h5dset.h5type;
@@ -657,7 +657,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 			"of dataset yet, sorry. You can\n  "
 			"use 'H5DSetDescriptor(filepath, name)' "
 			"to see details about the dataset.");
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	}
 
 	ret = check_Rtype(h5type->Rtype, opcode);
@@ -666,7 +666,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		H5Dclose(dset_id);
 		if (!isObject(filepath))
 			H5Fclose(file_id);
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	}
 
 	ans = PROTECT(h5summarize(&h5dset, index,
@@ -678,7 +678,7 @@ SEXP C_h5summarize(SEXP filepath, SEXP name, SEXP index, SEXP as_integer,
 		H5Fclose(file_id);
 	UNPROTECT(1);
 	if (ans == R_NilValue)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	return ans;
 }
 

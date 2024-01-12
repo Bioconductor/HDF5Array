@@ -1179,7 +1179,7 @@ SEXP C_new_H5DSetDescriptor_xp(SEXP filepath, SEXP name, SEXP as_integer)
 		H5Dclose(dset_id);
 		if (!isObject(filepath))
 			H5Fclose(file_id);
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	}
 	if (!isObject(filepath))
 		H5Fclose(file_id);

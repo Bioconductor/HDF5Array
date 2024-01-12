@@ -44,7 +44,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 	if (!isObject(filepath))
 		H5Fclose(file_id);
 	if (ret < 0)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 
 	h5type = h5dset.h5type;
 	if (!h5type->Rtype_is_set) {
@@ -54,7 +54,7 @@ SEXP C_get_h5mread_returned_type(SEXP filepath, SEXP name, SEXP as_integer)
 			"of dataset yet, sorry. You can\n  "
 			"use 'H5DSetDescriptor(filepath, name)' "
 			"to see details about the dataset.");
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	}
 
 	Rtype = h5type->Rtype;
@@ -332,7 +332,7 @@ SEXP C_h5mread(SEXP filepath, SEXP name,
 		H5Fclose(file_id);
 	UNPROTECT(1);
 	if (ans == R_NilValue)
-		error(_HDF5Array_global_errmsg_buf());
+		error("%s", _HDF5Array_global_errmsg_buf());
 	return ans;
 }
 
