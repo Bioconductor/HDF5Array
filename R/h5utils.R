@@ -253,6 +253,10 @@ h5createDataset2 <- function(filepath, name, dim, maxdim=dim,
                              type="double", H5type=NULL, size=NULL,
                              chunkdim=dim, level=6L)
 {
+    stopifnot(is.numeric(dim),
+              is.numeric(maxdim), length(maxdim) == length(dim),
+              is.numeric(chunkdim), length(chunkdim) == length(dim))
+    chunkdim <- pmin(chunkdim, maxdim)
     ## If h5createDataset() fails, it will leave an HDF5 file handle opened.
     ## Calling H5close() will close all opened HDF5 object handles.
     #on.exit(H5close())
