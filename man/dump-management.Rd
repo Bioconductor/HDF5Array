@@ -41,7 +41,7 @@ setHDF5DumpChunkShape(shape="scale")
 setHDF5DumpCompressionLevel(level=6L)
 
 getHDF5DumpDir()
-getHDF5DumpFile(for.use=FALSE)
+getHDF5DumpFile()
 getHDF5DumpName(for.use=FALSE)
 getHDF5DumpChunkLength()
 getHDF5DumpChunkShape()
@@ -108,7 +108,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     See the Note TO DEVELOPERS below.
   }
   \item{for.use}{
-    Whether the returned file or dataset name is for use by the caller or not.
+    Whether the returned dataset name is for use by the caller or not.
     See below for the details.
   }
   \item{dim}{
@@ -174,9 +174,8 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   If your application needs to write its own dataset to the \emph{HDF5 dump}
   then it should:
   \enumerate{
-    \item Get a file/name combination by calling
-          \code{getHDF5DumpFile(for.use=TRUE)} and
-          \code{getHDF5DumpName(for.use=TRUE)}.
+    \item Get a file/dataset name combination by calling
+          \code{getHDF5DumpFile()} and \code{getHDF5DumpName(for.use=TRUE)}.
 
     \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim)} to get reasonable
           chunk dimensions to use for writing the dataset to disk. Or choose

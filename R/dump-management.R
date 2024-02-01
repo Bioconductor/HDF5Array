@@ -14,11 +14,25 @@
 ###   bplapply(1:5, function(i) .get_dump_files_global_counter(increment=TRUE))
 ###   bplapply(1:5, function(i) .get_dump_names_global_counter(increment=TRUE))
 ###
+### Jan 31, 2024: Hmm... actually they are not. They are when parallelizing
+### via a MulticoreParam, but not via a SnowParam:
+###
+###   register(SnowParam(workers=2))
+###   res <- bplapply(1:5, function(i) .get_dump_files_global_counter(TRUE))
+###   unlist(res)
+###   # [1] 1 2 3 1 2
+###
+### So we need to move away from this broken global counter thing.
+### We actually started to do so in .get_dump_autofile() (see IMPORTANT
+### CHANGE IN HDF5Array 1.31.4 below in this file). With this change,
+### .get_dump_files_global_counter() is no longer used or needed.
+### TODO: What about the .get_dump_names_global_counter_filepath()? Do we
+### still need this or should we move away from this too?
 
-.get_dump_files_global_counter_filepath <- function()
-{
-    file.path(tempdir(), "HDF5Array_dump_files_global_counter")
-}
+#.get_dump_files_global_counter_filepath <- function()
+#{
+#    file.path(tempdir(), "HDF5Array_dump_files_global_counter")
+#}
 
 .get_dump_names_global_counter_filepath <- function()
 {
@@ -26,12 +40,12 @@
 }
 
 ### Called by .onLoad() hook (see zzz.R file).
-init_HDF5_dump_files_global_counter <- function()
-{
-    filepath <- .get_dump_files_global_counter_filepath()
-    init_global_counter(filepath)
-    filepath
-}
+#init_HDF5_dump_files_global_counter <- function()
+#{
+#    filepath <- .get_dump_files_global_counter_filepath()
+#    init_global_counter(filepath)
+#    filepath
+#}
 
 ### Called by .onLoad() hook (see zzz.R file).
 init_HDF5_dump_names_global_counter <- function()
@@ -41,11 +55,11 @@ init_HDF5_dump_names_global_counter <- function()
     filepath
 }
 
-.get_dump_files_global_counter <- function(increment=FALSE)
-{
-    filepath <- .get_dump_files_global_counter_filepath()
-    get_global_counter(filepath, increment=increment)
-}
+#.get_dump_files_global_counter <- function(increment=FALSE)
+#{
+#    filepath <- .get_dump_files_global_counter_filepath()
+#    get_global_counter(filepath, increment=increment)
+#}
 
 .get_dump_names_global_counter <- function(increment=FALSE)
 {
@@ -84,7 +98,26 @@ normalize_dump_name <- function(name)
 ### Very low-level stuff used in this file only
 ###
 
-.dump_settings_envir <- new.env(parent=emptyenv())
+.set_HDF5Array_global_option <- function(name, value)
+{
+    stopifnot(isSingleString(name))
+    HDF5Array_options <- getOption("HDF5Array", default=list())
+    HDF5Array_options[[name]] <- value
+    options(HDF5Array=HDF5Array_options)
+    invisible(value)
+}
+
+.get_HDF5Array_global_option <- function(name)
+{
+    stopifnot(isSingleString(name))
+    getOption("HDF5Array", default=list())[[name]]
+}
+
+HDF5Array_global_option_is_set <- function(name)
+{
+    stopifnot(isSingleString(name))
+    name %in% names(getOption("HDF5Array", default=list()))
+}
 
 ### Create directory 'dir' if it doesn't exist yet.
 .set_dump_dir <- function(dir)
@@ -102,36 +135,36 @@ normalize_dump_name <- function(name)
             stop("cannot create directory \"", dir, "\"")
     }
     dir <- file_path_as_absolute(dir)
-    assign("dir", dir, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.dir", dir)
 }
 
 .set_dump_autofiles_mode <- function()
 {
-    suppressWarnings(rm(list="specfile", envir=.dump_settings_envir))
+    .set_HDF5Array_global_option("dump.specfile", NULL)
 }
 
 ### Create file as an empty HDF5 file if it doesn't exist yet.
 .set_dump_specfile <- function(filepath)
 {
     filepath <- normalize_dump_filepath(filepath)
-    assign("specfile", filepath, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.specfile", filepath)
 }
 
 .set_dump_autonames_mode <- function()
 {
-    suppressWarnings(rm(list="specname", envir=.dump_settings_envir))
+    .set_HDF5Array_global_option("dump.specname", NULL)
 }
 
 .set_dump_specname <- function(name)
 {
-    assign("specname", name, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.specname", name)
 }
 
 ### Return the user-specified file of the dump or an error if the user didn't
 ### specify a file.
 .get_dump_specfile <- function()
 {
-    get("specfile", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.specfile")
 }
 
 .get_dump_autoname <- function(increment=FALSE)
@@ -144,7 +177,7 @@ normalize_dump_name <- function(name)
 ### specify a name.
 .get_dump_specname <- function()
 {
-    get("specname", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.specname")
 }
 
 
@@ -154,14 +187,75 @@ normalize_dump_name <- function(name)
 
 getHDF5DumpDir <- function()
 {
-    get("dir", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.dir")
 }
 
 ### Create auto file as an empty HDF5 file if it doesn't exist yet.
-.get_dump_autofile <- function(increment=FALSE)
+###
+### !!! IMPORTANT CHANGE IN HDF5Array 1.31.4 !!!
+###
+### In HDF5Array 1.31.4 we moved away from the global counter approach used
+### in .get_dump_autofile()!
+### The global counter approach was failing to generate unique "automatique
+### dump files" across workers when using BiocParallel::SnowParam(). For
+### example using this code:
+###
+###   library(BiocParallel)
+###   register(SnowParam(workers=2))
+###   res <- bplapply(1:5, function(i) HDF5Array::getHDF5DumpFile(for.use=TRUE))
+###   unlist(res)
+###
+### was returning the following with HDF5Array < 1.31.4:
+###
+###   [1] "/tmp/RtmpVEnUTi/HDF5Array_dump/auto00001.h5"
+###   [2] "/tmp/RtmpVEnUTi/HDF5Array_dump/auto00002.h5"
+###   [3] "/tmp/RtmpVEnUTi/HDF5Array_dump/auto00003.h5"
+###   [4] "/tmp/RtmpLpy4Ru/HDF5Array_dump/auto00001.h5"
+###   [5] "/tmp/RtmpLpy4Ru/HDF5Array_dump/auto00002.h5"
+###
+### File names were unique within a worker (each worker uses its own "dump dir"
+### obtained with getHDF5DumpDir()). However the dump dirs get destroyed at
+### the end of the bplapply() call thus breaking any HDF5Array object pointing
+### at them.
+### So in HDF5Array 1.31.4 we made a first change to address the above issue
+### by having all workers use the same "dump dir". Note that this introduces
+### a new difficulty which is that workers don't necessarily have access
+### to the file system seen by the main R process (this happens on some
+### clusters), but this is another story.
+### We this first change we were getting:
+###
+###   [1] "/tmp/Rtmp3zyYrg/HDF5Array_dump/auto00001.h5"
+###   [2] "/tmp/Rtmp3zyYrg/HDF5Array_dump/auto00002.h5"
+###   [3] "/tmp/Rtmp3zyYrg/HDF5Array_dump/auto00003.h5"
+###   [4] "/tmp/Rtmp3zyYrg/HDF5Array_dump/auto00001.h5"
+###   [5] "/tmp/Rtmp3zyYrg/HDF5Array_dump/auto00002.h5"
+###
+### But the problem is that now the "automatique dump files" are no longer
+### unique across workers!
+### So we decided to replace the global counter approach with the tempfile()
+### approach. With this second change we get:
+###
+###   [1] "/tmp/RtmpCMkJSO/HDF5Array_dump/auto2d2ed559eb9bf.h5"
+###   [2] "/tmp/RtmpCMkJSO/HDF5Array_dump/auto2d2ed1e06d072.h5"
+###   [3] "/tmp/RtmpCMkJSO/HDF5Array_dump/auto2d2ed2f3c6dfe.h5"
+###   [4] "/tmp/RtmpCMkJSO/HDF5Array_dump/auto2d2e32c00b14f.h5"
+###   [5] "/tmp/RtmpCMkJSO/HDF5Array_dump/auto2d2e356b6f184.h5"
+###
+### Everything looks good. So now sometyhing like:
+###
+###   make_mat <- function(i) matrix(10*i + runif(12), nrow=2)
+###   bplapply(1:5, function(i) HDF5Array::writeHDF5Array(make_mat(i)))
+###
+### is finally working (it has never worked before), which was the ultimate
+### goal all along.
+#.get_dump_autofile <- function(increment=FALSE)
+.get_dump_autofile <- function()
 {
-    counter <- .get_dump_files_global_counter(increment=increment)
-    filepath <- file.path(getHDF5DumpDir(), sprintf("auto%05d.h5", counter))
+    ## Replacing the global counter approach used in HDF5Array < 1.31.4
+    ## with the tempfile() approach.
+    #counter <- .get_dump_files_global_counter(increment=increment)
+    #filepath <- file.path(getHDF5DumpDir(), sprintf("auto%05d.h5", counter))
+    filepath <- tempfile(pattern="auto", tmpdir=getHDF5DumpDir(), fileext=".h5")
     if (!file.exists(filepath))
         h5createFile(filepath)
     filepath
@@ -178,7 +272,7 @@ setHDF5DumpDir <- function(dir)
     }
     dir <- .set_dump_dir(dir)
     .set_dump_autofiles_mode()
-    .get_dump_autofile()
+    #.get_dump_autofile()
     invisible(dir)
 }
 
@@ -211,13 +305,11 @@ setHDF5DumpFile <- function(filepath)
 }
 
 ### Return the *absolute path* to the dump file.
-getHDF5DumpFile <- function(for.use=FALSE)
+getHDF5DumpFile <- function()
 {
-    if (!isTRUEorFALSE(for.use))
-        stop("'for.use' must be TRUE or FALSE")
-    filepath <- try(.get_dump_specfile(), silent=TRUE)
-    if (is(filepath, "try-error"))
-        filepath <- .get_dump_autofile(increment=for.use)
+    filepath <- .get_dump_specfile()
+    if (is.null(filepath))
+        filepath <- .get_dump_autofile()
     filepath
 }
 
@@ -244,14 +336,14 @@ getHDF5DumpName <- function(for.use=FALSE)
 {
     if (!isTRUEorFALSE(for.use))
         stop("'for.use' must be TRUE or FALSE")
-    name <- try(.get_dump_specname(), silent=TRUE)
-    if (is(name, "try-error")) {
+    name <- .get_dump_specname()
+    if (is.null(name)) {
         name <- .get_dump_autoname(increment=for.use)
     } else if (for.use) {
         ## If the dump file is a user-specified file, we switch back to
         ## automatic dump names.
-        filepath <- try(.get_dump_specfile(), silent=TRUE)
-        if (!is(filepath, "try-error"))
+        filepath <- .get_dump_specfile()
+        if (!is.null(filepath))
             .set_dump_autonames_mode()
     }
     name
@@ -265,23 +357,23 @@ getHDF5DumpName <- function(for.use=FALSE)
 ### Called by .onLoad() hook (see zzz.R file).
 setHDF5DumpChunkLength <- function(length=1000000L)
 {
-    assign("chunk_len", length, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.chunk.length", length)
 }
 
 getHDF5DumpChunkLength <- function()
 {
-    get("chunk_len", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.chunk.length")
 }
 
 ### Called by .onLoad() hook (see zzz.R file).
 setHDF5DumpChunkShape <- function(shape="scale")
 {
-    assign("chunk_shape", shape, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.chunk.shape", shape)
 }
 
 getHDF5DumpChunkShape <- function()
 {
-    get("chunk_shape", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.chunk.shape")
 }
 
 ### TODO: Replace 'dim' argument with 'x'. This will allow the default
@@ -315,12 +407,12 @@ normalize_compression_level <- function(level)
 setHDF5DumpCompressionLevel <- function(level=6L)
 {
     level <- normalize_compression_level(level)
-    assign("level", level, envir=.dump_settings_envir)
+    .set_HDF5Array_global_option("dump.compression.level", level)
 }
 
 getHDF5DumpCompressionLevel <- function()
 {
-    get("level", envir=.dump_settings_envir)
+    .get_HDF5Array_global_option("dump.compression.level")
 }
 
 

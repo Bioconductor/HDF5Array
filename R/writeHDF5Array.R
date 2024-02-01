@@ -88,7 +88,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
     if (!isTRUEorFALSE(as.sparse))
         stop(wmsg("'as.sparse' must be TRUE or FALSE"))
     if (is.null(filepath)) {
-        filepath <- getHDF5DumpFile(for.use=TRUE)
+        filepath <- getHDF5DumpFile()
     } else {
         filepath <- normalize_dump_filepath(filepath)
     }

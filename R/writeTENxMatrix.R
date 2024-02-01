@@ -152,7 +152,7 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                       "with 1 list element per dimension"))
     }
     if (is.null(filepath)) {
-        filepath <- getHDF5DumpFile(for.use=TRUE)
+        filepath <- getHDF5DumpFile()
     } else {
         filepath <- normalize_dump_filepath(filepath)
     }

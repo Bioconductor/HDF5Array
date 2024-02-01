@@ -3,8 +3,8 @@
 {
     checkTrue(validObject(A))
     checkTrue(is(A, "HDF5Array"))
-    checkEquals(dim(A), dim(a0))
-    checkEquals(type(A), type(a0))
+    checkIdentical(dim(A), dim(a0))
+    checkIdentical(type(A), type(a0))
     ## dimnames() of a dgCMatrix is list(NULL, NULL) but turning 'a0' into
     ## an ordinary array fixes that so we do it **before** comparing
     ## dimnames(A) with dimnames(a).
@@ -82,5 +82,20 @@ test_writeHDF5Array_4D <- function()
     checkTrue(class(A4) == "HDF5Array")
     checkEquals(chunkdim(A4), dim(a0))
     checkTrue(is_sparse(A4))
+}
+
+test_writeHDF5Array_on_workers <- function()
+{
+    library(BiocParallel)
+    snow2 <- SnowParam(workers=2)
+    make_mat <- function(i) matrix(100*i + 1:12, nrow=2)
+    res <- bplapply(1:5, function(i) HDF5Array::writeHDF5Array(make_mat(i)),
+                    BPPARAM=snow2)
+    for (i in seq_along(res)) {
+        M <- res[[i]]
+        m <- make_mat(i)
+        .basic_checks(M, m)
+        checkTrue(class(M) == "HDF5Matrix")
+    }
 }
 
