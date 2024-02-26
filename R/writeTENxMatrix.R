@@ -188,10 +188,12 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
 }
 
 ### Defining this method will force writeTENxMatrix() (thru
-### BLOCK_write_to_sink() thru blockGrid()) to write blocks that
+### BLOCK_write_to_sink() thru sinkApply()) to write blocks that
 ### span full columns which is a requirement of the write_block()
 ### method for TENxRealizationSink objects. See below.
-setMethod("chunkdim", "TENxRealizationSink", function(x) c(nrow(x), 1L))
+setMethod("chunkdim", "TENxRealizationSink",
+    function(x) c(nrow(x), min(ncol(x), 1L))
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

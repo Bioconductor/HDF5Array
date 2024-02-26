@@ -548,9 +548,13 @@ setMethod("extract_array", "H5SparseMatrixSeed",
 ###
 
 ### Does NOT access the file.
-setMethod("chunkdim", "CSC_H5SparseMatrixSeed", function(x) c(nrow(x), 1L))
+setMethod("chunkdim", "CSC_H5SparseMatrixSeed",
+    function(x) c(nrow(x), min(ncol(x), 1L))
+)
 
-setMethod("chunkdim", "CSR_H5SparseMatrixSeed", function(x) c(1L, ncol(x)))
+setMethod("chunkdim", "CSR_H5SparseMatrixSeed",
+    function(x) c(min(nrow(x), 1L), ncol(x))
+)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
