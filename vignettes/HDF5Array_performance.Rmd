@@ -1,0 +1,396 @@
+---
+title: "_HDF5Array_ performance"
+author:
+- name: Hervé Pagès
+  affiliation: Fred Hutchinson Cancer Research Center, Seattle, WA
+date: "Compiled `r doc_date()`; Modified 13 January 2024"
+package: HDF5Array
+vignette: |
+  %\VignetteIndexEntry{HDF5Array performance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+output:
+  BiocStyle::html_document
+---
+
+
+# Introduction
+
+The aim of this short document is to measure the performance of
+the `r Biocpkg("HDF5Array")` package for normalization and PCA,
+two operations commomly involved in the context of single cell analysis.
+
+The goal is to facilitate comparison with other tools like Seurat
+and Scanpy.
+
+
+# Install and load required packages
+
+Let's install and load `r Biocpkg("HDF5Array")` as well as the other
+packages used in this vignette:
+```{r, eval=FALSE}
+if (!require("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+
+pkgs <- c("HDF5Array", "ExperimentHub", "DelayedMatrixStats", "RSpectra")
+BiocManager::install(pkgs)
+```
+
+Load the package:
+```{r, message=FALSE}
+library(HDF5Array)
+library(ExperimentHub)
+library(DelayedMatrixStats)
+library(RSpectra)
+```
+
+
+# Test datasets
+
+## _Sparse_ vs _dense_ representation
+
+The datasets that we will use in this document are subsets of the
+_1.3 Million Brain Cell Dataset_ from 10x Genomics.
+
+The _1.3 Million Brain Cell Dataset_ is a 27,998 x 1,306,127 matrix
+of counts with one gene per row and one cell per column. It's available
+via the `r Biocpkg("ExperimentHub")` package in two forms, one that uses
+a sparse representation and one that uses a dense representation:
+```{r}
+hub <- ExperimentHub()
+hub["EH1039"]$description  # sparse representation
+hub["EH1040"]$description  # dense representation
+```
+
+The two datasets are big HDF5 files stored on a remote location.
+Let's download them to the local `r Biocpkg("ExperimentHub")` cache
+if they are not there yet:
+```{r, message=FALSE}
+## Note that this will be quick if the HDF5 files are already in the
+## local ExperimentHub cache. Otherwise, it will take a while
+full_sparse_h5 <- hub[["EH1039"]]
+full_dense_h5  <- hub[["EH1040"]]
+```
+
+## TENxMatrix vs HDF5Matrix object
+
+We use the `TENxMatrix()` and `HDF5Array()` constructors to bring the
+sparse and dense datasets in R as DelayedArray derivatives. Note that
+this does _not_ load the matrix data in memory.
+
+Bring the sparse dataset in R:
+```{r}
+## Use 'h5ls(full_sparse_h5)' to find out the group.
+full_sparse <- TENxMatrix(full_sparse_h5, group="mm10")
+class(full_sparse)
+dim(full_sparse)
+```
+
+Bring the dense dataset in R:
+```{r}
+## Use 'h5ls(full_dense_h5)' to find out the name of the dataset.
+full_dense <- HDF5Array(full_dense_h5, name="counts")
+class(full_dense)
+dim(full_dense)
+```
+
+Note that the dense HDF5 file does not contain the dimnames of the
+matrix so we add them:
+```{r}
+dimnames(full_dense) <- dimnames(full_sparse)
+```
+
+## Create the test datasets
+
+For our benchmarks below we'll use subsets of the _1.3 Million Brain
+Cell Dataset_ of increasing sizes: subsets with 10,000 cells, 20,000 cells,
+and 40,000 cells:
+```{r}
+sparse1 <- full_sparse[ , 1:10000]
+sparse2 <- full_sparse[ , 1:20000]
+sparse3 <- full_sparse[ , 1:40000]
+
+dense1 <- full_dense[ , 1:10000]
+dense2 <- full_dense[ , 1:20000]
+dense3 <- full_dense[ , 1:40000]
+```
+
+# Code for normalization and PCA
+
+We'll use the following code for normalization:
+```{r}
+## Keep 1000 most variable genes by default.
+simple_normalize <- function(mat, num_variable_genes=1000)
+{
+    stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
+    mat <- mat[rowSums(mat) > 0, ]
+    mat <- t(t(mat) * 10000 / colSums(mat))
+    row_vars <- rowVars(mat)
+    rv_order <- order(row_vars, decreasing=TRUE)
+    variable_idx <- head(rv_order, n=num_variable_genes)
+    mat <- log1p(mat[variable_idx, ])
+    mat / rowSds(mat)
+}
+```
+
+and the following code for PCA:
+```{r}
+simple_PCA <- function(mat, k=25)
+{
+    stopifnot(length(dim(mat)) == 2)
+    row_means <- rowMeans(mat)
+    Ax <- function(x, args)
+        (as.numeric(mat %*% x) - row_means * sum(x))
+    Atx <- function(x, args)
+        (as.numeric(x %*% mat) - as.vector(row_means %*% x))
+    RSpectra::svds(Ax, Atrans=Atx, k=k, dim=dim(mat))
+}
+```
+
+Note that the implementations of `simple_normalize()` and `simple_PCA()`
+are expected to work on any matrix-like object regardless of its exact
+type/representation e.g. it can be an ordinary matrix, a SparseMatrix
+object from the `r Biocpkg("SparseArray")` package, an dgCMatrix object
+from the `r Biocpkg("Matrix")` package, a DelayedMatrix derivative
+(TENxMatrix, HDF5Matrix, TileDBMatrix), etc...
+
+However, when the input is a DelayedMatrix object or derivative,
+it's important to be aware that:
+
+- Summarization methods like `sum()`, `colSums()`, `rowVars()`, or `rowSds()`,
+  and matrix multiplication (`%*%`), are block-processed operations.
+
+- The block size is 100 Mb by default.
+
+- The block size can be controlled with `DelayedArray::getAutoBlockSize()`
+  and `DelayedArray::setAutoBlockSize()`.
+
+For out benchmarks below, we'll use the following block sizes:
+- normalization of the sparse datasets: 250 Mb
+- normalization of the dense datasets: 100 Mb
+- PCA on the normalized sparse datasets: 100 Mb
+- PCA on the normalized dense datasets: 100 Mb
+
+
+# Normalization benchmarks
+
+We report timings and memory usage.
+
+## Normalizing the sparse datasets
+
+```{r}
+DelayedArray::setAutoBlockSize(2.5e8)  # blocks of 250 Mb
+```
+
+### 27,998 x 10,000 sparse dataset
+
+```{r normalize_sparse1}
+dim(sparse1)
+system.time(sparse1n <- simple_normalize(sparse1))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA later:
+```{r, results="hide"}
+dim(sparse1n)
+sparse1n_path <- tempfile()
+writeTENxMatrix(sparse1n, sparse1n_path, group="matrix", level=0)
+```
+
+### 27,998 x 20,000 sparse dataset
+
+```{r normalize_sparse2}
+dim(sparse2)
+system.time(sparse2n <- simple_normalize(sparse2))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA later:
+```{r, results="hide"}
+dim(sparse2n)
+sparse2n_path <- tempfile()
+writeTENxMatrix(sparse2n, sparse2n_path, group="matrix", level=0)
+```
+
+### 27,998 x 40,000 sparse dataset
+
+```{r normalize_sparse3}
+dim(sparse3)
+system.time(sparse3n <- simple_normalize(sparse3))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA later:
+```{r, results="hide"}
+dim(sparse3n)
+sparse3n_path <- tempfile()
+writeTENxMatrix(sparse3n, sparse3n_path, group="matrix", level=0)
+```
+
+### About memory usage
+
+With this block size (250 Mb), memory usage (as reported by Unix
+command `top`) remained < 3.7 Gb at all time.
+
+## Normalizing the dense datasets
+
+```{r}
+DelayedArray::setAutoBlockSize(1e8)  # blocks of 100 Mb
+```
+
+### 27,998 x 10,000 dense dataset
+
+```{r normalize_dense1}
+dim(dense1)
+system.time(dense1n <- simple_normalize(dense1))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA:
+```{r, results="hide"}
+dim(dense1n)
+dense1n_path <- tempfile()
+writeHDF5Array(dense1n, dense1n_path, name="normalized_counts", level=0)
+```
+
+### 27,998 x 20,000 dense dataset
+
+```{r normalize_dense2}
+dim(dense2)
+system.time(dense2n <- simple_normalize(dense2))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA:
+```{r, results="hide"}
+dim(dense2n)
+dense2n_path <- tempfile()
+writeHDF5Array(dense2n, dense2n_path, name="normalized_counts", level=0)
+```
+
+### 27,998 x 40,000 dense dataset
+
+```{r normalize_dense3}
+dim(dense3)
+system.time(dense3n <- simple_normalize(dense3))
+gc()
+```
+
+Saving the normalized dataset to a temporary file for PCA:
+```{r, results="hide"}
+dim(dense3n)
+dense3n_path <- tempfile()
+writeHDF5Array(dense3n, dense3n_path, name="normalized_counts", level=0)
+```
+
+### About memory usage
+
+With this block size (100 Mb), memory usage (as reported by Unix
+command `top`) remained < 2.8 Gb at all time.
+
+
+# PCA benchmarks
+
+We report timings and memory usage.
+
+## PCA on the normalized sparse datasets
+
+```{r}
+DelayedArray::setAutoBlockSize(1e8)  # blocks of 100 Mb
+```
+
+### 1000 x 10,000 sparse dataset
+
+```{r PCA_sparse1n}
+sparse1n <- TENxMatrix(sparse1n_path)
+dim(sparse1n)
+system.time(pca1s <- simple_PCA(sparse1n))
+gc()
+```
+
+### 1000 x 20,000 sparse dataset
+
+```{r PCA_sparse2n}
+sparse2n <- TENxMatrix(sparse2n_path)
+dim(sparse2n)
+system.time(pca2s <- simple_PCA(sparse2n))
+gc()
+```
+
+### 1000 x 40,000 sparse dataset
+
+```{r PCA_sparse3n}
+sparse3n <- TENxMatrix(sparse3n_path)
+dim(sparse3n)
+system.time(pca3s <- simple_PCA(sparse3n))
+gc()
+```
+
+### About memory usage
+
+With this block size (100 Mb), memory usage (as reported by Unix
+command `top`) remained < 2.4 Gb at all time.
+
+## PCA on the normalized dense datasets
+
+```{r}
+DelayedArray::setAutoBlockSize(1e8)  # blocks of 100 Mb
+```
+
+### 1000 x 10,000 dense dataset
+
+```{r PCA_dense1n}
+dense1n <- HDF5Array(dense1n_path, name="normalized_counts")
+dim(dense1n)
+system.time(pca1d <- simple_PCA(dense1n))
+gc()
+```
+
+### 1000 x 20,000 dense dataset
+
+```{r PCA_dense2n}
+dense2n <- HDF5Array(dense2n_path, name="normalized_counts")
+dim(dense2n)
+system.time(pca2d <- simple_PCA(dense2n))
+gc()
+```
+
+### 1000 x 40,000 dense dataset
+
+```{r PCA_dense3n}
+dense3n <- HDF5Array(dense3n_path, name="normalized_counts")
+dim(dense3n)
+system.time(pca3d <- simple_PCA(dense3n))
+gc()
+```
+
+### About memory usage
+
+With this block size (100 Mb), memory usage (as reported by Unix
+command `top`) remained < 2.7 Gb at all time.
+
+## Sanity checks
+
+```{r sanity_checks}
+stopifnot(all.equal(pca1s, pca1d))
+stopifnot(all.equal(pca2s, pca2d))
+stopifnot(all.equal(pca3s, pca3d))
+```
+
+
+# Conclusions
+
+There's no significant difference in performance between sparse (TENxMatrix)
+and dense (HDF5Matrix) representations when it comes to normalization/PCA.
+
+Normalization and PCA are linear in time, regardless of representation
+(sparse or dense).
+
+Both operations perform at constant memory.
+
+# Session information
+
+```{r}
+sessionInfo()
+```
+
