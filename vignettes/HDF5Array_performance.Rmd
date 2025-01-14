@@ -2,8 +2,8 @@
 title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
-  affiliation: Fred Hutchinson Cancer Research Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 13 January 2024"
+  affiliation: Fred Hutch Cancer Center, Seattle, WA
+date: "Compiled `r doc_date()`; Modified 14 January 2024"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -115,7 +115,9 @@ dense2 <- full_dense[ , 1:20000]
 dense3 <- full_dense[ , 1:40000]
 ```
 
-# Code for normalization and PCA
+# Block-processed normalization and PCA
+
+## Code used for normalization and PCA
 
 We'll use the following code for normalization:
 ```{r}
@@ -147,6 +149,8 @@ simple_PCA <- function(mat, k=25)
 }
 ```
 
+## Block processing and block size
+
 Note that the implementations of `simple_normalize()` and `simple_PCA()`
 are expected to work on any matrix-like object regardless of its exact
 type/representation e.g. it can be an ordinary matrix, a SparseMatrix
@@ -158,9 +162,11 @@ However, when the input is a DelayedMatrix object or derivative,
 it's important to be aware that:
 
 - Summarization methods like `sum()`, `colSums()`, `rowVars()`, or `rowSds()`,
-  and matrix multiplication (`%*%`), are block-processed operations.
+  and matrix multiplication (`%*%`), are _block-processed_ operations.
 
-- The block size is 100 Mb by default.
+- The block size is 100 Mb by default. Increasing or decreasing the block
+  size will increase or decrease the memory usage of _block-processed_
+  operations.
 
 - The block size can be controlled with `DelayedArray::getAutoBlockSize()`
   and `DelayedArray::setAutoBlockSize()`.
@@ -170,6 +176,17 @@ For out benchmarks below, we'll use the following block sizes:
 - normalization of the dense datasets: 100 Mb
 - PCA on the normalized sparse datasets: 100 Mb
 - PCA on the normalized dense datasets: 100 Mb
+
+## Monitoring memory usage
+
+While manually running our benchmarks below on a Linux system, we monitored
+memory usage at the command line in a terminal with:
+
+    (while true; do ps u -q <PID>; sleep 1; done) >ps.log 2>&1 &
+
+where `<PID>` was the process id of our R session. This allowed us to measure
+the maximum amount of memory used by the calls to `simple_normalize()`
+or `simple_PCA()`.
 
 
 # Normalization benchmarks
@@ -230,7 +247,8 @@ writeTENxMatrix(sparse3n, sparse3n_path, group="matrix", level=0)
 ### About memory usage
 
 With this block size (250 Mb), memory usage (as reported by Unix
-command `top`) remained < 3.7 Gb at all time.
+command `ps u -q <PID>`, see **Monitoring memory usage** above in
+this document) remained < 3.7 Gb at all time.
 
 ## Normalizing the dense datasets
 
@@ -286,7 +304,8 @@ writeHDF5Array(dense3n, dense3n_path, name="normalized_counts", level=0)
 ### About memory usage
 
 With this block size (100 Mb), memory usage (as reported by Unix
-command `top`) remained < 2.8 Gb at all time.
+command `ps u -q <PID>`, see **Monitoring memory usage** above in
+this document) remained < 2.8 Gb at all time.
 
 
 # PCA benchmarks
@@ -329,7 +348,8 @@ gc()
 ### About memory usage
 
 With this block size (100 Mb), memory usage (as reported by Unix
-command `top`) remained < 2.4 Gb at all time.
+command `ps u -q <PID>`, see **Monitoring memory usage** above in
+this document) remained < 2.4 Gb at all time.
 
 ## PCA on the normalized dense datasets
 
@@ -367,7 +387,8 @@ gc()
 ### About memory usage
 
 With this block size (100 Mb), memory usage (as reported by Unix
-command `top`) remained < 2.7 Gb at all time.
+command `ps u -q <PID>`, see **Monitoring memory usage** above in
+this document) remained < 2.7 Gb at all time.
 
 ## Sanity checks
 
