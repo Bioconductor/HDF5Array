@@ -376,10 +376,10 @@ on all our test datasets on various systems.
 
 ## DELL XPS 15 laptop (model 9520)
 
-RAM: 32GB
-Disk: 1TB SSD
-OS: Linux Ubuntu 24.04
-Bioconductor/R versions: 3.21/4.5
+- **RAM:** 32GB
+- **Disk:** 1TB SSD
+- **OS:** Linux Ubuntu 24.04
+- **Bioconductor/R versions:** 3.21/4.5
 
 ### Normalization
 
@@ -519,10 +519,10 @@ Bioconductor/R versions: 3.21/4.5
 
 ## DELL PowerEdge R440 Server
 
-RAM: 128GB
-Disk: 1.92TB SSD SATA Mix Use
-OS: Linux Ubuntu 24.04
-Bioconductor/R versions: 3.21/4.5
+- **RAM:** 128GB
+- **Disk:** 1.92TB SSD SATA Mix Use
+- **OS:** Linux Ubuntu 24.04
+- **Bioconductor/R versions:** 3.21/4.5
 
 ### Normalization
 
@@ -534,10 +534,10 @@ Timings coming soon...
 
 ## Mac Pro (Apple M2 Ultra)
 
-RAM: 192GB
-Disk: 2TB SSD
-OS: Linux Ubuntu 24.04
-Bioconductor/R versions: 3.21/4.5
+- **RAM:** 192GB
+- **Disk:** 2TB SSD
+- **OS:** macOS 13.7.1
+- **Bioconductor/R versions:** 3.21/4.5
 
 ### Normalization
 
