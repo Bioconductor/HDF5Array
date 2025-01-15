@@ -383,18 +383,18 @@ Bioconductor/R versions: 3.21/4.5
 
 ### Normalization
 
-<table>
+<table style="text-align: center;">
   <tr>
     <th></th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="3">
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
       sparse<br/>(TENxMatrix)<br/>block size = 250 Mb
     </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="3">
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
       dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
     </th>
   </tr>
-  <tr>
-    <th style="border: 1pt solid #888; padding: 4pt;">object dimensions</th>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
     <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
     <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
     <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
@@ -451,18 +451,18 @@ Bioconductor/R versions: 3.21/4.5
 
 ### PCA
 
-<table>
+<table style="text-align: center;">
   <tr>
     <th></th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="3">
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
       sparse<br/>(TENxMatrix)<br/>block size = 100 Mb
     </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="3">
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
       dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
     </th>
   </tr>
-  <tr>
-    <th style="border: 1pt solid #888; padding: 4pt;">object dimensions</th>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
     <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
     <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
     <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
@@ -532,18 +532,161 @@ Timings coming soon...
 
 Timings coming soon...
 
+## Mac Pro (Apple M2 Ultra)
+
+RAM: 192GB
+Disk: 2TB SSD
+OS: Linux Ubuntu 24.04
+Bioconductor/R versions: 3.21/4.5
+
+### Normalization
+
+<table style="text-align: center;">
+  <tr>
+    <th></th>
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
+      sparse<br/>(TENxMatrix)<br/>block size = 250 Mb
+    </th>
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
+      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 12,500</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse1</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">33.6</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense1</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">35.3</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 25,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse2</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">67.4</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense2</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">74.2</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 50,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse3</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">140.3</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense3</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">148.1</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 100,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse4</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">279.9</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense4</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">305.4</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 200,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse5</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">608.1</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense5</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">617.8</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+</table>
+
+### PCA
+
+<table style="text-align: center;">
+  <tr>
+    <th></th>
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
+      sparse<br/>(TENxMatrix)<br/>block size = 100 Mb
+    </th>
+    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
+      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
+    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 12,500</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse1n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">33.7</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense1n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">30.0</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 25,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse2n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">58.0</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense2n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">56.1</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 50,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse3n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">117.5</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense3n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">127.9</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 100,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse4n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">255.1</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense4n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">372.6</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+  <tr>
+    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 200,000</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse5n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">570.8</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense5n</code></td>
+    <td style="border: 1pt solid #888; padding: 4pt;">677.1</td>
+    <td style="border: 1pt solid #888; padding: 4pt;"></td>
+  </tr>
+</table>
+
 
 # Conclusions
 
-The sparse representation (TENxMatrix) performs slightly better than
-the dense representation (HDF5Matrix) when it comes to normalization/PCA
-of single cell data. Also the gap in performance tend to slightly increase
-with the size of the dataset.
+The sparse representation (TENxMatrix) seems to perform slightly better
+than the dense representation (HDF5Matrix) when it comes to normalization/PCA
+of single cell data. Also the gap in performance between sparse and dense
+tends to slightly increase with the size of the dataset.
 
-Normalization and PCA are roughly linear in time, regardless of
+Normalization and PCA are very roughly linear in time, regardless of
 representation (sparse or dense).
 
-Normalization and PCA both perform at constant memory, regardless
+Normalization and PCA both perform at almost constant memory, regardless
 of representation (sparse or dense).
 
 

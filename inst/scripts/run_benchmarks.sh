@@ -1,5 +1,5 @@
 #!/bin/bash
-# 
+#
 # To run this script in "batch mode":
 #
 #   ./run_benchmarks.sh >run_benchmarks.log 2>&1 &
