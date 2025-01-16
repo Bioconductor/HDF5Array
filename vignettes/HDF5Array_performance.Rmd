@@ -36,12 +36,19 @@ pkgs <- c("HDF5Array", "ExperimentHub", "DelayedMatrixStats", "RSpectra")
 BiocManager::install(pkgs)
 ```
 
-Load the package:
+Load the packages:
 ```{r, message=FALSE}
 library(HDF5Array)
 library(ExperimentHub)
 library(DelayedMatrixStats)
 library(RSpectra)
+```
+
+```{r source_make_timings_table_R, echo=FALSE, results='hide'}
+## Needed for the make_timings_table() function.
+path <- system.file(package="HDF5Array",
+                    "scripts", "make_timings_table.R", mustWork=TRUE)
+source(path, verbose=FALSE)
 ```
 
 
@@ -179,6 +186,7 @@ it's important to be aware that:
   and `DelayedArray::setAutoBlockSize()`.
 
 For out benchmarks below, we'll use the following block sizes:
+
 - normalization of the sparse datasets: 250 Mb
 - normalization of the dense datasets: 100 Mb
 - PCA on the normalized sparse datasets: 100 Mb
@@ -383,183 +391,15 @@ on all our test datasets on various systems.
 
 ### Normalization
 
-<table style="text-align: center;">
-  <tr>
-    <th></th>
-    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)
-    </th>
-    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)
-    </th>
-  </tr>
-  <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object name
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
-      block&nbsp;size&nbsp;=&nbsp;250&nbsp;Mb
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object name
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
-      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
-    </th>
-  </tr>
-  <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      time (seconds)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      max. memory<br />used
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      time (seconds)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      max. memory<br />used
-    </th>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 12,500</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse1</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">40.7</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense1</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">52.8</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 25,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse2</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">85.2</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense2</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">111.4</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 50,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse3</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">172.7</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense3</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">223.3</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 100,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse4</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">346.6</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense4</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">456.4</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 200,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse5</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">742.0</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense5</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">942.5</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-</table>
+```{r xps15_norm_timings, echo=FALSE, results='asis'}
+make_timings_table("xps15", "norm")
+```
 
 ### PCA
 
-<table style="text-align: center;">
-  <tr>
-    <th></th>
-    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)
-    </th>
-    <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)
-    </th>
-  </tr>
-  <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object name
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
-      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
-      object name
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
-      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
-    </th>
-  </tr>
-  <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      time (seconds)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      max. memory<br />used
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      time (seconds)
-    </th>
-    <th style="border: 1pt solid #888; padding: 4pt;">
-      max. memory<br />used
-    </th>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 12,500</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse1n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">47.9</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense1n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">42.2</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 25,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse2n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">70.0</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense2n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">78.9</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 50,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse3n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">152.3</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense3n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">176.4</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 100,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse4n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">289.8</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense4n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">458.7</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-  <tr>
-    <td style="border: 1pt solid #888; padding: 4pt;">1000 x 200,000</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>sparse5n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">637.4</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-    <td style="border: 1pt solid #888; padding: 4pt;"><code>dense5n</code></td>
-    <td style="border: 1pt solid #888; padding: 4pt;">867.4</td>
-    <td style="border: 1pt solid #888; padding: 4pt;"></td>
-  </tr>
-</table>
+```{r xps15_pca_timings, echo=FALSE, results='asis'}
+make_timings_table("xps15", "pca")
+```
 
 ## DELL PowerEdge R440 Server
 

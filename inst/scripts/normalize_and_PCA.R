@@ -1,11 +1,11 @@
 # To run this R script:
 #
-#   Rscript normalize_and_PCA.R <sparse_or_dense> <ncells> \
+#   Rscript normalize_and_PCA.R <ncells> <format> \
 #                               <norm_block_size> <pca_block_size>
 #
 # To run it in "batch mode":
 #
-#   Rscript normalize_and_PCA.R sparse 12500 \
+#   Rscript normalize_and_PCA.R 12500 sparse \
 #                               250 100 >normalize_and_PCA.log 2>&1 &
 #
 
@@ -19,18 +19,18 @@ suppressPackageStartupMessages(library(RSpectra))
 
 args <- commandArgs(trailingOnly=TRUE)
 stopifnot(length(args) == 4L)
-sparse_or_dense <- args[[1L]]
-ncells <- as.integer(args[[2L]])
+ncells <- as.integer(args[[1L]])
+format <- args[[2L]]
 norm_block_size <- as.integer(args[[3L]])  # block size in Mb (normalization)
 pca_block_size <- as.integer(args[[4L]])   # block size in Mb (PCA)
 
-stopifnot(sparse_or_dense %in% c("sparse", "dense"),
-          isSingleInteger(ncells), ncells > 0L,
+stopifnot(isSingleInteger(ncells), ncells > 0L,
+          format %in% c("sparse", "dense"),
           isSingleInteger(norm_block_size), norm_block_size > 0L,
           isSingleInteger(pca_block_size), pca_block_size > 0L)
 
-cat("sparse_or_dense = ", sparse_or_dense, "\n", sep="")
 cat("ncells = ", ncells, "\n", sep="")
+cat("format = ", format, "\n", sep="")
 cat("norm_block_size = ", norm_block_size, "\n", sep="")
 cat("pca_block_size = ", pca_block_size, "\n", sep="")
 cat("\n")
@@ -43,7 +43,7 @@ full_dataset <- TENxMatrix(h5_path, group="mm10")
 stopifnot(is_sparse(full_dataset),
           identical(chunkdim(full_dataset), c(27998L, 1L)))
 
-if (sparse_or_dense == "dense") {
+if (format == "dense") {
     full_sparse_dataset <- full_dataset
     h5_path <- suppressMessages(hub[["EH1040"]])
     full_dataset <- HDF5Array(h5_path, name="counts")
@@ -90,7 +90,7 @@ gc()
 norm_time <- timing[["elapsed"]]
 cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
 normalized_path <- tempfile()
-if (sparse_or_dense == "sparse") {
+if (format == "sparse") {
     normalized <- writeTENxMatrix(normalized, normalized_path,
                                   group="matrix", level=0)
 } else {
@@ -103,7 +103,7 @@ gcm <- gc()
 
 cat("Running PCA ...\n")
 DelayedArray::setAutoBlockSize(pca_block_size * 1e6)
-if (sparse_or_dense == "sparse") {
+if (format == "sparse") {
     normalized <- TENxMatrix(normalized_path)
 } else {
     normalized <- HDF5Array(normalized_path, name="normalized_counts")
@@ -113,8 +113,11 @@ gc()
 pca_time <- timing[["elapsed"]]
 cat("---> PCA completed in ", pca_time, " s.\n\n", sep="")
 
-cat("sparse_or_dense = ", sparse_or_dense, "; ncells = ", ncells,
-    "; norm_block_size = ", norm_block_size, "; norm_time = ", norm_time,
-    "; pca_block_size = ", pca_block_size, "; pca_time = ", pca_time, "\n",
-    sep="", file="normalize_and_PCA_timings.txt", append=TRUE)
+cat("ncells: ", ncells, "\n",
+    "format: ", format, "\n",
+    "norm_block_size: ", norm_block_size, "\n",
+    "norm_time: ", norm_time, "\n",
+    "pca_block_size: ", pca_block_size, "\n",
+    "pca_time: ", pca_time, "\n",
+    "\n", sep="", file="timings.dcf", append=TRUE)
 
