@@ -1,0 +1,12 @@
+Wed Jan 15 06:19:04 PM EST 2025
+sparse_or_dense = sparse; ncells = 12500; norm_block_size = 250; norm_time = 74.147; pca_block_size = 100; pca_time = 82.344
+sparse_or_dense = dense; ncells = 12500; norm_block_size = 100; norm_time = 87.317; pca_block_size = 100; pca_time = 69.369
+sparse_or_dense = sparse; ncells = 25000; norm_block_size = 250; norm_time = 143.316; pca_block_size = 100; pca_time = 120.741
+sparse_or_dense = dense; ncells = 25000; norm_block_size = 100; norm_time = 187.373; pca_block_size = 100; pca_time = 148.444
+sparse_or_dense = sparse; ncells = 50000; norm_block_size = 250; norm_time = 296.055; pca_block_size = 100; pca_time = 257.185
+sparse_or_dense = dense; ncells = 50000; norm_block_size = 100; norm_time = 377.279; pca_block_size = 100; pca_time = 289.793
+sparse_or_dense = sparse; ncells = 100000; norm_block_size = 250; norm_time = 606.821; pca_block_size = 100; pca_time = 545.423
+sparse_or_dense = dense; ncells = 100000; norm_block_size = 100; norm_time = 736.033; pca_block_size = 100; pca_time = 544.13
+sparse_or_dense = sparse; ncells = 200000; norm_block_size = 250; norm_time = 1268.915; pca_block_size = 100; pca_time = 1384.562
+sparse_or_dense = dense; ncells = 200000; norm_block_size = 100; norm_time = 1562.784; pca_block_size = 100; pca_time = 1509.398
+Wed Jan 15 09:20:53 PM EST 2025
