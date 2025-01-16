@@ -37,27 +37,8 @@
     round(as.numeric(t))  # rounding to the second (closest)
 }
 
-.NGENES_BEFORE_NORM <- 27998
-.NGENES_AFTER_NORM <- 1000
-
-make_timings_table <- function(machine_name,
-                               step=c("norm", "pca"),
-                               block_sizes=c(40, 100, 250))
+.make_header_lines <- function(timings, block_sizes=c(40, 100, 250))
 {
-    file_path <- .find_timings_file(machine_name)
-    step <- match.arg(step)
-    stopifnot(is.numeric(block_sizes))
-
-    timings <- read.dcf(file_path)  # character matrix
-    EXPECTED_COLS <- c("ncells", "format",
-                       "norm_block_size", "norm_time",
-                       "pca_block_size", "pca_time")
-    stopifnot(setequal(colnames(timings), EXPECTED_COLS))
-
-    cat('<table style="margin-left: 0pt; text-align: center; font-size: smaller;">\n')
-
-    ## Header lines
-
     TH_STYLE <- c("background: #CCC", "border: 1pt solid #888", "padding: 3pt")
     TH_STYLE <- paste0("style='", paste(TH_STYLE, collapse="; "), "'")
 
@@ -102,8 +83,15 @@ make_timings_table <- function(machine_name,
         cat(sprintf('    <th %s>max.<br />mem.<br />used</th>\n', TH_STYLE))
     }
     cat('  </tr>\n')
+}
 
-    ## Data lines
+.NGENES_BEFORE_NORM <- 27998
+.NGENES_AFTER_NORM <- 1000
+
+.make_data_lines <- function(timings, step=c("norm", "pca"),
+                             block_sizes=c(40, 100, 250))
+{
+    step <- match.arg(step)
 
     TD_STYLE <- c("border: 1pt solid #888", "padding: 3pt")
     TD_STYLE <- paste0("style='", paste(TD_STYLE, collapse="; "), "'")
@@ -113,7 +101,8 @@ make_timings_table <- function(machine_name,
     for (i in seq_along(unique_ncells)) {
         cat('  <tr>\n')
         ncells <- unique_ncells[[i]]
-        cat(sprintf('    <td %s>%d x %d</td>\n', TD_STYLE, ngenes, ncells))
+        cat(sprintf('    <td %s>%d&nbsp;x&nbsp;%d</td>\n',
+                    TD_STYLE, ngenes, ncells))
         object_name <- sprintf("sparse%d", i)
         if (step == "pca")
             object_name <- paste0(object_name, "n")
@@ -136,6 +125,46 @@ make_timings_table <- function(machine_name,
         }
         cat('  </tr>\n')
     }
+}
+
+### Generates an HTML table with 3 + 4 * length(block_sizes) columns.
+.make_table <- function(timings, block_sizes=c(40, 100, 250))
+{
+    table_ncols <- 3L + 4L * length(block_sizes)
+
+    TABLE_STYLE <- c("margin-left: 0pt",
+                     "text-align: center",
+                     "font-size: smaller")
+    TABLE_STYLE <- paste0("style='", paste(TABLE_STYLE, collapse="; "), "'")
+    cat(sprintf('<table %s>\n', TABLE_STYLE))
+
+    .make_header_lines(timings, block_sizes=block_sizes)
+
+    TH_STYLE <- c("background: #EEE", "border: 1pt solid #888", "padding: 3pt")
+    TH_STYLE <- paste0("style='", paste(TH_STYLE, collapse="; "), "'")
+
+    cat(sprintf('<tr><th %s colspan="%d">Normalization</th></tr>\n',
+                TH_STYLE, table_ncols))
+    .make_data_lines(timings, "norm", block_sizes=block_sizes)
+
+    cat(sprintf('<tr><th %s colspan="%d">PCA</th></tr>\n',
+                TH_STYLE, table_ncols))
+    .make_data_lines(timings, "pca", block_sizes=block_sizes)
+
     cat('</table>\n')
+}
+
+make_timings_table <- function(machine_name,
+                               block_sizes=c(40, 100, 250))
+{
+    file_path <- .find_timings_file(machine_name)
+    stopifnot(is.numeric(block_sizes))
+
+    timings <- read.dcf(file_path)  # character matrix
+    EXPECTED_COLS <- c("ncells", "format",
+                       "norm_block_size", "norm_time",
+                       "pca_block_size", "pca_time")
+    stopifnot(setequal(colnames(timings), EXPECTED_COLS))
+    .make_table(timings, block_sizes=block_sizes)
 }
 
