@@ -1,0 +1,210 @@
+ncells: 12500
+format: sparse
+norm_block_size: 40
+norm_time: 56.545
+pca_block_size: 40
+pca_time: 26.92
+
+ncells: 12500
+format: sparse
+norm_block_size: 100
+norm_time: 41.531
+pca_block_size: 100
+pca_time: 33.482
+
+ncells: 12500
+format: sparse
+norm_block_size: 250
+norm_time: 33.556
+pca_block_size: 250
+pca_time: 33.784
+
+ncells: 12500
+format: dense
+norm_block_size: 40
+norm_time: 36.539
+pca_block_size: 40
+pca_time: 31.56
+
+ncells: 12500
+format: dense
+norm_block_size: 100
+norm_time: 35.339
+pca_block_size: 100
+pca_time: 29.859
+
+ncells: 12500
+format: dense
+norm_block_size: 250
+norm_time: 31.574
+pca_block_size: 250
+pca_time: 24.851
+
+ncells: 25000
+format: sparse
+norm_block_size: 40
+norm_time: 118.941
+pca_block_size: 40
+pca_time: 64.177
+
+ncells: 25000
+format: sparse
+norm_block_size: 100
+norm_time: 92.7
+pca_block_size: 100
+pca_time: 64.947
+
+ncells: 25000
+format: sparse
+norm_block_size: 250
+norm_time: 67.456
+pca_block_size: 250
+pca_time: 59.677
+
+ncells: 25000
+format: dense
+norm_block_size: 40
+norm_time: 70.645
+pca_block_size: 40
+pca_time: 63.34
+
+ncells: 25000
+format: dense
+norm_block_size: 100
+norm_time: 74.69
+pca_block_size: 100
+pca_time: 56.157
+
+ncells: 25000
+format: dense
+norm_block_size: 250
+norm_time: 67.655
+pca_block_size: 250
+pca_time: 94.648
+
+ncells: 50000
+format: sparse
+norm_block_size: 40
+norm_time: 235.78
+pca_block_size: 40
+pca_time: 119.159
+
+ncells: 50000
+format: sparse
+norm_block_size: 100
+norm_time: 182.131
+pca_block_size: 100
+pca_time: 149.801
+
+ncells: 50000
+format: sparse
+norm_block_size: 250
+norm_time: 141.299
+pca_block_size: 250
+pca_time: 132.595
+
+ncells: 50000
+format: dense
+norm_block_size: 40
+norm_time: 141.395
+pca_block_size: 40
+pca_time: 152.24
+
+ncells: 50000
+format: dense
+norm_block_size: 100
+norm_time: 147.987
+pca_block_size: 100
+pca_time: 132.604
+
+ncells: 50000
+format: dense
+norm_block_size: 250
+norm_time: 149.166
+pca_block_size: 250
+pca_time: 111.155
+
+ncells: 100000
+format: sparse
+norm_block_size: 40
+norm_time: 462.979
+pca_block_size: 40
+pca_time: 230.181
+
+ncells: 100000
+format: sparse
+norm_block_size: 100
+norm_time: 360.716
+pca_block_size: 100
+pca_time: 254.362
+
+ncells: 100000
+format: sparse
+norm_block_size: 250
+norm_time: 281.426
+pca_block_size: 250
+pca_time: 269.168
+
+ncells: 100000
+format: dense
+norm_block_size: 40
+norm_time: 282.902
+pca_block_size: 40
+pca_time: 300.576
+
+ncells: 100000
+format: dense
+norm_block_size: 100
+norm_time: 305.434
+pca_block_size: 100
+pca_time: 376.195
+
+ncells: 100000
+format: dense
+norm_block_size: 250
+norm_time: 304.513
+pca_block_size: 250
+pca_time: 321.226
+
+ncells: 200000
+format: sparse
+norm_block_size: 40
+norm_time: 949.36
+pca_block_size: 40
+pca_time: 435.764
+
+ncells: 200000
+format: sparse
+norm_block_size: 100
+norm_time: 735.561
+pca_block_size: 100
+pca_time: 665.31
+
+ncells: 200000
+format: sparse
+norm_block_size: 250
+norm_time: 604.08
+pca_block_size: 250
+pca_time: 528.101
+
+ncells: 200000
+format: dense
+norm_block_size: 40
+norm_time: 578.256
+pca_block_size: 40
+pca_time: 824.808
+
+ncells: 200000
+format: dense
+norm_block_size: 100
+norm_time: 617.933
+pca_block_size: 100
+pca_time: 713.911
+
+ncells: 200000
+format: dense
+norm_block_size: 250
+norm_time: 624.279
+pca_block_size: 250
+pca_time: 781.89
+
