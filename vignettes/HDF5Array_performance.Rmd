@@ -387,20 +387,42 @@ on all our test datasets on various systems.
   <tr>
     <th></th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)<br/>block size = 250 Mb
+      sparse<br/>(TENxMatrix)
     </th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+      dense<br/>(HDF5Matrix)
     </th>
   </tr>
   <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;250&nbsp;Mb
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
   </tr>
   <tr>
     <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 12,500</td>
@@ -455,20 +477,42 @@ on all our test datasets on various systems.
   <tr>
     <th></th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)<br/>block size = 100 Mb
+      sparse<br/>(TENxMatrix)
     </th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+      dense<br/>(HDF5Matrix)
     </th>
   </tr>
   <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
   </tr>
   <tr>
     <td style="border: 1pt solid #888; padding: 4pt;">1000 x 12,500</td>
@@ -545,20 +589,42 @@ Timings coming soon...
   <tr>
     <th></th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)<br/>block size = 250 Mb
+      sparse<br/>(TENxMatrix)
     </th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+      dense<br/>(HDF5Matrix)
     </th>
   </tr>
   <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;250&nbsp;Mb
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
   </tr>
   <tr>
     <td style="border: 1pt solid #888; padding: 4pt;">27,998 x 12,500</td>
@@ -613,20 +679,42 @@ Timings coming soon...
   <tr>
     <th></th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      sparse<br/>(TENxMatrix)<br/>block size = 100 Mb
+      sparse<br/>(TENxMatrix)
     </th>
     <th style="background: #CCC; border: 1pt solid #888; padding: 4pt;" colspan="3">
-      dense<br/>(HDF5Matrix)<br/>block size = 100 Mb
+      dense<br/>(HDF5Matrix)
     </th>
   </tr>
   <tr style="background: #CCC;">
-    <th style="border: 1pt solid #888; padding: 4pt;">object&nbsp;dimensions</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">object name</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">time (seconds)</th>
-    <th style="border: 1pt solid #888; padding: 4pt;">max. memory<br/>used</th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object&nbsp;dimensions<br />(genes&nbsp;x&nbsp;cells)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" rowspan="2">
+      object name
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;" colspan="2">
+      block&nbsp;size&nbsp;=&nbsp;100&nbsp;Mb
+    </th>
+  </tr>
+  <tr style="background: #CCC;">
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      time (seconds)
+    </th>
+    <th style="border: 1pt solid #888; padding: 4pt;">
+      max. memory<br />used
+    </th>
   </tr>
   <tr>
     <td style="border: 1pt solid #888; padding: 4pt;">1000 x 12,500</td>
