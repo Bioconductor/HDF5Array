@@ -159,7 +159,8 @@ dense5  <- full_dense[ , 1:200000]
 
 We'll use the following code for normalization:
 ```{r}
-## Keep 1000 most variable genes by default.
+## Also does variable gene selection by keeping the 1000 most variable
+## genes by default.
 simple_normalize <- function(mat, num_variable_genes=1000)
 {
     stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
