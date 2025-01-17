@@ -30,7 +30,7 @@ SystemRequirements: GNU make
 Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 	h5vcData, ExperimentHub, TENxBrainData, zellkonverter,
 	GenomicFeatures, SingleCellExperiment, DelayedMatrixStats, genefilter,
-	RUnit, knitr, rmarkdown, BiocStyle
+	RSpectra, RUnit, knitr, rmarkdown, BiocStyle
 VignetteBuilder: knitr
 Collate: utils.R
 	H5File-class.R
