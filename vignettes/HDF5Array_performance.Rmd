@@ -16,15 +16,23 @@ output:
 
 # Introduction
 
-The aim of this short document is to measure the performance of
-the `r Biocpkg("HDF5Array")` package for normalization and PCA,
-two operations commomly involved in the context of single cell analysis.
+The aim of this document is to measure the performance of
+the `r Biocpkg("HDF5Array")` package for normalization and PCA
+of _on-disk_ single cell data, two computationally intensive
+operations at the core of single cell analysis.
 
-The goal is to facilitate comparison with other tools like Seurat
-and Scanpy.
+The benchmarks presented in this document were specifically designed
+to observe the impact of two critical parameters on performance:
+
+1. data representation (i.e. _sparse_ vs _dense_);
+2. size of the blocks used for block-processed operations.
+
+Hopefully these benchmarks will also facilitate comparing performance
+of single cell analysis workflows based on `r Biocpkg("HDF5Array")`
+with workflows based on other tools like Seurat or Scanpy.
 
 
-# Install and load required packages
+# Install and load the required packages
 
 Let's install and load `r Biocpkg("HDF5Array")` as well as the other
 packages used in this vignette:
@@ -56,7 +64,7 @@ source(path, verbose=FALSE)
 
 ## _Sparse_ vs _dense_ representation
 
-The datasets that we will use in this document are subsets of the
+The datasets that we will use for our benchmarks are subsets of the
 _1.3 Million Brain Cell Dataset_ from 10x Genomics.
 
 The _1.3 Million Brain Cell Dataset_ is a 27,998 x 1,306,127 matrix
@@ -74,12 +82,12 @@ Let's download them to the local `r Biocpkg("ExperimentHub")` cache
 if they are not there yet:
 ```{r, message=FALSE}
 ## Note that this will be quick if the HDF5 files are already in the
-## local ExperimentHub cache. Otherwise, it will take a while
+## local ExperimentHub cache. Otherwise, it will take a while!
 full_sparse_h5 <- hub[["EH1039"]]
 full_dense_h5  <- hub[["EH1040"]]
 ```
 
-## TENxMatrix vs HDF5Matrix object
+## TENxMatrix vs HDF5Matrix objects
 
 We use the `TENxMatrix()` and `HDF5Array()` constructors to bring the
 sparse and dense datasets in R as DelayedArray derivatives. Note that
@@ -89,29 +97,44 @@ Bring the sparse dataset in R:
 ```{r}
 ## Use 'h5ls(full_sparse_h5)' to find out the group.
 full_sparse <- TENxMatrix(full_sparse_h5, group="mm10")
+```
+
+Note that `full_sparse` is a 27,998 x 1,306,127 TENxMatrix object:
+```{r}
 class(full_sparse)
 dim(full_sparse)
 ```
+See `?TENxMatrix` in the `r Biocpkg("HDF5Array")` package for more
+information about TENxMatrix objects.
 
 Bring the dense dataset in R:
 ```{r}
 ## Use 'h5ls(full_dense_h5)' to find out the name of the dataset.
 full_dense <- HDF5Array(full_dense_h5, name="counts")
+```
+
+Note that `full_dense` is a 27,998 x 1,306,127 HDF5Matrix object that
+contains the same data as `full_sparse`:
+```{r}
 class(full_dense)
 dim(full_dense)
 ```
+See `?HDF5Matrix` in the `r Biocpkg("HDF5Array")` package for more
+information about HDF5Matrix objects.
 
-Note that the dense HDF5 file does not contain the dimnames of the
-matrix so we manually add them:
+Finally note that the dense HDF5 file does not contain the dimnames
+of the matrix so we manually add them to `full_sparse`:
 ```{r}
 dimnames(full_dense) <- dimnames(full_sparse)
 ```
 
 ## Create the test datasets
 
-For our benchmarks below we'll use subsets of the _1.3 Million Brain
+For our benchmarks, below we create subsets of the _1.3 Million Brain
 Cell Dataset_ of increasing sizes: subsets with 12,500 cells, 25,000 cells,
-50,000 cells, 100,000 cells, and 200,000 cells:
+50,000 cells, 100,000 cells, and 200,000 cells. Note that subsetting a
+TENxMatrix or HDF5Matrix object with `[` is a delayed operation so has
+virtually no cost:
 ```{r}
 sparse1 <- full_sparse[ , 1:12500]
 dense1  <- full_dense[ , 1:12500]
@@ -128,6 +151,7 @@ dense4  <- full_dense[ , 1:100000]
 sparse5 <- full_sparse[ , 1:200000]
 dense5  <- full_dense[ , 1:200000]
 ```
+
 
 # Block-processed normalization and PCA
 
@@ -169,7 +193,7 @@ Note that the implementations of `simple_normalize()` and `simple_PCA()`
 are expected to work on any matrix-like object regardless of its exact
 type/representation e.g. it can be an ordinary matrix, a SparseMatrix
 object from the `r Biocpkg("SparseArray")` package, a dgCMatrix object
-from the `r Biocpkg("Matrix")` package, a DelayedMatrix derivative
+from the `r CRANpkg("Matrix")` package, a DelayedMatrix derivative
 (TENxMatrix, HDF5Matrix, TileDBMatrix), etc...
 
 However, when the input is a DelayedMatrix object or derivative,
@@ -179,8 +203,9 @@ it's important to be aware that:
   and matrix multiplication (`%*%`), are _block-processed_ operations.
 
 - The block size is 100 Mb by default. Increasing or decreasing the block
-  size will increase or decrease the memory usage of _block-processed_
-  operations.
+  size will typically increase or decrease the memory usage
+  of _block-processed_ operations. It will also impact performance,
+  sometimes in unexpected or counter-intuitive ways.
 
 - The block size can be controlled with `DelayedArray::getAutoBlockSize()`
   and `DelayedArray::setAutoBlockSize()`.
@@ -190,18 +215,18 @@ For our benchmarks below, we'll use the following block sizes:
 - normalization of the sparse datasets: 250 Mb
 - normalization of the dense datasets: 40 Mb
 - PCA on the normalized sparse datasets: 40 Mb
-- PCA on the normalized dense datasets: 100 Mb
+- PCA on the normalized dense datasets: 100 Mb (the default)
 
 ## Monitoring memory usage
 
-While manually running our benchmarks below on a Linux system, we also
-monitor memory usage at the command line in a terminal with:
+While manually running our benchmarks below on a Linux system, we will
+also monitor memory usage at the command line in a terminal with:
 
     (while true; do ps u -p <PID>; sleep 1; done) >ps.log 2>&1 &
 
-where `<PID>` was the process id of our R session. This allowed us to measure
-the maximum amount of memory used by the calls to `simple_normalize()`
-or `simple_PCA()`.
+where `<PID>` is the process id of our R session. This will allow us
+to measure the maximum amount of memory used by the calls
+to `simple_normalize()` or `simple_PCA()`.
 
 
 # Normalization benchmarks
@@ -210,9 +235,10 @@ In this section we run `simple_normalize()` on the two smaller test
 datasets only (27,998 x 12,500 and 27,998 x 25,000, sparse and dense),
 and we report timings and memory usage.
 
-See **Timings observed on various systems** section at the end of this
-document for `simple_normalize()` and `simple_pca()` times observed
-on all our test datasets on various systems.
+See **Timings obtained on various systems** section at the end of this
+document for `simple_normalize()` and `simple_pca()` timings obtained
+on various systems on all our test datasets and using three different
+block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## Normalizing the sparse datasets
 
@@ -294,7 +320,7 @@ writeHDF5Array(dense2n, dense2n_path, name="normalized_counts", level=0)
 
 ### About memory usage
 
-With this block size (100 Mb), memory usage (as reported by Unix
+With this block size (40 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
 this document) remained < 2.8 Gb at all time.
 
@@ -305,9 +331,10 @@ In this section we run `simple_pca()` on the two normalized datasets
 obtained in the previous section (1000 x 12,500 and 1000 x 25,000,
 sparse and dense), and we report timings and memory usage.
 
-See **Timings observed on various systems** section at the end of this
-document for `simple_normalize()` and `simple_pca()` times observed
-on all our test datasets on various systems.
+See **Timings obtained on various systems** section at the end of this
+document for `simple_normalize()` and `simple_pca()` timings obtained
+on various systems on all our test datasets and using three different
+block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## PCA on the normalized sparse datasets
 
@@ -335,7 +362,7 @@ gc()
 
 ### About memory usage
 
-With this block size (100 Mb), memory usage (as reported by Unix
+With this block size (40 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
 this document) remained < 2.4 Gb at all time.
 
@@ -377,38 +404,63 @@ stopifnot(all.equal(pca2s, pca2d))
 ```
 
 
-# Timings observed on various systems
+# Timings obtained on various systems
 
-Here we report `simple_normalize()` and `simple_pca()` times observed
-on all our test datasets for various block sizes on various systems.
+Here we report normalization & PCA timings obtained on various systems.
+For each system, the results are summarized in a table that shows
+the `simple_normalize()` and `simple_pca()` timings obtained on all our test
+datasets and using three different block sizes: 40 Mb, 100 Mb, and 250 Mb.
+The times with <span style="background: #EFE;">light green</span> background
+correspond to the best time amongst the three different block sizes for
+a given operation.
 
 ## DELL XPS 15 laptop (model 9520)
 
-- **RAM:** 32GB
-- **Disk:** 1TB SSD
 - **OS:** Linux Ubuntu 24.04
 - **Bioconductor/R versions:** 3.21/4.5
+- **RAM:** 32GB
+- **Disk:** 1TB SSD
+- **Disk performance**:
+<table><tr><td style="width: 80pt"></td><td>
+<pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
+    # Output of 'sudo hdparm -Tt device':
+     Timing cached reads:   35188 MB in  2.00 seconds = 17620.75 MB/sec
+     Timing buffered disk reads: 7842 MB in  3.00 seconds = 2613.57 MB/sec
+</pre>
+</td></tr></table>
 
 ```{r xps15_timings, echo=FALSE, results='asis'}
 make_timings_table("xps15")
 ```
 _Note: "max. mem. used" columns to be populated soon._
 
-## DELL PowerEdge R440 Server
+## Supermicro SuperServer 1029GQ-TRT
 
-- **RAM:** 128GB
-- **Disk:** 1.92TB SSD SATA Mix Use
-- **OS:** Linux Ubuntu 24.04
+- **OS:** Linux Ubuntu 22.04
 - **Bioconductor/R versions:** 3.21/4.5
+- **RAM:** 384GB
+- **Disk:** 1.3TB ATA Disk
+- **Disk performance**:
+<table><tr><td style="width: 80pt"></td><td>
+<pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
+    # Output of 'sudo hdparm -Tt device':
+     Timing cached reads:   20592 MB in  1.99 seconds = 10361.41 MB/sec
+     Timing buffered disk reads: 1440 MB in  3.00 seconds = 479.66 MB/sec
+</pre>
+</td></tr></table>
 
-Timings coming soon...
+```{r rex3_timings, echo=FALSE, results='asis'}
+make_timings_table("rex3")
+```
+_Note: "max. mem. used" columns to be populated soon._
 
 ## Mac Pro (Apple M2 Ultra)
 
-- **RAM:** 192GB
-- **Disk:** 2TB SSD
 - **OS:** macOS 13.7.1
 - **Bioconductor/R versions:** 3.21/4.5
+- **RAM:** 192GB
+- **Disk:** 2TB SSD
+- **Disk performance**: N/A
 
 ```{r kjohnson3_timings, echo=FALSE, results='asis'}
 make_timings_table("kjohnson3")
@@ -416,14 +468,26 @@ make_timings_table("kjohnson3")
 _Note: "max. mem. used" columns to be populated soon._
 
 
-# Final notes
+# Final remarks
 
-The sparse representation (TENxMatrix) seems to perform slightly better
-than the dense representation (HDF5Matrix) when it comes to normalization & PCA
-of single cell data.
+The Supermicro SuperServer 1029GQ-TRT machine is significantly slower
+than the other machines. This is most likely due to the less performant
+disk.
 
-Normalization and PCA are very roughly linear in time, regardless of
-representation (sparse or dense).
+For PCA, choosing the sparse representation (TENxMatrix) and using small
+block sizes (40 Mb) is a clear winner.
+
+For normalization, there's no clear best choice between the parse and dense
+representations. More precisely, for this operation, the sparse representation
+tends to give the best times when using bigger blocks (250 Mb), whereas the
+dense representation tends to give the best times when using smaller blocks
+(40 Mb). However, based on the above benchmarks, there's no clear best choice
+between "sparse with big blocks" and "dense with small blocks" in terms of
+speed. Maybe extending the benchmarks to include more extreme block sizes
+(e.g. 20 Mb and 500 Mb) could help break the tie.
+
+Normalization and PCA are roughly linear in time, regardless of
+representation (sparse or dense) or block size.
 
 [Needs confirmation] Normalization and PCA both perform at almost
 constant memory, regardless of representation (sparse or dense).
