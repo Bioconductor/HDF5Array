@@ -87,7 +87,7 @@
 
 .NGENES_BEFORE_NORM <- 27998
 .NGENES_AFTER_NORM <- 1000
-.BASE_STYLE <- c("border: 1pt solid #888", "padding: 3pt")
+.BASE_STYLE <- c("border: 1pt solid #888", "padding: 2pt")
 
 ## Produces 2 * length(times) td elements.
 .make_td_group <- function(times)

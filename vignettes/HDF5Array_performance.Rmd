@@ -423,7 +423,7 @@ a given operation.
 - **Disk performance**:
 <table><tr><td style="width: 80pt"></td><td>
 <pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
-    # Output of 'sudo hdparm -Tt device':
+    # Output of 'sudo hdparm -Tt &lt;device&gt;':
      Timing cached reads:   35188 MB in  2.00 seconds = 17620.75 MB/sec
      Timing buffered disk reads: 7842 MB in  3.00 seconds = 2613.57 MB/sec
 </pre>
@@ -443,7 +443,7 @@ _Note: "max. mem. used" columns to be populated soon._
 - **Disk performance**:
 <table><tr><td style="width: 80pt"></td><td>
 <pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
-    # Output of 'sudo hdparm -Tt device':
+    # Output of 'sudo hdparm -Tt &lt;device&gt;':
      Timing cached reads:   20592 MB in  1.99 seconds = 10361.41 MB/sec
      Timing buffered disk reads: 1440 MB in  3.00 seconds = 479.66 MB/sec
 </pre>
