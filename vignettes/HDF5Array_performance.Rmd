@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 16 January 2025"
+date: "Compiled `r doc_date()`; Modified 18 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -21,7 +21,7 @@ the `r Biocpkg("HDF5Array")` package for normalization and PCA
 of _on-disk_ single cell data, two computationally intensive
 operations at the core of single cell analysis.
 
-The benchmarks presented in this document were specifically designed
+The benchmarks presented in the document were specifically designed
 to observe the impact of two critical parameters on performance:
 
 1. data representation (i.e. _sparse_ vs _dense_);
@@ -130,7 +130,7 @@ dimnames(full_dense) <- dimnames(full_sparse)
 
 ## Create the test datasets
 
-For our benchmarks, below we create subsets of the _1.3 Million Brain
+For our benchmarks below, we create subsets of the _1.3 Million Brain
 Cell Dataset_ of increasing sizes: subsets with 12,500 cells, 25,000 cells,
 50,000 cells, 100,000 cells, and 200,000 cells. Note that subsetting a
 TENxMatrix or HDF5Matrix object with `[` is a delayed operation so has
@@ -206,7 +206,7 @@ it's important to be aware that:
 - The block size is 100 Mb by default. Increasing or decreasing the block
   size will typically increase or decrease the memory usage
   of _block-processed_ operations. It will also impact performance,
-  sometimes in unexpected or counter-intuitive ways.
+  but sometimes in unexpected or counter-intuitive ways.
 
 - The block size can be controlled with `DelayedArray::getAutoBlockSize()`
   and `DelayedArray::setAutoBlockSize()`.
@@ -220,8 +220,8 @@ For our benchmarks below, we'll use the following block sizes:
 
 ## Monitoring memory usage
 
-While manually running our benchmarks below on a Linux system, we will
-also monitor memory usage at the command line in a terminal with:
+While manually running our benchmarks below on a Linux or macOS system,
+we will also monitor memory usage at the command line in a terminal with:
 
     (while true; do ps u -p <PID>; sleep 1; done) >ps.log 2>&1 &
 
@@ -236,15 +236,16 @@ In this section we run `simple_normalize()` on the two smaller test
 datasets only (27,998 x 12,500 and 27,998 x 25,000, sparse and dense),
 and we report timings and memory usage.
 
-See **Timings obtained on various systems** section at the end of this
+See the **Timings obtained on various systems** section at the end of this
 document for `simple_normalize()` and `simple_pca()` timings obtained
 on various systems on all our test datasets and using three different
 block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## Normalizing the sparse datasets
 
+Set block size to 250 Mb:
 ```{r set_block_size_for_normalize_sparse}
-DelayedArray::setAutoBlockSize(2.5e8)  # blocks of 250 Mb
+DelayedArray::setAutoBlockSize(2.5e8)
 ```
 
 ### 27,998 x 12,500 sparse dataset
@@ -253,14 +254,35 @@ DelayedArray::setAutoBlockSize(2.5e8)  # blocks of 250 Mb
 dim(sparse1)
 system.time(sparse1n <- simple_normalize(sparse1))
 gc()
+dim(sparse1n)
 ```
 
-Saving the normalized dataset to a temporary file for PCA later:
-```{r writeTENxMatrix_sparse1n, results="hide"}
-dim(sparse1n)
-sparse1n_path <- tempfile()
-writeTENxMatrix(sparse1n, sparse1n_path, group="matrix", level=0)
+Note that `sparse1n` is a DelayedMatrix object that carrries delayed
+operations. These can be displayed with `showtree()`:
+```{r show_sparse1n_delayed_ops}
+class(sparse1n)
+showtree(sparse1n)
 ```
+
+Let's write `sparse1n` to a temporary HDF5 file so we can do PCA on it later:
+```{r writeTENxMatrix_sparse1n, results="hide"}
+sparse1n_path <- tempfile()
+sparse1n <- writeTENxMatrix(sparse1n, sparse1n_path, group="matrix", level=0)
+```
+
+### A note about delayed operations and on-disk realization
+
+Writing a DelayedMatrix object to an HDF5 file with `writeTENxMatrix()`
+has a significant cost, but, on the other hand, it has the advantage of
+triggering _on-disk realization_ of the object. This means that all the
+delayed operations carried by the object get realized on-the-fly before
+the matrix data lands on the disk:
+```{r show_pristine_sparse1n}
+class(sparse1n)
+showtree(sparse1n)  # "pristine" object (i.e. no more delayed operations)
+```
+This will make this new TENxMatrix object more efficient for whatever
+block-processed operations will come next.
 
 ### 27,998 x 25,000 sparse dataset
 
@@ -268,11 +290,11 @@ writeTENxMatrix(sparse1n, sparse1n_path, group="matrix", level=0)
 dim(sparse2)
 system.time(sparse2n <- simple_normalize(sparse2))
 gc()
+dim(sparse2n)
 ```
 
-Saving the normalized dataset to a temporary file for PCA later:
+Let's write `sparse2n` to a temporary HDF5 file so we can do PCA on it later:
 ```{r writeTENxMatrix_sparse2n, results="hide"}
-dim(sparse2n)
 sparse2n_path <- tempfile()
 writeTENxMatrix(sparse2n, sparse2n_path, group="matrix", level=0)
 ```
@@ -285,8 +307,9 @@ this document) remained < 3.7 Gb at all time.
 
 ## Normalizing the dense datasets
 
+Set block size to 40 Mb:
 ```{r set_block_size_for_normalize_dense}
-DelayedArray::setAutoBlockSize(4e7)  # blocks of 40 Mb
+DelayedArray::setAutoBlockSize(4e7)
 ```
 
 ### 27,998 x 12,500 dense dataset
@@ -295,14 +318,32 @@ DelayedArray::setAutoBlockSize(4e7)  # blocks of 40 Mb
 dim(dense1)
 system.time(dense1n <- simple_normalize(dense1))
 gc()
+dim(dense1n)
 ```
 
-Saving the normalized dataset to a temporary file for PCA:
-```{r writeHDF5Array_dense1n, results="hide"}
-dim(dense1n)
-dense1n_path <- tempfile()
-writeHDF5Array(dense1n, dense1n_path, name="normalized_counts", level=0)
+Note that, like `sparse1n` and `sparse2n` above, `dense1n` is a
+DelayedMatrix object that carrries delayed operations. These can
+be displayed with `showtree()`:
+```{r show_dense1n_delayed_ops}
+class(dense1n)
+showtree(dense1n)
 ```
+
+Let's write `dense1n` to a temporary HDF5 file so we can do PCA on it later:
+```{r writeHDF5Array_dense1n, results="hide"}
+dense1n_path <- tempfile()
+dense1n <- writeHDF5Array(dense1n, dense1n_path, name="normalized_counts", level=0)
+```
+
+Note that, like with `writeTENxMatrix()`, writing a DelayedMatrix object
+to an HDF5 file with `writeHDF5Array()` has a significant cost but also has
+the advantage of triggering _on-disk realization_ of the object:
+```{r show_pristine_dense1n}
+class(dense1n)
+showtree(dense1n)  # "pristine" object (i.e. no more delayed operations)
+```
+This will make this new HDF5Array object more efficient for whatever
+block-processed operations will come next.
 
 ### 27,998 x 25,000 dense dataset
 
@@ -310,11 +351,11 @@ writeHDF5Array(dense1n, dense1n_path, name="normalized_counts", level=0)
 dim(dense2)
 system.time(dense2n <- simple_normalize(dense2))
 gc()
+dim(dense2n)
 ```
 
-Saving the normalized dataset to a temporary file for PCA:
+Let's write `dense2n` to a temporary HDF5 file so we can do PCA on it later:
 ```{r writeHDF5Array_dense2n, results="hide"}
-dim(dense2n)
 dense2n_path <- tempfile()
 writeHDF5Array(dense2n, dense2n_path, name="normalized_counts", level=0)
 ```
@@ -332,15 +373,16 @@ In this section we run `simple_pca()` on the two normalized datasets
 obtained in the previous section (1000 x 12,500 and 1000 x 25,000,
 sparse and dense), and we report timings and memory usage.
 
-See **Timings obtained on various systems** section at the end of this
+See the **Timings obtained on various systems** section at the end of this
 document for `simple_normalize()` and `simple_pca()` timings obtained
 on various systems on all our test datasets and using three different
 block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## PCA on the normalized sparse datasets
 
+Set block size to 40 Mb:
 ```{r set_block_size_for_PCA_sparse}
-DelayedArray::setAutoBlockSize(4e7)  # blocks of 40 Mb
+DelayedArray::setAutoBlockSize(4e7)
 ```
 
 ### 1000 x 12,500 sparse dataset
@@ -369,8 +411,9 @@ this document) remained < 2.4 Gb at all time.
 
 ## PCA on the normalized dense datasets
 
+Set block size to 100 Mb (the default):
 ```{r set_block_size_for_PCA_dense}
-DelayedArray::setAutoBlockSize(1e8)  # blocks of 100 Mb
+DelayedArray::setAutoBlockSize()
 ```
 
 ### 1000 x 12,500 dense dataset
