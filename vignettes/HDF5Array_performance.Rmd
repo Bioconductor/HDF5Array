@@ -36,7 +36,7 @@ with workflows based on other tools like Seurat or Scanpy.
 
 Let's install and load `r Biocpkg("HDF5Array")` as well as the other
 packages used in this vignette:
-```{r, eval=FALSE}
+```{r install, eval=FALSE}
 if (!require("BiocManager", quietly=TRUE))
     install.packages("BiocManager")
 
@@ -45,7 +45,7 @@ BiocManager::install(pkgs)
 ```
 
 Load the packages:
-```{r, message=FALSE}
+```{r load, message=FALSE}
 library(HDF5Array)
 library(ExperimentHub)
 library(DelayedMatrixStats)
@@ -71,7 +71,7 @@ The _1.3 Million Brain Cell Dataset_ is a 27,998 x 1,306,127 matrix
 of counts with one gene per row and one cell per column. It's available
 via the `r Biocpkg("ExperimentHub")` package in two forms, one that uses
 a sparse representation and one that uses a dense representation:
-```{r}
+```{r ExperimentHub}
 hub <- ExperimentHub()
 hub["EH1039"]$description  # sparse representation
 hub["EH1040"]$description  # dense representation
@@ -80,7 +80,7 @@ hub["EH1040"]$description  # dense representation
 The two datasets are big HDF5 files stored on a remote location.
 Let's download them to the local `r Biocpkg("ExperimentHub")` cache
 if they are not there yet:
-```{r, message=FALSE}
+```{r get_EH1039_and_EH1040, message=FALSE}
 ## Note that this will be quick if the HDF5 files are already in the
 ## local ExperimentHub cache. Otherwise, it will take a while!
 full_sparse_h5 <- hub[["EH1039"]]
@@ -94,13 +94,13 @@ sparse and dense datasets in R as DelayedArray derivatives. Note that
 this does _not_ load the matrix data in memory.
 
 Bring the sparse dataset in R:
-```{r}
+```{r TENxMatrix_constructor}
 ## Use 'h5ls(full_sparse_h5)' to find out the group.
 full_sparse <- TENxMatrix(full_sparse_h5, group="mm10")
 ```
 
 Note that `full_sparse` is a 27,998 x 1,306,127 TENxMatrix object:
-```{r}
+```{r full_sparse_class_and_dim}
 class(full_sparse)
 dim(full_sparse)
 ```
@@ -108,14 +108,14 @@ See `?TENxMatrix` in the `r Biocpkg("HDF5Array")` package for more
 information about TENxMatrix objects.
 
 Bring the dense dataset in R:
-```{r}
+```{r HDF5Array_constructor}
 ## Use 'h5ls(full_dense_h5)' to find out the name of the dataset.
 full_dense <- HDF5Array(full_dense_h5, name="counts")
 ```
 
 Note that `full_dense` is a 27,998 x 1,306,127 HDF5Matrix object that
 contains the same data as `full_sparse`:
-```{r}
+```{r full_dense_class_and_dim}
 class(full_dense)
 dim(full_dense)
 ```
@@ -124,7 +124,7 @@ information about HDF5Matrix objects.
 
 Finally note that the dense HDF5 file does not contain the dimnames
 of the matrix so we manually add them to `full_sparse`:
-```{r}
+```{r set_full_dense_dimnames}
 dimnames(full_dense) <- dimnames(full_sparse)
 ```
 
@@ -135,7 +135,7 @@ Cell Dataset_ of increasing sizes: subsets with 12,500 cells, 25,000 cells,
 50,000 cells, 100,000 cells, and 200,000 cells. Note that subsetting a
 TENxMatrix or HDF5Matrix object with `[` is a delayed operation so has
 virtually no cost:
-```{r}
+```{r create_test_datasets}
 sparse1 <- full_sparse[ , 1:12500]
 dense1  <- full_dense[ , 1:12500]
 
@@ -158,7 +158,7 @@ dense5  <- full_dense[ , 1:200000]
 ## Code used for normalization and PCA
 
 We'll use the following code for normalization:
-```{r}
+```{r simple_normalize_function}
 ## Also does variable gene selection by keeping the 1000 most variable
 ## genes by default.
 simple_normalize <- function(mat, num_variable_genes=1000)
@@ -175,7 +175,7 @@ simple_normalize <- function(mat, num_variable_genes=1000)
 ```
 
 and the following code for PCA:
-```{r}
+```{r simple_PCA_function}
 simple_PCA <- function(mat, k=25)
 {
     stopifnot(length(dim(mat)) == 2)
@@ -243,7 +243,7 @@ block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## Normalizing the sparse datasets
 
-```{r}
+```{r set_block_size_for_normalize_sparse}
 DelayedArray::setAutoBlockSize(2.5e8)  # blocks of 250 Mb
 ```
 
@@ -256,7 +256,7 @@ gc()
 ```
 
 Saving the normalized dataset to a temporary file for PCA later:
-```{r, results="hide"}
+```{r writeTENxMatrix_sparse1n, results="hide"}
 dim(sparse1n)
 sparse1n_path <- tempfile()
 writeTENxMatrix(sparse1n, sparse1n_path, group="matrix", level=0)
@@ -271,7 +271,7 @@ gc()
 ```
 
 Saving the normalized dataset to a temporary file for PCA later:
-```{r, results="hide"}
+```{r writeTENxMatrix_sparse2n, results="hide"}
 dim(sparse2n)
 sparse2n_path <- tempfile()
 writeTENxMatrix(sparse2n, sparse2n_path, group="matrix", level=0)
@@ -285,7 +285,7 @@ this document) remained < 3.7 Gb at all time.
 
 ## Normalizing the dense datasets
 
-```{r}
+```{r set_block_size_for_normalize_dense}
 DelayedArray::setAutoBlockSize(4e7)  # blocks of 40 Mb
 ```
 
@@ -298,7 +298,7 @@ gc()
 ```
 
 Saving the normalized dataset to a temporary file for PCA:
-```{r, results="hide"}
+```{r writeHDF5Array_dense1n, results="hide"}
 dim(dense1n)
 dense1n_path <- tempfile()
 writeHDF5Array(dense1n, dense1n_path, name="normalized_counts", level=0)
@@ -313,7 +313,7 @@ gc()
 ```
 
 Saving the normalized dataset to a temporary file for PCA:
-```{r, results="hide"}
+```{r writeHDF5Array_dense2n, results="hide"}
 dim(dense2n)
 dense2n_path <- tempfile()
 writeHDF5Array(dense2n, dense2n_path, name="normalized_counts", level=0)
@@ -339,7 +339,7 @@ block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ## PCA on the normalized sparse datasets
 
-```{r}
+```{r set_block_size_for_PCA_sparse}
 DelayedArray::setAutoBlockSize(4e7)  # blocks of 40 Mb
 ```
 
@@ -369,7 +369,7 @@ this document) remained < 2.4 Gb at all time.
 
 ## PCA on the normalized dense datasets
 
-```{r}
+```{r set_block_size_for_PCA_dense}
 DelayedArray::setAutoBlockSize(1e8)  # blocks of 100 Mb
 ```
 
@@ -496,7 +496,7 @@ constant memory, regardless of representation (sparse or dense).
 
 # Session information
 
-```{r}
+```{r sessionInfo}
 sessionInfo()
 ```
 
