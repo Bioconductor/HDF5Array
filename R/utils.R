@@ -23,21 +23,6 @@ trim_trailing_slashes <- function(x)
     sub("/*$", "", x)
 }
 
-add_prefix_to_basename <- function(name, prefix=".")
-{
-    stopifnot(isSingleString(name), isSingleString(prefix))
-    slash_idx <- which(safeExplode(name) == "/")
-    if (length(slash_idx) == 0L) {
-        dname <- ""
-        bname <- name
-    } else {
-        last_slash_idx <- max(slash_idx)
-        dname <- substr(name, start=1L, stop=last_slash_idx)
-        bname <- substr(name, start=last_slash_idx+1L, stop=nchar(name))
-    }
-    paste0(dname, prefix, bname)
-}
-
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### A simple/naive/imperfect mechanism to lock/unlock a file so processes can

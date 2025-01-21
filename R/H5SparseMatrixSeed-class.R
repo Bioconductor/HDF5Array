@@ -90,8 +90,9 @@ setMethod("path", "H5SparseMatrixSeed", function(object) object@filepath)
 setReplaceMethod("path", "H5SparseMatrixSeed",
     function(object, value)
     {
-        new_filepath <- normarg_h5_filepath(value, what1="the supplied path",
-                                                   what2="the sparse matrix")
+        new_filepath <- h5mread:::normarg_h5_filepath(value,
+                                             what1="the supplied path",
+                                             what2="the sparse matrix")
         old_filepath <- path(object)
         if (new_filepath != old_filepath)
             stop(wmsg("changing the path of a ", class(object), " object ",
@@ -330,10 +331,12 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
                                dim=NULL, sparse.layout=NULL)
 {
     ## Check 'filepath', 'group', and 'subdata'.
-    filepath <- normarg_h5_filepath(filepath, what2="the sparse matrix")
-    group <- normarg_h5_name(group, what1="'group'",
-                                    what2="the name of the group",
-                                    what3=" that stores the sparse matrix")
+    filepath <- h5mread:::normarg_h5_filepath(filepath,
+                                  what2="the sparse matrix")
+    group <- h5mread:::normarg_h5_name(group,
+                                  what1="'group'",
+                                  what2="the name of the group",
+                                  what3=" that stores the sparse matrix")
     .check_group(filepath, group)
     .check_data_and_subdata(filepath, group, subdata)
 

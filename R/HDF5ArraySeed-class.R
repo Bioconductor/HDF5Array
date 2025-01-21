@@ -155,9 +155,9 @@ setReplaceMethod("path", "HDF5ArraySeed",
             ## Check dim compatibility.
             ## TODO: Implement this.
         } else {
-            new_filepath <- normarg_h5_filepath(value,
-                                                what1="the supplied path",
-                                                what2="the HDF5 dataset")
+            new_filepath <- h5mread:::normarg_h5_filepath(value,
+                                              what1="the supplied path",
+                                              what2="the HDF5 dataset")
             ## Check dim compatibility.
             new_dim <- h5dim(new_filepath, object@name)
             object_dim <- object@dim
@@ -332,8 +332,8 @@ setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
 {
     if (!is(filepath, "H5File"))
-        filepath <- normarg_h5_filepath(filepath)
-    name <- normarg_h5_name(name)
+        filepath <- h5mread:::normarg_h5_filepath(filepath)
+    name <- h5mread:::normarg_h5_name(name)
 
     ## Check 'as.sparse'.
     if (!isTRUEorFALSE(as.sparse))

@@ -14,35 +14,23 @@ biocViews: Infrastructure, DataRepresentation, DataImport, Sequencing, RNASeq,
 	Coverage, Annotation, GenomeAnnotation, SingleCell, ImmunoOncology
 URL: https://bioconductor.org/packages/HDF5Array
 BugReports: https://github.com/Bioconductor/HDF5Array/issues
-Version: 1.35.7
+Version: 1.35.8
 License: Artistic-2.0
 Encoding: UTF-8
 Authors@R: person("Hervé", "Pagès", role=c("aut", "cre"),
 		  email="hpages.on.github@gmail.com",
 		  comment=c(ORCID="0009-0002-8272-4522"))
 Depends: R (>= 3.4), methods, SparseArray (>= 1.5.42), DelayedArray (>= 0.33.1),
-	rhdf5 (>= 2.31.6)
+	h5mread (>= 0.99.4)
 Imports: utils, stats, tools, Matrix,
-	rhdf5filters, BiocGenerics (>= 0.51.2), S4Vectors, IRanges,
-	S4Arrays (>= 1.1.1)
-LinkingTo: S4Vectors (>= 0.27.13), Rhdf5lib
-SystemRequirements: GNU make
+	BiocGenerics (>= 0.51.2), S4Vectors, IRanges, S4Arrays (>= 1.1.1), rhdf5
 Suggests: BiocParallel, GenomicRanges, SummarizedExperiment (>= 1.15.1),
 	h5vcData, ExperimentHub, TENxBrainData, zellkonverter,
 	GenomicFeatures, SingleCellExperiment, DelayedMatrixStats, genefilter,
 	RSpectra, RUnit, knitr, rmarkdown, BiocStyle
 VignetteBuilder: knitr
 Collate: utils.R
-	H5File-class.R
-	h5ls.R
 	h5utils.R
-	H5DSetDescriptor-class.R
-	h5dimscales.R
-	uaselection.R
-	h5mread.R
-	h5mread_from_reshaped.R
-	h5writeDimnames.R
-	h5summarize.R
 	HDF5ArraySeed-class.R
 	HDF5Array-class.R
 	ReshapedHDF5ArraySeed-class.R

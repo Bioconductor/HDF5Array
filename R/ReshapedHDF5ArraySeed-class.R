@@ -65,7 +65,8 @@ ReshapedHDF5ArraySeed <- function(filepath, name, dim, type=NA)
     if (is.null(seed@chunkdim)) {
         reshaped_chunkdim <- NULL
     } else {
-        reshaped_chunkdim <- collapse_dims(seed@chunkdim, collapse_along)
+        reshaped_chunkdim <- h5mread:::collapse_dims(seed@chunkdim,
+                                                     collapse_along)
         reshaped_chunkdim <- as.integer(reshaped_chunkdim)
     }
     new2("ReshapedHDF5ArraySeed", seed,
