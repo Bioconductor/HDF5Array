@@ -1,12 +1,12 @@
 # To run this R script:
 #
-#   Rscript normalize_and_PCA.R <ncells> <format> \
+#   Rscript normalize_and_PCA.R <ncells> <num_var_genes> <format> \
 #                     <norm_block_size> <realize_block_size> <pca_block_size>
 #
 # To run it in "batch mode":
 #
-#   Rscript normalize_and_PCA.R 12500 sparse \
-#                               250 100 >normalize_and_PCA.log 2>&1 &
+#   Rscript normalize_and_PCA.R 12500 1000 sparse \
+#                     250 40 100 >normalize_and_PCA.log 2>&1 &
 #
 
 suppressPackageStartupMessages(library(S4Vectors))
@@ -18,20 +18,23 @@ suppressPackageStartupMessages(library(RSpectra))
 ## Retrieve and check script arguments.
 
 args <- commandArgs(trailingOnly=TRUE)
-stopifnot(length(args) == 5L)
+stopifnot(length(args) == 6L)
 ncells <- as.integer(args[[1L]])
-format <- args[[2L]]
-norm_block_size <- as.integer(args[[3L]])     # block size in Mb (normalization)
-realize_block_size <- as.integer(args[[4L]])  # block size in Mb (realization)
-pca_block_size <- as.integer(args[[5L]])      # block size in Mb (PCA)
+num_var_genes <- as.integer(args[[2L]])
+format <- args[[3L]]
+norm_block_size <- as.integer(args[[4L]])     # block size in Mb (normalization)
+realize_block_size <- as.integer(args[[5L]])  # block size in Mb (realization)
+pca_block_size <- as.integer(args[[6L]])      # block size in Mb (PCA)
 
 stopifnot(isSingleInteger(ncells), ncells > 0L,
+          isSingleInteger(num_var_genes), num_var_genes > 0L,
           format %in% c("sparse", "dense"),
           isSingleInteger(norm_block_size), norm_block_size > 0L,
           isSingleInteger(realize_block_size), realize_block_size > 0L,
           isSingleInteger(pca_block_size), pca_block_size > 0L)
 
 cat("ncells = ", ncells, "\n", sep="")
+cat("num_var_genes = ", num_var_genes, "\n", sep="")
 cat("format = ", format, "\n", sep="")
 cat("norm_block_size = ", norm_block_size, "\n", sep="")
 cat("realize_block_size = ", realize_block_size, "\n", sep="")
@@ -61,14 +64,14 @@ dataset <- full_dataset[ , seq_len(ncells)]
 
 ## Define functions simple_normalize() and simple_PCA().
 
-simple_normalize <- function(mat, num_variable_genes=1000)
+simple_normalize <- function(mat, num_var_genes=1000)
 {
     stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
     mat <- mat[rowSums(mat) > 0, ]
     mat <- t(t(mat) * 10000 / colSums(mat))
     row_vars <- rowVars(mat)
     rv_order <- order(row_vars, decreasing=TRUE)
-    variable_idx <- head(rv_order, n=num_variable_genes)
+    variable_idx <- head(rv_order, n=num_var_genes)
     mat <- log1p(mat[variable_idx, ])
     mat / rowSds(mat)
 }
@@ -88,7 +91,7 @@ simple_PCA <- function(mat, k=25)
 
 cat("Running normalization ...\n")
 DelayedArray::setAutoBlockSize(norm_block_size * 1e6)
-timing <- system.time(normalized <- simple_normalize(dataset))
+timing <- system.time(normalized <- simple_normalize(dataset, num_var_genes=num_var_genes))
 gc()
 norm_time <- timing[["elapsed"]]
 cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
@@ -128,6 +131,7 @@ pca_time <- timing[["elapsed"]]
 cat("---> PCA completed in ", pca_time, " s.\n\n", sep="")
 
 cat("ncells: ", ncells, "\n",
+    "num_var_genes: ", num_var_genes, "\n",
     "format: ", format, "\n",
     "norm_block_size: ", norm_block_size, "\n",
     "norm_time: ", norm_time, "\n",

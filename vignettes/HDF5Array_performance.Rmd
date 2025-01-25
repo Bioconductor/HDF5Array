@@ -164,14 +164,14 @@ dense5  <- full_dense[ , 1:200000]
 We'll use the following code for normalization:
 ```{r simple_normalize_function}
 ## Also selects the most variable genes (1000 by default).
-simple_normalize <- function(mat, num_variable_genes=1000)
+simple_normalize <- function(mat, num_var_genes=1000)
 {
     stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
     mat <- mat[rowSums(mat) > 0, ]
     mat <- t(t(mat) * 10000 / colSums(mat))
     row_vars <- rowVars(mat)
     rv_order <- order(row_vars, decreasing=TRUE)
-    variable_idx <- head(rv_order, n=num_variable_genes)
+    variable_idx <- head(rv_order, n=num_var_genes)
     mat <- log1p(mat[variable_idx, ])
     mat / rowSds(mat)
 }
@@ -534,7 +534,7 @@ a given operation.
 </td></tr></table>
 
 ```{r xps15_timings, echo=FALSE, results='asis'}
-make_timings_table("xps15")
+make_timings_table("xps15", num_var_genes=1000L)
 ```
 _Note: "max. mem. used" columns to be populated soon._
 
@@ -554,7 +554,7 @@ _Note: "max. mem. used" columns to be populated soon._
 </td></tr></table>
 
 ```{r rex3_timings, echo=FALSE, results='asis'}
-make_timings_table("rex3")
+make_timings_table("rex3", num_var_genes=1000L)
 ```
 _Note: "max. mem. used" columns to be populated soon._
 
@@ -567,7 +567,7 @@ _Note: "max. mem. used" columns to be populated soon._
 - **Disk performance**: N/A
 
 ```{r kjohnson3_timings, echo=FALSE, results='asis'}
-make_timings_table("kjohnson3")
+make_timings_table("kjohnson3", num_var_genes=1000L)
 ```
 _Note: "max. mem. used" columns to be populated soon._
 

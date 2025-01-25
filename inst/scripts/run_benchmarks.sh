@@ -5,7 +5,7 @@
 #   cd path/to/HDF5Array/inst/scripts/timings_db/<machine-name>
 #   time ../../run_benchmarks.sh >run_benchmarks.log 2>&1 &
 #
-# It takes between 5 and 10 hours to complete, depending on the machine!
+# It takes between 12 and 30 hours to complete, depending on the machine!
 
 set -e  # exit immediately if a simple command exits with a non-zero status
 
@@ -17,44 +17,29 @@ RSCRIPT=`R -s --vanilla -e 'cat(file.path(R.home("bin"), "Rscript"))'`
 
 NORMALIZE_AND_PCA_R=`$RSCRIPT -e 'suppressPackageStartupMessages(library(HDF5Array)); cat(system.file(package="HDF5Array", "scripts", "normalize_and_PCA.R", mustWork=TRUE))'`
 
+normalize_and_PCA()
+{
+	ncells="$1"
+	num_var_genes="$2"
+	format="$3"
+	norm_block_size="$4"
+	realize_block_size="$4"
+	pca_block_size="$4"
+	$RSCRIPT $NORMALIZE_AND_PCA_R "$ncells" "$num_var_genes" "$format" "$norm_block_size" "$realize_block_size" "$pca_block_size"
+}
+
 echo "Starting run_benchmarks.sh on `date`."
 echo ""
 
-# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse              40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             250                250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense               40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              250                250            250
-# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse              40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             250                250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense               40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              250                250            250
-# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse              40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             250                250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense               40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              250                250            250
-# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse              40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             250                250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense               40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              250                250            250
-# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse              40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             250                250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense               40                 40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              100                100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              250                250            250
+for ncells in 12500 25000 50000 100000 200000; do
+	for num_var_genes in 1000 2000; do
+		for format in sparse dense; do
+			for block_size in 40 100 250; do
+				normalize_and_PCA "$ncells" "$num_var_genes" "$format" "$block_size"
+			done
+		done
+	done
+done
 
 echo "Completed run_benchmarks.sh on `date`."
 echo ""
