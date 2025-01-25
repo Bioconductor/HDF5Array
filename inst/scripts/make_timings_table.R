@@ -24,6 +24,9 @@
     if (step == "norm") {
         ok2 <- timings[ , "norm_block_size"] == block_size
         t <- timings[ok1 & ok2, "norm_time"]
+    } else if (step == "realize") {
+        ok2 <- timings[ , "realize_block_size"] == block_size
+        t <- timings[ok1 & ok2, "realize_time"]
     } else {
         ok2 <- timings[ , "pca_block_size"] == block_size
         t <- timings[ok1 & ok2, "pca_time"]
@@ -34,7 +37,8 @@
         stop(wmsg("no time (or more than one time) found for ",
                   "ncells=", ncells, ", format=\"", format, "\", ",
                   "step=\"", step, "\", and block_size=", block_size))
-    as.integer(as.numeric(t) + 0.5)  # rounding to the second (closest)
+    t <- suppressWarnings(as.numeric(t))
+    as.integer(t + 0.5)  # rounding to the closest integer
 }
 
 .make_header_lines <- function(timings, block_sizes=c(40, 100, 250))
@@ -106,7 +110,7 @@
 }
 
 ## Produces a tr element with 3 + 4 * length(block_sizes) td elements in it.
-.make_data_line <- function(timings, step=c("norm", "pca"),
+.make_data_line <- function(timings, step=c("norm", "realize", "pca"),
                             ncells, dataset_rank, block_sizes=c(40, 100, 250))
 {
     step <- match.arg(step)
@@ -120,7 +124,7 @@
 
     ## Results for sparse objects.
     object_name <- sprintf("sparse%d", dataset_rank)
-    if (step == "pca")
+    if (step != "norm")
         object_name <- paste0(object_name, "n")
     cat(sprintf('    <td %s><code>%s</code></td>\n', base_style, object_name))
     times <- vapply(block_sizes,
@@ -131,7 +135,7 @@
 
     ## Results for dense objects.
     object_name <- sprintf("dense%d", dataset_rank)
-    if (step == "pca")
+    if (step != "norm")
         object_name <- paste0(object_name, "n")
     cat(sprintf('    <td %s><code>%s</code></td>\n', base_style, object_name))
     times <- vapply(block_sizes,
@@ -143,7 +147,7 @@
     cat('  </tr>\n')
 }
 
-.make_data_lines <- function(timings, step=c("norm", "pca"),
+.make_data_lines <- function(timings, step=c("norm", "realize", "pca"),
                              block_sizes=c(40, 100, 250))
 {
     step <- match.arg(step)
@@ -171,11 +175,15 @@
     th_style <- c(.BASE_STYLE, "background: #EEE")
     th_style <- paste0("style='", paste(th_style, collapse="; "), "'")
 
-    cat(sprintf('<tr><th %s colspan="%d">Normalization</th></tr>\n',
+    cat(sprintf('<tr><th %s colspan="%d">1. Normalization</th></tr>\n',
                 th_style, table_ncols))
     .make_data_lines(timings, "norm", block_sizes=block_sizes)
 
-    cat(sprintf('<tr><th %s colspan="%d">PCA</th></tr>\n',
+    cat(sprintf('<tr><th %s colspan="%d">2. On-disk realization of the normalized datasets</th></tr>\n',
+                th_style, table_ncols))
+    .make_data_lines(timings, "realize", block_sizes=block_sizes)
+
+    cat(sprintf('<tr><th %s colspan="%d">3. PCA</th></tr>\n',
                 th_style, table_ncols))
     .make_data_lines(timings, "pca", block_sizes=block_sizes)
 
@@ -191,6 +199,7 @@ make_timings_table <- function(machine_name,
     timings <- read.dcf(file_path)  # character matrix
     EXPECTED_COLS <- c("ncells", "format",
                        "norm_block_size", "norm_time",
+                       "realize_block_size", "realize_time",
                        "pca_block_size", "pca_time")
     stopifnot(setequal(colnames(timings), EXPECTED_COLS))
     .make_table(timings, block_sizes=block_sizes)

@@ -20,41 +20,41 @@ NORMALIZE_AND_PCA_R=`$RSCRIPT -e 'suppressPackageStartupMessages(library(HDF5Arr
 echo "Starting run_benchmarks.sh on `date`."
 echo ""
 
-# --------------------------- ncells format norm_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse              40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense               40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              250            250
-# --------------------------- ncells format norm_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse              40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense               40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              250            250
-# --------------------------- ncells format norm_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse              40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense               40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              250            250
-# --------------------------- ncells format norm_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse              40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense               40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              250            250
-# --------------------------- ncells format norm_block_size pca_block_size
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse              40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             250            250
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense               40             40
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              100            100
-$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              250            250
+# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse              40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 sparse             250                250            250
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense               40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  12500 dense              250                250            250
+# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse              40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 sparse             250                250            250
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense               40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  25000 dense              250                250            250
+# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse              40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 sparse             250                250            250
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense               40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R  50000 dense              250                250            250
+# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse              40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 sparse             250                250            250
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense               40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R 100000 dense              250                250            250
+# --------------------------- ncells format norm_block_size realize_block_size pca_block_size
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse              40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 sparse             250                250            250
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense               40                 40             40
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              100                100            100
+$RSCRIPT $NORMALIZE_AND_PCA_R 200000 dense              250                250            250
 
 echo "Completed run_benchmarks.sh on `date`."
 echo ""

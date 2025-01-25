@@ -1,7 +1,7 @@
 # To run this R script:
 #
 #   Rscript normalize_and_PCA.R <ncells> <format> \
-#                               <norm_block_size> <pca_block_size>
+#                     <norm_block_size> <realize_block_size> <pca_block_size>
 #
 # To run it in "batch mode":
 #
@@ -18,20 +18,23 @@ suppressPackageStartupMessages(library(RSpectra))
 ## Retrieve and check script arguments.
 
 args <- commandArgs(trailingOnly=TRUE)
-stopifnot(length(args) == 4L)
+stopifnot(length(args) == 5L)
 ncells <- as.integer(args[[1L]])
 format <- args[[2L]]
-norm_block_size <- as.integer(args[[3L]])  # block size in Mb (normalization)
-pca_block_size <- as.integer(args[[4L]])   # block size in Mb (PCA)
+norm_block_size <- as.integer(args[[3L]])     # block size in Mb (normalization)
+realize_block_size <- as.integer(args[[4L]])  # block size in Mb (realization)
+pca_block_size <- as.integer(args[[5L]])      # block size in Mb (PCA)
 
 stopifnot(isSingleInteger(ncells), ncells > 0L,
           format %in% c("sparse", "dense"),
           isSingleInteger(norm_block_size), norm_block_size > 0L,
+          isSingleInteger(realize_block_size), realize_block_size > 0L,
           isSingleInteger(pca_block_size), pca_block_size > 0L)
 
 cat("ncells = ", ncells, "\n", sep="")
 cat("format = ", format, "\n", sep="")
 cat("norm_block_size = ", norm_block_size, "\n", sep="")
+cat("realize_block_size = ", realize_block_size, "\n", sep="")
 cat("pca_block_size = ", pca_block_size, "\n", sep="")
 cat("\n")
 
@@ -89,15 +92,26 @@ timing <- system.time(normalized <- simple_normalize(dataset))
 gc()
 norm_time <- timing[["elapsed"]]
 cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
+
+## On-disk realization of normalized dataset.
+
+cat("On-disk realization of normalized dataset ...\n")
+DelayedArray::setAutoBlockSize(realize_block_size * 1e6)
 normalized_path <- tempfile()
 if (format == "sparse") {
-    normalized <- writeTENxMatrix(normalized, normalized_path,
-                                  group="matrix", level=0)
+    timing <- system.time(
+        normalized <- writeTENxMatrix(normalized, normalized_path,
+                                      group="matrix", level=0)
+    )
 } else {
-    normalized <- writeHDF5Array(normalized, normalized_path,
-                                 name="normalized_counts", level=0)
+    timing <- system.time(
+        normalized <- writeHDF5Array(normalized, normalized_path,
+                                     name="normalized_counts", level=0)
+    )
 }
-gcm <- gc()
+gc()
+realize_time <- timing[["elapsed"]]
+cat("---> realization completed in ", realize_time, " s.\n\n", sep="")
 
 ## PCA.
 
@@ -117,6 +131,8 @@ cat("ncells: ", ncells, "\n",
     "format: ", format, "\n",
     "norm_block_size: ", norm_block_size, "\n",
     "norm_time: ", norm_time, "\n",
+    "realize_block_size: ", realize_block_size, "\n",
+    "realize_time: ", realize_time, "\n",
     "pca_block_size: ", pca_block_size, "\n",
     "pca_time: ", pca_time, "\n",
     "\n", sep="", file="timings.dcf", append=TRUE)
