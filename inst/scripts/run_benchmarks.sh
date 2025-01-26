@@ -5,7 +5,7 @@
 #   cd path/to/HDF5Array/inst/scripts/timings_db/<machine-name>
 #   time ../../run_benchmarks.sh >run_benchmarks.log 2>&1 &
 #
-# It takes between 12 and 30 hours to complete, depending on the machine!
+# It takes between 10 and 30 hours to complete, depending on the machine!
 
 set -e  # exit immediately if a simple command exits with a non-zero status
 

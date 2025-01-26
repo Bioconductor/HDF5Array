@@ -1,7 +1,3 @@
-### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### .build_html_table()
-###
-
 .EXPECTED_TIMINGS_COLS <- c("ncells", "num_var_genes", "format",
                             "norm_block_size", "norm_time",
                             "realize_block_size", "realize_time",
@@ -49,121 +45,215 @@
     as.integer(t + 0.5)  # rounding to the closest integer
 }
 
-.make_header_lines <- function(timings, block_sizes=c(40L, 100L, 250L))
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### deparse_html_tree()
+###
+### Generate HTML from a nested list representation of the HTML document.
+###
+### HTML element: named ordinary list with 1 to 4 components:
+###   1. tag:     single string
+###   2. attribs: named character or numeric vector
+###   3. style:   unnamed character vector
+###   4. content: can be either
+###      - a character vector: interpreted as text (including unparsed html);
+###      - a named list: must represent an HTML element;
+###      - an unnamed list: represents mix content where each list
+###        element must be either a character vector or an HTML element.
+### Only the first element (tag) is mandatory.
+### Example:
+###   td_elt <- list(tag="td", style="padding: 2pt", content=c("hi", "there"))
+###   tr_elt <- list(tag="tr", content=list(td_elt, td_elt, td_elt))
+###   table_elt <- list(tag="table", style="background: grey", content=tr_elt)
+### Note that 'table_elt' is a tree structure similar to the Document Object
+### Model (DOM) representation, but with a simple representation based on
+### nested lists.
+
+### Returns a single string.
+.deparse_elt_attribs <- function(attribs)
 {
-    th_style <- c(.BASE_STYLE, "background: #CCC")
-    th_style <- paste0("style='", paste(th_style, collapse="; "), "'")
-
-    cat('  <tr>\n')
-    cat('    <th></th>\n')
-    colspan <- 1L + 2L * length(block_sizes)
-    cat(sprintf('    <th %s colspan="%d">\n', th_style, colspan))
-    cat('      sparse<br/>(TENxMatrix)\n')
-    cat('    </th>\n')
-    cat(sprintf('    <th %s colspan="%d">\n', th_style, colspan))
-    cat('      dense<br/>(HDF5Matrix)\n')
-    cat('    </th>\n')
-    cat('  </tr>\n')
-
-    cat('  <tr>\n')
-    cat(sprintf('    <th %s rowspan="2">\n', th_style))
-    cat('      object<br />dimensions<br />(genes&nbsp;x&nbsp;cells)\n')
-    cat('    </th>\n')
-    cat(sprintf('    <th %s rowspan="2">\n', th_style))
-    cat('      object name\n')
-    cat('    </th>\n')
-    for (j in seq_along(block_sizes)) {
-        cat(sprintf('    <th %s colspan="2">\n', th_style))
-        cat(sprintf('      block&nbsp;size<br />= %s&nbsp;Mb\n',
-                    block_sizes[[j]]))
-        cat('    </th>\n')
-    }
-    cat(sprintf('    <th %s rowspan="2">\n', th_style))
-    cat('      object name\n')
-    cat('    </th>\n')
-    for (j in seq_along(block_sizes)) {
-        cat(sprintf('    <th %s colspan="2">\n', th_style))
-        cat(sprintf('      block&nbsp;size<br />= %s&nbsp;Mb\n',
-                    block_sizes[[j]]))
-        cat('    </th>\n')
-    }
-    cat('  </tr>\n')
-
-    cat('  <tr>\n')
-    for (j in seq_len(2L * length(block_sizes))) {
-        cat(sprintf('    <th %s>time<br />in<br />seconds</th>\n', th_style))
-        cat(sprintf('    <th %s>max.<br />mem.<br />used</th>\n', th_style))
-    }
-    cat('  </tr>\n')
+    if (!(is.character(attribs) || is.numeric(attribs)))
+        stop(wmsg("'attribs' must be a named character or numeric vector"))
+    attribs_names <- names(attribs)
+    if (is.null(attribs_names))
+        stop(wmsg("'attribs' must be a named character or numeric vector"))
+    attribs <- paste0(attribs_names, "=\"", attribs, "\"")
+    paste(attribs, collapse=" ")
 }
 
+### Returns a single string.
+.deparse_elt_style <- function(style)
+{
+    if (!is.character(style))
+        stop(wmsg("'style' must be a character vector"))
+    if (!is.null(names(style)))
+        stop(wmsg("'style' cannot have names"))
+    paste0("style=\"", paste(style, collapse="; "), "\"")
+}
+
+### Returns a character vector.
+.deparse_elt_content <- function(content)
+{
+    if (is.character(content))
+        return(content)
+    if (!is.list(content))
+        stop(wmsg("'content' must be either a character vector or a list"))
+    if (!is.null(names(content)))
+        return(.deparse_elt(content))
+    unlist(lapply(content, .deparse_elt_content))
+}
+
+### Returns a character vector.
+.deparse_elt <- function(elt)
+{
+    stopifnot(is.list(elt))
+    elt_names <- names(elt)
+    VALID_NAMES <- c("tag", "attribs", "style", "content")
+    invalid_names <- setdiff(elt_names, VALID_NAMES)
+    if (length(invalid_names) != 0L) {
+        in1string <- paste(invalid_names, collapse=", ")
+        stop(wmsg("invalid names on HTML element: ", in1string))
+    }
+    tag <- elt$tag
+    if (is.null(tag))
+        stop(wmsg("'tag' missing on HTML element"))
+    if (!isSingleString(tag) || tag == "")
+        stop(wmsg("'tag' must be a single string"))
+    attribs <- elt$attribs
+    if (!is.null(attribs))
+        attribs <- .deparse_elt_attribs(attribs)
+    style <- elt$style
+    if (!is.null(style))
+        style <- .deparse_elt_style(style)
+    content <- elt$content
+    if (!is.null(content))
+        content <- paste0("  ", .deparse_elt_content(content))
+    tag_html <- paste0("<", tag)
+    if (!is.null(attribs))
+        tag_html <- paste(tag_html, attribs)
+    if (!is.null(style))
+        tag_html <- paste(tag_html, style)
+    tag_html <- paste0(tag_html, ">")
+    c(tag_html, content, paste0("</", tag, ">"))
+}
+
+deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .build_html_table()
+###
+
 .NGENES_BEFORE_NORM <- 27998
+.TABLE_STYLE <- c("margin-left: 0pt",
+                  "text-align: center",
+                  "font-size: smaller")
 .BASE_STYLE <- c("border: 1pt solid #888", "padding: 2pt")
+.TH_STYLE <- c(.BASE_STYLE, "background: #CCC")
 .MIN_STYLE <- c(.BASE_STYLE, "background: #EFE")
 .NA_STYLE <- c(.BASE_STYLE, "color: #D00")
 
-## Produces 2 * length(times) td elements.
+.make_header_tr_elts <- function(block_sizes=c(40L, 100L, 250L))
+{
+    ## 1st <tr> element.
+    th11_elt <- list(tag="th")
+    colspan <- 1L + 2L * length(block_sizes)
+    th12_elt <- list(tag="th",
+                     attribs=c(colspan=colspan),
+                     style=.TH_STYLE,
+                     content="sparse<br/>(TENxMatrix)")
+    th13_elt <- list(tag="th",
+                     attribs=c(colspan=colspan),
+                     style=.TH_STYLE,
+                     content="dense<br/>(HDF5Matrix)")
+    tr1_elt <- list(tag="tr", content=list(th11_elt, th12_elt, th13_elt))
+
+    ## 2nd <tr> element.
+    th2od_elt <- list(tag="th",
+                      attribs=c(rowspan=2),
+                      style=.TH_STYLE,
+                      content=c("object<br />",
+                                "dimensions<br />",
+                                "(genes&nbsp;x&nbsp;cells)"))
+    th2on_elt <- list(tag="th",
+                      attribs=c(rowspan=2),
+                      style=.TH_STYLE,
+                      content="object name")
+    th2bs_elts <- lapply(block_sizes,
+        function(block_size) {
+            content <- sprintf("block&nbsp;size<br />= %s&nbsp;Mb", block_size)
+            list(tag="th",
+                 attribs=c(colspan=2),
+                 style=.TH_STYLE,
+                 content=content)
+        })
+    content <- list(th2od_elt, th2on_elt, th2bs_elts, th2on_elt, th2bs_elts)
+    tr2_elt <- list(tag="tr", content=content)
+
+    ## 3rd <tr> element.
+    content <- lapply(seq_len(2L * length(block_sizes)),
+        function(j) {
+            content <- "time<br />in<br />seconds"
+            th31_elt <- list(tag="th", style=.TH_STYLE, content=content)
+            content <- "max.<br />mem.<br />used"
+            th32_elt <- list(tag="th", style=.TH_STYLE, content=content)
+            list(th31_elt, th32_elt)
+        })
+    tr3_elt <- list(tag="tr", content=content)
+
+    list(tr1_elt, tr2_elt, tr3_elt)
+}
+
+## Produces 2 * length(times) <td> elements.
 .make_td_group <- function(times)
 {
     stopifnot(is.integer(times))
-    base_style <- paste0("style='", paste(.BASE_STYLE, collapse="; "), "'")
-    min_style <- paste0("style='", paste(.MIN_STYLE, collapse="; "), "'")
-    na_style <- paste0("style='", paste(.NA_STYLE, collapse="; "), "'")
-
     min_time <- suppressWarnings(min(times, na.rm=TRUE))
-    for (j in seq_along(times)) {
-        t <- times[[j]]
-        if (is.na(t)) {
-            style <- na_style
-        } else if (t == min_time) {
-            style <- min_style
-        } else {
-            style <- base_style
-        }
-        cat(sprintf('    <td %s>%d</td>\n', style, t))
-        cat(sprintf('    <td %s></td>\n', base_style))
-    }
+    lapply(times,
+        function(t) {
+            if (is.na(t)) {
+                style <- .NA_STYLE
+            } else if (t == min_time) {
+                style <- .MIN_STYLE
+            } else {
+                style <- .BASE_STYLE
+            }
+            td1_elt <- list(tag="td", style=style, content=as.character(t))
+            td2_elt <- list(tag="td", style=.BASE_STYLE)
+            list(td1_elt, td2_elt)
+        })
 }
 
-## Produces a tr element with 3 + 4 * length(block_sizes) td elements in it.
-.make_data_line <- function(timings, step=c("norm", "realize", "pca"),
-                            ncells, num_var_genes, dataset_rank,
-                            block_sizes=c(40L, 100L, 250L))
+## Produces a <tr> element with 3 + 2 * (n1 + n2) <td> elements in it,
+## where n1 = length(sparse_times) and n2 = length(dense_times).
+.make_data_line <- function(sparse_times, dense_times,
+                            step=c("norm", "realize", "pca"),
+                            ncells, num_var_genes, dataset_rank)
 {
+    stopifnot(is.integer(sparse_times), is.integer(dense_times))
     step <- match.arg(step)
     ngenes <- if (step == "norm") .NGENES_BEFORE_NORM else num_var_genes
-
-    base_style <- paste0("style='", paste(.BASE_STYLE, collapse="; "), "'")
-
-    cat('  <tr>\n')
-    cat(sprintf('    <td %s>%d&nbsp;x&nbsp;%d</td>\n',
-                base_style, ngenes, ncells))
+    content <- sprintf("%d&nbsp;x&nbsp;%d", ngenes, ncells)
+    td0_elt <- list(tag="td", style=.BASE_STYLE, content=content)
 
     ## Results for sparse objects.
     object_name <- sprintf("sparse%d", dataset_rank)
     if (step != "norm")
         object_name <- paste0(object_name, "n")
-    cat(sprintf('    <td %s><code>%s</code></td>\n', base_style, object_name))
-    times <- vapply(block_sizes,
-        function(block_size)
-            .get_time(timings, ncells, num_var_genes, "sparse",
-                      step, block_size),
-        integer(1), USE.NAMES=FALSE)
-    .make_td_group(times)
+    code_elt <- list(tag="code", content=object_name)
+    td1_elt <- list(tag="td", style=.BASE_STYLE, content=code_elt)
+    td_group1 <- .make_td_group(sparse_times)
 
     ## Results for dense objects.
     object_name <- sprintf("dense%d", dataset_rank)
     if (step != "norm")
         object_name <- paste0(object_name, "n")
-    cat(sprintf('    <td %s><code>%s</code></td>\n', base_style, object_name))
-    times <- vapply(block_sizes,
-        function(block_size)
-            .get_time(timings, ncells, num_var_genes, "dense",
-                      step, block_size),
-        integer(1), USE.NAMES=FALSE)
-    .make_td_group(times)
+    code_elt <- list(tag="code", content=object_name)
+    td2_elt <- list(tag="td", style=.BASE_STYLE, content=code_elt)
+    td_group2 <- .make_td_group(dense_times)
 
-    cat('  </tr>\n')
+    content <- list(td0_elt, td1_elt, td_group1, td2_elt, td_group2)
+    list(tag="tr", content=content)
 }
 
 .make_data_lines <- function(timings, num_var_genes=1000L,
@@ -172,12 +262,23 @@
 {
     step <- match.arg(step)
     unique_ncells <- sort(as.integer(unique(timings[ , "ncells"])))
-    for (i in seq_along(unique_ncells)) {
-        ncells <- unique_ncells[[i]]
-        .make_data_line(timings, step=step,
-                        ncells=ncells, num_var_genes=num_var_genes,
-                        dataset_rank=i, block_sizes=block_sizes)
-    }
+    lapply(seq_along(unique_ncells),
+        function(i) {
+            ncells <- unique_ncells[[i]]
+            sparse_times <- vapply(block_sizes,
+                function(block_size) {
+                    .get_time(timings, ncells, num_var_genes, "sparse",
+                              step, block_size)
+                }, integer(1), USE.NAMES=FALSE)
+            dense_times <- vapply(block_sizes,
+                function(block_size) {
+                    .get_time(timings, ncells, num_var_genes, "dense",
+                              step, block_size)
+                }, integer(1), USE.NAMES=FALSE)
+            .make_data_line(sparse_times, dense_times, step=step,
+                            ncells=ncells, num_var_genes=num_var_genes,
+                            dataset_rank=i)
+        })
 }
 
 ### Generates an HTML table with 3 + 4 * length(block_sizes) columns.
@@ -185,36 +286,44 @@
                               block_sizes=c(40L, 100L, 250L))
 {
     timings <- .check_and_add_missing_cols(timings)
-
     table_ncols <- 3L + 4L * length(block_sizes)
-
-    TABLE_STYLE <- c("margin-left: 0pt",
-                     "text-align: center",
-                     "font-size: smaller")
-    table_style <- paste0("style='", paste(TABLE_STYLE, collapse="; "), "'")
-    cat(sprintf('<table %s>\n', table_style))
-
-    .make_header_lines(timings, block_sizes=block_sizes)
-
+    header_tr_elts <- .make_header_tr_elts(block_sizes=block_sizes)
     th_style <- c(.BASE_STYLE, "background: #EEE")
-    th_style <- paste0("style='", paste(th_style, collapse="; "), "'")
 
-    cat(sprintf('<tr><th %s colspan="%d">1. Normalization</th></tr>\n',
-                th_style, table_ncols))
-    .make_data_lines(timings, num_var_genes=num_var_genes,
-                     step="norm", block_sizes=block_sizes)
+    ## 1. Normalization.
+    content <- c("1.&nbsp;Normalization (&amp;&nbsp;selection&nbsp;of&nbsp;",
+                 num_var_genes, "&nbsp;most&nbsp;variable&nbsp;genes)")
+    th_elt <- list(tag="th",
+                   attribs=c(colspan=table_ncols),
+                   style=th_style,
+                   content=content)
+    norm_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
+                                     step="norm", block_sizes=block_sizes)
+    norm_tr_elts <- list(list(tag="tr", content=th_elt), norm_tr_elts)
 
-    cat(sprintf('<tr><th %s colspan="%d">2. On-disk realization of the normalized datasets</th></tr>\n',
-                th_style, table_ncols))
-    .make_data_lines(timings, num_var_genes=num_var_genes,
-                     step="realize", block_sizes=block_sizes)
+    ## 2. Realization.
+    content <- "2.&nbsp;On-disk realization of the normalized datasets"
+    th_elt <- list(tag="th",
+                   attribs=c(colspan=table_ncols),
+                   style=th_style,
+                   content=content)
+    realize_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
+                                        step="realize", block_sizes=block_sizes)
+    realize_tr_elts <- list(list(tag="tr", content=th_elt), realize_tr_elts)
 
-    cat(sprintf('<tr><th %s colspan="%d">3. PCA</th></tr>\n',
-                th_style, table_ncols))
-    .make_data_lines(timings, num_var_genes=num_var_genes,
-                     step="pca", block_sizes=block_sizes)
+    ## 3. PCA.
+    th_elt <- list(tag="th",
+                   attribs=c(colspan=table_ncols),
+                   style=th_style,
+                   content="3.&nbsp;PCA")
+    pca_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
+                                    step="pca", block_sizes=block_sizes)
+    pca_tr_elts <- list(list(tag="tr", content=th_elt), pca_tr_elts)
 
-    cat('</table>\n')
+    content <- list(header_tr_elts, norm_tr_elts, realize_tr_elts, pca_tr_elts)
+    list(tag="table",
+         style=.TABLE_STYLE,
+	 content=content)
 }
 
 
@@ -242,13 +351,15 @@
 }
 
 make_timings_table <- function(machine_name, num_var_genes=1000L,
-                               block_sizes=c(40L, 100L, 250L))
+                               block_sizes=c(40L, 100L, 250L),
+                               file="")
 {
     file_path <- .find_timings_file(machine_name)
     stopifnot(is.numeric(block_sizes))
 
     timings <- read.dcf(file_path)  # character matrix
-    .build_html_table(timings, num_var_genes=num_var_genes,
-                      block_sizes=block_sizes)
+    html_table <- .build_html_table(timings, num_var_genes=num_var_genes,
+                                    block_sizes=block_sizes)
+    cat(deparse_html_tree(html_table), sep="\n", file=file)
 }
 
