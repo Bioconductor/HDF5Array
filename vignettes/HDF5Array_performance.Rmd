@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 24 January 2025"
+date: "Compiled `r doc_date()`; Modified 25 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -533,8 +533,8 @@ a given operation.
 </pre>
 </td></tr></table>
 
-```{r xps15_timings, echo=FALSE, results='asis'}
-make_timings_table("xps15", num_var_genes=1000L)
+```{r xps15_timings_1k_var_genes, echo=FALSE, results='asis'}
+make_timings_table("xps15", num_var_genes="1000")
 ```
 _Note: "max. mem. used" columns to be populated soon._
 
@@ -553,8 +553,8 @@ _Note: "max. mem. used" columns to be populated soon._
 </pre>
 </td></tr></table>
 
-```{r rex3_timings, echo=FALSE, results='asis'}
-make_timings_table("rex3", num_var_genes=1000L)
+```{r rex3_timings_1k_var_genes, echo=FALSE, results='asis'}
+make_timings_table("rex3", num_var_genes="1000")
 ```
 _Note: "max. mem. used" columns to be populated soon._
 
@@ -566,8 +566,8 @@ _Note: "max. mem. used" columns to be populated soon._
 - **Disk:** 2TB SSD
 - **Disk performance**: N/A
 
-```{r kjohnson3_timings, echo=FALSE, results='asis'}
-make_timings_table("kjohnson3", num_var_genes=1000L)
+```{r kjohnson3_timings_1k_var_genes, echo=FALSE, results='asis'}
+make_timings_table("kjohnson3", num_var_genes="1000")
 ```
 _Note: "max. mem. used" columns to be populated soon._
 

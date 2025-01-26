@@ -3,7 +3,10 @@
                             "realize_block_size", "realize_time",
                             "pca_block_size", "pca_time")
 
-.check_and_add_missing_cols <- function(timings)
+.VALID_FORMATS <- c("sparse", "dense")
+.VALID_STEPS <- c("norm", "realize", "pca")
+
+.check_and_add_missing_timings_cols <- function(timings)
 {
     stopifnot(is.matrix(timings))
     missing_cols <- setdiff(.EXPECTED_TIMINGS_COLS, colnames(timings))
@@ -21,12 +24,13 @@
     timings
 }
 
-.get_time <- function(timings, ncells, num_var_genes, format, step, block_size)
+### Returns a single integer or NA_integer_.
+.get_time <- function(timings, ncells, num_var_genes, format, block_size, step)
 {
     stopifnot(is.matrix(timings), is.character(timings),
-              isSingleNumber(ncells), isSingleNumber(num_var_genes),
+              isSingleString(ncells), isSingleString(num_var_genes),
               isSingleString(format), isSingleString(step),
-              isSingleNumber(block_size))
+              isSingleString(block_size))
     ok1 <- timings[ , "ncells"] == ncells &
            timings[ , "num_var_genes"] == num_var_genes &
            timings[ , "format"] == format
@@ -43,6 +47,41 @@
     time_colname <- paste0(step, "_time")
     t <- suppressWarnings(as.numeric(timings[rowidx, time_colname]))
     as.integer(t + 0.5)  # rounding to the closest integer
+}
+
+### Returns a 5D integer array.
+.fold_timings_matrix_into_5D_array <- function(timings)
+{
+    timings <- .check_and_add_missing_timings_cols(timings)
+    stopifnot(all(timings[ , "format"] %in% .VALID_FORMATS))
+    block_size_colnames <- paste0(.VALID_STEPS, "_block_size")
+    unique_block_sizes <- as.integer(timings[ , block_size_colnames])
+    unique_block_sizes <- sort(unique(unique_block_sizes))
+    unique_num_var_genes <- as.integer(timings[ , "num_var_genes"])
+    unique_num_var_genes <- sort(unique(unique_num_var_genes))
+    unique_ncells <- as.integer(timings[ , "ncells"])
+    unique_ncells <- sort(unique(unique_ncells))
+    ans_dimnames <- list(step=.VALID_STEPS,
+                         block_size=as.character(unique_block_sizes),
+                         format=.VALID_FORMATS,
+                         num_var_genes=as.character(unique_num_var_genes),
+                         ncells=as.character(unique_ncells))
+    ans_dim <- lengths(ans_dimnames)
+    ans <- array(NA_integer_, dim=ans_dim, dimnames=ans_dimnames)
+    for (ncells in dimnames(ans)[[5L]]) {
+        for (num_var_genes in dimnames(ans)[[4L]]) {
+            for (format in dimnames(ans)[[3L]]) {
+                for (block_size in dimnames(ans)[[2L]]) {
+                    for (step in dimnames(ans)[[1L]]) {
+                      t <- .get_time(timings, ncells, num_var_genes,
+                                              format, block_size, step)
+                      ans[step, block_size, format, num_var_genes, ncells] <- t
+                    }
+                }
+            }
+        }
+    }
+    ans
 }
 
 
@@ -153,7 +192,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 .MIN_STYLE <- c(.BASE_STYLE, "background: #EFE")
 .NA_STYLE <- c(.BASE_STYLE, "color: #D00")
 
-.make_header_tr_elts <- function(block_sizes=c(40L, 100L, 250L))
+.make_header_tr_elts <- function(block_sizes)
 {
     ## 1st <tr> element.
     th11_elt <- list(tag="th")
@@ -179,7 +218,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                       attribs=c(rowspan=2),
                       style=.TH_STYLE,
                       content="object name")
-    th2bs_elts <- lapply(block_sizes,
+    th2bs_elts <- lapply(unname(block_sizes),
         function(block_size) {
             content <- sprintf("block&nbsp;size<br />= %s&nbsp;Mb", block_size)
             list(tag="th",
@@ -209,7 +248,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 {
     stopifnot(is.integer(times))
     min_time <- suppressWarnings(min(times, na.rm=TRUE))
-    lapply(times,
+    lapply(unname(times),
         function(t) {
             if (is.na(t)) {
                 style <- .NA_STYLE
@@ -227,67 +266,57 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 ## Produces a <tr> element with 3 + 2 * (n1 + n2) <td> elements in it,
 ## where n1 = length(sparse_times) and n2 = length(dense_times).
 .make_data_line <- function(sparse_times, dense_times,
-                            step=c("norm", "realize", "pca"),
-                            ncells, num_var_genes, dataset_rank)
+                            step, ncells, num_var_genes, dataset_rank)
 {
     stopifnot(is.integer(sparse_times), is.integer(dense_times))
-    step <- match.arg(step)
     ngenes <- if (step == "norm") .NGENES_BEFORE_NORM else num_var_genes
-    content <- sprintf("%d&nbsp;x&nbsp;%d", ngenes, ncells)
+    content <- sprintf("%s&nbsp;x&nbsp;%s", ngenes, ncells)
     td0_elt <- list(tag="td", style=.BASE_STYLE, content=content)
 
     ## Results for sparse objects.
     object_name <- sprintf("sparse%d", dataset_rank)
     if (step != "norm")
         object_name <- paste0(object_name, "n")
-    code_elt <- list(tag="code", content=object_name)
-    td1_elt <- list(tag="td", style=.BASE_STYLE, content=code_elt)
+    content <- sprintf("<code>%s</code>", object_name)
+    td1_elt <- list(tag="td", style=.BASE_STYLE, content=content)
     td_group1 <- .make_td_group(sparse_times)
 
     ## Results for dense objects.
     object_name <- sprintf("dense%d", dataset_rank)
     if (step != "norm")
         object_name <- paste0(object_name, "n")
-    code_elt <- list(tag="code", content=object_name)
-    td2_elt <- list(tag="td", style=.BASE_STYLE, content=code_elt)
+    content <- sprintf("<code>%s</code>", object_name)
+    td2_elt <- list(tag="td", style=.BASE_STYLE, content=content)
     td_group2 <- .make_td_group(dense_times)
 
     content <- list(td0_elt, td1_elt, td_group1, td2_elt, td_group2)
     list(tag="tr", content=content)
 }
 
-.make_data_lines <- function(timings, num_var_genes=1000L,
-                             step=c("norm", "realize", "pca"),
-                             block_sizes=c(40L, 100L, 250L))
+.make_data_lines <- function(timings, step, num_var_genes="1000")
 {
-    step <- match.arg(step)
-    unique_ncells <- sort(as.integer(unique(timings[ , "ncells"])))
+    stopifnot(isSingleString(step), step %in% .VALID_STEPS)
+    unique_ncells <- dimnames(timings)$ncells
+    unique_block_sizes <- dimnames(timings)$block_size
     lapply(seq_along(unique_ncells),
         function(i) {
             ncells <- unique_ncells[[i]]
-            sparse_times <- vapply(block_sizes,
-                function(block_size) {
-                    .get_time(timings, ncells, num_var_genes, "sparse",
-                              step, block_size)
-                }, integer(1), USE.NAMES=FALSE)
-            dense_times <- vapply(block_sizes,
-                function(block_size) {
-                    .get_time(timings, ncells, num_var_genes, "dense",
-                              step, block_size)
-                }, integer(1), USE.NAMES=FALSE)
+            sparse_times <- timings[step, , "sparse", num_var_genes, ncells]
+            dense_times  <- timings[step, , "dense" , num_var_genes, ncells]
             .make_data_line(sparse_times, dense_times, step=step,
                             ncells=ncells, num_var_genes=num_var_genes,
                             dataset_rank=i)
         })
 }
 
-### Generates an HTML table with 3 + 4 * length(block_sizes) columns.
-.build_html_table <- function(timings, num_var_genes=1000L,
-                              block_sizes=c(40L, 100L, 250L))
+### Generates an HTML table with 3 + 4 * length(unique_block_sizes) columns,
+### where 'unique_block_sizes' is 'dimnames(timings)$block_size'.
+.build_html_table <- function(timings, num_var_genes="1000")
 {
-    timings <- .check_and_add_missing_cols(timings)
-    table_ncols <- 3L + 4L * length(block_sizes)
-    header_tr_elts <- .make_header_tr_elts(block_sizes=block_sizes)
+    stopifnot(length(dim(timings)) == 5L, isSingleString(num_var_genes))
+    unique_block_sizes <- dimnames(timings)$block_size
+    header_tr_elts <- .make_header_tr_elts(unique_block_sizes)
+    table_ncols <- 3L + 4L * length(unique_block_sizes)
     th_style <- c(.BASE_STYLE, "background: #EEE")
 
     ## 1. Normalization.
@@ -297,8 +326,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                    attribs=c(colspan=table_ncols),
                    style=th_style,
                    content=content)
-    norm_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
-                                     step="norm", block_sizes=block_sizes)
+    norm_tr_elts <- .make_data_lines(timings, "norm",
+                                     num_var_genes=num_var_genes)
     norm_tr_elts <- list(list(tag="tr", content=th_elt), norm_tr_elts)
 
     ## 2. Realization.
@@ -307,8 +336,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                    attribs=c(colspan=table_ncols),
                    style=th_style,
                    content=content)
-    realize_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
-                                        step="realize", block_sizes=block_sizes)
+    realize_tr_elts <- .make_data_lines(timings, "realize",
+                                        num_var_genes=num_var_genes)
     realize_tr_elts <- list(list(tag="tr", content=th_elt), realize_tr_elts)
 
     ## 3. PCA.
@@ -316,14 +345,14 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                    attribs=c(colspan=table_ncols),
                    style=th_style,
                    content="3.&nbsp;PCA")
-    pca_tr_elts <- .make_data_lines(timings, num_var_genes=num_var_genes,
-                                    step="pca", block_sizes=block_sizes)
+    pca_tr_elts <- .make_data_lines(timings, "pca",
+                                    num_var_genes=num_var_genes)
     pca_tr_elts <- list(list(tag="tr", content=th_elt), pca_tr_elts)
 
     content <- list(header_tr_elts, norm_tr_elts, realize_tr_elts, pca_tr_elts)
     list(tag="table",
          style=.TABLE_STYLE,
-	 content=content)
+         content=content)
 }
 
 
@@ -350,16 +379,13 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     sort(file_paths, decreasing=TRUE)[[1L]]
 }
 
-make_timings_table <- function(machine_name, num_var_genes=1000L,
-                               block_sizes=c(40L, 100L, 250L),
-                               file="")
+make_timings_table <- function(machine_name, num_var_genes="1000", file="")
 {
+    stopifnot(isSingleString(num_var_genes))
     file_path <- .find_timings_file(machine_name)
-    stopifnot(is.numeric(block_sizes))
-
     timings <- read.dcf(file_path)  # character matrix
-    html_table <- .build_html_table(timings, num_var_genes=num_var_genes,
-                                    block_sizes=block_sizes)
+    timings <- .fold_timings_matrix_into_5D_array(timings)
+    html_table <- .build_html_table(timings, num_var_genes=num_var_genes)
     cat(deparse_html_tree(html_table), sep="\n", file=file)
 }
 
