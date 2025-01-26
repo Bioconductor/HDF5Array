@@ -1,0 +1,600 @@
+ncells: 12500
+num_var_genes: 1000
+format: sparse
+norm_block_size: 40
+norm_time: 109.402
+realize_block_size: 40
+realize_time: 8.836
+pca_block_size: 40
+pca_time: 66.943
+
+ncells: 12500
+num_var_genes: 1000
+format: sparse
+norm_block_size: 100
+norm_time: 84.633
+realize_block_size: 100
+realize_time: 10.522
+pca_block_size: 100
+pca_time: 88.648
+
+ncells: 12500
+num_var_genes: 1000
+format: sparse
+norm_block_size: 250
+norm_time: 73.871
+realize_block_size: 250
+realize_time: 9.426
+pca_block_size: 250
+pca_time: 90.384
+
+ncells: 12500
+num_var_genes: 1000
+format: dense
+norm_block_size: 40
+norm_time: 84.723
+realize_block_size: 40
+realize_time: 3.294
+pca_block_size: 40
+pca_time: 63.075
+
+ncells: 12500
+num_var_genes: 1000
+format: dense
+norm_block_size: 100
+norm_time: 89.621
+realize_block_size: 100
+realize_time: 3.298
+pca_block_size: 100
+pca_time: 71.438
+
+ncells: 12500
+num_var_genes: 1000
+format: dense
+norm_block_size: 250
+norm_time: 79.762
+realize_block_size: 250
+realize_time: 3.361
+pca_block_size: 250
+pca_time: 66.057
+
+ncells: 12500
+num_var_genes: 2000
+format: sparse
+norm_block_size: 40
+norm_time: 114.048
+realize_block_size: 40
+realize_time: 11.699
+pca_block_size: 40
+pca_time: 129.202
+
+ncells: 12500
+num_var_genes: 2000
+format: sparse
+norm_block_size: 100
+norm_time: 98.395
+realize_block_size: 100
+realize_time: 13.233
+pca_block_size: 100
+pca_time: 140.639
+
+ncells: 12500
+num_var_genes: 2000
+format: sparse
+norm_block_size: 250
+norm_time: 78.347
+realize_block_size: 250
+realize_time: 12.926
+pca_block_size: 250
+pca_time: 122.113
+
+ncells: 12500
+num_var_genes: 2000
+format: dense
+norm_block_size: 40
+norm_time: 87.938
+realize_block_size: 40
+realize_time: 4.775
+pca_block_size: 40
+pca_time: 127.592
+
+ncells: 12500
+num_var_genes: 2000
+format: dense
+norm_block_size: 100
+norm_time: 96.922
+realize_block_size: 100
+realize_time: 6.205
+pca_block_size: 100
+pca_time: 145.343
+
+ncells: 12500
+num_var_genes: 2000
+format: dense
+norm_block_size: 250
+norm_time: 82.698
+realize_block_size: 250
+realize_time: 6.368
+pca_block_size: 250
+pca_time: 215.235
+
+ncells: 25000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 40
+norm_time: 235.171
+realize_block_size: 40
+realize_time: 17.873
+pca_block_size: 40
+pca_time: 150.398
+
+ncells: 25000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 100
+norm_time: 191.747
+realize_block_size: 100
+realize_time: 17.521
+pca_block_size: 100
+pca_time: 172.326
+
+ncells: 25000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 250
+norm_time: 144.295
+realize_block_size: 250
+realize_time: 18.955
+pca_block_size: 250
+pca_time: 142.498
+
+ncells: 25000
+num_var_genes: 1000
+format: dense
+norm_block_size: 40
+norm_time: 178.29
+realize_block_size: 40
+realize_time: 6.97
+pca_block_size: 40
+pca_time: 141.657
+
+ncells: 25000
+num_var_genes: 1000
+format: dense
+norm_block_size: 100
+norm_time: 184.401
+realize_block_size: 100
+realize_time: 7.572
+pca_block_size: 100
+pca_time: 145.26
+
+ncells: 25000
+num_var_genes: 1000
+format: dense
+norm_block_size: 250
+norm_time: 169.551
+realize_block_size: 250
+realize_time: 8.078
+pca_block_size: 250
+pca_time: 214.654
+
+ncells: 25000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 40
+norm_time: 246.165
+realize_block_size: 40
+realize_time: 24.618
+pca_block_size: 40
+pca_time: 228.138
+
+ncells: 25000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 100
+norm_time: 201.438
+realize_block_size: 100
+realize_time: 28.464
+pca_block_size: 100
+pca_time: 276.018
+
+ncells: 25000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 250
+norm_time: 168.813
+realize_block_size: 250
+realize_time: 25.829
+pca_block_size: 250
+pca_time: 290.246
+
+ncells: 25000
+num_var_genes: 2000
+format: dense
+norm_block_size: 40
+norm_time: 183.496
+realize_block_size: 40
+realize_time: 13.703
+pca_block_size: 40
+pca_time: 300.652
+
+ncells: 25000
+num_var_genes: 2000
+format: dense
+norm_block_size: 100
+norm_time: 191.918
+realize_block_size: 100
+realize_time: 13.064
+pca_block_size: 100
+pca_time: 289.211
+
+ncells: 25000
+num_var_genes: 2000
+format: dense
+norm_block_size: 250
+norm_time: 184.023
+realize_block_size: 250
+realize_time: 11.093
+pca_block_size: 250
+pca_time: 448.305
+
+ncells: 50000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 40
+norm_time: 439.472
+realize_block_size: 40
+realize_time: 35.221
+pca_block_size: 40
+pca_time: 285.35
+
+ncells: 50000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 100
+norm_time: 370.441
+realize_block_size: 100
+realize_time: 35.675
+pca_block_size: 100
+pca_time: 308.302
+
+ncells: 50000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 250
+norm_time: 303.355
+realize_block_size: 250
+realize_time: 34.024
+pca_block_size: 250
+pca_time: 343.747
+
+ncells: 50000
+num_var_genes: 1000
+format: dense
+norm_block_size: 40
+norm_time: 352.234
+realize_block_size: 40
+realize_time: 19.499
+pca_block_size: 40
+pca_time: 336.127
+
+ncells: 50000
+num_var_genes: 1000
+format: dense
+norm_block_size: 100
+norm_time: 379.139
+realize_block_size: 100
+realize_time: 14.936
+pca_block_size: 100
+pca_time: 287.222
+
+ncells: 50000
+num_var_genes: 1000
+format: dense
+norm_block_size: 250
+norm_time: 354.314
+realize_block_size: 250
+realize_time: 14.949
+pca_block_size: 250
+pca_time: 462.204
+
+ncells: 50000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 40
+norm_time: 471.019
+realize_block_size: 40
+realize_time: 51.243
+pca_block_size: 40
+pca_time: 375.42
+
+ncells: 50000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 100
+norm_time: 391.162
+realize_block_size: 100
+realize_time: 47.676
+pca_block_size: 100
+pca_time: 424.002
+
+ncells: 50000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 250
+norm_time: 325.974
+realize_block_size: 250
+realize_time: 50.43
+pca_block_size: 250
+pca_time: 464.025
+
+ncells: 50000
+num_var_genes: 2000
+format: dense
+norm_block_size: 40
+norm_time: 367.574
+realize_block_size: 40
+realize_time: 29.674
+pca_block_size: 40
+pca_time: 569.554
+
+ncells: 50000
+num_var_genes: 2000
+format: dense
+norm_block_size: 100
+norm_time: 394.172
+realize_block_size: 100
+realize_time: 23.845
+pca_block_size: 100
+pca_time: 645.434
+
+ncells: 50000
+num_var_genes: 2000
+format: dense
+norm_block_size: 250
+norm_time: 369.379
+realize_block_size: 250
+realize_time: 21.135
+pca_block_size: 250
+pca_time: 649.631
+
+ncells: 100000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 40
+norm_time: 881.033
+realize_block_size: 40
+realize_time: 67.494
+pca_block_size: 40
+pca_time: 602.906
+
+ncells: 100000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 100
+norm_time: 741.413
+realize_block_size: 100
+realize_time: 69.347
+pca_block_size: 100
+pca_time: 571.56
+
+ncells: 100000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 250
+norm_time: 598.224
+realize_block_size: 250
+realize_time: 66.631
+pca_block_size: 250
+pca_time: 590.274
+
+ncells: 100000
+num_var_genes: 1000
+format: dense
+norm_block_size: 40
+norm_time: 706.261
+realize_block_size: 40
+realize_time: 36.889
+pca_block_size: 40
+pca_time: 626.9
+
+ncells: 100000
+num_var_genes: 1000
+format: dense
+norm_block_size: 100
+norm_time: 745.568
+realize_block_size: 100
+realize_time: 29.931
+pca_block_size: 100
+pca_time: 681.378
+
+ncells: 100000
+num_var_genes: 1000
+format: dense
+norm_block_size: 250
+norm_time: 722.652
+realize_block_size: 250
+realize_time: 28.383
+pca_block_size: 250
+pca_time: 545.605
+
+ncells: 100000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 40
+norm_time: 921.355
+realize_block_size: 40
+realize_time: 92.178
+pca_block_size: 40
+pca_time: 777.289
+
+ncells: 100000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 100
+norm_time: 781.109
+realize_block_size: 100
+realize_time: 97.714
+pca_block_size: 100
+pca_time: 1111.794
+
+ncells: 100000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 250
+norm_time: 639.027
+realize_block_size: 250
+realize_time: 94.472
+pca_block_size: 250
+pca_time: 987.648
+
+ncells: 100000
+num_var_genes: 2000
+format: dense
+norm_block_size: 40
+norm_time: 736.306
+realize_block_size: 40
+realize_time: 69.588
+pca_block_size: 40
+pca_time: 1295.7
+
+ncells: 100000
+num_var_genes: 2000
+format: dense
+norm_block_size: 100
+norm_time: 764.354
+realize_block_size: 100
+realize_time: 56.851
+pca_block_size: 100
+pca_time: 1049.044
+
+ncells: 100000
+num_var_genes: 2000
+format: dense
+norm_block_size: 250
+norm_time: 751.565
+realize_block_size: 250
+realize_time: 45.435
+pca_block_size: 250
+pca_time: 1432.067
+
+ncells: 200000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 40
+norm_time: 1850.634
+realize_block_size: 40
+realize_time: 139.045
+pca_block_size: 40
+pca_time: 1096.794
+
+ncells: 200000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 100
+norm_time: 1486.546
+realize_block_size: 100
+realize_time: 132.043
+pca_block_size: 100
+pca_time: 1111.886
+
+ncells: 200000
+num_var_genes: 1000
+format: sparse
+norm_block_size: 250
+norm_time: 1282.735
+realize_block_size: 250
+realize_time: 126.885
+pca_block_size: 250
+pca_time: 1306.054
+
+ncells: 200000
+num_var_genes: 1000
+format: dense
+norm_block_size: 40
+norm_time: 1456.907
+realize_block_size: 40
+realize_time: 94.96
+pca_block_size: 40
+pca_time: 1748.55
+
+ncells: 200000
+num_var_genes: 1000
+format: dense
+norm_block_size: 100
+norm_time: 1568.639
+realize_block_size: 100
+realize_time: 78.677
+pca_block_size: 100
+pca_time: 1505.369
+
+ncells: 200000
+num_var_genes: 1000
+format: dense
+norm_block_size: 250
+norm_time: 1511.536
+realize_block_size: 250
+realize_time: 58.03
+pca_block_size: 250
+pca_time: 1746.77
+
+ncells: 200000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 40
+norm_time: 1912.848
+realize_block_size: 40
+realize_time: 192.798
+pca_block_size: 40
+pca_time: 1517.416
+
+ncells: 200000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 100
+norm_time: 1558.327
+realize_block_size: 100
+realize_time: 190.004
+pca_block_size: 100
+pca_time: 1777.929
+
+ncells: 200000
+num_var_genes: 2000
+format: sparse
+norm_block_size: 250
+norm_time: 1376.159
+realize_block_size: 250
+realize_time: 198.228
+pca_block_size: 250
+pca_time: 1786.073
+
+ncells: 200000
+num_var_genes: 2000
+format: dense
+norm_block_size: 40
+norm_time: 1497.24
+realize_block_size: 40
+realize_time: 155.992
+pca_block_size: 40
+pca_time: 2812.737
+
+ncells: 200000
+num_var_genes: 2000
+format: dense
+norm_block_size: 100
+norm_time: 1648.052
+realize_block_size: 100
+realize_time: 114.304
+pca_block_size: 100
+pca_time: 2326.321
+
+ncells: 200000
+num_var_genes: 2000
+format: dense
+norm_block_size: 250
+norm_time: 1554.112
+realize_block_size: 250
+realize_time: 88.42
+pca_block_size: 250
+pca_time: 3057.761
+
