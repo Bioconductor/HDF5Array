@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 25 January 2025"
+date: "Compiled `r doc_date()`; Modified 26 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -218,7 +218,7 @@ For our benchmarks below, we'll use the following block sizes:
 
 - normalization of the sparse datasets: 250 Mb
 - normalization of the dense datasets: 40 Mb
-- on-disk realization of the normalized sparse datasets: 40 Mb
+- on-disk realization of the normalized sparse datasets: 100 Mb
 - on-disk realization of the normalized dense datasets: 250 Mb
 - PCA on the normalized sparse datasets: 40 Mb
 - PCA on the normalized dense datasets: 100 Mb (the default)
@@ -338,9 +338,9 @@ operations will come next.
 
 ### On-disk realization of the normalized sparse datasets
 
-Set block size to 40 Mb:
+Set block size to 100 Mb:
 ```{r set_block_size_for_realize_sparse}
-DelayedArray::setAutoBlockSize(4e7)
+DelayedArray::setAutoBlockSize(1e8)
 ```
 
 #### 1000 x 12,500 normalized sparse dataset
@@ -377,7 +377,7 @@ showtree(sparse2n)  # "pristine" object (i.e. no more delayed operations)
 
 #### About memory usage
 
-With this block size (40 Mb), memory usage (as reported by Unix
+With this block size (100 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
 this document) remained < 3 Gb at all time.
 
@@ -510,13 +510,12 @@ stopifnot(all.equal(pca2s, pca2d))
 
 ## Comprehensive timings obtained on various systems
 
-Here we report normalization & PCA timings obtained on various systems.
-For each system, the results are summarized in a table that shows
-the `simple_normalize()` and `simple_pca()` timings obtained on all our test
-datasets and using three different block sizes: 40 Mb, 100 Mb, and 250 Mb.
-The times with <span style="background: #EFE;">light green</span> background
-correspond to the best time amongst the three different block sizes for
-a given operation.
+Here we report timings obtained on various systems. For each system, the
+results are summarized in a table that shows the normalization &
+realization & PCA timings obtained on all our test datasets and using
+three different block sizes: 40 Mb, 100 Mb, and 250 Mb.
+For each operation, the best time across the three different block
+sizes is displayed in **bold**.
 
 ### DELL XPS 15 laptop (model 9520)
 
@@ -533,10 +532,13 @@ a given operation.
 </pre>
 </td></tr></table>
 
-```{r xps15_timings_1k_var_genes, echo=FALSE, results='asis'}
-make_timings_table("xps15", num_var_genes="1000")
+```{r xps15_timings, echo=FALSE, results='asis'}
+make_timings_table("xps15")
 ```
-_Note: "max. mem. used" columns to be populated soon._
+_Notes:_
+- _For each operation, the best time across the three different block sizes
+  is displayed in **bold**;_
+- _The "max. mem. used" columns to be populated soon._
 
 ### Supermicro SuperServer 1029GQ-TRT
 
@@ -553,10 +555,29 @@ _Note: "max. mem. used" columns to be populated soon._
 </pre>
 </td></tr></table>
 
-```{r rex3_timings_1k_var_genes, echo=FALSE, results='asis'}
-make_timings_table("rex3", num_var_genes="1000")
+```{r rex3_timings, echo=FALSE, results='asis'}
+make_timings_table("rex3")
 ```
-_Note: "max. mem. used" columns to be populated soon._
+_Notes:_
+- _For each operation, the best time across the three different block sizes
+  is displayed in **bold**;_
+- _The "max. mem. used" columns to be populated soon._
+
+### Mac Pro (24-Core Intel Xeon W)
+
+- **OS:** macOS 12.7.6
+- **Bioconductor/R versions:** 3.21/4.5
+- **RAM:** 96GB
+- **Disk:** 1TB SSD
+- **Disk performance**: N/A
+
+```{r lconway_timings, echo=FALSE, results='asis'}
+make_timings_table("lconway")
+```
+_Notes:_
+- _For each operation, the best time across the three different block sizes
+  is displayed in **bold**;_
+- _The "max. mem. used" columns to be populated soon._
 
 ### Mac Pro (Apple M2 Ultra)
 
@@ -566,10 +587,13 @@ _Note: "max. mem. used" columns to be populated soon._
 - **Disk:** 2TB SSD
 - **Disk performance**: N/A
 
-```{r kjohnson3_timings_1k_var_genes, echo=FALSE, results='asis'}
-make_timings_table("kjohnson3", num_var_genes="1000")
+```{r kjohnson3_timings, echo=FALSE, results='asis'}
+make_timings_table("kjohnson3")
 ```
-_Note: "max. mem. used" columns to be populated soon._
+_Notes:_
+- _For each operation, the best time across the three different block sizes
+  is displayed in **bold**;_
+- _The "max. mem. used" columns to be populated soon._
 
 
 ## Final remarks
