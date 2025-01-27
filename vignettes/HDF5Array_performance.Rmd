@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 26 January 2025"
+date: "Compiled `r doc_date()`; Modified 27 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -533,12 +533,9 @@ sizes is displayed in **bold**.
 </td></tr></table>
 
 ```{r xps15_timings, echo=FALSE, results='asis'}
-make_timings_table("xps15")
+title <- "Table 1: Timings for DELL XPS 15 laptop"
+make_timings_table("xps15", title=title)
 ```
-_Notes:_
-- _For each operation, the best time across the three different block sizes
-  is displayed in **bold**;_
-- _The "max. mem. used" columns to be populated soon._
 
 ### Supermicro SuperServer 1029GQ-TRT
 
@@ -556,14 +553,11 @@ _Notes:_
 </td></tr></table>
 
 ```{r rex3_timings, echo=FALSE, results='asis'}
-make_timings_table("rex3")
+title <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
+make_timings_table("rex3", title=title)
 ```
-_Notes:_
-- _For each operation, the best time across the three different block sizes
-  is displayed in **bold**;_
-- _The "max. mem. used" columns to be populated soon._
 
-### Mac Pro (24-Core Intel Xeon W)
+### Intel Mac Pro (24-Core Intel Xeon W)
 
 - **OS:** macOS 12.7.6
 - **Bioconductor/R versions:** 3.21/4.5
@@ -572,14 +566,11 @@ _Notes:_
 - **Disk performance**: N/A
 
 ```{r lconway_timings, echo=FALSE, results='asis'}
-make_timings_table("lconway")
+title <- "Table 3: Timings for Intel Mac Pro"
+make_timings_table("lconway", title=title)
 ```
-_Notes:_
-- _For each operation, the best time across the three different block sizes
-  is displayed in **bold**;_
-- _The "max. mem. used" columns to be populated soon._
 
-### Mac Pro (Apple M2 Ultra)
+### Apple Silicon Mac Pro (Apple M2 Ultra)
 
 - **OS:** macOS 13.7.1
 - **Bioconductor/R versions:** 3.21/4.5
@@ -588,12 +579,9 @@ _Notes:_
 - **Disk performance**: N/A
 
 ```{r kjohnson3_timings, echo=FALSE, results='asis'}
-make_timings_table("kjohnson3")
+title <- "Table 4: Timings for Apple Silicon Mac Pro"
+make_timings_table("kjohnson3", title=title)
 ```
-_Notes:_
-- _For each operation, the best time across the three different block sizes
-  is displayed in **bold**;_
-- _The "max. mem. used" columns to be populated soon._
 
 
 ## Final remarks
