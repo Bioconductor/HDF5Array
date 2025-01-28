@@ -279,7 +279,7 @@ dim(sparse2n)
 
 With this block size (250 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 3.7 Gb at all time.
+this document) remained <= 2.6 Gb at all time.
 
 ### Normalizing the dense datasets
 
@@ -310,7 +310,7 @@ dim(dense2n)
 
 With this block size (40 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 2.8 Gb at all time.
+this document) remained <= 2.5 Gb at all time.
 
 
 ## On-disk realization of the normalized datasets
@@ -379,7 +379,7 @@ showtree(sparse2n)  # "pristine" object (i.e. no more delayed operations)
 
 With this block size (100 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 3 Gb at all time.
+this document) remained <= 2.6 Gb at all time.
 
 ### On-disk realization of the normalized dense datasets
 
@@ -424,7 +424,7 @@ showtree(dense2n)  # "pristine" object (i.e. no more delayed operations)
 
 With this block size (250 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 2.8 Gb at all time.
+this document) remained <= 2.0 Gb at all time.
 
 
 ## PCA
@@ -467,7 +467,7 @@ gc()
 
 With this block size (40 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 2.4 Gb at all time.
+this document) remained <= 1.8 Gb at all time.
 
 ### PCA on the normalized dense datasets
 
@@ -498,7 +498,7 @@ gc()
 
 With this block size (100 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained < 2.7 Gb at all time.
+this document) remained <= 2.0 Gb at all time.
 
 ### Sanity checks
 
@@ -510,8 +510,8 @@ stopifnot(all.equal(pca2s, pca2d))
 
 ## Comprehensive timings obtained on various systems
 
-Here we report timings obtained on various systems. For each system, the
-results are summarized in a table that shows the normalization &
+Here we report timings obtained on various systems. For each system,
+the results are summarized in a table that shows the normalization &
 realization & PCA timings obtained on all our test datasets and using
 three different block sizes: 40 Mb, 100 Mb, and 250 Mb.
 For each operation, the best time across the three different block

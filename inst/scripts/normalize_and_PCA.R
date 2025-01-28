@@ -14,6 +14,11 @@ suppressPackageStartupMessages(library(HDF5Array))
 suppressPackageStartupMessages(library(ExperimentHub))
 suppressPackageStartupMessages(library(DelayedMatrixStats))
 suppressPackageStartupMessages(library(RSpectra))
+process_utils_path <- system.file(package="HDF5Array",
+                                  "scripts", "process_utils.R", mustWork=TRUE)
+source(process_utils_path)
+pid <- Sys.getpid()
+process_info_log <- tempfile()
 
 ## Retrieve and check script arguments.
 
@@ -91,7 +96,11 @@ simple_PCA <- function(mat, k=25)
 
 cat("Running normalization ...\n")
 DelayedArray::setAutoBlockSize(norm_block_size * 1e6)
+loop_pid <- start_log_process_info(pid, process_info_log)
+on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(normalized <- simple_normalize(dataset, num_var_genes=num_var_genes))
+stop_log_process_info(loop_pid)
+norm_max_mem_used <- extract_max_mem_used(process_info_log, pid)
 gc()
 norm_time <- timing[["elapsed"]]
 cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
@@ -101,6 +110,8 @@ cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
 cat("On-disk realization of normalized dataset ...\n")
 DelayedArray::setAutoBlockSize(realize_block_size * 1e6)
 normalized_path <- tempfile()
+loop_pid <- start_log_process_info(pid, process_info_log)
+on.exit(stop_log_process_info(loop_pid))
 if (format == "sparse") {
     timing <- system.time(
         normalized <- writeTENxMatrix(normalized, normalized_path,
@@ -112,6 +123,8 @@ if (format == "sparse") {
                                      name="normalized_counts", level=0)
     )
 }
+stop_log_process_info(loop_pid)
+realize_max_mem_used <- extract_max_mem_used(process_info_log, pid)
 gc()
 realize_time <- timing[["elapsed"]]
 cat("---> realization completed in ", realize_time, " s.\n\n", sep="")
@@ -125,7 +138,11 @@ if (format == "sparse") {
 } else {
     normalized <- HDF5Array(normalized_path, name="normalized_counts")
 }
+loop_pid <- start_log_process_info(pid, process_info_log)
+on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(pca <- simple_PCA(normalized))
+stop_log_process_info(loop_pid)
+pca_max_mem_used <- extract_max_mem_used(process_info_log, pid)
 gc()
 pca_time <- timing[["elapsed"]]
 cat("---> PCA completed in ", pca_time, " s.\n\n", sep="")
@@ -135,9 +152,12 @@ cat("ncells: ", ncells, "\n",
     "format: ", format, "\n",
     "norm_block_size: ", norm_block_size, "\n",
     "norm_time: ", norm_time, "\n",
+    "norm_max_mem_used: ", norm_max_mem_used, "\n",
     "realize_block_size: ", realize_block_size, "\n",
     "realize_time: ", realize_time, "\n",
+    "realize_max_mem_used: ", realize_max_mem_used, "\n",
     "pca_block_size: ", pca_block_size, "\n",
     "pca_time: ", pca_time, "\n",
+    "pca_max_mem_used: ", pca_max_mem_used, "\n",
     "\n", sep="", file="timings.dcf", append=TRUE)
 

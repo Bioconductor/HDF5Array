@@ -1,7 +1,8 @@
+.prefixes <- c("_block_size", "_time", "_max_mem_used")
 .EXPECTED_TIMINGS_COLS <- c("ncells", "num_var_genes", "format",
-                            "norm_block_size", "norm_time",
-                            "realize_block_size", "realize_time",
-                            "pca_block_size", "pca_time")
+                            paste0("norm", .prefixes),
+                            paste0("realize", .prefixes),
+                            paste0("pca", .prefixes))
 
 .VALID_FORMATS <- c("sparse", "dense")
 .VALID_STEPS <- c("norm", "realize", "pca")
@@ -25,12 +26,14 @@
 }
 
 ### Returns a single integer or NA_integer_.
-.get_time <- function(timings, ncells, num_var_genes, format, block_size, step)
+.extract_val <- function(timings, what=c("time", "max_mem_used"),
+                         ncells, num_var_genes, format, block_size, step)
 {
     stopifnot(is.matrix(timings), is.character(timings),
               isSingleString(ncells), isSingleString(num_var_genes),
               isSingleString(format), isSingleString(step),
               isSingleString(block_size))
+    what <- match.arg(what)
     ok1 <- timings[ , "ncells"] == ncells &
            timings[ , "num_var_genes"] == num_var_genes &
            timings[ , "format"] == format
@@ -40,18 +43,20 @@
     if (length(rowidx) == 0L)
         return(NA_integer_)
     if (length(rowidx) != 1L)
-        stop(wmsg("no time (or more than one time) found for ",
+        stop(wmsg("no \"", what, "\" value (or more than one val) found for",
                   "ncells=", ncells, ", num_var_genes=", num_var_genes, ", ",
                   "format=\"", format, "\", step=\"", step, "\", ",
                   "and block_size=", block_size))
-    time_colname <- paste0(step, "_time")
-    t <- suppressWarnings(as.numeric(timings[rowidx, time_colname]))
-    as.integer(t + 0.5)  # rounding to the closest integer
+    time_colname <- paste0(step, "_", what)
+    val <- suppressWarnings(as.numeric(timings[rowidx, time_colname]))
+    as.integer(val + 0.5)  # rounding to the closest integer
 }
 
 ### Returns a 5D integer array.
-.fold_timings_matrix_into_5D_array <- function(timings)
+.fold_timings_matrix_into_5D_array <-
+    function(timings, what=c("time", "max_mem_used"))
 {
+    what <- match.arg(what)
     timings <- .check_and_add_missing_timings_cols(timings)
     stopifnot(all(timings[ , "format"] %in% .VALID_FORMATS))
     block_size_colnames <- paste0(.VALID_STEPS, "_block_size")
@@ -69,17 +74,18 @@
     ans_dim <- lengths(ans_dimnames)
     ans <- array(NA_integer_, dim=ans_dim, dimnames=ans_dimnames)
     for (ncells in dimnames(ans)[[5L]]) {
-        for (num_var_genes in dimnames(ans)[[4L]]) {
-            for (format in dimnames(ans)[[3L]]) {
-                for (block_size in dimnames(ans)[[2L]]) {
-                    for (step in dimnames(ans)[[1L]]) {
-                      t <- .get_time(timings, ncells, num_var_genes,
-                                              format, block_size, step)
-                      ans[step, block_size, format, num_var_genes, ncells] <- t
-                    }
-                }
+      for (num_var_genes in dimnames(ans)[[4L]]) {
+        for (format in dimnames(ans)[[3L]]) {
+          for (block_size in dimnames(ans)[[2L]]) {
+            for (step in dimnames(ans)[[1L]]) {
+                val <- .extract_val(timings, what,
+                                    ncells, num_var_genes,
+                                    format, block_size, step)
+                ans[step, block_size, format, num_var_genes, ncells] <- val
             }
+          }
         }
+      }
     }
     ans
 }
@@ -187,7 +193,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 
 .BASE_STYLE <- c("border: 1pt solid #BBB", "padding: 2pt")
 
-.make_td_style <- function(t, min_time, base_style=NULL)
+.make_time_td_style <- function(t, min_time, base_style=NULL)
 {
     style <- if (is.null(base_style)) .BASE_STYLE else base_style
     if (is.na(t))
@@ -202,14 +208,25 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     c(style, xstyle)
 }
 
-### Produces 2 * length(times) <td> elements.
-.make_td_group <- function(times, base_style=NULL, draw_box=FALSE)
+.make_mem_td_style <- function(m, base_style=NULL)
 {
-    stopifnot(is.integer(times))
+    style <- if (is.null(base_style)) .BASE_STYLE else base_style
+    #style <- c(style, "font-style: italic")
+    xtyle <- if (is.na(m)) "color: #D77" else "color: #777"
+    c(style, xtyle)
+}
+
+### Produces 2 * length(times) <td> elements.
+.make_td_group <- function(times, mem, base_style=NULL, draw_box=FALSE)
+{
+    stopifnot(is.integer(times), is.integer(mem),
+              length(times) == length(mem))
     min_time <- suppressWarnings(min(times, na.rm=TRUE))
-    lapply(unname(times),
-        function(t) {
-            style <- .make_td_style(t, min_time, base_style=base_style)
+    lapply(seq_along(times),
+        function(i) {
+            t <- times[[i]]
+            m <- mem[[i]]  # max. mem. used in Mb
+            style <- .make_time_td_style(t, min_time, base_style=base_style)
             content <- as.character(t)
             if (draw_box && !is.na(t) && t == min_time) {
                 span_style <- "border: 1pt solid black"
@@ -217,8 +234,11 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                                    span_style, content)
             }
             td1_elt <- list(tag="td", style=style, content=content)
-            style <- if (is.null(base_style)) .BASE_STYLE else base_style
-            td2_elt <- list(tag="td", style=style)
+            style <- .make_mem_td_style(m, base_style=base_style)
+            content <- sprintf("%.1f", m/1024)  # max. mem. used in Gb
+            if (!is.na(m))
+                content <- paste0(content, "Gb")
+            td2_elt <- list(tag="td", style=style, content=content)
             list(td1_elt, td2_elt)
         })
 }
@@ -255,8 +275,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                  "the sparse and dense formats, then we ",
                  "<span style=\"font-weight: bold; border: 1pt solid black\">",
                  "&nbsp;box&nbsp;</span> it ",
-                 "(only for Normalization and PCA).<br />",
-                 "The \"max. mem. used\" columns will be populated soon.")
+                 "(only for Normalization and PCA).")
     if (!is.null(title)) {
         title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
                          title)
@@ -341,6 +360,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                 content <- "time<br />in<br />sec."
                 th21_elt <- list(tag="th", style=style, content=content)
                 content <- "max.<br />mem.<br />used"
+                #style <- c(style, "font-style: italic", "color: #777")
+                style <- c(style, "color: #777")
                 th22_elt <- list(tag="th", style=style, content=content)
                 list(th21_elt, th22_elt)
             })
@@ -388,11 +409,16 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 ### Produces a <tr> element that spans 3 + 2 * (n1 + n2 + n3) columns,
 ### where n1 = length(Ntimes), n2 = length(Rtimes), and n3 = length(Ptimes).
 .make_data_line <- function(ncells, format, num_var_genes,
-                            Ntimes, Rtimes, Ptimes,
-                            Nbox=FALSE, Rbox=FALSE, Pbox=FALSE)
+                            Ntimes, Nbox, Nmem,
+                            Rtimes, Rbox, Rmem,
+                            Ptimes, Pbox, Pmem)
 {
     stopifnot(isSingleString(format),
-              is.integer(Ntimes), is.integer(Rtimes), is.integer(Ptimes))
+              is.integer(Ntimes), is.integer(Rtimes), is.integer(Ptimes),
+              is.integer(Nmem), is.integer(Rmem), is.integer(Pmem),
+              length(Ntimes) == length(Nmem),
+              length(Rtimes) == length(Rmem),
+              length(Ptimes) == length(Pmem))
     content <- sprintf("<span style=\"%s\">%s&nbsp;x&nbsp;</span>%s",
                        "color: #888", .NGENES_BEFORE_NORM, ncells)
     td1_elt <- list(tag="td",
@@ -415,17 +441,20 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     ## Normalization results.
     base_style <-
         if (format == "dense") .NORM_TD_DENSE_STYLE else .NORM_TD_STYLE
-    td_groupN <- .make_td_group(Ntimes, base_style=base_style, draw_box=Nbox)
+    td_groupN <- .make_td_group(Ntimes, Nmem,
+                                base_style=base_style, draw_box=Nbox)
 
     ## Realization results.
     base_style <-
         if (format == "dense") .REALIZE_TD_DENSE_STYLE else .REALIZE_TD_STYLE
-    td_groupR <- .make_td_group(Rtimes, base_style=base_style, draw_box=Rbox)
+    td_groupR <- .make_td_group(Rtimes, Rmem,
+                                base_style=base_style, draw_box=Rbox)
 
     ## PCA results.
     base_style <-
         if (format == "dense") .PCA_TD_DENSE_STYLE else .PCA_TD_STYLE
-    td_groupP <- .make_td_group(Ptimes, base_style=base_style, draw_box=Pbox)
+    td_groupP <- .make_td_group(Ptimes, Pmem,
+                                base_style=base_style, draw_box=Pbox)
 
     if (format == "sparse") {
         content <- list(td1_elt, td3_elt, td_groupN,
@@ -438,14 +467,14 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 }
 
 ### Produce a pair of <tr> elements, one for "sparse" and one for "dense".
-.make_data_line_pair <- function(timings, ncells, num_var_genes)
+.make_data_line_pair <- function(times, memused, ncells, num_var_genes)
 {
-    sparse_Ntimes <- timings["norm",    , "sparse", num_var_genes, ncells]
-    dense_Ntimes  <- timings["norm",    , "dense",  num_var_genes, ncells]
-    sparse_Rtimes <- timings["realize", , "sparse", num_var_genes, ncells]
-    dense_Rtimes  <- timings["realize", , "dense",  num_var_genes, ncells]
-    sparse_Ptimes <- timings["pca",     , "sparse", num_var_genes, ncells]
-    dense_Ptimes  <- timings["pca",     , "dense",  num_var_genes, ncells]
+    sparse_Ntimes <- times["norm",    , "sparse", num_var_genes, ncells]
+    dense_Ntimes  <- times["norm",    , "dense",  num_var_genes, ncells]
+    sparse_Rtimes <- times["realize", , "sparse", num_var_genes, ncells]
+    dense_Rtimes  <- times["realize", , "dense",  num_var_genes, ncells]
+    sparse_Ptimes <- times["pca",     , "sparse", num_var_genes, ncells]
+    dense_Ptimes  <- times["pca",     , "dense",  num_var_genes, ncells]
 
     Nmin1 <- suppressWarnings(min(sparse_Ntimes, na.rm=TRUE))
     Nmin2 <- suppressWarnings(min(dense_Ntimes, na.rm=TRUE))
@@ -462,24 +491,36 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     Pmin2 <- suppressWarnings(min(dense_Ptimes, na.rm=TRUE))
     Pbox1 <- Pmin1 < Pmin2
     Pbox2 <- Pmin1 > Pmin2
+
+    sparse_Nmem <- memused["norm",    , "sparse", num_var_genes, ncells]
+    dense_Nmem  <- memused["norm",    , "dense",  num_var_genes, ncells]
+    sparse_Rmem <- memused["realize", , "sparse", num_var_genes, ncells]
+    dense_Rmem  <- memused["realize", , "dense",  num_var_genes, ncells]
+    sparse_Pmem <- memused["pca",     , "sparse", num_var_genes, ncells]
+    dense_Pmem  <- memused["pca",     , "dense",  num_var_genes, ncells]
+
     line1 <- .make_data_line(ncells, "sparse", num_var_genes,
-                             sparse_Ntimes, sparse_Rtimes, sparse_Ptimes,
-                             Nbox=Nbox1, Rbox=Rbox1, Pbox=Pbox1)
+                             sparse_Ntimes, Nbox1, sparse_Nmem,
+                             sparse_Rtimes, Rbox1, sparse_Rmem,
+                             sparse_Ptimes, Pbox1, sparse_Pmem)
     line2 <- .make_data_line(ncells, "dense", num_var_genes,
-                             dense_Ntimes, dense_Rtimes, dense_Ptimes,
-                             Nbox=Nbox2, Rbox=Rbox2, Pbox=Pbox2)
+                             dense_Ntimes, Nbox2, dense_Nmem,
+                             dense_Rtimes, Rbox2, dense_Rmem,
+                             dense_Ptimes, Pbox2, dense_Pmem)
     list(line1, line2)
 }
 
-.make_table_section <- function(timings, num_block_sizes, num_var_genes,
+.make_table_section <- function(times, memused,
+                                num_block_sizes, num_var_genes,
                                 hline=NULL)
 {
     stopifnot(isSingleString(num_var_genes))
     steps_header <- .make_steps_header(num_block_sizes, num_var_genes)
-    unique_ncells <- dimnames(timings)$ncells
+    unique_ncells <- dimnames(times)$ncells
     tr_elts <- lapply(unique_ncells,
         function(ncells) {
-            line_pair <- .make_data_line_pair(timings, ncells, num_var_genes)
+            line_pair <- .make_data_line_pair(times, memused,
+                                              ncells, num_var_genes)
             if (is.null(hline))
                 return(line_pair)
             c(list(hline), line_pair)
@@ -490,16 +531,19 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     c(list(hline), section)
 }
 
-.make_table <- function(timings, title=NULL)
+### times, memused: 5D integer arrays of same dimensions and dimnames.
+.make_table <- function(times, memused, title=NULL)
 {
-    stopifnot(length(dim(timings)) == 5L)
-    unique_block_sizes <- dimnames(timings)$block_size
+    stopifnot(length(dim(times)) == 5L,
+              identical(dim(times), dim(memused)),
+              identical(dimnames(times), dimnames(memused)))
+    unique_block_sizes <- dimnames(times)$block_size
     num_block_sizes <- length(unique_block_sizes)
     top_header <- .make_top_header(unique_block_sizes)
     hline <- .make_hline(3L+6L*num_block_sizes)
-    section1 <- .make_table_section(timings, num_block_sizes,
+    section1 <- .make_table_section(times, memused, num_block_sizes,
                                     num_var_genes="1000", hline=hline)
-    section2 <- .make_table_section(timings, num_block_sizes,
+    section2 <- .make_table_section(times, memused, num_block_sizes,
                                     num_var_genes="2000", hline=hline)
     footnote <- .make_footnote(3L+6L*num_block_sizes, title=title)
     content <- list(top_header, section1, section2, hline, footnote)
@@ -536,8 +580,9 @@ make_timings_table <- function(machine_name, title=NULL, file="")
 {
     file_path <- .find_timings_file(machine_name)
     timings <- read.dcf(file_path)  # character matrix
-    timings <- .fold_timings_matrix_into_5D_array(timings)
-    table_elt <- .make_table(timings, title)
+    times <- .fold_timings_matrix_into_5D_array(timings, what="time")
+    memused <- .fold_timings_matrix_into_5D_array(timings, what="max_mem_used")
+    table_elt <- .make_table(times, memused, title)
     cat(deparse_html_tree(table_elt), sep="\n", file=file)
 }
 
