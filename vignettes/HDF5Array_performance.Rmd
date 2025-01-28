@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 27 January 2025"
+date: "Compiled `r doc_date()`; Modified 28 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -310,7 +310,7 @@ dim(dense2n)
 
 With this block size (40 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained <= 2.5 Gb at all time.
+this document) remained <= 1.8 Gb at all time.
 
 
 ## On-disk realization of the normalized datasets
@@ -379,7 +379,7 @@ showtree(sparse2n)  # "pristine" object (i.e. no more delayed operations)
 
 With this block size (100 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained <= 2.6 Gb at all time.
+this document) remained <= 2.5 Gb at all time.
 
 ### On-disk realization of the normalized dense datasets
 
@@ -424,7 +424,7 @@ showtree(dense2n)  # "pristine" object (i.e. no more delayed operations)
 
 With this block size (250 Mb), memory usage (as reported by Unix
 command `ps u -p <PID>`, see **Monitoring memory usage** above in
-this document) remained <= 2.0 Gb at all time.
+this document) remained <= 1.6 Gb at all time.
 
 
 ## PCA
@@ -605,8 +605,14 @@ speed. Maybe extending the benchmarks to include more extreme block sizes
 Normalization and PCA are roughly linear in time, regardless of
 representation (sparse or dense) or block size.
 
-_[Needs confirmation]_ Normalization and PCA both perform at almost
-constant memory, regardless of representation (sparse or dense).
+For small block sizes (<= 100 Mb), memory usage doesn't seem to be affected
+by the number of cells in the dataset, that is, all operations seem to
+perform at almost constant memory, regardless of representation (sparse
+or dense). However, for bigger block sizes (e.g. 250 Mb), the memory used
+to process the sparse datasets tend to increase slightly with the number
+of cells in the dataset.
+
+_[TODO] Add some plots to help vizualize the above assertions._
 
 
 

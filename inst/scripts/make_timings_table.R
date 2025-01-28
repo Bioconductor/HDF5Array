@@ -191,6 +191,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 ### .make_td_group()
 ###
 
+.LIGHT_RED <- "#D77"  # used to display memory usage that is NA or > 4Gb
 .BASE_STYLE <- c("border: 1pt solid #BBB", "padding: 2pt")
 
 .make_time_td_style <- function(t, min_time, base_style=NULL)
@@ -212,8 +213,9 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 {
     style <- if (is.null(base_style)) .BASE_STYLE else base_style
     #style <- c(style, "font-style: italic")
-    xtyle <- if (is.na(m)) "color: #D77" else "color: #777"
-    c(style, xtyle)
+    ## Display value in red if NA or > 4Gb, otherwise in light grey.
+    color <- if (is.na(m) || m > 4) .LIGHT_RED else "#777"
+    c(style, paste0("color: ", color))
 }
 
 ### Produces 2 * length(times) <td> elements.
@@ -225,7 +227,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     lapply(seq_along(times),
         function(i) {
             t <- times[[i]]
-            m <- mem[[i]]  # max. mem. used in Mb
+            m <- mem[[i]] / 1024  # from Mb to Gb
             style <- .make_time_td_style(t, min_time, base_style=base_style)
             content <- as.character(t)
             if (draw_box && !is.na(t) && t == min_time) {
@@ -235,9 +237,14 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
             }
             td1_elt <- list(tag="td", style=style, content=content)
             style <- .make_mem_td_style(m, base_style=base_style)
-            content <- sprintf("%.1f", m/1024)  # max. mem. used in Gb
-            if (!is.na(m))
-                content <- paste0(content, "Gb")
+            content <- sprintf("%.1f", m)  # max. mem. used in Gb
+            if (!is.na(m)) {
+                Gb <- "Gb"
+                if (m <= 4)
+                    Gb <- sprintf("<span style=\"color: %s\">%s</span>",
+                                  "#AAA", Gb)
+                content <- paste0(content, Gb)
+            }
             td2_elt <- list(tag="td", style=style, content=content)
             list(td1_elt, td2_elt)
         })
@@ -275,7 +282,9 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                  "the sparse and dense formats, then we ",
                  "<span style=\"font-weight: bold; border: 1pt solid black\">",
                  "&nbsp;box&nbsp;</span> it ",
-                 "(only for Normalization and PCA).")
+                 "(only for Normalization and PCA).<br />",
+                 "Memory usage > 4Gb is displayed in ",
+                 "<span style=\"color: ", .LIGHT_RED, "\">light red</span>.")
     if (!is.null(title)) {
         title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
                          title)
