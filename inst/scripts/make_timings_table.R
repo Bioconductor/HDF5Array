@@ -1,4 +1,4 @@
-.prefixes <- c("_block_size", "_time", "_max_mem_used")
+.prefixes <- c("_block_size", "_time", "_max_vsz", "_max_rss")
 .EXPECTED_TIMINGS_COLS <- c("ncells", "num_var_genes", "format",
                             paste0("norm", .prefixes),
                             paste0("realize", .prefixes),
@@ -26,7 +26,7 @@
 }
 
 ### Returns a single integer or NA_integer_.
-.extract_val <- function(timings, what=c("time", "max_mem_used"),
+.extract_val <- function(timings, what=c("time", "max_vsz", "max_rss"),
                          ncells, num_var_genes, format, block_size, step)
 {
     stopifnot(is.matrix(timings), is.character(timings),
@@ -34,6 +34,7 @@
               isSingleString(format), isSingleString(step),
               isSingleString(block_size))
     what <- match.arg(what)
+    val_colname <- paste0(step, "_", what)
     ok1 <- timings[ , "ncells"] == ncells &
            timings[ , "num_var_genes"] == num_var_genes &
            timings[ , "format"] == format
@@ -43,18 +44,17 @@
     if (length(rowidx) == 0L)
         return(NA_integer_)
     if (length(rowidx) != 1L)
-        stop(wmsg("no \"", what, "\" value (or more than one val) found for",
+        stop(wmsg("no (or more than one) \"", val_colname, "\" value found for",
                   "ncells=", ncells, ", num_var_genes=", num_var_genes, ", ",
                   "format=\"", format, "\", step=\"", step, "\", ",
                   "and block_size=", block_size))
-    time_colname <- paste0(step, "_", what)
     val <- suppressWarnings(as.numeric(timings[rowidx, time_colname]))
     as.integer(val + 0.5)  # rounding to the closest integer
 }
 
 ### Returns a 5D integer array.
 .fold_timings_matrix_into_5D_array <-
-    function(timings, what=c("time", "max_mem_used"))
+    function(timings, what=c("time", "max_vsz", "max_rss"))
 {
     what <- match.arg(what)
     timings <- .check_and_add_missing_timings_cols(timings)
@@ -283,7 +283,10 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                  "<span style=\"font-weight: bold; border: 1pt solid black\">",
                  "&nbsp;box&nbsp;</span> it ",
                  "(only for Normalization and PCA).<br />",
-                 "Memory usage > 4Gb is displayed in ",
+                 "The \"max. mem. used\" is the max RSS (Resident Set Size) ",
+                 "value obtained by running <code>ps u -p <PID></code> ",
+                 "every second while performing a given operation. ",
+                 "Values > 4Gb are displayed in ",
                  "<span style=\"color: ", .LIGHT_RED, "\">light red</span>.")
     if (!is.null(title)) {
         title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
@@ -590,7 +593,10 @@ make_timings_table <- function(machine_name, title=NULL, file="")
     file_path <- .find_timings_file(machine_name)
     timings <- read.dcf(file_path)  # character matrix
     times <- .fold_timings_matrix_into_5D_array(timings, what="time")
-    memused <- .fold_timings_matrix_into_5D_array(timings, what="max_mem_used")
+    ## We choose to populate the "max. mem. used" table columns with
+    ## the "max_rss" values, not the "max_vsz" values, because the VSZ
+    ## as reported by 'ps u -p <PID>' seems meaningless on macOS.
+    memused <- .fold_timings_matrix_into_5D_array(timings, what="max_rss")
     table_elt <- .make_table(times, memused, title)
     cat(deparse_html_tree(table_elt), sep="\n", file=file)
 }

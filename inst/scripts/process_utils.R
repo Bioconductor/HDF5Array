@@ -47,7 +47,9 @@ stop_log_process_info <- function(loop_pid)
     matrix(unlist(data), nrow=length(data), byrow=TRUE)
 }
 
-### Returns max memory used in Mb.
+### Returns max memory used in a named integer vector made of 2 elements:
+### the max VSZ (Virtual Memory Size) and max RSS (Resident Set Size), both
+### reported **in Mb**. The names on the vector are "max_vsz" and "max_rss".
 extract_max_mem_used <- function(logfile, pid)
 {
     data <- .import_logfile_as_matrix(logfile)
@@ -56,6 +58,8 @@ extract_max_mem_used <- function(logfile, pid)
         stop(wmsg("File '", logfile, "' does not contain 'ps u' ",
                   "output for expected process (pid ", pid, ")"))
     VSZ <- as.integer(data[ , 5L])
-    as.integer(max(VSZ) / 1024 + 0.5)
+    RSS <- as.integer(data[ , 6L])
+    ans <- c(max_vsz=max(VSZ) , max_rss=max(RSS)) / 1024  # in Mb
+    setNames(as.integer(ans + 0.5), names(ans))
 }
 
