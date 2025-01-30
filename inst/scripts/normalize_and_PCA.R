@@ -5,7 +5,7 @@
 #
 # To run it in "batch mode":
 #
-#   Rscript normalize_and_PCA.R 12500 1000 sparse \
+#   Rscript normalize_and_PCA.R 12500 1000 s \
 #                     250 40 100 >normalize_and_PCA.log 2>&1 &
 #
 
@@ -33,7 +33,7 @@ pca_block_size <- as.integer(args[[6L]])      # block size in Mb (PCA)
 
 stopifnot(isSingleInteger(ncells), ncells > 0L,
           isSingleInteger(num_var_genes), num_var_genes > 0L,
-          format %in% c("sparse", "dense"),
+          format %in% c("s", "D", "Ds"),
           isSingleInteger(norm_block_size), norm_block_size > 0L,
           isSingleInteger(realize_block_size), realize_block_size > 0L,
           isSingleInteger(pca_block_size), pca_block_size > 0L)
@@ -49,23 +49,25 @@ cat("\n")
 ## Prepare dataset.
 
 hub <- ExperimentHub()
-h5_path <- suppressMessages(hub[["EH1039"]])
-full_dataset <- TENxMatrix(h5_path, group="mm10")
-stopifnot(is_sparse(full_dataset),
-          identical(chunkdim(full_dataset), c(27998L, 1L)))
+brain_s_path <- suppressMessages(hub[["EH1039"]])
+brain_s <- TENxMatrix(brain_s_path, group="mm10")
+stopifnot(is_sparse(brain_s),
+          identical(chunkdim(brain_s), c(27998L, 1L)))
 
-if (format == "dense") {
-    full_sparse_dataset <- full_dataset
-    h5_path <- suppressMessages(hub[["EH1040"]])
-    full_dataset <- HDF5Array(h5_path, name="counts")
-    stopifnot(!is_sparse(full_dataset),
-              identical(chunkdim(full_dataset), c(100L, 100L)))
+if (format == "s") {
+    full_brain <- brain_s
+} else {
+    as_sparse <- format == "Ds"
+    brain_D_path <- suppressMessages(hub[["EH1040"]])
+    full_brain <- HDF5Array(brain_D_path, name="counts", as.sparse=as_sparse)
+    stopifnot(identical(chunkdim(full_brain), c(100L, 100L)),
+              is_sparse(full_brain) == as_sparse)
     ## The dense HDF5 file does not contain the dimnames of the matrix
     ## so we manually add them:
-    dimnames(full_dataset) <- dimnames(full_sparse_dataset)
+    dimnames(full_brain) <- dimnames(brain_s)
 }
-stopifnot(identical(dim(full_dataset), c(27998L, 1306127L)))
-dataset <- full_dataset[ , seq_len(ncells)]
+stopifnot(identical(dim(full_brain), c(27998L, 1306127L)))
+dataset <- full_brain[ , seq_len(ncells)]
 
 ## Define functions simple_normalize() and simple_PCA().
 
@@ -112,7 +114,7 @@ DelayedArray::setAutoBlockSize(realize_block_size * 1e6)
 normalized_path <- tempfile()
 loop_pid <- start_log_process_info(pid, process_info_log)
 on.exit(stop_log_process_info(loop_pid))
-if (format == "sparse") {
+if (format == "s") {
     timing <- system.time(
         normalized <- writeTENxMatrix(normalized, normalized_path,
                                       group="matrix", level=0)
@@ -133,11 +135,6 @@ cat("---> realization completed in ", realize_time, " s.\n\n", sep="")
 
 cat("Running PCA ...\n")
 DelayedArray::setAutoBlockSize(pca_block_size * 1e6)
-if (format == "sparse") {
-    normalized <- TENxMatrix(normalized_path)
-} else {
-    normalized <- HDF5Array(normalized_path, name="normalized_counts")
-}
 loop_pid <- start_log_process_info(pid, process_info_log)
 on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(pca <- simple_PCA(normalized))

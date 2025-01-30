@@ -33,7 +33,7 @@ echo ""
 
 for ncells in 12500 25000 50000 100000 200000; do
 	for num_var_genes in 1000 2000; do
-		for format in sparse dense; do
+		for format in s D Ds; do
 			for block_size in 40 100 250; do
 				normalize_and_PCA "$ncells" "$num_var_genes" "$format" "$block_size"
 			done

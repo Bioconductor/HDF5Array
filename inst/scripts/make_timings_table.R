@@ -48,7 +48,7 @@
                   "ncells=", ncells, ", num_var_genes=", num_var_genes, ", ",
                   "format=\"", format, "\", step=\"", step, "\", ",
                   "and block_size=", block_size))
-    val <- suppressWarnings(as.numeric(timings[rowidx, time_colname]))
+    val <- suppressWarnings(as.numeric(timings[rowidx, val_colname]))
     as.integer(val + 0.5)  # rounding to the closest integer
 }
 
