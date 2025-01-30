@@ -258,7 +258,7 @@ For our benchmarks below, we'll use the following block sizes:
   | -------------------- | ------------: | ------------------: | -----: |
   | TENxMatrix (sparse)  |        250 Mb |              100 Mb |  40 Mb |
   | HDF5Matrix (dense)   |         40 Mb |              250 Mb | 100 Mb |
-  | HDF5Matrix as sparse |        100 Mb |              100 Mb | 100 Mb |
+  | HDF5Matrix as sparse |        250 Mb |              100 Mb |  16 Mb |
 
 
 ## Monitoring memory usage
@@ -286,8 +286,8 @@ for each of them. We report the time and memory usage for each run.
 
 See the **Comprehensive timings obtained on various systems** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
-obtained on various systems on all our test datasets and using three different
-block sizes: 40 Mb, 100 Mb, and 250 Mb.
+obtained on various systems on all our test datasets and using four different
+block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
 ### Normalization of the 27,998 x 12,500 dataset
 
@@ -295,7 +295,7 @@ block sizes: 40 Mb, 100 Mb, and 250 Mb.
 
 ```{r norm_brain1_s}
 dim(brain1_s)
-DelayedArray::setAutoBlockSize(2.5e8)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 system.time(norm_brain1_s <- simple_normalize(brain1_s))
 dim(norm_brain1_s)
 ```
@@ -304,7 +304,7 @@ dim(norm_brain1_s)
 
 ```{r norm_brain1_D}
 dim(brain1_D)
-DelayedArray::setAutoBlockSize(4e7)    # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 system.time(norm_brain1_D <- simple_normalize(brain1_D))
 dim(norm_brain1_D)
 ```
@@ -313,7 +313,7 @@ dim(norm_brain1_D)
 
 ```{r norm_brain1_Ds}
 dim(brain1_Ds)
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 system.time(norm_brain1_Ds <- simple_normalize(brain1_Ds))
 dim(norm_brain1_Ds)
 ```
@@ -324,7 +324,7 @@ dim(norm_brain1_Ds)
 
 ```{r norm_brain2_s}
 dim(brain2_s)
-DelayedArray::setAutoBlockSize(2.5e8)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 system.time(norm_brain2_s <- simple_normalize(brain2_s))
 dim(norm_brain2_s)
 ```
@@ -333,7 +333,7 @@ dim(norm_brain2_s)
 
 ```{r norm_brain2_D}
 dim(brain2_D)
-DelayedArray::setAutoBlockSize(4e7)    # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 system.time(norm_brain2_D <- simple_normalize(brain2_D))
 dim(norm_brain2_D)
 ```
@@ -342,7 +342,7 @@ dim(norm_brain2_D)
 
 ```{r norm_brain2_Ds}
 dim(brain2_Ds)
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 system.time(norm_brain2_Ds <- simple_normalize(brain2_Ds))
 dim(norm_brain2_Ds)
 ```
@@ -394,7 +394,7 @@ showtree(norm_brain1_s)  # "pristine" object (i.e. no more delayed operations)
 #### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain1_D}
-DelayedArray::setAutoBlockSize(2.5e8)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 dim(norm_brain1_D)
 system.time(norm_brain1_D <- writeHDF5Array(norm_brain1_D, level=0))
 ```
@@ -435,7 +435,7 @@ showtree(norm_brain2_s)  # "pristine" object (i.e. no more delayed operations)
 #### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain2_D}
-DelayedArray::setAutoBlockSize(2.5e8)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
 dim(norm_brain2_D)
 system.time(norm_brain2_D <- writeHDF5Array(norm_brain2_D, level=0))
 ```
@@ -468,15 +468,15 @@ for each dataset. We report the time and memory usage for each run.
 
 See the **Comprehensive timings obtained on various systems** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
-obtained on various systems on all our test datasets and using three different
-block sizes: 40 Mb, 100 Mb, and 250 Mb.
+obtained on various systems on all our test datasets and using four different
+block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
 ### PCA on the 1000 x 12,500 normalized dataset
 
 #### TENxMatrix (sparse)
 
 ```{r PCA_norm_brain1_s}
-DelayedArray::setAutoBlockSize(4e7)    # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 dim(norm_brain1_s)
 system.time(pca1s <- simple_PCA(norm_brain1_s))
 ```
@@ -497,7 +497,7 @@ stopifnot(all.equal(pca1s, pca1D))
 #### HDF5Matrix as sparse
 
 ```{r PCA_norm_brain1_Ds}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
+DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
 dim(norm_brain1_Ds)
 system.time(pca1Ds <- simple_PCA(norm_brain1_Ds))
 ```
@@ -512,7 +512,7 @@ stopifnot(all.equal(pca1s, pca1Ds))
 #### TENxMatrix (sparse)
 
 ```{r PCA_norm_brain2_s}
-DelayedArray::setAutoBlockSize(4e7)    # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 dim(norm_brain2_s)
 system.time(pca2s <- simple_PCA(norm_brain2_s))
 ```
@@ -533,7 +533,7 @@ stopifnot(all.equal(pca2s, pca2D))
 #### HDF5Matrix as sparse
 
 ```{r PCA_norm_brain2_Ds}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
+DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
 dim(norm_brain2_Ds)
 system.time(pca2Ds <- simple_PCA(norm_brain2_Ds))
 ```
@@ -549,8 +549,8 @@ stopifnot(all.equal(pca2s, pca2Ds))
 Here we report timings obtained on various systems. For each system,
 the results are summarized in a table that shows the normalization &
 realization & PCA timings obtained on all our test datasets and using
-three different block sizes: 40 Mb, 100 Mb, and 250 Mb.
-For each operation, the best time across the three different block
+four different block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
+For each operation, the best time across the four different block
 sizes is displayed in **bold**.
 
 ### DELL XPS 15 laptop (model 9520)
@@ -630,13 +630,18 @@ than the other machines. This is most likely due to the less performant
 disk.
 
 For PCA, choosing the sparse representation (TENxMatrix) and using small
-block sizes (40 Mb) is a clear winner.
+block sizes (16 Mb) is a clear winner.
 
 For normalization, there's no clear best choice between the parse and dense
 representations. More precisely, for this operation, the sparse representation
 tends to give the best times when using bigger blocks (250 Mb), whereas the
 dense representation tends to give the best times when using smaller blocks
-(40 Mb). However, based on the above benchmarks, there's no clear best choice
+(16 Mb).
+
+_[TODO] Revisit the paragraph below now that we have timings for blocks
+of 16 Mb._
+
+However, based on the above benchmarks, there's no clear best choice
 between "sparse with big blocks" and "dense with small blocks" in terms of
 speed. Maybe extending the benchmarks to include more extreme block sizes
 (e.g. 20 Mb and 500 Mb) could help break the tie.
