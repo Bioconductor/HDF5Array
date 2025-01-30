@@ -48,7 +48,7 @@ cat("\n")
 
 ## Prepare dataset.
 
-hub <- ExperimentHub()
+hub <- ExperimentHub(localHub=TRUE)
 brain_s_path <- suppressMessages(hub[["EH1039"]])
 brain_s <- TENxMatrix(brain_s_path, group="mm10")
 stopifnot(is_sparse(brain_s),
