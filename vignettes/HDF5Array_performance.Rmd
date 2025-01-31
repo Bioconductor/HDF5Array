@@ -154,10 +154,11 @@ dim(brain_Ds)
 chunkdim(brain_Ds)
 is_sparse(brain_Ds)
 ```
-Concretely this means that when blocks of data are loaded in memory
-during _block-processed_ operations, they will be immediately put in a
-sparse form. This should lead to a lower memory footprint and (hopefully)
-will help with overall performance.
+Concretely this means that, when blocks of data are loaded from
+the _dense_ HDF5 file to memory during _block-processed_ operations,
+they end up directly in an in-memory _sparse_ representation without going
+thru an in-memory _dense_ representation first. This is expected to reduce
+memory footprint and (hopefully) will help with overall performance.
 
 Finally note that the dense HDF5 file does not contain the dimnames of the
 matrix, so we manually add them to `brain_s` and `brain_Ds`:
@@ -616,11 +617,17 @@ make_timings_table("kjohnson3", title=title)
 
 ## Final remarks
 
+The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
+its promise so we leave it alone for now. Note that the code for loading
+blocks of data from the _dense_ HDF5 file to memory does not currently
+take full advantage of the SVT\_SparseArray representation, a new
+efficient data structure for multidimensional _sparse_ data implemented
+in the `r Biocpkg("SparseArray")` package that gets rid of some of the
+limitations of the dgCMatrix representation from the `r CRANpkg("Matrix")`
+package. This will need to be addressed.
+
 The Supermicro SuperServer 1029GQ-TRT machine is significantly slower
 than the other machines. This is likely due to the less performant disk.
-
-The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
-its promise so we leave it alone for now.
 
 Normalization and PCA are roughly linear in time with respect to the number
 of cells in the dataset, regardless of representation (sparse or dense) or
