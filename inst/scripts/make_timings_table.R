@@ -1,45 +1,53 @@
 .prefixes <- c("_block_size", "_time", "_max_vsz", "_max_rss")
-.EXPECTED_TIMINGS_COLS <- c("ncells", "num_var_genes", "format",
-                            paste0("norm", .prefixes),
-                            paste0("realize", .prefixes),
-                            paste0("pca", .prefixes))
+.TIMINGS_DB_COLS <- c("ncells", "num_var_genes", "format",
+                      paste0("norm", .prefixes),
+                      paste0("realize", .prefixes),
+                      paste0("pca", .prefixes))
 
-.VALID_FORMATS <- c("sparse", "dense")
+.VALID_FORMATS <- c("s", "D", "Ds")
 .VALID_STEPS <- c("norm", "realize", "pca")
 
-.check_and_add_missing_timings_cols <- function(timings)
+.check_and_add_missing_timings_db_cols <- function(timings_db)
 {
-    stopifnot(is.matrix(timings))
-    missing_cols <- setdiff(.EXPECTED_TIMINGS_COLS, colnames(timings))
+    stopifnot(is.matrix(timings_db), is.character(timings_db))
+
+    ## Only for compatibility with old timings db files.
+    format <- timings_db[ , "format"]
+    format[format %in% "sparse"] <- "s"
+    format[format %in% "dense"]  <- "D"
+    timings_db[ , "format"] <- format
+
+    missing_cols <- setdiff(.TIMINGS_DB_COLS, colnames(timings_db))
     if (length(missing_cols) != 0L) {
         ## Add missing cols (filled with NAs).
         m <- matrix(NA_character_,
-                    nrow=nrow(timings), ncol=length(missing_cols),
+                    nrow=nrow(timings_db), ncol=length(missing_cols),
                     dimnames=list(NULL, missing_cols))
-        timings <- cbind(timings, m)
+        timings_db <- cbind(timings_db, m)
     }
-    timings <- timings[ , .EXPECTED_TIMINGS_COLS, drop=FALSE]
-    na_idx <- which(is.na(timings[ , "num_var_genes"]))
+    timings_db <- timings_db[ , .TIMINGS_DB_COLS, drop=FALSE]
+    na_idx <- which(is.na(timings_db[ , "num_var_genes"]))
     if (length(na_idx) != 0L)
-        timings[na_idx, "num_var_genes"] <- 1000
-    timings
+        timings_db[na_idx, "num_var_genes"] <- 1000
+    timings_db
 }
 
 ### Returns a single integer or NA_integer_.
-.extract_val <- function(timings, what=c("time", "max_vsz", "max_rss"),
-                         ncells, num_var_genes, format, block_size, step)
+.get_val_from_timings_db <-
+    function(timings_db, varname=c("time", "max_vsz", "max_rss"),
+             ncells, num_var_genes, format, block_size, step)
 {
-    stopifnot(is.matrix(timings), is.character(timings),
+    stopifnot(is.matrix(timings_db), is.character(timings_db),
               isSingleString(ncells), isSingleString(num_var_genes),
               isSingleString(format), isSingleString(step),
               isSingleString(block_size))
-    what <- match.arg(what)
-    val_colname <- paste0(step, "_", what)
-    ok1 <- timings[ , "ncells"] == ncells &
-           timings[ , "num_var_genes"] == num_var_genes &
-           timings[ , "format"] == format
+    varname <- match.arg(varname)
+    val_colname <- paste0(step, "_", varname)
+    ok1 <- timings_db[ , "ncells"] == ncells &
+           timings_db[ , "num_var_genes"] == num_var_genes &
+           timings_db[ , "format"] == format
     block_size_colname <- paste0(step, "_block_size")
-    ok2 <- timings[ , block_size_colname] == block_size
+    ok2 <- timings_db[ , block_size_colname] == block_size
     rowidx <- which(ok1 & ok2)
     if (length(rowidx) == 0L)
         return(NA_integer_)
@@ -48,23 +56,24 @@
                   "ncells=", ncells, ", num_var_genes=", num_var_genes, ", ",
                   "format=\"", format, "\", step=\"", step, "\", ",
                   "and block_size=", block_size))
-    val <- suppressWarnings(as.numeric(timings[rowidx, val_colname]))
+    val <- suppressWarnings(as.numeric(timings_db[rowidx, val_colname]))
     as.integer(val + 0.5)  # rounding to the closest integer
 }
 
 ### Returns a 5D integer array.
-.fold_timings_matrix_into_5D_array <-
-    function(timings, what=c("time", "max_vsz", "max_rss"))
+.extract_var_from_timings_db <-
+    function(timings_db, varname=c("time", "max_vsz", "max_rss"))
 {
-    what <- match.arg(what)
-    timings <- .check_and_add_missing_timings_cols(timings)
-    stopifnot(all(timings[ , "format"] %in% .VALID_FORMATS))
+    stopifnot(is.matrix(timings_db),
+              identical(colnames(timings_db), .TIMINGS_DB_COLS))
+    varname <- match.arg(varname)
+    stopifnot(all(timings_db[ , "format"] %in% .VALID_FORMATS))
     block_size_colnames <- paste0(.VALID_STEPS, "_block_size")
-    unique_block_sizes <- as.integer(timings[ , block_size_colnames])
+    unique_block_sizes <- as.integer(timings_db[ , block_size_colnames])
     unique_block_sizes <- sort(unique(unique_block_sizes))
-    unique_num_var_genes <- as.integer(timings[ , "num_var_genes"])
+    unique_num_var_genes <- as.integer(timings_db[ , "num_var_genes"])
     unique_num_var_genes <- sort(unique(unique_num_var_genes))
-    unique_ncells <- as.integer(timings[ , "ncells"])
+    unique_ncells <- as.integer(timings_db[ , "ncells"])
     unique_ncells <- sort(unique(unique_ncells))
     ans_dimnames <- list(step=.VALID_STEPS,
                          block_size=as.character(unique_block_sizes),
@@ -78,9 +87,9 @@
         for (format in dimnames(ans)[[3L]]) {
           for (block_size in dimnames(ans)[[2L]]) {
             for (step in dimnames(ans)[[1L]]) {
-                val <- .extract_val(timings, what,
-                                    ncells, num_var_genes,
-                                    format, block_size, step)
+                val <- .get_val_from_timings_db(timings_db, varname,
+                                                ncells, num_var_genes,
+                                                format, block_size, step)
                 ans[step, block_size, format, num_var_genes, ncells] <- val
             }
           }
@@ -191,7 +200,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 ### .make_td_group()
 ###
 
-.LIGHT_RED <- "#D77"  # used to display memory usage that is NA or > 4Gb
+.MEM_THRESHOLD <- 4
+.LIGHT_RED <- "#D77"  # to display memory usage that is NA or > .MEM_THRESHOLD
 .BASE_STYLE <- c("border: 1pt solid #BBB", "padding: 2pt")
 
 .make_time_td_style <- function(t, min_time, base_style=NULL)
@@ -213,8 +223,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 {
     style <- if (is.null(base_style)) .BASE_STYLE else base_style
     #style <- c(style, "font-style: italic")
-    ## Display value in red if NA or > 4Gb, otherwise in light grey.
-    color <- if (is.na(m) || m > 4) .LIGHT_RED else "#777"
+    ## Use light red if NA or > .MEM_THRESHOLD, otherwise light grey.
+    color <- if (is.na(m) || m > .MEM_THRESHOLD) .LIGHT_RED else "#777"
     c(style, paste0("color: ", color))
 }
 
@@ -240,7 +250,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
             content <- sprintf("%.1f", m)  # max. mem. used in Gb
             if (!is.na(m)) {
                 Gb <- "Gb"
-                if (m <= 4)
+                if (m <= .MEM_THRESHOLD)
                     Gb <- sprintf("<span style=\"color: %s\">%s</span>",
                                   "#AAA", Gb)
                 content <- paste0(content, Gb)
@@ -273,21 +283,32 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 .make_footnote <- function(colspan, title=NULL)
 {
     style <- "font-style: italic"
-    ## Replace "three" with whatever is the new number of block sizes
+    formats <- sprintf("<span style=\"font-weight: bold\">[%s]</span>",
+                       .VALID_FORMATS)
+    fmt_explained <- sprintf("%s&nbsp;%s", formats,
+                             c("TENxMatrix&nbsp;(sparse)",
+                               "HDF5Matrix&nbsp;(dense)",
+                               "HDF5Matrix&nbsp;as&nbsp;sparse"))
+    #fmt_explained <- paste0(paste(fmt_explained, collapse="; "), ".")
+    fmt_explained <- paste0(paste(fmt_explained, collapse=" &mdash; "), ".")
+
+    ## Replace "four" with whatever is the new number of block sizes
     ## if we ever happen to change that.
-    content <- c("For each operation, the best time across the ",
-                 "three different block sizes is displayed in ",
-                 "<span style=\"font-weight: bold\">bold</span>.<br />",
-                 "In addition, if it's also the best time across ",
-                 "the sparse and dense formats, then we ",
-                 "<span style=\"font-weight: bold; border: 1pt solid black\">",
-                 "&nbsp;box&nbsp;</span> it ",
-                 "(only for Normalization and PCA).<br />",
-                 "The \"max. mem. used\" is the max RSS (Resident Set Size) ",
-                 "value obtained by running <code>ps u -p <PID></code> ",
-                 "every second while performing a given operation. ",
-                 "Values > 4Gb are displayed in ",
-                 "<span style=\"color: ", .LIGHT_RED, "\">light red</span>.")
+    content <- c(
+        "Formats:&nbsp;", fmt_explained, "<br />",
+        "For each operation, the best time across the ",
+        "four different block sizes is displayed in ",
+        "<span style=\"font-weight: bold\">bold</span>.<br />",
+        "In addition, if it's also the best time across the three formats ",
+        "(", formats[[1L]], ",", formats[[2L]], ", and", formats[[3L]], "), ",
+        "then we <span style=\"font-weight: bold; border: 1pt solid black\">",
+        "&nbsp;box&nbsp;</span> it ",
+        "(only for Normalization and PCA).<br />",
+        "The \"max. mem. used\" is the max RSS (Resident Set Size) ",
+        "value obtained by running <code>ps u -p &lt;PID&gt;</code> ",
+        "every second while performing a given operation.<br />",
+        "\"max. mem. used\" values > ", .MEM_THRESHOLD, "Gb are displayed ",
+        "in <span style=\"color: ", .LIGHT_RED, "\">light red</span>.")
     if (!is.null(title)) {
         title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
                          title)
@@ -324,16 +345,16 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 .make_top_header <- function(block_sizes)
 {
     ## 1st <tr> element.
-    content <- "Test&nbsp;dataset"
-    th1a_elt <- list(tag="th",
-                     style=.TH_STYLE,
-                     content=content)
     content <- "F<br />o<br />r<br />m<br />a<br />t"
-    th1b_elt <- list(tag="th",
+    th1a_elt <- list(tag="th",
                      attribs=c(rowspan=2),
                      style=c(.TH_STYLE, "font-size: smaller"),
                      content=content)
-    content <- "Normalized<br />Test&nbsp;dataset"
+    content <- "Test&nbsp;Dataset"
+    th1b_elt <- list(tag="th",
+                     style=.TH_STYLE,
+                     content=content)
+    content <- "Normalized<br />Test&nbsp;Dataset"
     th1c_elt <- list(tag="th",
                      style=.TH_STYLE,
                      content=content)
@@ -397,8 +418,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 
     colspan <- 2L * num_block_sizes
     content <- c("1.&nbsp;NORMALIZATION<br />",
-                 "&amp;&nbsp;sel.&nbsp;of&nbsp;", num_var_genes,
-                 "&nbsp;most&nbsp;var.&nbsp;genes")
+                 "&amp;&nbsp;selection&nbsp;of&nbsp;", num_var_genes,
+                 "&nbsp;most&nbsp;variable&nbsp;genes")
     N_th_elt <- list(tag="th",
                      attribs=c(colspan=colspan),
                      style=.NORM_TH_LIGHTER_STYLE,
@@ -427,99 +448,111 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 {
     stopifnot(isSingleString(format),
               is.integer(Ntimes), is.integer(Rtimes), is.integer(Ptimes),
+              isTRUEorFALSE(Nbox), isTRUEorFALSE(Rbox), isTRUEorFALSE(Pbox),
               is.integer(Nmem), is.integer(Rmem), is.integer(Pmem),
               length(Ntimes) == length(Nmem),
               length(Rtimes) == length(Rmem),
               length(Ptimes) == length(Pmem))
+
+    style <- c(.BASE_STYLE, "font-weight: bold", "color: #888")
+    if (format != "s")
+        style <- c(style, "background: #F8F8F8")
+    td0_elt <- list(tag="td",
+                    style=style,
+                    content=paste0("[", format, "]"))
+
     content <- sprintf("<span style=\"%s\">%s&nbsp;x&nbsp;</span>%s",
                        "color: #888", .NGENES_BEFORE_NORM, ncells)
     td1_elt <- list(tag="td",
-                    attribs=c(rowspan=2),
+                    attribs=c(rowspan=3),
                     style=.BASE_STYLE,
                     content=content)
+
     content <- sprintf("%s<span style=\"%s\">&nbsp;x&nbsp;</span>%s",
                        num_var_genes, "color: #888", ncells)
     td2_elt <- list(tag="td",
-                    attribs=c(rowspan=2),
+                    attribs=c(rowspan=3),
                     style=.BASE_STYLE,
                     content=content)
-    style <- c(.BASE_STYLE, "font-style: italic", "color: #888")
-    if (format == "dense")
-        style <- c(style, "background: #F8F8F8")
-    td3_elt <- list(tag="td",
-                    style=style,
-                    content=format)
 
     ## Normalization results.
     base_style <-
-        if (format == "dense") .NORM_TD_DENSE_STYLE else .NORM_TD_STYLE
+        if (format != "s") .NORM_TD_DENSE_STYLE else .NORM_TD_STYLE
     td_groupN <- .make_td_group(Ntimes, Nmem,
                                 base_style=base_style, draw_box=Nbox)
 
     ## Realization results.
     base_style <-
-        if (format == "dense") .REALIZE_TD_DENSE_STYLE else .REALIZE_TD_STYLE
+        if (format != "s") .REALIZE_TD_DENSE_STYLE else .REALIZE_TD_STYLE
     td_groupR <- .make_td_group(Rtimes, Rmem,
                                 base_style=base_style, draw_box=Rbox)
 
     ## PCA results.
     base_style <-
-        if (format == "dense") .PCA_TD_DENSE_STYLE else .PCA_TD_STYLE
+        if (format != "s") .PCA_TD_DENSE_STYLE else .PCA_TD_STYLE
     td_groupP <- .make_td_group(Ptimes, Pmem,
                                 base_style=base_style, draw_box=Pbox)
 
-    if (format == "sparse") {
-        content <- list(td1_elt, td3_elt, td_groupN,
+    if (format == "s") {
+        content <- list(td0_elt,
+                        td1_elt, td_groupN,
                         td2_elt, td_groupR, td_groupP)
     } else {
-        content <- list(         td3_elt, td_groupN,
+        content <- list(td0_elt,
+                                 td_groupN,
                                  td_groupR, td_groupP)
     }
     list(tag="tr", content=content)
 }
 
-### Produce a pair of <tr> elements, one for "sparse" and one for "dense".
-.make_data_line_pair <- function(times, memused, ncells, num_var_genes)
+### Produces 3 <tr> elements, one for each format in .VALID_FORMATS.
+.make_data_line_triplet <- function(times, memused, ncells, num_var_genes)
 {
-    sparse_Ntimes <- times["norm",    , "sparse", num_var_genes, ncells]
-    dense_Ntimes  <- times["norm",    , "dense",  num_var_genes, ncells]
-    sparse_Rtimes <- times["realize", , "sparse", num_var_genes, ncells]
-    dense_Rtimes  <- times["realize", , "dense",  num_var_genes, ncells]
-    sparse_Ptimes <- times["pca",     , "sparse", num_var_genes, ncells]
-    dense_Ptimes  <- times["pca",     , "dense",  num_var_genes, ncells]
+    ## Ntimes, Nmemused: 3-col matrices with colnames .VALID_FORMATS and
+    ## 1 row per block size.
+    Ntimes <- times["norm", , , num_var_genes, ncells]
+    stopifnot(identical(colnames(Ntimes), .VALID_FORMATS))
+    Nmemused <- memused["norm", , , num_var_genes, ncells]
+    stopifnot(identical(colnames(Nmemused), .VALID_FORMATS))
+    Ntimes_min <- suppressWarnings(min(Ntimes, na.rm=TRUE))
+    ## Logical vector of length 3 with names .VALID_FORMATS on it.
+    Nbox <- vapply(colnames(Ntimes),
+        function(j)
+            suppressWarnings(min(Ntimes[ , j],  na.rm=TRUE)) == Ntimes_min,
+        logical(1))
 
-    Nmin1 <- suppressWarnings(min(sparse_Ntimes, na.rm=TRUE))
-    Nmin2 <- suppressWarnings(min(dense_Ntimes, na.rm=TRUE))
-    Nbox1 <- Nmin1 < Nmin2
-    Nbox2 <- Nmin1 > Nmin2
-    Rmin1 <- suppressWarnings(min(sparse_Rtimes, na.rm=TRUE))
-    Rmin2 <- suppressWarnings(min(dense_Rtimes, na.rm=TRUE))
-    Rbox1 <- Rmin1 < Rmin2
-    Rbox2 <- Rmin1 > Rmin2
+    ## Rtimes, Rmemused: 3-col matrices with colnames .VALID_FORMATS and
+    ## 1 row per block size.
+    Rtimes <- times["realize", , , num_var_genes, ncells]
+    Rmemused <- memused["realize", , , num_var_genes, ncells]
+    Rtimes_min <- suppressWarnings(min(Rtimes, na.rm=TRUE))
+    ## Logical vector of length 3 with names .VALID_FORMATS on it.
+    Rbox <- vapply(colnames(Rtimes),
+        function(j)
+            suppressWarnings(min(Rtimes[ , j],  na.rm=TRUE)) == Rtimes_min,
+        logical(1))
     ## Disable boxing of the best realization time for now (too many boxes!
-    ## which is distracting and not that important for realization anyway).
-    Rbox1 <- Rbox2 <- FALSE
-    Pmin1 <- suppressWarnings(min(sparse_Ptimes, na.rm=TRUE))
-    Pmin2 <- suppressWarnings(min(dense_Ptimes, na.rm=TRUE))
-    Pbox1 <- Pmin1 < Pmin2
-    Pbox2 <- Pmin1 > Pmin2
+    ## which is distracting and we don't really care about realization anyway).
+    Rbox[] <- FALSE
 
-    sparse_Nmem <- memused["norm",    , "sparse", num_var_genes, ncells]
-    dense_Nmem  <- memused["norm",    , "dense",  num_var_genes, ncells]
-    sparse_Rmem <- memused["realize", , "sparse", num_var_genes, ncells]
-    dense_Rmem  <- memused["realize", , "dense",  num_var_genes, ncells]
-    sparse_Pmem <- memused["pca",     , "sparse", num_var_genes, ncells]
-    dense_Pmem  <- memused["pca",     , "dense",  num_var_genes, ncells]
+    ## Ptimes, Pmemused: 3-col matrices with colnames .VALID_FORMATS and
+    ## 1 row per block size.
+    Ptimes <- times["pca", , , num_var_genes, ncells]
+    Pmemused <- memused["pca", , , num_var_genes, ncells]
+    Ptimes_min <- suppressWarnings(min(Ptimes, na.rm=TRUE))
+    ## Logical vector of length 3 with names .VALID_FORMATS on it.
+    Pbox <- vapply(colnames(Ptimes),
+        function(j)
+            suppressWarnings(min(Ptimes[ , j],  na.rm=TRUE)) == Ptimes_min,
+        logical(1))
 
-    line1 <- .make_data_line(ncells, "sparse", num_var_genes,
-                             sparse_Ntimes, Nbox1, sparse_Nmem,
-                             sparse_Rtimes, Rbox1, sparse_Rmem,
-                             sparse_Ptimes, Pbox1, sparse_Pmem)
-    line2 <- .make_data_line(ncells, "dense", num_var_genes,
-                             dense_Ntimes, Nbox2, dense_Nmem,
-                             dense_Rtimes, Rbox2, dense_Rmem,
-                             dense_Ptimes, Pbox2, dense_Pmem)
-    list(line1, line2)
+    lapply(.VALID_FORMATS,
+        function(format)
+            .make_data_line(ncells, format, num_var_genes,
+                    Ntimes[ , format], Nbox[[format]], Nmemused[ , format],
+                    Rtimes[ , format], Rbox[[format]], Rmemused[ , format],
+                    Ptimes[ , format], Pbox[[format]], Pmemused[ , format])
+    )
 }
 
 .make_table_section <- function(times, memused,
@@ -531,11 +564,11 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     unique_ncells <- dimnames(times)$ncells
     tr_elts <- lapply(unique_ncells,
         function(ncells) {
-            line_pair <- .make_data_line_pair(times, memused,
-                                              ncells, num_var_genes)
+            line_triplet <- .make_data_line_triplet(times, memused,
+                                                    ncells, num_var_genes)
             if (is.null(hline))
-                return(line_pair)
-            c(list(hline), line_pair)
+                return(line_triplet)
+            c(list(hline), line_triplet)
         })
     section <- list(steps_header, tr_elts)
     if (is.null(hline))
@@ -569,7 +602,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 ### make_timings_table()
 ###
 
-.find_timings_file <- function(machine_name)
+.find_timings_db_file <- function(machine_name)
 {
     suppressPackageStartupMessages(library(S4Vectors))
     suppressPackageStartupMessages(library(HDF5Array))
@@ -584,19 +617,20 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     pattern <- "^timings.*\\.dcf$"
     file_paths <- list.files(machine_path, pattern=pattern, full.names=TRUE)
     if (length(file_paths) == 0L)
-        stop(wmsg("no timings files found in '", machine_path, "'"))
+        stop(wmsg("no timings db files found in '", machine_path, "'"))
     sort(file_paths, decreasing=TRUE)[[1L]]
 }
 
 make_timings_table <- function(machine_name, title=NULL, file="")
 {
-    file_path <- .find_timings_file(machine_name)
-    timings <- read.dcf(file_path)  # character matrix
-    times <- .fold_timings_matrix_into_5D_array(timings, what="time")
+    timings_db_file <- .find_timings_db_file(machine_name)
+    timings_db <- read.dcf(timings_db_file)  # character matrix
+    timings_db <- .check_and_add_missing_timings_db_cols(timings_db)
+    times <- .extract_var_from_timings_db(timings_db, varname="time")
     ## We choose to populate the "max. mem. used" table columns with
     ## the "max_rss" values, not the "max_vsz" values, because the VSZ
     ## as reported by 'ps u -p <PID>' seems meaningless on macOS.
-    memused <- .fold_timings_matrix_into_5D_array(timings, what="max_rss")
+    memused <- .extract_var_from_timings_db(timings_db, varname="max_rss")
     table_elt <- .make_table(times, memused, title)
     cat(deparse_html_tree(table_elt), sep="\n", file=file)
 }

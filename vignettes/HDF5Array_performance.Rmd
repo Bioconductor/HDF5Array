@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 30 January 2025"
+date: "Compiled `r doc_date()`; Modified 31 January 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -68,11 +68,11 @@ source(path, verbose=FALSE)
 ## _Sparse_ vs _dense_ representation
 
 The datasets that we will use for our benchmarks are subsets of the
-_1.3 Million Brain Cell Dataset_ from 10x Genomics.
-
-The _1.3 Million Brain Cell Dataset_ is a sparse 27,998 x 1,306,127 matrix
-of counts, with one gene per row and one cell per column. It's available
-via the `r Biocpkg("ExperimentHub")` package in two forms:
+_1.3 Million Brain Cell Dataset_ from 10x Genomics. This is a sparse
+27,998 x 1,306,127 matrix of counts, with one gene per row and one cell
+per column. Around 7% of the matrix values are nonzero counts.
+The dataset is available via the `r Biocpkg("ExperimentHub")` package
+in two forms:
 
 1. As a _sparse_ HDF5 file: This is the original HDF5 file provided by
    10x Genomics. It uses the CSR/CSC/Yale representation to store the
@@ -105,7 +105,8 @@ We use the `TENxMatrix()` and `HDF5Array()` constructors to bring the
 sparse and dense datasets in R, as DelayedArray derivatives. Note that
 this does _not_ load the matrix data in memory.
 
-Bring the sparse dataset in R:
+### Bring the sparse dataset in R
+
 ```{r brain_s}
 ## Use 'h5ls(brain_s_path)' to find out the group.
 brain_s <- TENxMatrix(brain_s_path, group="mm10")
@@ -120,7 +121,8 @@ is_sparse(brain_s)
 See `?TENxMatrix` in the `r Biocpkg("HDF5Array")` package for more
 information about TENxMatrix objects.
 
-Bring the dense dataset in R:
+### Bring the dense dataset in R
+
 ```{r brain_D}
 ## Use 'h5ls(brain_D_path)' to find out the name of the dataset.
 brain_D <- HDF5Array(brain_D_path, name="counts")
@@ -257,8 +259,8 @@ For our benchmarks below, we'll use the following block sizes:
   |                      | NORMALIZATION | ON-DISK REALIZATION |    PCA |
   | -------------------- | ------------: | ------------------: | -----: |
   | TENxMatrix (sparse)  |        250 Mb |              100 Mb |  40 Mb |
-  | HDF5Matrix (dense)   |         40 Mb |              250 Mb | 100 Mb |
-  | HDF5Matrix as sparse |        250 Mb |              100 Mb |  16 Mb |
+  | HDF5Matrix (dense)   |         16 Mb |              100 Mb | 100 Mb |
+  | HDF5Matrix as sparse |        250 Mb |              100 Mb |  40 Mb |
 
 
 ## Monitoring memory usage
@@ -304,7 +306,7 @@ dim(norm_brain1_s)
 
 ```{r norm_brain1_D}
 dim(brain1_D)
-DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
 system.time(norm_brain1_D <- simple_normalize(brain1_D))
 dim(norm_brain1_D)
 ```
@@ -333,7 +335,7 @@ dim(norm_brain2_s)
 
 ```{r norm_brain2_D}
 dim(brain2_D)
-DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
+DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
 system.time(norm_brain2_D <- simple_normalize(brain2_D))
 dim(norm_brain2_D)
 ```
@@ -352,29 +354,21 @@ dim(norm_brain2_Ds)
 
 Note that the normalized datasets obtained in the previous section
 are DelayedMatrix objects that carrry delayed operations. These can
-be displayed with `showtree()`:
+be displayed with `showtree()` e.g. for `norm_brain2_s`:
 ```{r show_norm_brain2_s_delayed_ops}
 class(norm_brain2_s)
 showtree(norm_brain2_s)
 ```
 
-```{r show_norm_brain2_D_delayed_ops}
-class(norm_brain2_D)
-showtree(norm_brain2_D)
-```
-
-```{r show_norm_brain2_Ds_delayed_ops}
-class(norm_brain2_Ds)
-showtree(norm_brain2_Ds)
-```
+All the other `norm_brain*` carry similar operations.
 
 Before we proceed with PCA, we're going to write the normalized datasets to
-new HDF5 files. This has a significant cost, but, on the other hand, it has
-the benefit of triggering _on-disk realization_ of the object. This means that
-all the delayed operations carried by the object will get realized on-the-fly
-before the matrix data actually lands on the disk, making the new object
-(TENxMatrix or HDF5Matrix) more efficient for PCA or whatever block-processed
-operations will come next.
+new HDF5 files. This introduces an additional cost, but, on the other hand,
+it has the benefit of triggering _on-disk realization_ of the object. This
+means that all the delayed operations carried by the object will get realized
+on-the-fly before the matrix data actually lands on the disk, making the new
+object (TENxMatrix or HDF5Matrix) more efficient for PCA or whatever
+block-processed operations will come next.
 
 ### On-disk realization of the 1000 x 12,500 normalized dataset
 
@@ -394,7 +388,7 @@ showtree(norm_brain1_s)  # "pristine" object (i.e. no more delayed operations)
 #### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain1_D}
-DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
 dim(norm_brain1_D)
 system.time(norm_brain1_D <- writeHDF5Array(norm_brain1_D, level=0))
 ```
@@ -435,7 +429,7 @@ showtree(norm_brain2_s)  # "pristine" object (i.e. no more delayed operations)
 #### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain2_D}
-DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
+DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
 dim(norm_brain2_D)
 system.time(norm_brain2_D <- writeHDF5Array(norm_brain2_D, level=0))
 ```
@@ -497,7 +491,7 @@ stopifnot(all.equal(pca1s, pca1D))
 #### HDF5Matrix as sparse
 
 ```{r PCA_norm_brain1_Ds}
-DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 dim(norm_brain1_Ds)
 system.time(pca1Ds <- simple_PCA(norm_brain1_Ds))
 ```
@@ -533,7 +527,7 @@ stopifnot(all.equal(pca2s, pca2D))
 #### HDF5Matrix as sparse
 
 ```{r PCA_norm_brain2_Ds}
-DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
+DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
 dim(norm_brain2_Ds)
 system.time(pca2Ds <- simple_PCA(norm_brain2_Ds))
 ```
@@ -622,39 +616,40 @@ make_timings_table("kjohnson3", title=title)
 
 ## Final remarks
 
-_[TODO] Update remarks in the light of new HDF5Matrix as sparse
- representation._
-
 The Supermicro SuperServer 1029GQ-TRT machine is significantly slower
-than the other machines. This is most likely due to the less performant
-disk.
+than the other machines. This is likely due to the less performant disk.
 
-For PCA, choosing the sparse representation (TENxMatrix) and using small
-block sizes (16 Mb) is a clear winner.
+The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
+its promise so we leave it alone for now.
 
-For normalization, there's no clear best choice between the parse and dense
-representations. More precisely, for this operation, the sparse representation
-tends to give the best times when using bigger blocks (250 Mb), whereas the
-dense representation tends to give the best times when using smaller blocks
-(16 Mb).
+Normalization and PCA are roughly linear in time with respect to the number
+of cells in the dataset, regardless of representation (sparse or dense) or
+block size.
 
-_[TODO] Revisit the paragraph below now that we have timings for blocks
-of 16 Mb._
+For PCA, choosing the "**[s]** TENxMatrix (sparse)" representation
+and using small block sizes (40 Mb) tends to give the best performance.
 
-However, based on the above benchmarks, there's no clear best choice
-between "sparse with big blocks" and "dense with small blocks" in terms of
-speed. Maybe extending the benchmarks to include more extreme block sizes
-(e.g. 20 Mb and 500 Mb) could help break the tie.
+For normalization, there's no clear best choice between the
+"**[s]** TENxMatrix (sparse)" and "**[D]** HDF5Matrix (dense)"
+representations. More precisely, for this operation, the former
+tends to give the best times when using bigger blocks (250 Mb),
+whereas the latter tends to give the best times when using smaller
+blocks (16 Mb). However, based on the above benchmarks, and in the absence
+of memory constraints, there's no clear best choice between "sparse with
+big blocks" and "dense with small blocks" in terms of speed. Of course,
+on systems with memory constraints, the latter is obviously the best
+choice.
 
-Normalization and PCA are roughly linear in time, regardless of
-representation (sparse or dense) or block size.
+About memory usage:
 
-For small block sizes (<= 100 Mb), memory usage doesn't seem to be affected
-by the number of cells in the dataset, that is, all operations seem to
-perform at almost constant memory, regardless of representation (sparse
-or dense). However, for bigger block sizes (e.g. 250 Mb), the memory used
-to process the sparse datasets tend to increase slightly with the number
-of cells in the dataset.
+- Overall, for a given choice of block size, memory usage doesn't seem
+  to be affected too much by the number of cells in the dataset,
+  that is, all operations seem to perform at _almost_ constant memory.
+
+- However, it should be noted that the "**[D]** HDF5Matrix (dense)"
+  representation seems to be significantly better than the
+  "**[s]** TENxMatrix (sparse)" representation at keeping memory
+  usage flat as the number of cells in the dataset increases.
 
 _[TODO] Add some plots to help vizualize the above assertions._
 
