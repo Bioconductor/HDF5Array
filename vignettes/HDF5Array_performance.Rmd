@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 31 January 2025"
+date: "Compiled `r doc_date()`; Modified 1 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -622,12 +622,12 @@ its promise so we leave it alone for now. Note that the code for loading
 blocks of data from the _dense_ HDF5 file to memory does not currently
 take full advantage of the SVT\_SparseArray representation, a new
 efficient data structure for multidimensional _sparse_ data implemented
-in the `r Biocpkg("SparseArray")` package that gets rid of some of the
+in the `r Biocpkg("SparseArray")` package that overcomes some of the
 limitations of the dgCMatrix representation from the `r CRANpkg("Matrix")`
 package. This will need to be addressed.
 
 The Supermicro SuperServer 1029GQ-TRT machine is significantly slower
-than the other machines. This is likely due to the less performant disk.
+than the other machines, likely due to its less performant disk.
 
 Normalization and PCA are roughly linear in time with respect to the number
 of cells in the dataset, regardless of representation (sparse or dense) or
@@ -647,18 +647,33 @@ big blocks" and "dense with small blocks" in terms of speed. Of course,
 on systems with memory constraints, the latter is obviously the best
 choice.
 
+_[TODO] Add some plots to help vizualize the above observations._
+
+Based on these observations, the best overall strategy is the following
+hybrid approach:
+
+- Start with the "**[D]** HDF5Matrix (dense)" representation.
+
+- Perform normalization, using very small blocks (16 Mb).
+
+- Switch to the "**[s]** TENxMatrix (sparse)" format when writing
+  the normalized dataset to disk, that is, use `writeTENxMatrix()`
+  instead of `writeHDF5Array()` for on-disk realization of the
+  intermediate dataset.
+
+- Perform PCA on the object returned by the on-disk realization step
+  (`writeTENxMatrix()`), using small blocks (40 Mb).
+
 About memory usage:
 
 - Overall, for a given choice of block size, memory usage doesn't seem
   to be affected too much by the number of cells in the dataset,
   that is, all operations seem to perform at _almost_ constant memory.
 
-- However, it should be noted that the "**[D]** HDF5Matrix (dense)"
-  representation seems to be significantly better than the
-  "**[s]** TENxMatrix (sparse)" representation at keeping memory
-  usage flat as the number of cells in the dataset increases.
-
-_[TODO] Add some plots to help vizualize the above assertions._
+- However, the "**[D]** HDF5Matrix (dense)" representation appears to
+  be better than the "**[s]** TENxMatrix (sparse)" representation at
+  keeping memory usage (mostly) flat as the number of cells in the
+  dataset increases.
 
 
 

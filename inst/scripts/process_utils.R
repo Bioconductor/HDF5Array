@@ -13,7 +13,10 @@ start_log_process_info <- function(pid, logfile, interval=1)
 
 stop_log_process_info <- function(loop_pid)
 {
-    suppressWarnings(system2("kill", args=loop_pid, stdout=TRUE, stderr=TRUE))
+    ## We ignore the result.
+    res <- suppressWarnings(
+        system2("kill", args=loop_pid, stdout=TRUE, stderr=TRUE)
+    )
 }
 
 ### Returns a 11-col matrix.
