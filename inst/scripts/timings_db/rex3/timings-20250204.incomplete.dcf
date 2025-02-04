@@ -1630,3 +1630,67 @@ pca_time: 1957.363
 pca_max_vsz: 2522
 pca_max_rss: 2083
 
+ncells: 100000
+num_var_genes: 1000
+format: Ds
+norm_block_size: 100
+norm_time: 490.649
+norm_max_vsz: 2505
+norm_max_rss: 2114
+realize_block_size: 100
+realize_time: 58.876
+realize_max_vsz: 2156
+realize_max_rss: 1756
+pca_block_size: 100
+pca_time: 1943.237
+pca_max_vsz: 2793
+pca_max_rss: 2340
+
+ncells: 100000
+num_var_genes: 1000
+format: Ds
+norm_block_size: 250
+norm_time: 506.052
+norm_max_vsz: 3883
+norm_max_rss: 3332
+realize_block_size: 250
+realize_time: 49.936
+realize_max_vsz: 3473
+realize_max_rss: 2954
+pca_block_size: 250
+pca_time: 1739.412
+pca_max_vsz: 4250
+pca_max_rss: 3688
+
+ncells: 200000
+num_var_genes: 1000
+format: Ds
+norm_block_size: 100
+norm_time: 996.437
+norm_max_vsz: 2668
+norm_max_rss: 2277
+realize_block_size: 100
+realize_time: 123.737
+realize_max_vsz: 2523
+realize_max_rss: 2131
+pca_block_size: 100
+pca_time: 4106.953
+pca_max_vsz: 3037
+pca_max_rss: 2580
+
+ncells: 100000
+num_var_genes: 2000
+format: s
+norm_block_size: 16
+norm_time: 1065.548
+norm_max_vsz: 1586
+norm_max_rss: 1196
+realize_block_size: 16
+realize_time: 54.316
+realize_max_vsz: 1542
+realize_max_rss: 1151
+pca_block_size: 16
+pca_time: 822.894
+pca_max_vsz: 1582
+pca_max_rss: 1191
+
