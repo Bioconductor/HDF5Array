@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 1 February 2025"
+date: "Compiled `r doc_date()`; Modified 3 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -208,10 +208,11 @@ simple_normalize <- function(mat, num_var_genes=1000)
 {
     stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
     mat <- mat[rowSums(mat) > 0, ]
-    mat <- t(t(mat) * 10000 / colSums(mat))
+    col_sums <- colSums(mat) / 10000
+    mat <- t(t(mat) / col_sums)
     row_vars <- rowVars(mat)
-    rv_order <- order(row_vars, decreasing=TRUE)
-    variable_idx <- head(rv_order, n=num_var_genes)
+    row_vars_order <- order(row_vars, decreasing=TRUE)
+    variable_idx <- head(row_vars_order, n=num_var_genes)
     mat <- log1p(mat[variable_idx, ])
     mat / rowSds(mat)
 }

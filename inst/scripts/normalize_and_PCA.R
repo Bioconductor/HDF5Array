@@ -75,10 +75,11 @@ simple_normalize <- function(mat, num_var_genes=1000)
 {
     stopifnot(length(dim(mat)) == 2, !is.null(rownames(mat)))
     mat <- mat[rowSums(mat) > 0, ]
-    mat <- t(t(mat) * 10000 / colSums(mat))
+    col_sums <- colSums(mat) / 10000
+    mat <- t(t(mat) / col_sums)
     row_vars <- rowVars(mat)
-    rv_order <- order(row_vars, decreasing=TRUE)
-    variable_idx <- head(rv_order, n=num_var_genes)
+    row_vars_order <- order(row_vars, decreasing=TRUE)
+    variable_idx <- head(row_vars_order, n=num_var_genes)
     mat <- log1p(mat[variable_idx, ])
     mat / rowSds(mat)
 }
@@ -103,9 +104,10 @@ on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(normalized <- simple_normalize(dataset, num_var_genes=num_var_genes))
 stop_log_process_info(loop_pid)
 norm_max_mem_used <- extract_max_mem_used(process_info_log, pid)
-gc()
+mem <- paste0(names(norm_max_mem_used), "=",
+              norm_max_mem_used, "Mb", collapse=" ")
 norm_time <- timing[["elapsed"]]
-cat("---> normalization completed in ", norm_time, " s.\n\n", sep="")
+cat("---> normalization completed in ", norm_time, " s (", mem, ").\n\n", sep="")
 
 ## On-disk realization of normalized dataset.
 
@@ -127,9 +129,10 @@ if (format == "s") {
 }
 stop_log_process_info(loop_pid)
 realize_max_mem_used <- extract_max_mem_used(process_info_log, pid)
-gc()
+mem <- paste0(names(realize_max_mem_used), "=",
+              realize_max_mem_used, "Mb", collapse=" ")
 realize_time <- timing[["elapsed"]]
-cat("---> realization completed in ", realize_time, " s.\n\n", sep="")
+cat("---> realization completed in ", realize_time, " s (", mem, ").\n\n", sep="")
 
 ## PCA.
 
@@ -140,9 +143,10 @@ on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(pca <- simple_PCA(normalized))
 stop_log_process_info(loop_pid)
 pca_max_mem_used <- extract_max_mem_used(process_info_log, pid)
-gc()
 pca_time <- timing[["elapsed"]]
-cat("---> PCA completed in ", pca_time, " s.\n\n", sep="")
+mem <- paste0(names(norm_max_mem_used), "=",
+              norm_max_mem_used, "Mb", collapse=" ")
+cat("---> PCA completed in ", pca_time, " s (", mem,").\n\n", sep="")
 
 cat("ncells: ", ncells, "\n",
     "num_var_genes: ", num_var_genes, "\n",

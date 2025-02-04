@@ -340,19 +340,19 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
 .PCA_TD_STYLE <- c(.BASE_STYLE, "background: #FFF7F7")
 .PCA_TD_DENSE_STYLE <- c(.BASE_STYLE, "background: #F8F0F0")
 
-### Produces 2 <tr> elements that span 3 + 6 * n columns each, where
+### Produces 2 <tr> elements that span 4 + 6 * n columns each, where
 ### n = length(block_sizes).
 .make_top_header <- function(block_sizes)
 {
     ## 1st <tr> element.
-    content <- "F<br />o<br />r<br />m<br />a<br />t"
+    content <- "Test&nbsp;Dataset"
     th1a_elt <- list(tag="th",
+                     style=.TH_STYLE,
+                     content=content)
+    content <- "F<br />o<br />r<br />m<br />a<br />t"
+    th1F_elt <- list(tag="th",
                      attribs=c(rowspan=2),
                      style=c(.TH_STYLE, "font-size: smaller"),
-                     content=content)
-    content <- "Test&nbsp;Dataset"
-    th1b_elt <- list(tag="th",
-                     style=.TH_STYLE,
                      content=content)
     content <- "Normalized<br />Test&nbsp;Dataset"
     th1c_elt <- list(tag="th",
@@ -372,8 +372,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     N_th1_elts <- make_th1_elts(block_sizes, .NORM_TH_STYLE)
     R_th1_elts <- make_th1_elts(block_sizes, .REALIZE_TH_STYLE)
     P_th1_elts <- make_th1_elts(block_sizes, .PCA_TH_STYLE)
-    content <- list(th1a_elt, th1b_elt, N_th1_elts,
-                    th1c_elt, R_th1_elts, P_th1_elts)
+    content <- list(th1a_elt, th1F_elt, N_th1_elts,
+                    th1c_elt, th1F_elt, R_th1_elts, P_th1_elts)
     tr1_elt <- list(tag="tr", content=content)
 
     ## 2nd <tr> element.
@@ -409,12 +409,10 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     list(tr1_elt, tr2_elt)
 }
 
-### Produces a <tr> element that spans 3 + 6 * num_block_sizes columns.
+### Produces a <tr> element that spans 4 + 6 * num_block_sizes columns.
 .make_steps_header <- function(num_block_sizes, num_var_genes)
 {
-    th1_elt <- list(tag="th", style=.TH_LIGHTER_STYLE)
-    #th2_elt <- list(tag="th", style=.TH_LIGHTER_STYLE, content="format")
-    th2_elt <- list(tag="th", style=.TH_LIGHTER_STYLE)
+    th0_elt <- list(tag="th", style=.TH_LIGHTER_STYLE)
 
     colspan <- 2L * num_block_sizes
     content <- c("1.&nbsp;NORMALIZATION<br />",
@@ -435,11 +433,12 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                      attribs=c(colspan=colspan),
                      style=.PCA_TH_LIGHTER_STYLE,
                      content=content)
-    content <- list(th1_elt, th2_elt, N_th_elt, th1_elt, R_th_elt, P_th_elt)
+    content <- list(th0_elt, th0_elt, N_th_elt,
+                    th0_elt, th0_elt, R_th_elt, P_th_elt)
     list(tag="tr", content=content)
 }
 
-### Produces a <tr> element that spans 3 + 2 * (n1 + n2 + n3) columns,
+### Produces a <tr> element that spans 4 + 2 * (n1 + n2 + n3) columns,
 ### where n1 = length(Ntimes), n2 = length(Rtimes), and n3 = length(Ptimes).
 .make_data_line <- function(ncells, format, num_var_genes,
                             Ntimes, Nbox, Nmem,
@@ -454,19 +453,19 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
               length(Rtimes) == length(Rmem),
               length(Ptimes) == length(Pmem))
 
-    style <- c(.BASE_STYLE, "font-weight: bold", "color: #888")
-    if (format != "s")
-        style <- c(style, "background: #F8F8F8")
-    td0_elt <- list(tag="td",
-                    style=style,
-                    content=paste0("[", format, "]"))
-
     content <- sprintf("<span style=\"%s\">%s&nbsp;x&nbsp;</span>%s",
                        "color: #888", .NGENES_BEFORE_NORM, ncells)
     td1_elt <- list(tag="td",
                     attribs=c(rowspan=3),
                     style=.BASE_STYLE,
                     content=content)
+
+    style <- c(.BASE_STYLE, "font-weight: bold", "color: #888")
+    if (format != "s")
+        style <- c(style, "background: #F8F8F8")
+    tdF_elt <- list(tag="td",
+                    style=style,
+                    content=paste0("[", format, "]"))
 
     content <- sprintf("%s<span style=\"%s\">&nbsp;x&nbsp;</span>%s",
                        num_var_genes, "color: #888", ncells)
@@ -494,13 +493,11 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                                 base_style=base_style, draw_box=Pbox)
 
     if (format == "s") {
-        content <- list(td0_elt,
-                        td1_elt, td_groupN,
-                        td2_elt, td_groupR, td_groupP)
+        content <- list(td1_elt, tdF_elt, td_groupN,
+                        td2_elt, tdF_elt, td_groupR, td_groupP)
     } else {
-        content <- list(td0_elt,
-                                 td_groupN,
-                                 td_groupR, td_groupP)
+        content <- list(         tdF_elt, td_groupN,
+                                 tdF_elt, td_groupR, td_groupP)
     }
     list(tag="tr", content=content)
 }
@@ -585,12 +582,12 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
     unique_block_sizes <- dimnames(times)$block_size
     num_block_sizes <- length(unique_block_sizes)
     top_header <- .make_top_header(unique_block_sizes)
-    hline <- .make_hline(3L+6L*num_block_sizes)
+    hline <- .make_hline(4L+6L*num_block_sizes)
     section1 <- .make_table_section(times, memused, num_block_sizes,
                                     num_var_genes="1000", hline=hline)
     section2 <- .make_table_section(times, memused, num_block_sizes,
                                     num_var_genes="2000", hline=hline)
-    footnote <- .make_footnote(3L+6L*num_block_sizes, title=title)
+    footnote <- .make_footnote(4L+6L*num_block_sizes, title=title)
     content <- list(top_header, section1, section2, hline, footnote)
     list(tag="table",
          style=.TABLE_STYLE,
