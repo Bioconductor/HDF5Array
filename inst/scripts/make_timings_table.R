@@ -217,11 +217,11 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
               is.character(specs), length(specs) >= 1L,
               !is.name(is.character(specs)), isSingleString(disk_perf))
     header <- list(tag="thead",
-                   content=list(tag="tr",
-                                content=list(tag="th",
-                                             style=.TH_STYLE,
-                                             attribs=c(colspan=4),
-                                             content=machine_name)))
+        content=list(tag="tr",
+            content=list(tag="th",
+                style=c(.TH_STYLE, "white-space: nowrap"),
+                attribs=c(colspan=4),
+                content=machine_name)))
     style1 <- c(.TH_LIGHTER_STYLE, "text-align: right",
                 "padding-left: 6pt", "padding-right: 4pt")
     style2 <- c(.BASE_STYLE, "text-align: left",
@@ -726,7 +726,7 @@ make_timings_table <- function(machine_name, title=NULL, file="")
     th_elts <- list(
         list(tag="th",
              style=.TH_LIGHTER_STYLE,
-             content="&nbsp;Machine&nbsp;"),
+             content="Machine"),
         list(tag="th",
              style=c("width: 95pt", .NORM_TH_LIGHTER_STYLE),
              content=step_contents[[1L]]),
@@ -788,7 +788,8 @@ make_timings_table <- function(machine_name, title=NULL, file="")
         function(step) NRPmem[step, as.character(block_sizes[[step]])],
         integer(1), USE.NAMES=TRUE)
 
-    style <- c(.BASE_STYLE, "padding-left: 6pt", "padding-right: 6pt")
+    style <- c(.BASE_STYLE, "white-space: nowrap",
+               "padding-left: 6pt", "padding-right: 6pt")
     machine_td_elt <- list(tag="td", style=style, content=machine_name)
     styles <- list(norm=.NORM_TD_STYLE,
                    realize=.REALIZE_TD_STYLE,

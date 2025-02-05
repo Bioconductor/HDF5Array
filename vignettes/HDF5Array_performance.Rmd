@@ -714,9 +714,9 @@ in this table:
 
 ```{r summarize_machine_times, echo=FALSE, results='asis'}
 machine_names <- c(
-    `DELL&nbsp;XPS&nbsp;15&nbsp;laptop`="xps15",
-    `Supermicro&nbsp;SuperServer&nbsp;1029GQ-TRT`="rex3",
-    `Apple&nbsp;Silicon&nbsp;Mac&nbsp;Pro`="kjohnson3"
+    `DELL XPS 15 laptop`="xps15",
+    `Supermicro SuperServer 1029GQ-TRT`="rex3",
+    `Apple Silicon Mac Pro`="kjohnson3"
 )
 summarize_machine_times(machine_names)
 ```
