@@ -756,8 +756,9 @@ make_timings_table <- function(machine_name, title=NULL, file="")
     content <- c(title,
         "For each machine, we show the normalization, ",
         "realization, and PCA times (plus total time) obtained<br />",
-        "on the ", .NGENES_BEFORE_NORM, " x ", ncells, " dataset, using ",
-        "the \"", deco_format, "\" format, and selecting<br />the ",
+        "on the ", .NGENES_BEFORE_NORM, " x ",
+        "<span style=\"font-weight: bold\">", ncells, "</span> dataset, ",
+	"using the \"", deco_format, "\" format, and selecting<br />the ",
         num_var_genes, " most variable genes during the ",
         "normalization step. All times are in seconds.")
     td_elt <- list(tag="td",
