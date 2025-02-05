@@ -676,7 +676,7 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
     suppressPackageStartupMessages(library(HDF5Array))
     stopifnot(isSingleString(machine_name))
     machine_path <- system.file(package="HDF5Array",
-                                "scripts", "timings_db", machine_name)
+                                "scripts", "timings_dbs", machine_name)
     if (machine_path == "")
         stop(wmsg("no '", machine_name, "' folder in timings db"))
     file_path <- file.path(machine_path, "timings.dcf")
