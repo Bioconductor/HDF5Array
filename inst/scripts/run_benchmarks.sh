@@ -5,8 +5,8 @@
 #   cd path/to/HDF5Array/inst/scripts/timings_db/<machine-name>
 #   time ../../run_benchmarks.sh >run_benchmarks.log 2>&1 &
 #
-# Takes 34.5 hours to complete on xps15!
-# Should take between 25 and 60 hours to complete, depending on the machine.
+# Takes about 32 hours to complete on xps15 with HDF5Array 1.35.12!
+# Should take between 20 and 50 hours to complete, depending on the machine.
 #
 set -e  # exit immediately if a simple command exits with a non-zero status
 

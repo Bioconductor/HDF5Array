@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 3 February 2025"
+date: "Compiled `r doc_date()`; Modified 5 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -288,9 +288,9 @@ datasets only (27,998 x 12,500 and 27,998 x 25,000), on the three
 different representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
 for each of them. We report the time and memory usage for each run.
 
-See the **Comprehensive timings obtained on various systems** section at
+See the **Comprehensive timings obtained on various machines** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
-obtained on various systems on all our test datasets and using four different
+obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
 ### Normalization of the 27,998 x 12,500 dataset
@@ -462,9 +462,9 @@ in the previous section (1000 x 12,500 and 1000 x 25,000), on the three
 different representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
 for each dataset. We report the time and memory usage for each run.
 
-See the **Comprehensive timings obtained on various systems** section at
+See the **Comprehensive timings obtained on various machines** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
-obtained on various systems on all our test datasets and using four different
+obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
 ### PCA on the 1000 x 12,500 normalized dataset
@@ -540,83 +540,108 @@ stopifnot(all.equal(pca2s, pca2Ds))
 ```
 
 
-## Comprehensive timings obtained on various systems
+## Comprehensive timings obtained on various machines
 
-Here we report timings obtained on various systems. For each system,
-the results are summarized in a table that shows the normalization &
-realization & PCA timings obtained on all our test datasets and using
-four different block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
+Here we report timings (and memory usage) observed on various machines.
+For each machine, the results are presented in a table that shows the
+normalization & realization & PCA timings obtained for all our test datasets
+and using four different block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 For each operation, the best time across the four different block
 sizes is displayed in **bold**.
 
-### DELL XPS 15 laptop (model 9520)
+All the timings (and memory usage) were produced by running
+the `run_benchmarks.sh` script located in the `HDF5Array/inst/scripts/`
+folder of the package, using R 4.5 and `r Biocpkg("HDF5Array")` 1.35.12
+(Bioconductor 3.21).
 
-- **OS:** Linux Ubuntu 24.04
-- **Bioconductor/R versions:** 3.21/4.5
-- **RAM:** 32GB
-- **Disk:** 1TB SSD
-- **Disk performance**:
-<table><tr><td style="width: 80pt"></td><td>
-<pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
-    # Output of 'sudo hdparm -Tt &lt;device&gt;':
-     Timing cached reads:   35188 MB in  2.00 seconds = 17620.75 MB/sec
-     Timing buffered disk reads: 7842 MB in  3.00 seconds = 2613.57 MB/sec
-</pre>
-</td></tr></table>
+### Timings for DELL XPS 15 laptop
 
+Machine specs:
+```{r xps15_specs, echo=FALSE, results='asis'}
+hdparm1 <- "Output of <code>sudo hdparm -Tt &lt;device&gt;</code>:"
+hdparm1 <- sprintf("<span style=\"font-style: italic\">%s</span>", hdparm1)
+hdparm2 <- c(
+    "Timing cached reads:   35188 MB in  2.00 seconds = 17620.75 MB/sec",
+    "Timing buffered disk reads: 7842 MB in  3.00 seconds = 2613.57 MB/sec"
+)
+hdparm2 <- sprintf("<code>%s</code>", paste(hdparm2, collapse="<br />"))
+disk_perf <- paste0(hdparm1, "<br />", hdparm2)
+make_machine_specs_table("DELL XPS 15 laptop (model 9520)",
+    specs=c(`OS`="Linux Ubuntu 24.04",
+            `RAM`="32GB",
+            `Disk`="1TB SSD"),
+    disk_perf=disk_perf)
+```
+
+Timings:
 ```{r xps15_timings, echo=FALSE, results='asis'}
 title <- "Table 1: Timings for DELL XPS 15 laptop"
 make_timings_table("xps15", title=title)
 ```
 
-### Supermicro SuperServer 1029GQ-TRT
+### Timings for Supermicro SuperServer 1029GQ-TRT
 
-- **OS:** Linux Ubuntu 22.04
-- **Bioconductor/R versions:** 3.21/4.5
-- **RAM:** 384GB
-- **Disk:** 1.3TB ATA Disk
-- **Disk performance**:
-<table><tr><td style="width: 80pt"></td><td>
-<pre style="padding: 2pt; background: #EDF; font-size: 8pt;">
-    # Output of 'sudo hdparm -Tt &lt;device&gt;':
-     Timing cached reads:   20592 MB in  1.99 seconds = 10361.41 MB/sec
-     Timing buffered disk reads: 1440 MB in  3.00 seconds = 479.66 MB/sec
-</pre>
-</td></tr></table>
+Machine specs:
+```{r rex3_specs, echo=FALSE, results='asis'}
+hdparm1 <- "Output of <code>sudo hdparm -Tt &lt;device&gt;</code>:"
+hdparm1 <- sprintf("<span style=\"font-style: italic\">%s</span>", hdparm1)
+hdparm2 <- c(
+    "Timing cached reads:   20592 MB in  1.99 seconds = 10361.41 MB/sec",
+    "Timing buffered disk reads: 1440 MB in  3.00 seconds = 479.66 MB/sec"
+)
+hdparm2 <- sprintf("<code>%s</code>", paste(hdparm2, collapse="<br />"))
+disk_perf <- paste0(hdparm1, "<br />", hdparm2)
+make_machine_specs_table("Supermicro SuperServer 1029GQ-TRT",
+    specs=c(`OS`="Linux Ubuntu 22.04",
+            `RAM`="384GB",
+            `Disk`="1.3TB ATA Disk"),
+    disk_perf=disk_perf)
+```
 
+Timings:
 ```{r rex3_timings, echo=FALSE, results='asis'}
 title <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
 make_timings_table("rex3", title=title)
 ```
 
-### Intel Mac Pro (24-Core Intel Xeon W)
+### Timings for Apple Silicon Mac Pro
 
-- **OS:** macOS 12.7.6
-- **Bioconductor/R versions:** 3.21/4.5
-- **RAM:** 96GB
-- **Disk:** 1TB SSD
-- **Disk performance**: N/A
-
-```{r lconway_timings, echo=FALSE, results='asis'}
-title <- "Table 3: Timings for Intel Mac Pro"
-make_timings_table("lconway", title=title)
+Machine specs:
+```{r kjohnson3_specs, echo=FALSE, results='asis'}
+make_machine_specs_table("Apple Silicon Mac Pro (Apple M2 Ultra)",
+    specs=c(`OS`="macOS 13.7.1",
+            `RAM`="192GB",
+            `Disk`="2TB SSD"),
+    disk_perf="N/A")
 ```
 
-### Apple Silicon Mac Pro (Apple M2 Ultra)
-
-- **OS:** macOS 13.7.1
-- **Bioconductor/R versions:** 3.21/4.5
-- **RAM:** 192GB
-- **Disk:** 2TB SSD
-- **Disk performance**: N/A
-
+Timings:
 ```{r kjohnson3_timings, echo=FALSE, results='asis'}
-title <- "Table 4: Timings for Apple Silicon Mac Pro"
+title <- "Table 3: Timings for Apple Silicon Mac Pro"
 make_timings_table("kjohnson3", title=title)
 ```
 
+### Timings for Intel Mac Pro
 
-## Final remarks
+Machine specs:
+```{r lconway_specs, echo=FALSE, results='asis'}
+make_machine_specs_table("Intel Mac Pro (24-Core Intel Xeon W)",
+    specs=c(`OS`="macOS 12.7.6",
+            `RAM`="96GB",
+            `Disk`="1TB SSD"),
+    disk_perf="N/A")
+```
+
+Timings: _Timings for this machine will be added soon._
+```{r lconway_timings, echo=FALSE, results='asis'}
+#title <- "Table 4: Timings for Intel Mac Pro"
+#make_timings_table("lconway", title=title)
+```
+
+
+## Discussion
+
+### TENxMatrix (sparse) vs HDF5Matrix (dense)
 
 The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
 its promise so we leave it alone for now. Note that the code for loading
@@ -627,31 +652,34 @@ in the `r Biocpkg("SparseArray")` package that overcomes some of the
 limitations of the dgCMatrix representation from the `r CRANpkg("Matrix")`
 package. This will need to be addressed.
 
-The Supermicro SuperServer 1029GQ-TRT machine is significantly slower
-than the other machines, likely due to its less performant disk.
+#### Normalization
 
-Normalization and PCA are roughly linear in time with respect to the number
-of cells in the dataset, regardless of representation (sparse or dense) or
-block size.
+There's no obvious best choice between the "**[s]** TENxMatrix (sparse)"
+and "**[D]** HDF5Matrix (dense)" representations. More precisely, for
+normalization, the former tends to give the best times when using bigger
+blocks (e.g. 250 Mb), whereas the latter tends to give the best times when
+using smaller blocks (e.g. 16 Mb).
+
+Therefore, on a machine with enough memory to support big block sizes,
+one will get the best results with the **[s]** representation and
+blocks of 250 Mb or more. However, on a machine with not enough memory
+to support such big blocks, one should instead use the **[D]** representation
+with blocks of 16 Mb.
+
+_[TODO: Add some plots to help vizualize the above observations.]_
+
+#### PCA
 
 For PCA, choosing the "**[s]** TENxMatrix (sparse)" representation
 and using small block sizes (40 Mb) tends to give the best performance.
 
-For normalization, there's no clear best choice between the
-"**[s]** TENxMatrix (sparse)" and "**[D]** HDF5Matrix (dense)"
-representations. More precisely, for this operation, the former
-tends to give the best times when using bigger blocks (250 Mb),
-whereas the latter tends to give the best times when using smaller
-blocks (16 Mb). However, based on the above benchmarks, and in the absence
-of memory constraints, there's no clear best choice between "sparse with
-big blocks" and "dense with small blocks" in terms of speed. Of course,
-on systems with memory constraints, the latter is obviously the best
-choice.
+_[TODO: Add some plots to help vizualize this observation.]_
 
-_[TODO] Add some plots to help vizualize the above observations._
+#### Hybrid approach
 
-Based on these observations, the best overall strategy is the following
-hybrid approach:
+Note that, on a machine where using blocks of 250 Mb or more for
+normalization is not an option, one should use the following hybrid
+approach:
 
 - Start with the "**[D]** HDF5Matrix (dense)" representation.
 
@@ -665,16 +693,45 @@ hybrid approach:
 - Perform PCA on the object returned by the on-disk realization step
   (`writeTENxMatrix()`), using small blocks (40 Mb).
 
-About memory usage:
+#### A note about memory usage
 
-- Overall, for a given choice of block size, memory usage doesn't seem
-  to be affected too much by the number of cells in the dataset,
-  that is, all operations seem to perform at _almost_ constant memory.
+Overall, for a given choice of block size, memory usage doesn't seem
+to be affected too much by the number of cells in the dataset,
+that is, all operations seem to perform at _almost_ constant memory.
 
-- However, the "**[D]** HDF5Matrix (dense)" representation appears to
-  be better than the "**[s]** TENxMatrix (sparse)" representation at
-  keeping memory usage (mostly) flat as the number of cells in the
-  dataset increases.
+However, the "**[D]** HDF5Matrix (dense)" representation appears to
+be better than the "**[s]** TENxMatrix (sparse)" representation at
+keeping memory usage (mostly) flat as the number of cells in the
+dataset increases.
+
+### Main takeaways
+
+Using the TENxMatrix representation (sparse format), one can perform
+**normalization and PCA** of the bigger dataset (200,000 cells) on an
+average consumer-grade laptop like the DELL XPS 15 laptop (model 9520)
+**in less than 25 minutes and using less than 4Gb of memory**, as shown
+in this table:
+
+```{r summarize_machine_times, echo=FALSE, results='asis'}
+machine_names <- c(
+    `DELL&nbsp;XPS&nbsp;15&nbsp;laptop`="xps15",
+    `Supermicro&nbsp;SuperServer&nbsp;1029GQ-TRT`="rex3",
+    `Apple&nbsp;Silicon&nbsp;Mac&nbsp;Pro`="kjohnson3"
+)
+summarize_machine_times(machine_names)
+```
+
+Normalization and PCA are roughly linear in time with respect to the number
+of cells in the dataset, regardless of representation (sparse or dense) or
+block size.
+
+Block size matters. When using the TENxMatrix representation (sparse format),
+the bigger the blocks the faster normalization will be (at the cost of
+increased memory usage). On the other hand PCA prefers small blocks.
+
+Disk performance is of course important as attested by the lower performance
+of the Supermicro SuperServer 1029GQ-TRT machine, likely due to its slower
+disk.
 
 
 
