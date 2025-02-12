@@ -143,9 +143,9 @@ on.exit(stop_log_process_info(loop_pid))
 timing <- system.time(pca <- simple_PCA(normalized))
 stop_log_process_info(loop_pid)
 pca_max_mem_used <- extract_max_mem_used(process_info_log, pid)
-pca_time <- timing[["elapsed"]]
 mem <- paste0(names(norm_max_mem_used), "=",
               norm_max_mem_used, "Mb", collapse=" ")
+pca_time <- timing[["elapsed"]]
 cat("---> PCA completed in ", pca_time, " s (", mem,").\n\n", sep="")
 
 cat("ncells: ", ncells, "\n",

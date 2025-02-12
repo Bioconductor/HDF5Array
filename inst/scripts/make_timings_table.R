@@ -110,6 +110,7 @@
 ###   2. attribs: named character or numeric vector
 ###   3. style:   unnamed character vector
 ###   4. content: can be either
+###      - a NULL;
 ###      - a character vector: interpreted as text (including unparsed html);
 ###      - a named list: must represent an HTML element;
 ###      - an unnamed list: represents mix content where each list
@@ -205,6 +206,8 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                   "margin-left: 0pt",
                   "text-align: center",
                   "font-size: smaller")
+.CAPTION_STYLE <- c("text-align: center", "font-weight: bold",
+                    "font-size: larger", "padding: 6pt", "padding-top: 8pt")
 .BASE_STYLE <- c("border: 1pt solid #BBB", "padding: 2pt")
 .TH_BASE_STYLE <- c(.BASE_STYLE, "color: #555")
 .TH_STYLE <- c(.TH_BASE_STYLE, "background: #CCC")
@@ -351,7 +354,7 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
     setNames(formats, .VALID_FORMATS)
 }
 
-.make_timings_tfoot <- function(colspan, title=NULL)
+.make_timings_tfoot <- function(colspan)
 {
     style <- "font-style: italic"
     formats <- .decorated_formats()
@@ -379,11 +382,6 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
             "\"max. mem. used\" values > ", .MEM_THRESHOLD, "Gb ",
             "are displayed in ",
             "<span style=\"color: ", .LIGHT_RED, "\">light red</span>.")
-    }
-    if (!is.null(title)) {
-        title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
-                         title)
-        content <- c(title, content)
     }
     td_elt <- list(tag="td",
                    attribs=c(colspan=colspan),
@@ -646,12 +644,13 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
 }
 
 ### times, memused: 5D integer arrays of same dimensions and dimnames.
-.make_table <- function(times, memused, title=NULL)
+.make_table <- function(times, memused, caption=NULL)
 {
     stopifnot(length(dim(times)) == 5L,
               identical(dim(times), dim(memused)),
               identical(dimnames(times), dimnames(memused)))
     .some_mem_used_is_big <<- FALSE
+    caption <- list(tag="caption", style=.CAPTION_STYLE, content=caption)
     unique_block_sizes <- dimnames(times)$block_size
     num_block_sizes <- length(unique_block_sizes)
     header <- .make_timings_header(unique_block_sizes)
@@ -660,8 +659,8 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
                                     num_var_genes="1000", hline=hline)
     section2 <- .make_table_section(times, memused, num_block_sizes,
                                     num_var_genes="2000", hline=hline)
-    tfoot <- .make_timings_tfoot(4L+6L*num_block_sizes, title=title)
-    content <- list(header, section1, section2, hline, tfoot)
+    tfoot <- .make_timings_tfoot(4L+6L*num_block_sizes)
+    content <- list(caption, header, section1, section2, hline, tfoot)
     list(tag="table", style=.TABLE_STYLE, content=content)
 }
 
@@ -689,7 +688,7 @@ make_machine_specs_table <- function(machine_name, specs, disk_perf, file="")
     sort(file_paths, decreasing=TRUE)[[1L]]
 }
 
-make_timings_table <- function(machine_name, title=NULL, file="")
+make_timings_table <- function(machine_name, caption=NULL, file="")
 {
     stopifnot(isSingleString(machine_name))
     db_file <- .find_timings_db_file(machine_name)
@@ -700,7 +699,7 @@ make_timings_table <- function(machine_name, title=NULL, file="")
     ## the "max_rss" values, not the "max_vsz" values, because the VSZ
     ## as reported by 'ps u -p <PID>' seems meaningless on macOS.
     memused <- .extract_var_from_timings_db(timings_db, varname="max_rss")
-    table_elt <- .make_table(times, memused, title)
+    table_elt <- .make_table(times, memused, caption)
     cat(deparse_html_tree(table_elt), sep="\n", file=file)
 }
 
@@ -751,9 +750,7 @@ make_timings_table <- function(machine_name, title=NULL, file="")
 {
     style <- "font-style: italic"
     deco_format <- .decorated_formats(TRUE)[[format]]
-    title <- sprintf("<span style=\"font-weight: bold\">%s</span><br />",
-                     "Comparing times across machines")
-    content <- c(title,
+    content <- c(
         "For each machine, we show the normalization, ",
         "realization, and PCA times (plus total time) obtained<br />",
         "on the ", .NGENES_BEFORE_NORM, " x ",
@@ -835,6 +832,9 @@ summarize_machine_times <- function(machine_names,
     db_files <- vapply(machine_names, .find_timings_db_file, character(1))
 
     .some_mem_used_is_big <<- FALSE
+    caption <- list(tag="caption",
+                    style=.CAPTION_STYLE,
+                    content="Comparing times across machines")
     header <- .make_machine_times_header(block_sizes)
     tr_elts <- lapply(seq_along(db_files),
         function(i) {
@@ -846,7 +846,7 @@ summarize_machine_times <- function(machine_names,
 
     table_elt <- list(tag="table",
                       style=.TABLE_STYLE,
-                      content=c(list(header), tr_elts, list(tfoot)))
+                      content=c(list(caption, header), tr_elts, list(tfoot)))
     cat(deparse_html_tree(table_elt), sep="\n", file=file)
 }
 

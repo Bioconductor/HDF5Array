@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 5 February 2025"
+date: "Compiled `r doc_date()`; Modified 11 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -163,7 +163,7 @@ memory footprint and (hopefully) will help with overall performance.
 Finally note that the dense HDF5 file does not contain the dimnames of the
 matrix, so we manually add them to `brain_s` and `brain_Ds`:
 ```{r set_brain_D_and_brain_Ds_dimnames}
-dimnames(brain_D) <- dimnames(brain_Ds) <- dimnames(brain_s)
+dimnames(brain_Ds) <- dimnames(brain_D) <- dimnames(brain_s)
 ```
 
 ## Create the test datasets
@@ -283,19 +283,17 @@ to `simple_normalize()` or `simple_PCA()`.
 
 ## Normalization
 
-In this section we run `simple_normalize()` on the two smaller test
-datasets only (27,998 x 12,500 and 27,998 x 25,000), on the three
-different representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
-for each of them. We report the time and memory usage for each run.
+In this section we run `simple_normalize()` on the three different
+representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
+of the smaller test dataset only (27,998 x 12,500), and we report the
+time of each run.
 
 See the **Comprehensive timings obtained on various machines** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
 obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
-### Normalization of the 27,998 x 12,500 dataset
-
-#### TENxMatrix (sparse)
+### TENxMatrix (sparse)
 
 ```{r norm_brain1_s}
 dim(brain1_s)
@@ -304,7 +302,7 @@ system.time(norm_brain1_s <- simple_normalize(brain1_s))
 dim(norm_brain1_s)
 ```
 
-#### HDF5Matrix (dense)
+### HDF5Matrix (dense)
 
 ```{r norm_brain1_D}
 dim(brain1_D)
@@ -313,7 +311,7 @@ system.time(norm_brain1_D <- simple_normalize(brain1_D))
 dim(norm_brain1_D)
 ```
 
-#### HDF5Matrix as sparse
+### HDF5Matrix as sparse
 
 ```{r norm_brain1_Ds}
 dim(brain1_Ds)
@@ -322,47 +320,18 @@ system.time(norm_brain1_Ds <- simple_normalize(brain1_Ds))
 dim(norm_brain1_Ds)
 ```
 
-### Normalization of the 27,998 x 25,000 dataset
-
-#### TENxMatrix (sparse)
-
-```{r norm_brain2_s}
-dim(brain2_s)
-DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
-system.time(norm_brain2_s <- simple_normalize(brain2_s))
-dim(norm_brain2_s)
-```
-
-#### HDF5Matrix (dense)
-
-```{r norm_brain2_D}
-dim(brain2_D)
-DelayedArray::setAutoBlockSize(16e6)   # set block size to 16 Mb
-system.time(norm_brain2_D <- simple_normalize(brain2_D))
-dim(norm_brain2_D)
-```
-
-#### HDF5Matrix as sparse
-
-```{r norm_brain2_Ds}
-dim(brain2_Ds)
-DelayedArray::setAutoBlockSize(250e6)  # set block size to 250 Mb
-system.time(norm_brain2_Ds <- simple_normalize(brain2_Ds))
-dim(norm_brain2_Ds)
-```
-
 
 ## On-disk realization of the normalized datasets
 
 Note that the normalized datasets obtained in the previous section
-are DelayedMatrix objects that carrry delayed operations. These can
-be displayed with `showtree()` e.g. for `norm_brain2_s`:
-```{r show_norm_brain2_s_delayed_ops}
-class(norm_brain2_s)
-showtree(norm_brain2_s)
+are DelayedMatrix objects that carry delayed operations. These can
+be displayed with `showtree()` e.g. for `norm_brain1_s`:
+```{r show_norm_brain1_s_delayed_ops}
+class(norm_brain1_s)
+showtree(norm_brain1_s)
 ```
 
-All the other `norm_brain*` carry similar operations.
+The other `norm_brain1_*` objects carry similar operations.
 
 Before we proceed with PCA, we're going to write the normalized datasets to
 new HDF5 files. This introduces an additional cost, but, on the other hand,
@@ -372,9 +341,7 @@ on-the-fly before the matrix data actually lands on the disk, making the new
 object (TENxMatrix or HDF5Matrix) more efficient for PCA or whatever
 block-processed operations will come next.
 
-### On-disk realization of the 1000 x 12,500 normalized dataset
-
-#### TENxMatrix (sparse)
+### TENxMatrix (sparse)
 
 ```{r writeTENxMatrix_norm_brain1_s}
 DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
@@ -387,7 +354,7 @@ class(norm_brain1_s)
 showtree(norm_brain1_s)  # "pristine" object (i.e. no more delayed operations)
 ```
 
-#### HDF5Matrix (dense)
+### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain1_D}
 DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
@@ -400,7 +367,7 @@ class(norm_brain1_D)
 showtree(norm_brain1_D)  # "pristine" object (i.e. no more delayed operations)
 ```
 
-#### HDF5Matrix as sparse
+### HDF5Matrix as sparse
 
 ```{r writeHDF5Array_norm_brain1_Ds}
 DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
@@ -413,63 +380,18 @@ class(norm_brain1_Ds)
 showtree(norm_brain1_Ds)  # "pristine" object (i.e. no more delayed operations)
 ```
 
-### On-disk realization of the 1000 x 25,000 normalized dataset
-
-#### TENxMatrix (sparse)
-
-```{r writeTENxMatrix_norm_brain2_s}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
-dim(norm_brain2_s)
-system.time(norm_brain2_s <- writeTENxMatrix(norm_brain2_s, level=0))
-```
-The new `norm_brain2_s` object is a _pristine_ TENxMatrix object:
-```{r show_pristine_norm_brain2_s}
-class(norm_brain2_s)
-showtree(norm_brain2_s)  # "pristine" object (i.e. no more delayed operations)
-```
-
-#### HDF5Matrix (dense)
-
-```{r writeHDF5Array_norm_brain2_D}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
-dim(norm_brain2_D)
-system.time(norm_brain2_D <- writeHDF5Array(norm_brain2_D, level=0))
-```
-The new `norm_brain2_D` object is a _pristine_ HDF5Matrix object:
-```{r show_pristine_norm_brain2_D}
-class(norm_brain2_D)
-showtree(norm_brain2_D)  # "pristine" object (i.e. no more delayed operations)
-```
-
-#### HDF5Matrix as sparse
-
-```{r writeHDF5Array_norm_brain2_Ds}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
-dim(norm_brain2_Ds)
-system.time(norm_brain2_Ds <- writeHDF5Array(norm_brain2_Ds, level=0))
-```
-The new `norm_brain2_Ds` object is a _pristine_ sparse HDF5Matrix object:
-```{r show_pristine_norm_brain2_Ds}
-class(norm_brain2_Ds)
-showtree(norm_brain2_Ds)  # "pristine" object (i.e. no more delayed operations)
-```
-
 
 ## PCA
 
 In this section we run `simple_pca()` on the normalized datasets obtained
-in the previous section (1000 x 12,500 and 1000 x 25,000), on the three
-different representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
-for each dataset. We report the time and memory usage for each run.
+in the previous section and report the time of each run.
 
 See the **Comprehensive timings obtained on various machines** section at
 the end of this document for `simple_normalize()` and `simple_pca()` timings
 obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
-### PCA on the 1000 x 12,500 normalized dataset
-
-#### TENxMatrix (sparse)
+### TENxMatrix (sparse)
 
 ```{r PCA_norm_brain1_s}
 DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
@@ -477,7 +399,7 @@ dim(norm_brain1_s)
 system.time(pca1s <- simple_PCA(norm_brain1_s))
 ```
 
-#### HDF5Matrix (dense)
+### HDF5Matrix (dense)
 
 ```{r PCA_norm_brain1_D}
 DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
@@ -487,10 +409,10 @@ system.time(pca1D <- simple_PCA(norm_brain1_D))
 
 Sanity check:
 ```{r sanity_check1d}
-stopifnot(all.equal(pca1s, pca1D))
+stopifnot(all.equal(pca1D, pca1s))
 ```
 
-#### HDF5Matrix as sparse
+### HDF5Matrix as sparse
 
 ```{r PCA_norm_brain1_Ds}
 DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
@@ -500,43 +422,7 @@ system.time(pca1Ds <- simple_PCA(norm_brain1_Ds))
 
 Sanity check:
 ```{r sanity_check1ds}
-stopifnot(all.equal(pca1s, pca1Ds))
-```
-
-### PCA on the 1000 x 25,000 normalized dataset
-
-#### TENxMatrix (sparse)
-
-```{r PCA_norm_brain2_s}
-DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
-dim(norm_brain2_s)
-system.time(pca2s <- simple_PCA(norm_brain2_s))
-```
-
-#### HDF5Matrix (dense)
-
-```{r PCA_norm_brain2_D}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
-dim(norm_brain2_D)
-system.time(pca2D <- simple_PCA(norm_brain2_D))
-```
-
-Sanity check:
-```{r sanity_check2d}
-stopifnot(all.equal(pca2s, pca2D))
-```
-
-#### HDF5Matrix as sparse
-
-```{r PCA_norm_brain2_Ds}
-DelayedArray::setAutoBlockSize(40e6)   # set block size to 40 Mb
-dim(norm_brain2_Ds)
-system.time(pca2Ds <- simple_PCA(norm_brain2_Ds))
-```
-
-Sanity check:
-```{r sanity_check2ds}
-stopifnot(all.equal(pca2s, pca2Ds))
+stopifnot(all.equal(pca1Ds, pca1s))
 ```
 
 
@@ -573,10 +459,9 @@ make_machine_specs_table("DELL XPS 15 laptop (model 9520)",
     disk_perf=disk_perf)
 ```
 
-Timings:
 ```{r xps15_timings, echo=FALSE, results='asis'}
-title <- "Table 1: Timings for DELL XPS 15 laptop"
-make_timings_table("xps15", title=title)
+caption <- "Table 1: Timings for DELL XPS 15 laptop"
+make_timings_table("xps15", caption=caption)
 ```
 
 ### Timings for Supermicro SuperServer 1029GQ-TRT
@@ -598,10 +483,9 @@ make_machine_specs_table("Supermicro SuperServer 1029GQ-TRT",
     disk_perf=disk_perf)
 ```
 
-Timings:
 ```{r rex3_timings, echo=FALSE, results='asis'}
-title <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
-make_timings_table("rex3", title=title)
+caption <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
+make_timings_table("rex3", caption=caption)
 ```
 
 ### Timings for Apple Silicon Mac Pro
@@ -615,10 +499,9 @@ make_machine_specs_table("Apple Silicon Mac Pro (Apple M2 Ultra)",
     disk_perf="N/A")
 ```
 
-Timings:
 ```{r kjohnson3_timings, echo=FALSE, results='asis'}
-title <- "Table 3: Timings for Apple Silicon Mac Pro"
-make_timings_table("kjohnson3", title=title)
+caption <- "Table 3: Timings for Apple Silicon Mac Pro"
+make_timings_table("kjohnson3", caption=caption)
 ```
 
 ### Timings for Intel Mac Pro
@@ -632,10 +515,10 @@ make_machine_specs_table("Intel Mac Pro (24-Core Intel Xeon W)",
     disk_perf="N/A")
 ```
 
-Timings: _Timings for this machine will be added soon._
+_[Timings for this machine will be added soon.]_
 ```{r lconway_timings, echo=FALSE, results='asis'}
-#title <- "Table 4: Timings for Intel Mac Pro"
-#make_timings_table("lconway", title=title)
+#caption <- "Table 4: Timings for Intel Mac Pro"
+#make_timings_table("lconway", caption=caption)
 ```
 
 
@@ -710,7 +593,7 @@ Using the TENxMatrix representation (sparse format), one can perform
 **normalization and PCA** of the bigger dataset (200,000 cells) on an
 average consumer-grade laptop like the DELL XPS 15 laptop (model 9520)
 **in less than 25 minutes and using less than 4Gb of memory**, as shown
-in this table:
+in the table below.
 
 ```{r summarize_machine_times, echo=FALSE, results='asis'}
 machine_names <- c(
@@ -720,6 +603,11 @@ machine_names <- c(
 )
 summarize_machine_times(machine_names)
 ```
+
+For comparison, **normalization and PCA** on an _in-memory_ representation
+of the same dataset (e.g. on a SparseMatrix object) takes less then 4 minutes.
+However, that consumes about 18.5Gb of memory! This will be the subject of
+a separate vignette in the `r Biocpkg("SparseArray")` package.
 
 Normalization and PCA are roughly linear in time with respect to the number
 of cells in the dataset, regardless of representation (sparse or dense) or
