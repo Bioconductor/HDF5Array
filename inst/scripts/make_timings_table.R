@@ -207,7 +207,7 @@ deparse_html_tree <- function(html_tree) .deparse_elt_content(html_tree)
                   "text-align: center",
                   "font-size: smaller")
 .CAPTION_STYLE <- c("text-align: center", "font-weight: bold",
-                    "font-size: larger", "padding: 6pt", "padding-top: 8pt")
+                    "font-size: larger", "padding: 5pt", "padding-top: 8pt")
 .BASE_STYLE <- c("border: 1pt solid #BBB", "padding: 2pt")
 .TH_BASE_STYLE <- c(.BASE_STYLE, "color: #555")
 .TH_STYLE <- c(.TH_BASE_STYLE, "background: #CCC")

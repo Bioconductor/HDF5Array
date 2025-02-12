@@ -258,11 +258,11 @@ it's important to be aware that:
 
 For our benchmarks below, we'll use the following block sizes:
 
-  |                      | NORMALIZATION | ON-DISK REALIZATION |    PCA |
-  | -------------------- | ------------: | ------------------: | -----: |
-  | TENxMatrix (sparse)  |        250 Mb |              100 Mb |  40 Mb |
-  | HDF5Matrix (dense)   |         16 Mb |              100 Mb | 100 Mb |
-  | HDF5Matrix as sparse |        250 Mb |              100 Mb |  40 Mb |
+  |                      | NORMALIZATION |    PCA |
+  | -------------------- | ------------: | -----: |
+  | TENxMatrix (sparse)  |        250 Mb |  40 Mb |
+  | HDF5Matrix (dense)   |         16 Mb | 100 Mb |
+  | HDF5Matrix as sparse |        250 Mb |  40 Mb |
 
 
 ## Monitoring memory usage
@@ -278,7 +278,7 @@ to `simple_normalize()` or `simple_PCA()`.
 
 
 
-# Benchmarks
+# Normalization and PCA of the 27,998 x 12,500 test dataset
 
 
 ## Normalization
@@ -288,8 +288,8 @@ representations (TENxMatrix, HDF5Matrix, and "HDF5Matrix as sparse")
 of the smaller test dataset only (27,998 x 12,500), and we report the
 time of each run.
 
-See the **Comprehensive timings obtained on various machines** section at
-the end of this document for `simple_normalize()` and `simple_pca()` timings
+See the **Comprehensive timings obtained on various machines** section
+below in this document for `simple_normalize()` and `simple_pca()` timings
 obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
@@ -324,8 +324,8 @@ dim(norm_brain1_Ds)
 ## On-disk realization of the normalized datasets
 
 Note that the normalized datasets obtained in the previous section
-are DelayedMatrix objects that carry delayed operations. These can
-be displayed with `showtree()` e.g. for `norm_brain1_s`:
+are DelayedMatrix objects that carry delayed operations. These operations
+can be displayed with `showtree()` e.g. for `norm_brain1_s`:
 ```{r show_norm_brain1_s_delayed_ops}
 class(norm_brain1_s)
 showtree(norm_brain1_s)
@@ -341,10 +341,14 @@ on-the-fly before the matrix data actually lands on the disk, making the new
 object (TENxMatrix or HDF5Matrix) more efficient for PCA or whatever
 block-processed operations will come next.
 
+We will use blocks of 100 Mb for all the writing operations.
+```{r set_realization_block_size}
+DelayedArray::setAutoBlockSize(1e8)
+```
+
 ### TENxMatrix (sparse)
 
 ```{r writeTENxMatrix_norm_brain1_s}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
 dim(norm_brain1_s)
 system.time(norm_brain1_s <- writeTENxMatrix(norm_brain1_s, level=0))
 ```
@@ -357,7 +361,6 @@ showtree(norm_brain1_s)  # "pristine" object (i.e. no more delayed operations)
 ### HDF5Matrix (dense)
 
 ```{r writeHDF5Array_norm_brain1_D}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
 dim(norm_brain1_D)
 system.time(norm_brain1_D <- writeHDF5Array(norm_brain1_D, level=0))
 ```
@@ -370,7 +373,6 @@ showtree(norm_brain1_D)  # "pristine" object (i.e. no more delayed operations)
 ### HDF5Matrix as sparse
 
 ```{r writeHDF5Array_norm_brain1_Ds}
-DelayedArray::setAutoBlockSize(1e8)    # set block size to 100 Mb
 dim(norm_brain1_Ds)
 system.time(norm_brain1_Ds <- writeHDF5Array(norm_brain1_Ds, level=0))
 ```
@@ -386,8 +388,8 @@ showtree(norm_brain1_Ds)  # "pristine" object (i.e. no more delayed operations)
 In this section we run `simple_pca()` on the normalized datasets obtained
 in the previous section and report the time of each run.
 
-See the **Comprehensive timings obtained on various machines** section at
-the end of this document for `simple_normalize()` and `simple_pca()` timings
+See the **Comprehensive timings obtained on various machines** section
+below in this document for `simple_normalize()` and `simple_pca()` timings
 obtained on various machines on all our test datasets and using four different
 block sizes: 16 Mb, 40 Mb, 100 Mb, and 250 Mb.
 
@@ -426,7 +428,8 @@ stopifnot(all.equal(pca1Ds, pca1s))
 ```
 
 
-## Comprehensive timings obtained on various machines
+
+# Comprehensive timings obtained on various machines
 
 Here we report timings (and memory usage) observed on various machines.
 For each machine, the results are presented in a table that shows the
@@ -440,7 +443,7 @@ the `run_benchmarks.sh` script located in the `HDF5Array/inst/scripts/`
 folder of the package, using R 4.5 and `r Biocpkg("HDF5Array")` 1.35.12
 (Bioconductor 3.21).
 
-### Timings for DELL XPS 15 laptop
+## Timings for DELL XPS 15 laptop
 
 Machine specs:
 ```{r xps15_specs, echo=FALSE, results='asis'}
@@ -464,7 +467,7 @@ caption <- "Table 1: Timings for DELL XPS 15 laptop"
 make_timings_table("xps15", caption=caption)
 ```
 
-### Timings for Supermicro SuperServer 1029GQ-TRT
+## Timings for Supermicro SuperServer 1029GQ-TRT
 
 Machine specs:
 ```{r rex3_specs, echo=FALSE, results='asis'}
@@ -488,7 +491,7 @@ caption <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
 make_timings_table("rex3", caption=caption)
 ```
 
-### Timings for Apple Silicon Mac Pro
+## Timings for Apple Silicon Mac Pro
 
 Machine specs:
 ```{r kjohnson3_specs, echo=FALSE, results='asis'}
@@ -504,7 +507,7 @@ caption <- "Table 3: Timings for Apple Silicon Mac Pro"
 make_timings_table("kjohnson3", caption=caption)
 ```
 
-### Timings for Intel Mac Pro
+## Timings for Intel Mac Pro
 
 Machine specs:
 ```{r lconway_specs, echo=FALSE, results='asis'}
@@ -522,9 +525,10 @@ _[Timings for this machine will be added soon.]_
 ```
 
 
-## Discussion
 
-### TENxMatrix (sparse) vs HDF5Matrix (dense)
+# Discussion
+
+## TENxMatrix (sparse) vs HDF5Matrix (dense)
 
 The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
 its promise so we leave it alone for now. Note that the code for loading
@@ -535,7 +539,7 @@ in the `r Biocpkg("SparseArray")` package that overcomes some of the
 limitations of the dgCMatrix representation from the `r CRANpkg("Matrix")`
 package. This will need to be addressed.
 
-#### Normalization
+### Normalization
 
 There's no obvious best choice between the "**[s]** TENxMatrix (sparse)"
 and "**[D]** HDF5Matrix (dense)" representations. More precisely, for
@@ -551,14 +555,14 @@ with blocks of 16 Mb.
 
 _[TODO: Add some plots to help vizualize the above observations.]_
 
-#### PCA
+### PCA
 
 For PCA, choosing the "**[s]** TENxMatrix (sparse)" representation
 and using small block sizes (40 Mb) tends to give the best performance.
 
 _[TODO: Add some plots to help vizualize this observation.]_
 
-#### Hybrid approach
+### Hybrid approach
 
 Note that, on a machine where using blocks of 250 Mb or more for
 normalization is not an option, one should use the following hybrid
@@ -576,7 +580,7 @@ approach:
 - Perform PCA on the object returned by the on-disk realization step
   (`writeTENxMatrix()`), using small blocks (40 Mb).
 
-#### A note about memory usage
+### A note about memory usage
 
 Overall, for a given choice of block size, memory usage doesn't seem
 to be affected too much by the number of cells in the dataset,
@@ -587,7 +591,7 @@ be better than the "**[s]** TENxMatrix (sparse)" representation at
 keeping memory usage (mostly) flat as the number of cells in the
 dataset increases.
 
-### Main takeaways
+## Main takeaways
 
 Using the TENxMatrix representation (sparse format), one can perform
 **normalization and PCA** of the bigger dataset (200,000 cells) on an
