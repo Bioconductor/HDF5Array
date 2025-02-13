@@ -609,7 +609,7 @@ dataset increases.
    average consumer-grade laptop like the DELL XPS 15 laptop (model 9520)
    **in less than 25 minutes and using less than 4Gb of memory**, as shown
    in the table below.
-   For comparison, **normalization and PCA** on an _in-memory_ representation
+   For comparison, normalization and PCA on an _in-memory_ representation
    of the same dataset (e.g. on a SparseMatrix object) takes less then
    4 minutes. However, that consumes about 18.5Gb of memory! This will be
    the subject of an upcoming vignette in the `r Biocpkg("SparseArray")`
