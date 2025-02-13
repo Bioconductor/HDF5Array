@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 11 February 2025"
+date: "Compiled `r doc_date()`; Modified 13 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -65,6 +65,7 @@ source(path, verbose=FALSE)
 
 # The test datasets
 
+
 ## _Sparse_ vs _dense_ representation
 
 The datasets that we will use for our benchmarks are subsets of the
@@ -98,6 +99,7 @@ brain_s_path <- hub[["EH1039"]]
 brain_D_path <- hub[["EH1040"]]
 ```
 `brain_s_path` and `brain_D_path` are the paths to the downloaded files.
+
 
 ## TENxMatrix vs HDF5Matrix objects
 
@@ -166,6 +168,7 @@ matrix, so we manually add them to `brain_s` and `brain_Ds`:
 dimnames(brain_Ds) <- dimnames(brain_D) <- dimnames(brain_s)
 ```
 
+
 ## Create the test datasets
 
 For our benchmarks below, we create subsets of the _1.3 Million Brain
@@ -198,6 +201,7 @@ brain5_Ds <- brain_Ds[ , 1:200000]
 
 
 # Block-processed normalization and PCA
+
 
 ## Code used for normalization and PCA
 
@@ -443,6 +447,7 @@ the `run_benchmarks.sh` script located in the `HDF5Array/inst/scripts/`
 folder of the package, using R 4.5 and `r Biocpkg("HDF5Array")` 1.35.12
 (Bioconductor 3.21).
 
+
 ## Timings for DELL XPS 15 laptop
 
 Machine specs:
@@ -466,6 +471,7 @@ make_machine_specs_table("DELL XPS 15 laptop (model 9520)",
 caption <- "Table 1: Timings for DELL XPS 15 laptop"
 make_timings_table("xps15", caption=caption)
 ```
+
 
 ## Timings for Supermicro SuperServer 1029GQ-TRT
 
@@ -491,6 +497,7 @@ caption <- "Table 2: Timings for Supermicro SuperServer 1029GQ-TRT"
 make_timings_table("rex3", caption=caption)
 ```
 
+
 ## Timings for Apple Silicon Mac Pro
 
 Machine specs:
@@ -506,6 +513,7 @@ make_machine_specs_table("Apple Silicon Mac Pro (Apple M2 Ultra)",
 caption <- "Table 3: Timings for Apple Silicon Mac Pro"
 make_timings_table("kjohnson3", caption=caption)
 ```
+
 
 ## Timings for Intel Mac Pro
 
@@ -528,7 +536,6 @@ _[Timings for this machine will be added soon.]_
 
 # Discussion
 
-## TENxMatrix (sparse) vs HDF5Matrix (dense)
 
 The "**[Ds]** HDF5Matrix as sparse" representation didn't live up to
 its promise so we leave it alone for now. Note that the code for loading
@@ -538,6 +545,9 @@ efficient data structure for multidimensional _sparse_ data implemented
 in the `r Biocpkg("SparseArray")` package that overcomes some of the
 limitations of the dgCMatrix representation from the `r CRANpkg("Matrix")`
 package. This will need to be addressed.
+
+
+## TENxMatrix (sparse) vs HDF5Matrix (dense)
 
 ### Normalization
 
@@ -591,13 +601,19 @@ be better than the "**[s]** TENxMatrix (sparse)" representation at
 keeping memory usage (mostly) flat as the number of cells in the
 dataset increases.
 
+
 ## Main takeaways
 
-Using the TENxMatrix representation (sparse format), one can perform
-**normalization and PCA** of the bigger dataset (200,000 cells) on an
-average consumer-grade laptop like the DELL XPS 15 laptop (model 9520)
-**in less than 25 minutes and using less than 4Gb of memory**, as shown
-in the table below.
+1. Using the TENxMatrix representation (sparse format), one can perform
+   **normalization and PCA** of the bigger dataset (200,000 cells) on an
+   average consumer-grade laptop like the DELL XPS 15 laptop (model 9520)
+   **in less than 25 minutes and using less than 4Gb of memory**, as shown
+   in the table below.
+   For comparison, **normalization and PCA** on an _in-memory_ representation
+   of the same dataset (e.g. on a SparseMatrix object) takes less then
+   4 minutes. However, that consumes about 18.5Gb of memory! This will be
+   the subject of an upcoming vignette in the `r Biocpkg("SparseArray")`
+   package.
 
 ```{r summarize_machine_times, echo=FALSE, results='asis'}
 machine_names <- c(
@@ -608,22 +624,18 @@ machine_names <- c(
 summarize_machine_times(machine_names)
 ```
 
-For comparison, **normalization and PCA** on an _in-memory_ representation
-of the same dataset (e.g. on a SparseMatrix object) takes less then 4 minutes.
-However, that consumes about 18.5Gb of memory! This will be the subject of
-a separate vignette in the `r Biocpkg("SparseArray")` package.
+2. Normalization and PCA are roughly **linear in time** with respect to the
+   number of cells in the dataset, regardless of representation (sparse or
+   dense) or block size.
 
-Normalization and PCA are roughly linear in time with respect to the number
-of cells in the dataset, regardless of representation (sparse or dense) or
-block size.
+3. Block size matters. When using the TENxMatrix representation (sparse format),
+   the bigger the blocks the faster normalization will be (at the cost of
+   increased memory usage). On the other hand, it seems that PCA prefers
+   small blocks (at least with our naive `simple_PCA()` implementation).
 
-Block size matters. When using the TENxMatrix representation (sparse format),
-the bigger the blocks the faster normalization will be (at the cost of
-increased memory usage). On the other hand PCA prefers small blocks.
-
-Disk performance is of course important as attested by the lower performance
-of the Supermicro SuperServer 1029GQ-TRT machine, likely due to its slower
-disk.
+4. Disk performance is important (not surprisingly) as attested by the lower
+   performance of the Supermicro SuperServer 1029GQ-TRT machine, likely due
+   to its slower disk.
 
 
 
