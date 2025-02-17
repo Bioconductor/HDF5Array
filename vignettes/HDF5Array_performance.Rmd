@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 13 February 2025"
+date: "Compiled `r doc_date()`; Modified 16 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -450,7 +450,6 @@ folder of the package, using R 4.5 and `r Biocpkg("HDF5Array")` 1.35.12
 
 ## Timings for DELL XPS 15 laptop
 
-Machine specs:
 ```{r xps15_specs, echo=FALSE, results='asis'}
 hdparm1 <- "Output of <code>sudo hdparm -Tt &lt;device&gt;</code>:"
 hdparm1 <- sprintf("<span style=\"font-style: italic\">%s</span>", hdparm1)
@@ -460,7 +459,7 @@ hdparm2 <- c(
 )
 hdparm2 <- sprintf("<code>%s</code>", paste(hdparm2, collapse="<br />"))
 disk_perf <- paste0(hdparm1, "<br />", hdparm2)
-make_machine_specs_table("DELL XPS 15 laptop (model 9520)",
+make_machine_specs_table("Specs for DELL XPS 15 laptop (model 9520)",
     specs=c(`OS`="Linux Ubuntu 24.04",
             `RAM`="32GB",
             `Disk`="1TB SSD"),
@@ -475,7 +474,6 @@ make_timings_table("xps15", caption=caption)
 
 ## Timings for Supermicro SuperServer 1029GQ-TRT
 
-Machine specs:
 ```{r rex3_specs, echo=FALSE, results='asis'}
 hdparm1 <- "Output of <code>sudo hdparm -Tt &lt;device&gt;</code>:"
 hdparm1 <- sprintf("<span style=\"font-style: italic\">%s</span>", hdparm1)
@@ -485,7 +483,7 @@ hdparm2 <- c(
 )
 hdparm2 <- sprintf("<code>%s</code>", paste(hdparm2, collapse="<br />"))
 disk_perf <- paste0(hdparm1, "<br />", hdparm2)
-make_machine_specs_table("Supermicro SuperServer 1029GQ-TRT",
+make_machine_specs_table("Specs for Supermicro SuperServer 1029GQ-TRT",
     specs=c(`OS`="Linux Ubuntu 22.04",
             `RAM`="384GB",
             `Disk`="1.3TB ATA Disk"),
@@ -500,9 +498,8 @@ make_timings_table("rex3", caption=caption)
 
 ## Timings for Apple Silicon Mac Pro
 
-Machine specs:
 ```{r kjohnson3_specs, echo=FALSE, results='asis'}
-make_machine_specs_table("Apple Silicon Mac Pro (Apple M2 Ultra)",
+make_machine_specs_table("Specs for Apple Silicon Mac Pro (Apple M2 Ultra)",
     specs=c(`OS`="macOS 13.7.1",
             `RAM`="192GB",
             `Disk`="2TB SSD"),
@@ -517,19 +514,17 @@ make_timings_table("kjohnson3", caption=caption)
 
 ## Timings for Intel Mac Pro
 
-Machine specs:
 ```{r lconway_specs, echo=FALSE, results='asis'}
-make_machine_specs_table("Intel Mac Pro (24-Core Intel Xeon W)",
+make_machine_specs_table("Specs for Intel Mac Pro (24-Core Intel Xeon W)",
     specs=c(`OS`="macOS 12.7.6",
             `RAM`="96GB",
             `Disk`="1TB SSD"),
     disk_perf="N/A")
 ```
 
-_[Timings for this machine will be added soon.]_
 ```{r lconway_timings, echo=FALSE, results='asis'}
-#caption <- "Table 4: Timings for Intel Mac Pro"
-#make_timings_table("lconway", caption=caption)
+caption <- "Table 4: Timings for Intel Mac Pro"
+make_timings_table("lconway", caption=caption)
 ```
 
 
@@ -619,7 +614,8 @@ dataset increases.
 machine_names <- c(
     `DELL XPS 15 laptop`="xps15",
     `Supermicro SuperServer 1029GQ-TRT`="rex3",
-    `Apple Silicon Mac Pro`="kjohnson3"
+    `Apple Silicon Mac Pro`="kjohnson3",
+    `Intel Mac Pro`="lconway"
 )
 summarize_machine_times(machine_names)
 ```
