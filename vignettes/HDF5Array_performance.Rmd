@@ -3,7 +3,7 @@ title: "_HDF5Array_ performance"
 author:
 - name: Hervé Pagès
   affiliation: Fred Hutch Cancer Center, Seattle, WA
-date: "Compiled `r doc_date()`; Modified 16 February 2025"
+date: "Compiled `r doc_date()`; Modified 18 February 2025"
 package: HDF5Array
 vignette: |
   %\VignetteIndexEntry{HDF5Array performance}
@@ -587,14 +587,21 @@ approach:
 
 ### A note about memory usage
 
-Overall, for a given choice of block size, memory usage doesn't seem
-to be affected too much by the number of cells in the dataset,
-that is, all operations seem to perform at _almost_ constant memory.
+The machines running macOS use between 2x and 3x more memory than the
+machines running Linux for the same task using the same block size.
+
+Overall, on Linux, and for a given choice of block size, memory usage
+doesn't seem to be affected too much by the number of cells in the
+dataset, that is, all operations seem to perform at _almost_ constant
+memory.
 
 However, the "**[D]** HDF5Matrix (dense)" representation appears to
 be better than the "**[s]** TENxMatrix (sparse)" representation at
 keeping memory usage (mostly) flat as the number of cells in the
-dataset increases.
+dataset increases. This is even more accentuated on macOS where, somehow
+counter intuitively, using the dense representation manages to keep memory
+usage at a reasonable level (and more or less capped with respect to the
+number of cells), while using the sparse representation fails to do that.
 
 
 ## Main takeaways
@@ -627,7 +634,7 @@ summarize_machine_times(machine_names)
 3. Block size matters. When using the TENxMatrix representation (sparse format),
    the bigger the blocks the faster normalization will be (at the cost of
    increased memory usage). On the other hand, it seems that PCA prefers
-   small blocks (at least with our naive `simple_PCA()` implementation).
+   small blocks, at least with our naive `simple_PCA()` implementation.
 
 4. Disk performance is important (not surprisingly) as attested by the lower
    performance of the Supermicro SuperServer 1029GQ-TRT machine, likely due
