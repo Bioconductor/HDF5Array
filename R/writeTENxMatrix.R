@@ -64,7 +64,8 @@
 .create_empty_indptr <- function(filepath, group, ncol)
 {
     name <- paste0(group, "/indptr")
-    ## Standard HDF5 type H5T_STD_I64LE: unsigned 64-bit integer, little-endian
+    ## 10x Genomics uses HDF5 standard type H5T_STD_I64LE (64-bit signed
+    ## integer, little-endian) for the "indptr" dataset, so we do the same.
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=ncol+1L,
                                 type="integer", H5type="H5T_STD_I64LE",
                                 chunkdim=4096L, level=0L)
