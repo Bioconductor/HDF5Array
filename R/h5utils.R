@@ -67,9 +67,9 @@ h5length <- function(filepath, name)
 
 ### Append data to a one-dimensional HDF5 dataset.
 ### Return the length of the extended dataset.
-h5append <- function(data, filepath, name)
+h5append <- function(filepath, name, data)
 {
-    old_len <- as.numeric(h5length(filepath, name))
+    old_len <- as.double(h5length(filepath, name))
     data_len <- length(data)
     new_len <- old_len + data_len
     h5set_extent(filepath, name, new_len)

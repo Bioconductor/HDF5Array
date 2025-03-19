@@ -64,11 +64,11 @@
 .create_empty_indptr <- function(filepath, group, ncol)
 {
     name <- paste0(group, "/indptr")
-    ## Standard HDF5 type H5T_STD_U32LE: unsigned 32-bit integer, little-endian
+    ## Standard HDF5 type H5T_STD_I64LE: unsigned 64-bit integer, little-endian
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=ncol+1L,
-                                type="integer", H5type="H5T_STD_U32LE",
+                                type="integer", H5type="H5T_STD_I64LE",
                                 chunkdim=4096L, level=0L)
-    h5append(0, filepath, name)
+    h5append(filepath, name, 0)
 }
 
 ### The current length of 'indptr' is the "current 1-based column index"
@@ -81,24 +81,24 @@
 .append_data <- function(filepath, group, data)
 {
     name <- paste0(group, "/data")
-    h5append(data, filepath, name)
+    h5append(filepath, name, data)
 }
 
 .append_row_indices <- function(filepath, group, row_indices)
 {
     name <- paste0(group, "/indices")
-    h5append(row_indices, filepath, name)
+    h5append(filepath, name, row_indices)
 }
 
 ### Return the last value in the extended "indptr" dataset.
-.append_indptr <- function(filepath, group, col_indices, ncol)
+.append_indptr <- function(filepath, group, block_indptr)
 {
     name <- paste0(group, "/indptr")
     old_len <- h5length(filepath, name)
     old_data_len <- h5mread(filepath, name, starts=list(old_len),
                             as.vector=TRUE)
-    indptr <- end(PartitioningByEnd(col_indices, NG=ncol)) + old_data_len
-    new_len <- h5append(indptr, filepath, name)
+    indptr <- as.double(old_data_len) + block_indptr
+    new_len <- h5append(filepath, name, indptr)
     h5mread(filepath, name, starts=list(new_len), as.vector=TRUE)
 }
 
@@ -239,9 +239,9 @@ setMethod("write_block", "TENxRealizationSink",
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
-        new_data_len3 <- .append_indptr(sink@filepath, sink@group,
-                                        block@nzcoo[ , 2L],
-                                        ncol(viewport))
+        partitioning <- PartitioningByEnd(block@nzcoo[ , 2L], NG=ncol(block))
+        block_indptr <- end(partitioning)  # sorted integer vector
+        new_data_len3 <- .append_indptr(sink@filepath, sink@group, block_indptr)
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
         sink
     }
