@@ -1,3 +1,29 @@
+CHANGES IN VERSION 1.36.0
+-------------------------
+
+NEW FEATURES
+
+    o The package now has a vignette that discusses/compares performance of
+      various HDF5-based representations in the context of single cell
+      analysis.
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o h5mread() and other low-level HDF5 manipulation functions have moved
+      from the HDF5Array package to the new h5mread package and the former
+      now depends on the latter.
+
+DEPRECATED AND DEFUNCT
+
+    o All the OLD_extract_sparse_array() and read_sparse_block() methods are
+      gone (the corresponding generics went defunct in DelayedArray 0.33.1).
+
+BUG FIXES
+
+    o Make sure writeTENxMatrix() can handle a matrix-like object with more
+      than 2^31 - 1 nonzero values.
+
+
 CHANGES IN VERSION 1.34.0
 -------------------------
 
