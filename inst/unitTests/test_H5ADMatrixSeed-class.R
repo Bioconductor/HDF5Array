@@ -3,6 +3,7 @@ library(zellkonverter)
 
 .make_TEST_SCE1 <- function(assays.as=NULL)
 {
+    set.seed(2009)
     cells <- letters[1:10]
     genes <- LETTERS[1:20]
     ncells <- length(cells)
@@ -59,14 +60,14 @@ test_CSR_H5ADMatrixSeed <- function()
     on.exit(unlink("test.h5ad"))
 
     seed <- H5ADMatrixSeed("test.h5ad")
-    checkTrue(is(seed, "CSR_H5ADMatrixSeed"))
+    checkTrue(is(seed, "CSC_H5ADMatrixSeed"))
     checkIdentical(dim(sce), dim(seed))
     checkIdentical(dimnames(sce), dimnames(seed))
     checkEquals(as.array(assay(sce, "counts")), as.array(seed))
     checkTrue(is_sparse(seed))
 
     seed <- H5ADMatrixSeed("test.h5ad", layer="logcounts")
-    checkTrue(is(seed, "CSR_H5ADMatrixSeed"))
+    checkTrue(is(seed, "CSC_H5ADMatrixSeed"))
     checkIdentical(dim(sce), dim(seed))
     checkIdentical(dimnames(sce), dimnames(seed))
     checkEquals(as.array(assay(sce, "logcounts")), as.array(seed))
