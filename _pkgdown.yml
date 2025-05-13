@@ -1,0 +1,7 @@
+title: HDF5Array
+url: https://Bioconductor.github.io/HDF5Array
+
+template:
+  bootstrap: 5
+  params:
+    bootswatch: flatly
