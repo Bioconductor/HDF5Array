@@ -190,9 +190,10 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
     if (is.na(as.sparse))
         as.sparse <- is_sparse(x)
     sink_dimnames <- if (with.dimnames) dimnames(x) else NULL
-    ## compute_max_string_size() will trigger block processing if 'x' is a
-    ## DelayedArray object of type "character", so it could take a while.
-    size <- compute_max_string_size(x)
+    ## Note that h5mread:::compute_max_string_size() will trigger block
+    ## processing if 'x' is a DelayedArray object of type "character", so
+    ## it could take a while.
+    size <- h5mread:::compute_max_string_size(x)
     sink <- HDF5RealizationSink(dim(x), sink_dimnames, type(x), as.sparse,
                                 filepath=filepath, name=name,
                                 H5type=H5type, size=size,

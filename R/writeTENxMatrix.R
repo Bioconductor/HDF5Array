@@ -13,7 +13,7 @@
                                   H5type=NULL, chunk.length=NULL)
 {
     name <- paste0(group, "/", name)
-    size <- compute_max_string_size(data)
+    size <- h5mread:::compute_max_string_size(data)
     data_len <- length(data)
     if (is.null(chunk.length) || chunk.length > data_len) {
         chunk_len <- data_len
