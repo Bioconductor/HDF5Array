@@ -169,6 +169,7 @@ cvg
 is(cvg, "DelayedArray")  # TRUE
 seed(cvg)
 path(cvg)
+group(cvg)
 chunkdim(cvg)
 
 ## The data in the dataset looks sparse. In this case it is recommended

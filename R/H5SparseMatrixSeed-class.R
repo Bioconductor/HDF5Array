@@ -107,7 +107,8 @@ setReplaceMethod("path", "H5SparseMatrixSeed",
 ###
 
 setMethod("group", "H5SparseMatrixSeed",
-    function(object) {
+    function(object)
+    {
         group <- object@group
         if (!startsWith(group, "/"))
             group <- paste0("/", group)

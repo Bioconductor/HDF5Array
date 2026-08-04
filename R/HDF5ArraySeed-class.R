@@ -186,6 +186,21 @@ setReplaceMethod("path", "HDF5ArraySeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### group() getter
+###
+
+setMethod("group", "HDF5ArraySeed",
+    function(object)
+    {
+        name <- object@name
+        if (!startsWith(name, "/"))
+            name <- paste0("/", name)
+        dirname(name)
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### type() getter
 ###
 

@@ -7,6 +7,7 @@
 
 \alias{path,HDF5ArraySeed-method}
 \alias{path<-,HDF5ArraySeed-method}
+\alias{group,HDF5ArraySeed-method}
 \alias{type,HDF5ArraySeed-method}
 \alias{dim,HDF5ArraySeed-method}
 \alias{dimnames,HDF5ArraySeed-method}
@@ -40,6 +41,8 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 \S4method{path}{HDF5ArraySeed}(object)
 
 \S4method{path}{HDF5ArraySeed}(object) <- value
+
+\S4method{group}{HDF5ArraySeed}(object)
 
 \S4method{dim}{HDF5ArraySeed}(x)
 
@@ -91,6 +94,8 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
   \itemize{
     \item \code{path()}: Returns the path to the HDF5 file where the dataset
           is located.
+    \item \code{group()}: Returns the HDF5 group in the HDF5 file where
+          the dataset is located.
     \item \code{dim()}, \code{dimnames()}.
     \item \code{type()}, \code{extract_array()}, \code{is_sparse()},
           \code{extract_sparse_array()}, \code{chunkdim()}:
@@ -148,6 +153,7 @@ name <- "/ExampleStudy/16/Coverages"  # name of the dataset of interest
 seed1 <- HDF5ArraySeed(tally_file, name)
 seed1
 path(seed1)
+group(seed1)
 dim(seed1)
 chunkdim(seed1)
 
