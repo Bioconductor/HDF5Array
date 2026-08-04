@@ -83,6 +83,7 @@ class(seed(M))  # CSC_H5SparseMatrixSeed
 
 dim(M)
 path(M)
+group(M)
 is_sparse(M)  # TRUE
 
 ## Use coercion to load the full dataset into memory:

@@ -20,6 +20,7 @@
 
 \alias{path,H5SparseMatrixSeed-method}
 \alias{path<-,H5SparseMatrixSeed-method}
+\alias{group,H5SparseMatrixSeed-method}
 \alias{dim,H5SparseMatrixSeed-method}
 \alias{dimnames,H5SparseMatrixSeed-method}
 \alias{chunkdim,CSC_H5SparseMatrixSeed-method}
@@ -67,6 +68,8 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
 ## --- Accessors --------------
 
 \S4method{path}{H5SparseMatrixSeed}(object)
+
+\S4method{group}{H5SparseMatrixSeed}(object)
 
 \S4method{dim}{H5SparseMatrixSeed}(x)
 
@@ -164,6 +167,8 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
   \itemize{
     \item \code{path()}: Returns the path to the HDF5 file where the sparse
           matrix is located.
+    \item \code{group()}: Returns the HDF5 group in the HDF5 file where
+          the sparse matrix is located.
     \item \code{dim()}, \code{dimnames()}.
     \item \code{extract_array()}, \code{is_sparse()},
           \code{extract_sparse_array()}, \code{chunkdim()}:

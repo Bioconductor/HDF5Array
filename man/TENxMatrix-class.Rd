@@ -144,6 +144,7 @@ oneM
 is(oneM, "DelayedMatrix")  # TRUE
 seed(oneM)
 path(oneM)
+group(oneM)
 nzcount(oneM)  # nb of nonzero values in the dataset
 
 ## Some examples of delayed operations:

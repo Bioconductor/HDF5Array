@@ -103,6 +103,20 @@ setReplaceMethod("path", "H5SparseMatrixSeed",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### group() getter
+###
+
+setMethod("group", "H5SparseMatrixSeed",
+    function(object) {
+        group <- object@group
+        if (!startsWith(group, "/"))
+            group <- paste0("/", group)
+        group
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### dim() and dimnames() getters
 ###
 ### They access the slot, not the file.
