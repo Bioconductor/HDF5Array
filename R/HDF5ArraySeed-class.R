@@ -190,8 +190,12 @@ setReplaceMethod("path", "HDF5ArraySeed",
 ###
 
 setMethod("group", "HDF5ArraySeed",
-    function(object)
+    function(object, ...)
     {
+        if (length(list(...)) != 0L)
+            stop(wmsg("the group() method for HDF5ArraySeed objects ",
+                      "does not accept additional arguments passed thru ",
+                      "the ellipsis (...)"))
         name <- object@name
         if (!startsWith(name, "/"))
             name <- paste0("/", name)

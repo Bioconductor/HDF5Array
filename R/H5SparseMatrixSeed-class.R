@@ -107,8 +107,12 @@ setReplaceMethod("path", "H5SparseMatrixSeed",
 ###
 
 setMethod("group", "H5SparseMatrixSeed",
-    function(object)
+    function(object, ...)
     {
+        if (length(list(...)) != 0L)
+            stop(wmsg("the group() method for H5SparseMatrixSeed objects ",
+                      "does not accept additional arguments passed thru ",
+                      "the ellipsis (...)"))
         group <- object@group
         if (!startsWith(group, "/"))
             group <- paste0("/", group)
