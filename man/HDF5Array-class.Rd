@@ -36,15 +36,15 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \arguments{
   \item{filepath}{
-    The path (as a single string or \link{H5File} object) to the HDF5 file
-    (\code{.h5} or \code{.h5ad}) where the dataset is located.
+    The path (as a single string or \link[h5mread]{H5File} object) to the
+    HDF5 file (\code{.h5} or \code{.h5ad}) where the dataset is located.
 
-    Note that you must create and use an \link{H5File} object if the HDF5
-    file to access is stored in an Amazon S3 bucket. See \code{?\link{H5File}}
-    for how to do this.
+    Note that you must create and use an \link[h5mread]{H5File} object if
+    the HDF5 file to access is stored in an Amazon S3 bucket.
+    See \code{?\link{H5File}} for how to do this.
 
-    Also please note that \link{H5File} objects must NOT be used in the
-    context of parallel evaluation at the moment.
+    Also please note that \link[h5mread]{H5File} objects must NOT be used
+    in the context of parallel evaluation at the moment.
   }
   \item{name}{
     The name of the dataset in the HDF5 file.
@@ -91,7 +91,7 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \seealso{
   \itemize{
-    \item \link{H5File} objects.
+    \item \link[h5mread]{H5File} objects in the \pkg{h5mread} package.
 
     \item \link{H5SparseMatrix} objects for representing HDF5 sparse matrices
           as \link[DelayedArray]{DelayedMatrix} objects.
@@ -124,8 +124,8 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
     \item The \link{HDF5ArraySeed} helper class.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file (\code{.h5}
-          or \code{.h5ad}).
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

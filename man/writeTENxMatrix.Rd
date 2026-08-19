@@ -46,9 +46,10 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
     The object to write should typically be sparse, that is, most of its
     elements should be zero.
 
-    If \code{x} is a \link{DelayedMatrix} object, \code{writeTENxMatrix}
-    \emph{realizes} it on disk, that is, all the delayed operations carried
-    by the object are executed while the object is written to disk.
+    If \code{x} is a \link[DelayedArray]{DelayedMatrix} object,
+    \code{writeTENxMatrix} \emph{realizes} it on disk, that is, all the
+    delayed operations carried by the object are executed while the object
+    is written to disk.
   }
   \item{filepath}{
     \code{NULL} or the path (as a single string) to the (new or existing)
@@ -97,7 +98,8 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
     \item \link{HDF5-dump-management} to control the location and
           physical properties of automatically created HDF5 datasets.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

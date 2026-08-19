@@ -69,7 +69,7 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
 
 \S4method{path}{H5SparseMatrixSeed}(object)
 
-\S4method{group}{H5SparseMatrixSeed}(object)
+\S4method{group}{H5SparseMatrixSeed}(object, ...)
 
 \S4method{dim}{H5SparseMatrixSeed}(x)
 
@@ -113,6 +113,10 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
   }
   \item{object, x}{
     An H5SparseMatrixSeed derivative.
+  }
+  \item{...}{
+    The \code{group()} method for H5SparseMatrixSeed objects does not
+    accept additional arguments passed thru the ellipsis.
   }
   \item{index}{
     See \code{?\link[S4Arrays]{extract_array}} in the \pkg{S4Arrays}
@@ -218,8 +222,8 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
   \itemize{
     \item \link{H5SparseMatrix} objects.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file (\code{.h5}
-          or \code{.h5ad}).
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

@@ -100,9 +100,9 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   \item{level}{
     For \code{setHDF5DumpCompressionLevel}:
     The compression level to use for writing \emph{automatic HDF5 datasets}
-    to disk.
-    See the \code{level} argument in \code{?rhdf5::\link{h5createDataset}}
-    (in the \pkg{rhdf5} package) for more information about this.
+    to disk. See the \code{level} argument in
+    \code{?rhdf5::\link[rhdf5]{h5createDataset}} (in the \pkg{rhdf5} package)
+    for more information about this.
 
     For \code{appendDatasetCreationToHDF5DumpLog}:
     See the Note TO DEVELOPERS below.
@@ -115,7 +115,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     The dimensions of the HDF5 dataset to be written to disk, that is,
     an integer vector of length one or more giving the maximal indices in each
     dimension.
-    See the \code{dims} argument in \code{?rhdf5::\link{h5createDataset}}
+    See the \code{dims} argument in \code{?rhdf5::\link[rhdf5]{h5createDataset}}
     (in the \pkg{rhdf5} package) for more information about this.
   }
   \item{type}{
@@ -124,7 +124,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
     ordinary array). This is typically what an application writing datasets
     to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
-    of its call to \code{rhdf5::\link{h5createDataset}}.
+    of its call to \code{rhdf5::\link[rhdf5]{h5createDataset}}.
     See the Note TO DEVELOPERS below for more information.
   }
   \item{chunkdim}{
@@ -144,7 +144,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   combination.
 
   \code{lsHDF5DumpFile()} is a just convenience wrapper for
-  \code{\link{h5ls}(getHDF5DumpFile())}.
+  \code{\link[rhdf5]{h5ls}(getHDF5DumpFile())}.
 }
 
 \value{
@@ -206,8 +206,8 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
 
     \item \link{HDF5Array} objects.
 
-    \item The \code{\link{h5ls}} function on which \code{lsHDF5DumpFile}
-          is based.
+    \item The \code{\link[rhdf5]{h5ls}} function in the \pkg{rhdf5} package on
+          which \code{lsHDF5DumpFile} is based.
 
     \item \code{\link[DelayedArray]{makeCappedVolumeBox}} in the
           \pkg{DelayedArray} package.

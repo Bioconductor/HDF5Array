@@ -36,9 +36,10 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   \item{x}{
     The array-like object to write to an HDF5 file.
 
-    If \code{x} is a \link{DelayedArray} object, \code{writeHDF5Array}
-    \emph{realizes} it on disk, that is, all the delayed operations carried
-    by the object are executed while the object is written to disk.
+    If \code{x} is a \link[DelayedArray]{DelayedArray} object,
+    \code{writeHDF5Array} \emph{realizes} it on disk, that is, all the
+    delayed operations carried by the object are executed while the object
+    is written to disk.
     See "On-disk realization of a DelayedArray object as an HDF5 dataset"
     section below for more information.
   }
@@ -139,7 +140,7 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
 }
 
 \section{On-disk realization of a DelayedArray object as an HDF5 dataset}{
-  When passed a \link{DelayedArray} object, \code{writeHDF5Array}
+  When passed a \link[DelayedArray]{DelayedArray} object, \code{writeHDF5Array}
   \emph{realizes} it on disk, that is, all the delayed operations carried
   by the object are executed on-the-fly while the object is written to disk.
   This uses a block-processing strategy so that the full object is not
@@ -150,8 +151,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   to \code{writeHDF5Array(as.array(x), ...)}, except that \code{as.array(x)}
   is not called because this would realize the full object at once in memory.
 
-  See \code{?\link{DelayedArray}} for general information about
-  \link{DelayedArray} objects.
+  See \code{?\link[DelayedArray]{DelayedArray}} in the \pkg{DelayedArray}
+  package for general information about \link{DelayedArray} objects.
 }
 
 \references{
@@ -163,8 +164,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   \itemize{
     \item \link{HDF5Array} objects.
 
-    \item \code{\link{h5writeDimnames}} for writing the dimnames of an
-          HDF5 dataset to disk.
+    \item \code{\link[h5mread]{h5writeDimnames}} in the \pkg{h5mread} package
+          for writing the dimnames of an HDF5 dataset to disk.
 
     \item \code{\link{saveHDF5SummarizedExperiment}} and
           \code{\link{loadHDF5SummarizedExperiment}} in this
@@ -175,7 +176,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     \item \link{HDF5-dump-management} to control the location and
           physical properties of automatically created HDF5 datasets.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

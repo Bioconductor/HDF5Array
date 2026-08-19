@@ -58,8 +58,8 @@ H5SparseMatrix(filepath, group)
 
     \item The \link{H5SparseMatrixSeed} helper class.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file (\code{.h5}
-          or \code{.h5ad}).
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
 
     \item \link[SparseArray]{SparseArray} objects in the \pkg{SparseArray}
           package.

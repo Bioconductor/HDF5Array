@@ -47,7 +47,8 @@ ReshapedHDF5ArraySeed(filepath, name, dim, type=NA)
   \itemize{
     \item \link{ReshapedHDF5Array} objects.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

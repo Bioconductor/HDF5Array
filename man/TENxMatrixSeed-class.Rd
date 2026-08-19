@@ -64,7 +64,8 @@ TENxMatrixSeed(filepath, group="matrix")
     \item The \code{\link[TENxBrainData]{TENxBrainData}} dataset (in the
           \pkg{TENxBrainData} package).
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 

@@ -42,7 +42,7 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
 
 \S4method{path}{HDF5ArraySeed}(object) <- value
 
-\S4method{group}{HDF5ArraySeed}(object)
+\S4method{group}{HDF5ArraySeed}(object, ...)
 
 \S4method{dim}{HDF5ArraySeed}(x)
 
@@ -75,6 +75,10 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
     HDF5 file where the dataset is located.
 
     For the \code{is_sparse()} setter: \code{TRUE} or \code{FALSE}.
+  }
+  \item{...}{
+    The \code{group()} method for HDF5ArraySeed objects does not
+    accept additional arguments passed thru the ellipsis.
   }
   \item{index}{
     See \code{?\link[S4Arrays]{extract_array}} in the \pkg{S4Arrays}
@@ -139,7 +143,8 @@ HDF5ArraySeed(filepath, name, as.sparse=FALSE, type=NA)
     \item \code{\link[DelayedArray]{chunkdim}} in the \pkg{DelayedArray}
           package.
 
-    \item \code{\link{h5ls}} to list the content of an HDF5 file.
+    \item \code{\link[rhdf5]{h5ls}} in the \pkg{rhdf5} package to list the
+          content of an HDF5 file (\code{.h5} or \code{.h5ad}).
   }
 }
 
