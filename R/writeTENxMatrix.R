@@ -13,7 +13,11 @@
                                   H5type=NULL, chunk.length=NULL)
 {
     name <- paste0(group, "/", name)
-    size <- h5mread:::compute_max_string_size(data)
+    ## Starting with rhdf5 2.57.10, fixed-size string datasets no longer
+    ## support NAs. The recommendation now is to use a variable-length string
+    ## dataset (by setting 'size' to NULL, the default) if there's a chance
+    ## that the character array to write to disk contains NAs.
+    #size <- h5mread:::compute_max_string_size(data)
     data_len <- length(data)
     if (is.null(chunk.length) || chunk.length > data_len) {
         chunk_len <- data_len
@@ -21,7 +25,7 @@
         chunk_len <- chunk.length
     }
     create_and_log_HDF5_dataset(filepath, name, dim=data_len,
-                                type=typeof(data), H5type=H5type, size=size,
+                                type=typeof(data), H5type=H5type, # size=size,
                                 chunkdim=chunk_len, level=0L)
     h5write(data, filepath, name)
 }

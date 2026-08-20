@@ -193,10 +193,14 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
     ## Note that h5mread:::compute_max_string_size() will trigger block
     ## processing if 'x' is a DelayedArray object of type "character", so
     ## it could take a while.
-    size <- h5mread:::compute_max_string_size(x)
+    ## Starting with rhdf5 2.57.10, fixed-size string datasets no longer
+    ## support NAs. The recommendation now is to use a variable-length string
+    ## dataset (by setting 'size' to NULL, the default) if there's a chance
+    ## that the character array to write to disk contains NAs.
+    #size <- h5mread:::compute_max_string_size(x)
     sink <- HDF5RealizationSink(dim(x), sink_dimnames, type(x), as.sparse,
                                 filepath=filepath, name=name,
-                                H5type=H5type, size=size,
+                                H5type=H5type, # size=size,
                                 chunkdim=chunkdim, level=level)
     sink <- BLOCK_write_to_sink(sink, x, verbose=verbose)
     as(sink, "HDF5Array")
