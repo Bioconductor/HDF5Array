@@ -41,7 +41,8 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
     Note that you must create and use an \link[h5mread]{H5File} object if
     the HDF5 file to access is stored in an Amazon S3 bucket.
-    See \code{?\link{H5File}} for how to do this.
+    See \code{?\link[h5mread]{H5File}} in the \pkg{h5mread} package for
+    how to do this.
 
     Also please note that \link[h5mread]{H5File} objects must NOT be used
     in the context of parallel evaluation at the moment.

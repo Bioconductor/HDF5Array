@@ -106,11 +106,12 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     Whether the dimnames on \code{x} should also be written to the HDF5
     file or not. \code{TRUE} by default.
 
-    Note that \code{\link{h5writeDimnames}} is used internally to write
-    the dimnames to disk. Setting \code{with.dimnames} to \code{FALSE}
-    and calling \code{\link{h5writeDimnames}} is another way to write
-    the dimnames on \code{x} to disk that gives more control.
-    See \code{?\link{h5writeDimnames}} for more information.
+    Note that \code{\link[h5mread]{h5writeDimnames}} is used internally to
+    write the dimnames to disk. Note that setting \code{with.dimnames} to
+    \code{FALSE} and calling \code{\link[h5mread]{h5writeDimnames}} explicitly
+    is another way to write \code{x}'s dimnames to disk that provides slightly
+    more control. See \code{?\link[h5mread]{h5writeDimnames}} in the
+    \pkg{h5mread} package for more information.
   }
   \item{verbose}{
     Whether block processing progress should be displayed or not.
@@ -152,7 +153,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   is not called because this would realize the full object at once in memory.
 
   See \code{?\link[DelayedArray]{DelayedArray}} in the \pkg{DelayedArray}
-  package for general information about \link{DelayedArray} objects.
+  package for general information about \link[DelayedArray]{DelayedArray}
+  objects.
 }
 
 \references{
