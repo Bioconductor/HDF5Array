@@ -18,9 +18,12 @@ setClass("HDF5ArraySeed",
         ## Name of dataset in the HDF5 file.
         name="character",
 
+        ## Slot added in HDF5Array 1.41.2.
+        as_integer="logical",  # TRUE or FALSE
+
         ## Whether the HDF5 dataset should be considered sparse (and treated
         ## as such) or not. Slot added in HDF5Array 1.17.8.
-        as_sparse="logical",  # TRUE or FALSE
+        as_sparse="logical",   # TRUE or FALSE
 
         ## NA or the desired type. Slot added in HDF5Array 1.15.6.
         type="character",
