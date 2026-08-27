@@ -137,7 +137,7 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
   argument should be \emph{informative} only i.e. it's a mean for the user
   to know where the \emph{next automatic HDF5 dataset} will be written.
   Since a given file/name combination can be used only once, the user should
-  be careful to not use that combination to explicitly create an HDF5 dataset
+  be careful to not use that combination to explicitely create an HDF5 dataset
   because that would get in the way of the creation of the \emph{next
   automatic HDF5 dataset}.
   See the Note TO DEVELOPERS below if you actually need to use this file/name
