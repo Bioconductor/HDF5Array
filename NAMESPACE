@@ -72,13 +72,13 @@ exportMethods(
     path, "path<-", group, type, updateObject,
 
     ## Methods for generics defined in the S4Arrays package:
-    extract_array, is_sparse, "is_sparse<-",
+    extract_array, is_sparse, "is_sparse<-", write_block,
 
     ## Methods for generics defined in the SparseArray package:
     nzcount, extract_sparse_array,
 
     ## Methods for generics defined in the DelayedArray package:
-    chunkdim, write_block,
+    chunkdim,
     matrixClass, DelayedArray,
     close
 )
