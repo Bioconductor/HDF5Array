@@ -23,6 +23,7 @@
 \alias{group,H5SparseMatrixSeed-method}
 \alias{dim,H5SparseMatrixSeed-method}
 \alias{dimnames,H5SparseMatrixSeed-method}
+\alias{type,H5SparseMatrixSeed-method}
 \alias{chunkdim,CSC_H5SparseMatrixSeed-method}
 \alias{chunkdim,CSR_H5SparseMatrixSeed-method}
 \alias{is_sparse,H5SparseMatrixSeed-method}
@@ -74,6 +75,8 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
 \S4method{dim}{H5SparseMatrixSeed}(x)
 
 \S4method{dimnames}{H5SparseMatrixSeed}(x)
+
+\S4method{type}{H5SparseMatrixSeed}(x)
 
 \S4method{chunkdim}{CSC_H5SparseMatrixSeed}(x)
 \S4method{chunkdim}{CSR_H5SparseMatrixSeed}(x)
@@ -174,6 +177,12 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
     \item \code{group()}: Returns the HDF5 group in the HDF5 file where
           the sparse matrix is located.
     \item \code{dim()}, \code{dimnames()}.
+    \item \code{type()}: Returns the type of the nonzero values in the
+          object (e.g. \code{"integer"} or \code{"double"}), as recorded
+          by the \code{H5SparseMatrixSeed()} constructor, that is, without
+          accessing the file, or, for objects serialized with an earlier
+          version, from the file. See \code{?\link[S4Arrays]{type}} in the
+          \pkg{S4Arrays} package.
     \item \code{extract_array()}, \code{is_sparse()},
           \code{extract_sparse_array()}, \code{chunkdim()}:
           These generics are defined and documented in other packages e.g.
