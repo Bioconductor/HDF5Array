@@ -420,7 +420,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
     type <- get_h5mread_returned_type(filepath,
                                       .get_data_name(subdata, group))
 
-    new2(ans_class, filepath=filepath, group=group,
+    new2(ans_class, filepath=filepath, group=group, subdata=subdata,
                     dim=dim, indptr_ranges=indptr_ranges, type=type)
 }
 

@@ -74,3 +74,40 @@ test_H5SparseMatrixSeed_type <- function()
     checkIdentical(n, 0L)
     checkIdentical(unname(as.matrix(B)), m)
 }
+
+test_H5SparseMatrixSeed_subdata <- function()
+{
+    set.seed(123)
+    m <- Matrix::rsparsematrix(10, 20, 0.3)
+    m@x <- round(10 * m@x)
+    ## the nonzero data are stored in datasets "counts" (double) and
+    ## "flags" (integer) of the HDF5 group "g/data"
+    filepath <- tempfile(fileext=".h5")
+    rhdf5::h5createFile(filepath)
+    rhdf5::h5createGroup(filepath, "g")
+    rhdf5::h5createGroup(filepath, "g/data")
+    rhdf5::h5write(m@x, filepath, "g/data/counts")
+    rhdf5::h5write(as.integer(m@x > 0), filepath, "g/data/flags")
+    rhdf5::h5write(m@i, filepath, "g/indices")
+    rhdf5::h5write(m@p, filepath, "g/indptr")
+    rhdf5::h5write(dim(m), filepath, "g/shape")
+    flags <- as.matrix(m) > 0
+    storage.mode(flags) <- "integer"
+    expected <- list(counts=as.matrix(m), flags=flags)
+
+    for (subdata in names(expected)) {
+        s <- H5SparseMatrixSeed(filepath, "g", subdata=subdata,
+                                sparse.layout="CSC")
+        checkIdentical(s@subdata, subdata)
+        checkIdentical(type(s), typeof(expected[[subdata]]))
+        checkIdentical(nzcount(s), length(m@x))
+        checkIdentical(as.matrix(DelayedArray(s)), expected[[subdata]])
+        checkIdentical(as.array(extract_sparse_array(s, list(NULL, 2:4))),
+                       expected[[subdata]][ , 2:4])
+
+        ## objects without the "type" slot obtain it from the same dataset
+        old <- s
+        attr(old, "type") <- NULL
+        checkIdentical(type(old), typeof(expected[[subdata]]))
+    }
+}
