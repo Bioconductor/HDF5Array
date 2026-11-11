@@ -30,11 +30,19 @@ setClass("H5SparseMatrixSeed",
         ## objects don't support large integer start/end values yet.
         indptr_ranges="data.frame",
 
+        ## Type of the nonzero data, as returned by h5mread(). Recorded at
+        ## construction time so type() and the extraction of empty arrays,
+        ## used e.g. by the validity methods of DelayedArray objects, don't
+        ## access the file. NA when unknown, in which case it's obtained
+        ## from the file. Slot added in HDF5Array (FILL OUT VERSION HERE!).
+        type="character",
+
     ## ------------- populated by specialized subclasses -------------
 
         dimnames="list"
     ),
     prototype(
+        type=NA_character_,
         dimnames=list(NULL, NULL)
     )
 )
@@ -131,6 +139,24 @@ setMethod("dim", "H5SparseMatrixSeed", function(x) x@dim)
 
 setMethod("dimnames", "H5SparseMatrixSeed",
     function(x) S4Arrays:::simplify_NULL_dimnames(x@dimnames)
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type() getter
+###
+
+### Does NOT access the file, except for objects that don't record the type
+### of their data, e.g. objects serialized with HDF5Array < 1.41.4, which
+### don't have the "type" slot.
+setMethod("type", "H5SparseMatrixSeed",
+    function(x)
+    {
+        if (.hasSlot(x, "type") && !is.na(x@type))
+            return(x@type)
+        get_h5mread_returned_type(x@filepath,
+                                  .get_data_name(x@subdata, x@group))
+    }
 )
 
 
@@ -390,8 +416,12 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
     indptr_ranges <- data.frame(start=indptr[-length(indptr)] + 1,
                                 width=as.integer(diff(indptr)))
 
+    ## Get the type of the nonzero data.
+    type <- get_h5mread_returned_type(filepath,
+                                      .get_data_name(subdata, group))
+
     new2(ans_class, filepath=filepath, group=group,
-                    dim=dim, indptr_ranges=indptr_ranges)
+                    dim=dim, indptr_ranges=indptr_ranges, type=type)
 }
 
 
@@ -440,6 +470,16 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
     ## 'cumsum(as.double(w))' instead of 'cumsum(w)' to avoid integer overflow.
     ans_indptr <- c(0, cumsum(as.double(w)))
     ans_nzcount <- ans_indptr[[length(ans_indptr)]]
+
+    ## Selections without nonzero data, e.g. the empty selections of
+    ## S4Arrays:::extract_empty_array(), don't access the file, unless
+    ## 'x' doesn't record the type of its data, see type().
+    if (ans_nzcount == 0) {
+        ans <- SparseArray:::make_SVT_SparseMatrix_from_CSC(ans_dim,
+                                        ans_indptr, vector(type(x), 0L),
+                                        integer(0))
+        return(ans)
+    }
 
     ## DATABLOCKLEN == 0L means no block processing.
     if (DATABLOCKLEN == 0L || ans_nzcount <= DATABLOCKLEN) {
