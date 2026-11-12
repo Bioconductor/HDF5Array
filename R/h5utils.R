@@ -57,7 +57,7 @@ validate_h5_dataset_name <- function(path, name, what="'name'")
 ###
 
 ### Length of a one-dimensional HDF5 dataset.
-### Return the length as a single integer (if < 2^31) or numeric (if >= 2^31).
+### Returns the length as a single integer (if < 2^31) or numeric (if >= 2^31).
 h5length <- function(filepath, name)
 {
     len <- h5dim(filepath, name, as.integer=FALSE)
@@ -66,7 +66,7 @@ h5length <- function(filepath, name)
 }
 
 ### Append data to a one-dimensional HDF5 dataset.
-### Return the length of the extended dataset.
+### Returns the length of the extended dataset.
 h5append <- function(filepath, name, data)
 {
     old_len <- as.double(h5length(filepath, name))

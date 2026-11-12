@@ -6,6 +6,7 @@
 setClass("HDF5ArraySeed",
     contains=c("Array", "OutOfMemoryObject"),
     representation(
+
       ## ----------------- user supplied slots -----------------
 
         ## H5File object or **absolute** path to a local HDF5 file so the
@@ -15,14 +16,18 @@ setClass("HDF5ArraySeed",
         ## (required by quickResaveHDF5SummarizedExperiment()).
         filepath="character_OR_H5File",
 
-        ## Name of dataset in the HDF5 file.
+        ## The name of the HDF5 dataset.
         name="character",
 
         ## Whether the HDF5 dataset should be considered sparse (and treated
-        ## as such) or not. Slot added in HDF5Array 1.17.8.
+        ## as such) or not.
+        ## Slot added in HDF5Array 1.17.8.
         as_sparse="logical",  # TRUE or FALSE
 
-        ## NA or the desired type. Slot added in HDF5Array 1.15.6.
+        ## NA or the user-desired type() of the HDF5ArraySeed object.
+        ## If set to NA, then type() will return the "natural type" of
+        ## the HDF5 dataset. See type() method below in this file.
+        ## Slot added in HDF5Array 1.15.6.
         type="character",
 
       ## ------------ automatically populated slots ------------
@@ -120,7 +125,7 @@ setValidity2("HDF5ArraySeed", .validate_HDF5ArraySeed)
 ### path() getter/setter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("path", "HDF5ArraySeed",
     function(object)
     {
@@ -131,7 +136,7 @@ setMethod("path", "HDF5ArraySeed",
     }
 )
 
-### Return a fake value (of the correct type) if the dataset is empty i.e.
+### Returns a fake value (of the correct type) if the dataset is empty i.e.
 ### if at least one of its dimensions is 0.
 .read_h5dataset_first_val <- function(filepath, name, dim)
 {
@@ -208,19 +213,19 @@ setMethod("group", "HDF5ArraySeed",
 ### type() getter
 ###
 
-### Override the default method (defined in the DelayedArray package) with
-### a much faster one.
+### The default type() method (defined in the S4Arrays package) would do
+### the job but it's based on S4Arrays:::extract_empty_array() which calls
+### h5mread::h5mread() to access the HDF5 file even if there's no data to read.
+### This is not particularly efficient. So we override it with a method that
+### does NOT access the HDF5 file.
 setMethod("type", "HDF5ArraySeed",
     function(x)
     {
-        ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
-        ## the "type" slot.
-        if (!.hasSlot(x, "type"))
-            return(type(x@first_val))
-        type <- x@type
-        if (is.na(type))
-            type <- get_h5mread_returned_type(x@filepath, x@name)
-        type
+        ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
+        ## the 'type' slot.
+        if (!.hasSlot(x, "type") || is.na(x@type))
+            return(type(x@first_val))  # "natural type" of the HDF5 dataset
+        x@type
     }
 )
 
@@ -229,7 +234,7 @@ setMethod("type", "HDF5ArraySeed",
 ### dim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("dim", "HDF5ArraySeed", function(x) x@dim)
 
 
@@ -265,7 +270,7 @@ setMethod("dimnames", "HDF5ArraySeed",
 
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
-    ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
+    ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
     ## the "type" slot.
     if (!.hasSlot(x, "type"))
         return(.h5mread2(x@filepath, x@name, index))
@@ -285,7 +290,7 @@ setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
 ### is_sparse() and extract_sparse_array() methods
 ###
 
-### Prior to HDF5Array 1.17.8 HDF5ArraySeed objects didn't have the
+### Prior to HDF5Array 1.17.8, HDF5ArraySeed objects didn't have the
 ### "as_sparse" slot.
 setMethod("is_sparse", "HDF5ArraySeed",
     function(x) .hasSlot(x, "as_sparse") && x@as_sparse
@@ -311,7 +316,7 @@ setReplaceMethod("is_sparse", "HDF5ArraySeed",
     if (!is_sparse(x))
         stop(wmsg("calling extract_sparse_array() on an HDF5ArraySeed ",
                   "object is supported only if the object is sparse"))
-    ## Prior to HDF5Array 1.15.6 HDF5ArraySeed objects didn't have
+    ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
     ## the "type" slot.
     if (!.hasSlot(x, "type"))
         return(.h5mread2(x@filepath, x@name, index, as.sparse=TRUE))
@@ -340,7 +345,7 @@ setMethod("extract_sparse_array", "HDF5ArraySeed",
 ### chunkdim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("chunkdim", "HDF5ArraySeed", function(x) x@chunkdim)
 
 
@@ -358,7 +363,7 @@ HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
     if (!isTRUEorFALSE(as.sparse))
         stop(wmsg("'as.sparse' must be TRUE or FALSE"))
 
-    ## Check 'type'
+    ## Check 'type'.
     if (!isSingleStringOrNA(type))
         stop(wmsg("'type' must be a single string or NA"))
     if (is.na(type)) {

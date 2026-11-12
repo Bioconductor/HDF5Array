@@ -82,7 +82,7 @@ setMethod("t", "CSR_H5SparseMatrixSeed", t.CSR_H5SparseMatrixSeed)
 ### path() getter/setter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("path", "H5SparseMatrixSeed", function(object) object@filepath)
 
 ### Just a placeholder for now. Doesn't actually allow changing the path of
@@ -138,7 +138,7 @@ setMethod("dimnames", "H5SparseMatrixSeed",
 ### chunkdim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("chunkdim", "CSC_H5SparseMatrixSeed",
     function(x) c(nrow(x), min(ncol(x), 1L))
 )
@@ -307,7 +307,10 @@ read_h5sparse_component <- function(filepath, group, name,
     if (is.null(dim)) {
         dim <- .read_h5sparse_dim(filepath, group)
         stopifnot(length(dim) == 2L)
-        return(dim_as_integer(dim, filepath, group, what="sparse matrix"))
+        stop_if_big_h5_dimensions(dim, filepath, group,
+                            of_what="HDF5 sparse matrix",
+                            about_what="HDF5 sparse matrix stored in group")
+        return(as.integer(dim))
     }
     ## Check user-supplied 'dim'.
     if (!is.numeric(dim) || length(dim) != 2L || anyNA(dim))

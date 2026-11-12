@@ -66,14 +66,16 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
             ans <- as.character(ans)
         return(ans)
     }
-    ok <- try(h5isgroup(filepath, name), silent=TRUE)
-    if (!isTRUE(ok))
-        return(NULL)
-    ROWNAMES_DATASET <- paste0(name, "/_index")
-    ok <- try(h5isdataset(filepath, ROWNAMES_DATASET), silent=TRUE)
-    if (!isTRUE(ok))
-        return(NULL)
-    h5mread(filepath, ROWNAMES_DATASET, as.vector=TRUE)
+    for (subgroup in c("_index", "values")) {
+        ok <- try(h5isgroup(filepath, name), silent=TRUE)
+        if (!isTRUE(ok))
+            return(NULL)
+        name <- paste0(name, "/", subgroup)
+        ok <- try(h5isdataset(filepath, name), silent=TRUE)
+        if (isTRUE(ok))
+            return(h5mread(filepath, name, as.vector=TRUE))
+    }
+    NULL
 }
 
 ### Must return a list of length 2.
