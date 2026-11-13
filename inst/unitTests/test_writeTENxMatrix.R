@@ -119,7 +119,7 @@ test_TENxRealizationSink <- function()
 test_writeTENxMatrix <- function()
 {
     set.seed(2009)
-    svt <- poissonSparseMatrix(100, 375, density=0.4) * 0.2 * c(1, -1)
+    svt <- poissonSparseMatrix(100, 375, density=0.4) * c(0.1, -0.1)
     m <- as.matrix(svt)
     dgc <- as(svt, "dgCMatrix")
 

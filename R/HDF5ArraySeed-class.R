@@ -7,13 +7,14 @@ setClass("HDF5ArraySeed",
     contains=c("Array", "OutOfMemoryObject"),
     representation(
 
-      ## ----------------- user supplied slots -----------------
+      ## --------------------- user supplied slots ---------------------
 
-        ## H5File object or **absolute** path to a local HDF5 file so the
-        ## object won't break when the user changes the working directory
-        ## (e.g. with setwd()). The path must also be in its canonical
-        ## form so comparing paths from different objects is meaningful
-        ## (required by quickResaveHDF5SummarizedExperiment()).
+        ## **Absolute** path to a local HDF5 file so the object won't break
+        ## when the user changes the working directory (e.g. with setwd()).
+        ## The path must also be in its canonical form so comparing paths
+        ## from different objects is meaningful (note that
+        ## quickResaveHDF5SummarizedExperiment() relies on that).
+        ## Can also be an H5File object.
         filepath="character_OR_H5File",
 
         ## The name of the HDF5 dataset.
@@ -25,12 +26,12 @@ setClass("HDF5ArraySeed",
         as_sparse="logical",  # TRUE or FALSE
 
         ## NA or the user-desired type() of the HDF5ArraySeed object.
-        ## If set to NA, then type() will return the "natural type" of
+        ## If set to NA, then type() will return the "natural" type of
         ## the HDF5 dataset. See type() method below in this file.
         ## Slot added in HDF5Array 1.15.6.
         type="character",
 
-      ## ------------ automatically populated slots ------------
+      ## ---------------- automatically populated slots ----------------
 
         dim="integer",
         chunkdim="integer_OR_NULL",
@@ -54,13 +55,13 @@ validate_HDF5ArraySeed_dataset_geometry <- function(x, what="object")
     h5_dim <- h5dim(x@filepath, x@name)
     if (!identical(h5_dim, x@dim))
         return(paste0(what, " points to an HDF5 dataset (\"", x@name, "\") ",
-                      "in HDF5 file \"", x@filepath, "\" ",
-                      "that does not have the expected dimensions"))
+                      "in HDF5 file \"", path(x), "\" that does ",
+                      "not have the expected dimensions"))
     h5_chunkdim <- h5chunkdim(x@filepath, x@name, adjust=TRUE)
     if (!identical(h5_chunkdim, x@chunkdim))
         return(paste0(what, " points to an HDF5 dataset (\"", x@name, "\") ",
-                      "in HDF5 file \"", x@filepath, "\" ",
-                      "that does not have the expected chunk dimensions"))
+                      "in HDF5 file \"", path(x), "\" that does ",
+                      "not have the expected chunk dimensions"))
     TRUE
 }
 
@@ -224,8 +225,8 @@ setMethod("type", "HDF5ArraySeed",
         ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
         ## the 'type' slot.
         if (!.hasSlot(x, "type") || is.na(x@type))
-            return(type(x@first_val))  # "natural type" of the HDF5 dataset
-        x@type
+            return(type(x@first_val))  # "natural" type() of the HDF5 dataset
+        x@type  # user-desired type()
     }
 )
 
@@ -252,35 +253,24 @@ setMethod("dimnames", "HDF5ArraySeed",
 ### extract_array()
 ###
 
-### A thin wrapper around h5mread().
-### TODO: Maybe we no longer need this. I mean, this is used in the
-### extract_array() and extract_sparse_array() methods for HDF5ArraySeed
-### objects but the 'index' passed to these methods should never contain
-### RangeNSBS objects. So it's probably ok to get rid of this and to just
-### use h5mread() instead.
-.h5mread2 <- function(filepath, name, index=NULL,
-                      as.integer=FALSE, as.sparse=FALSE)
+### A thin wrapper to h5mread().
+.h5mread2 <- function(filepath, name, index, desired_type, as.sparse=FALSE)
 {
-    if (!is.null(index))
-        index <- S4Arrays:::expand_Nindex_RangeNSBS(index)
-    h5mread(filepath, name, starts=index,
-            as.vector=FALSE, as.integer=as.integer, as.sparse=as.sparse)
+    as_int <- desired_type == "integer"
+    ## Note that, when 'as.sparse=TRUE', h5mread() returns a COO_SparseArray
+    ## object!
+    ## TODO: Modify h5mread() so that it natively constructs and returns
+    ## an SVT_SparseArray object when 'as.sparse=TRUE'.
+    ans <- h5mread(filepath, name, starts=index,
+                   as.vector=FALSE, as.integer=as_int, as.sparse=as.sparse)
+    if (typeof(ans) != desired_type)
+        type(ans) <- desired_type
+    ans
 }
-
 
 .extract_array_from_HDF5ArraySeed <- function(x, index)
 {
-    ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
-    ## the "type" slot.
-    if (!.hasSlot(x, "type"))
-        return(.h5mread2(x@filepath, x@name, index))
-    ## If the user requested a specific type when HDF5ArraySeed object 'x'
-    ## was constructed then we must return an array of that type.
-    as_int <- !is.na(x@type) && x@type == "integer"
-    ans <- .h5mread2(x@filepath, x@name, index, as.integer=as_int)
-    if (!is.na(x@type) && typeof(ans) != x@type)
-        storage.mode(ans) <- x@type
-    ans
+    .h5mread2(x@filepath, x@name, index, type(x))
 }
 
 setMethod("extract_array", "HDF5ArraySeed", .extract_array_from_HDF5ArraySeed)
@@ -308,36 +298,20 @@ setReplaceMethod("is_sparse", "HDF5ArraySeed",
     }
 )
 
-### Returns a COO_SparseArray object.
-### TODO: Modify h5mread() so that it natively constructs and returns
-### an SVT_SparseArray object when 'as.sparse=TRUE'.
+### Returns an SVT_SparseArray object.
 .extract_sparse_array_from_HDF5ArraySeed <- function(x, index)
 {
     if (!is_sparse(x))
         stop(wmsg("calling extract_sparse_array() on an HDF5ArraySeed ",
                   "object is supported only if the object is sparse"))
-    ## Prior to HDF5Array 1.15.6, HDF5ArraySeed objects didn't have
-    ## the "type" slot.
-    if (!.hasSlot(x, "type"))
-        return(.h5mread2(x@filepath, x@name, index, as.sparse=TRUE))
-    ## If the user requested a specific type when HDF5ArraySeed object 'x'
-    ## was constructed then we must return a COO_SparseArray object of
-    ## that type.
-    as_int <- !is.na(x@type) && x@type == "integer"
-    ## .h5mread2(..., as.sparse=TRUE) returns a COO_SparseArray object.
-    ans <- .h5mread2(x@filepath, x@name, index, as.integer=as_int,
-                                         as.sparse=TRUE)
-    if (!is.na(x@type) && type(ans) != x@type)
-        type(ans) <- x@type
-    ans
+    ## Note that, when 'as.sparse=TRUE', .h5mread2() returns a COO_SparseArray
+    ## object. See .h5mread2() above in this file.
+    coo <- .h5mread2(x@filepath, x@name, index, type(x), as.sparse=TRUE)
+    as(coo, "SVT_SparseArray")
 }
 
 setMethod("extract_sparse_array", "HDF5ArraySeed",
-    function(x, index)
-    {
-        coo <- .extract_sparse_array_from_HDF5ArraySeed(x, index)
-        as(coo, "SVT_SparseArray")
-    }
+    .extract_sparse_array_from_HDF5ArraySeed
 )
 
 
