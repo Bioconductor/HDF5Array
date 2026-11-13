@@ -43,9 +43,9 @@ setClass("TENxMatrixSeed", contains="CSC_H5SparseMatrixSeed")
 ### Constructor
 ###
 
-TENxMatrixSeed <- function(filepath, group="matrix")
+TENxMatrixSeed <- function(filepath, group="matrix", type=NA)
 {
-    seed0 <- H5SparseMatrixSeed(filepath, group)
+    seed0 <- H5SparseMatrixSeed(filepath, group, type=type)
 
     ## dimnames
     rownames <- .load_tenx_rownames(seed0@filepath, seed0@group)

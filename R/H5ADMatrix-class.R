@@ -20,15 +20,15 @@ setMethod("DelayedArray", "H5ADMatrixSeed",
 
 ### Works directly on an H5ADMatrixSeed derivative, in which case it must
 ### be called with a single argument.
-H5ADMatrix <- function(filepath, layer=NULL)
+H5ADMatrix <- function(filepath, layer=NULL, type=NA)
 {
     if (is(filepath, "H5ADMatrixSeed")) {
-        if (!is.null(layer))
+        if (!(missing(layer) && missing(type)))
             stop(wmsg("H5ADMatrix() must be called with a single argument ",
                       "when passed an H5ADMatrixSeed derivative"))
         seed <- filepath
     } else {
-        seed <- H5ADMatrixSeed(filepath, layer=layer)
+        seed <- H5ADMatrixSeed(filepath, layer=layer, type=type)
     }
     DelayedArray(seed)
 }

@@ -16,13 +16,11 @@
 test_H5SparseMatrixSeed <- function()
 {
     set.seed(2009)
-    svt <- poissonSparseMatrix(12, 20, density=0.4) * c(0.1, -0.1)
-    tsvt <- t(svt)
-    m <- as.matrix(svt)
-    dgc <- as(svt, "dgCMatrix")
+    svt <- poissonSparseMatrix(12, 20, density=0.4) * c(1.1, -1.1)
 
     filepath <- tempfile(fileext=".h5")
     rhdf5::h5createFile(filepath)
+    dgc <- as(svt, "dgCMatrix")
     shape <- dim(dgc)
     data <- dgc@x
     indices <- dgc@i
@@ -35,22 +33,30 @@ test_H5SparseMatrixSeed <- function()
     seed1 <- H5SparseMatrixSeed(filepath, "SM1")
     checkIdentical(group(seed1), "/SM1")
 
+    seed2 <- H5SparseMatrixSeed(filepath, "SM1", type="integer")
+    seed3 <- H5SparseMatrixSeed(filepath, "SM1", type="logical")
+
     ## Store nonzero data in "<group>/data/counts" dataset:
     .write_h5_sparse_matrix(filepath, "SM2", shape, data, indices, indptr,
                             subdata="counts")
     checkException(H5SparseMatrixSeed(filepath, "SM2"))
-    seed2 <- H5SparseMatrixSeed(filepath, "SM2", subdata="counts")
-    checkIdentical(group(seed2), "/SM2")
+    seed4 <- H5SparseMatrixSeed(filepath, "SM2", subdata="counts")
+    checkIdentical(group(seed4), "/SM2")
 
     ## Store nonzero data in "<group>/data/flags" dataset.
     ## WARNING: This dataset will actually contain zeros. Is this allowed?
-    ## This kind of breaks 'nzcount(seed3)'. More generally, how will it
-    ## impact the proper operations of H5SparseMatrixSeed 'seed3'?
+    ## This kind of breaks 'nzcount(seed5)'. More generally, how will it
+    ## impact the proper operations of H5SparseMatrixSeed 'seed5'?
     rhdf5::h5write(as.raw(data > 0), filepath, "SM2/data/flags")
-    seed3 <- H5SparseMatrixSeed(filepath, "SM2", subdata="flags")
-    checkIdentical(group(seed3), "/SM2")
+    seed5 <- H5SparseMatrixSeed(filepath, "SM2", subdata="flags")
+    checkIdentical(group(seed5), "/SM2")
 
     ## --- Test the H5SparseMatrixSeed objects ---
+
+    ## Leaving 'seed5' out of this for now.
+    #seeds <- list(seed1, seed2, seed3, seed4, seed5)
+    seeds <- list(seed1, seed2, seed3, seed4)
+    svts <- list(svt, `type<-`(svt, "integer"), `type<-`(svt, "logical"), svt)
 
     index_list <- list(list(NULL, NULL),
                        list(5:8, NULL),
@@ -60,11 +66,13 @@ test_H5SparseMatrixSeed <- function()
                        list(12L, integer(0)),
                        list(c(11:12, 1L), c(4:18, 20:15)))
 
-    ## Leaving 'seed3' out of this for now.
-    #for (seed in list(seed1, seed2, seed3)) {
-    for (seed in list(seed1, seed2)) {
+    for (i in seq_along(seeds)) {
+        seed <- seeds[[i]]
+        svt <- svts[[i]]
+        tsvt <- t(svt)
+
         checkTrue(is(seed, "CSC_H5SparseMatrixSeed"))
-        checkIdentical(path(seed), filepath)
+        checkIdentical(path(seed), h5mread:::normarg_h5_filepath(filepath))
         checkIdentical(dim(seed), dim(svt))
         checkIdentical(chunkdim(seed), c(nrow(svt), 1L))
         checkIdentical(type(seed), type(svt))
@@ -80,7 +88,7 @@ test_H5SparseMatrixSeed <- function()
 
         tseed <- t(seed)
         checkTrue(is(tseed, "CSR_H5SparseMatrixSeed"))
-        checkIdentical(path(tseed), filepath)
+        checkIdentical(path(tseed), h5mread:::normarg_h5_filepath(filepath))
         checkIdentical(group(tseed), group(seed))
         checkIdentical(dim(tseed), rev(dim(svt)))
         checkIdentical(chunkdim(tseed), c(1L, nrow(svt)))

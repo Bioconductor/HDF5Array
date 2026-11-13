@@ -21,6 +21,7 @@
 \alias{path,H5SparseMatrixSeed-method}
 \alias{path<-,H5SparseMatrixSeed-method}
 \alias{group,H5SparseMatrixSeed-method}
+\alias{type,H5SparseMatrixSeed-method}
 \alias{dim,H5SparseMatrixSeed-method}
 \alias{dimnames,H5SparseMatrixSeed-method}
 \alias{chunkdim,CSC_H5SparseMatrixSeed-method}
@@ -62,7 +63,7 @@
 \usage{
 ## --- Constructor function ---
 
-H5SparseMatrixSeed(filepath, group, subdata=NULL,
+H5SparseMatrixSeed(filepath, group, subdata=NULL, type=NA,
                    dim=NULL, sparse.layout=NULL)
 
 ## --- Accessors --------------
@@ -96,11 +97,8 @@ H5SparseMatrixSeed(filepath, group, subdata=NULL,
 }
 
 \arguments{
-  \item{filepath, group}{
+  \item{filepath, group, subdata, type}{
     See \code{?\link{H5SparseMatrix}} for a description of these arguments.
-  }
-  \item{subdata}{
-    Experimental. Don't use!
   }
   \item{dim, sparse.layout}{
     The \code{H5SparseMatrixSeed()} constructor should be able to

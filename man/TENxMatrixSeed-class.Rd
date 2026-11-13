@@ -22,11 +22,11 @@
 
 \usage{
 ## Constructor function:
-TENxMatrixSeed(filepath, group="matrix")
+TENxMatrixSeed(filepath, group="matrix", type=NA)
 }
 
 \arguments{
-  \item{filepath, group}{
+  \item{filepath, group, type}{
     See \code{?\link{TENxMatrix}} for a description of these arguments.
   }
 }

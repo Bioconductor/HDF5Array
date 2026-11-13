@@ -54,11 +54,11 @@
 
 \usage{
 ## Constructor function:
-H5ADMatrixSeed(filepath, layer=NULL)
+H5ADMatrixSeed(filepath, layer=NULL, type=NA)
 }
 
 \arguments{
-  \item{filepath, layer}{
+  \item{filepath, layer, type}{
     See \code{?\link{H5ADMatrix}} for a description of these arguments.
   }
 }

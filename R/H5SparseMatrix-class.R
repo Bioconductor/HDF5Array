@@ -20,15 +20,15 @@ setMethod("DelayedArray", "H5SparseMatrixSeed",
 
 ### Works directly on an H5SparseMatrixSeed derivative, in which case it must
 ### be called with a single argument.
-H5SparseMatrix <- function(filepath, group)
+H5SparseMatrix <- function(filepath, group, subdata=NULL, type=NA)
 {
     if (is(filepath, "H5SparseMatrixSeed")) {
-        if (!missing(group))
+        if (!(missing(group) && missing(subdata) && missing(type)))
             stop(wmsg("H5SparseMatrix() must be called with a single argument ",
                       "when passed an H5SparseMatrixSeed object"))
         seed <- filepath
     } else {
-        seed <- H5SparseMatrixSeed(filepath, group)
+        seed <- H5SparseMatrixSeed(filepath, group, subdata=subdata, type=type)
     }
     DelayedArray(seed)
 }

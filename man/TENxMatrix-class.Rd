@@ -25,7 +25,7 @@
 
 \usage{
 ## Constructor function:
-TENxMatrix(filepath, group="matrix")
+TENxMatrix(filepath, group="matrix", type=NA)
 }
 
 \arguments{
@@ -44,6 +44,13 @@ TENxMatrix(filepath, group="matrix")
   }
   \item{group}{
     The name of the group in the HDF5 file containing the 10x Genomics data.
+  }
+  \item{type}{
+    By default, the \code{\link[DelayedArray]{type}} of the returned
+    object is inferred from the H5 datatype of the HDF5 dataset.
+    This can be overridden by specifying the \code{type} argument.
+    The specified type must be an \emph{R atomic type} (e.g.
+    \code{"integer"}), or \code{"list"}.
   }
 }
 

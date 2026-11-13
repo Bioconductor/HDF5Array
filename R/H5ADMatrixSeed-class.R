@@ -90,7 +90,7 @@ setMethod("t", "CSR_H5ADMatrixSeed", t.CSR_H5ADMatrixSeed)
 
 ### Returns an H5ADMatrixSeed derivative (can be either a Dense_H5ADMatrixSeed,
 ### or a CSC_H5SparseMatrixSeed, or a CSR_H5SparseMatrixSeed object).
-H5ADMatrixSeed <- function(filepath, layer=NULL)
+H5ADMatrixSeed <- function(filepath, layer=NULL, type=NA)
 {
     if (!isSingleString(filepath))
         stop(wmsg("'filepath' must be a single string specifying the ",
@@ -121,7 +121,7 @@ H5ADMatrixSeed <- function(filepath, layer=NULL)
                       "dataset."))
         ans <- new2("Dense_H5ADMatrixSeed", ans0, dimnames=dimnames)
     } else if (h5isgroup(filepath, name)) {
-        ans0 <- H5SparseMatrixSeed(filepath, name)
+        ans0 <- H5SparseMatrixSeed(filepath, name, type=type)
         if (is(ans0, "CSC_H5SparseMatrixSeed"))
             ans_class <- "CSC_H5ADMatrixSeed"
         else

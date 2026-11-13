@@ -67,11 +67,11 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
     the \code{HDF5Array()} constructor.
   }
   \item{type}{
-    By default the \code{\link[DelayedArray]{type}} of the returned
+    By default, the \code{\link[DelayedArray]{type}} of the returned
     object is inferred from the H5 datatype of the HDF5 dataset.
     This can be overridden by specifying the \code{type} argument.
     The specified type must be an \emph{R atomic type} (e.g.
-    \code{"integer"}) or \code{"list"}.
+    \code{"integer"}), or \code{"list"}.
   }
 }
 

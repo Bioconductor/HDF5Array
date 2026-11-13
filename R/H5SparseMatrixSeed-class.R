@@ -25,9 +25,19 @@ setClass("H5SparseMatrixSeed",
         ## name of a dataset in that group. Otherwise, must be set to NULL.
         subdata="character_OR_NULL",
 
+        ## NA or the user-desired type() of the H5SparseMatrixSeed object.
+        ## If set to NA, then type() will return the "natural" type of
+        ## the HDF5 dataset. See type() method below in this file.
+        ## Slot added in HDF5Array 1.41.6.
+        type="character",
+
       ## ---------------- automatically populated slots ----------------
 
         dim="integer",
+
+        ## The "natural" type() of the H5SparseMatrixSeed object.
+        ## Slot added in HDF5Array 1.41.6.
+        natural_type="character",
 
         ## Can't use an IRanges object for this at the moment because IRanges
         ## objects don't support large integer start/end values yet.
@@ -38,6 +48,9 @@ setClass("H5SparseMatrixSeed",
         dimnames="list"
     ),
     prototype(
+        group="/",
+        subdata=NULL,
+        type=NA_character_,
         dimnames=list(NULL, NULL)
     )
 )
@@ -128,6 +141,43 @@ setMethod("group", "H5SparseMatrixSeed",
         if (!startsWith(group, "/"))
             group <- paste0("/", group)
         group
+    }
+)
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### type() getter
+###
+
+### Accesses the HDF5 file.
+.get_sparse_matrix_natural_type <- function(filepath, group, subdata)
+{
+    name <- paste0(group, "/", .get_data_name(subdata))
+    get_h5mread_returned_type(filepath, name)
+}
+
+### Does NOT access the HDF5 file (except for H5SparseMatrixSeed objects
+### created prior to HDF5Array 1.41.6).
+setMethod("type", "H5SparseMatrixSeed",
+    function(x)
+    {
+        ## Prior to HDF5Array 1.41.6, H5SparseMatrixSeed objects didn't have
+        ## the 'type' or 'natural_type' slots.
+        if (!.hasSlot(x, "type")) {
+            ## Note that doing 'natural_type <- callNextMethod()' would do
+            ## the job. It would call the default type() method defined in
+            ## the S4Arrays package, and, after a long succession of nested
+            ## calls, this would end up calling h5mread() to access the HDF5
+            ## file, even if there's no data to read. However, calling
+            ## .get_sparse_matrix_natural_type() is about 4 times faster
+            ## as it bypasses all these contorsions.
+            natural_type <-
+                .get_sparse_matrix_natural_type(x@filepath, x@group, x@subdata)
+            return(natural_type)
+        }
+        if (is.na(x@type))
+            return(x@natural_type)
+        x@type  # user-desired type()
     }
 )
 
@@ -236,10 +286,14 @@ read_h5sparse_component <- function(filepath, group, name,
     read_h5sparse_component(filepath, group, "indptr")
 
 .read_h5sparse_data <-
-    function(filepath, group, subdata, start=NULL, count=NULL)
+    function(filepath, group, subdata, desired_type, start=NULL, count=NULL)
 {
     name <- .get_data_name(subdata)
-    read_h5sparse_component(filepath, group, name, start=start, count=count)
+    ans <- read_h5sparse_component(filepath, group, name,
+                                   start=start, count=count)
+    if (type(ans) != desired_type)
+        type(ans) <- desired_type
+    ans
 }
 
 ### The row (or column) indices stored in HDF5 dataset "indices" are 0-based
@@ -360,7 +414,7 @@ read_h5sparse_component <- function(filepath, group, name,
 
 ### Returns an H5SparseMatrixSeed derivative (can be either a
 ### CSC_H5SparseMatrixSeed or CSR_H5SparseMatrixSeed object).
-H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
+H5SparseMatrixSeed <- function(filepath, group, subdata=NULL, type=NA,
                                dim=NULL, sparse.layout=NULL)
 {
     ## Check 'filepath', 'group', and 'subdata'.
@@ -373,6 +427,18 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
                                   what3=" that stores the sparse matrix")
     .check_group(filepath, group)
     .check_data_and_subdata(filepath, group, subdata)
+
+    ## Check 'type'.
+    if (!isSingleStringOrNA(type))
+        stop(wmsg("'type' must be a single string or NA"))
+    if (is.na(type)) {
+        type <- as.character(type)
+    } else {
+        type <- S4Arrays:::normarg_array_type(type)
+    }
+
+    ## Get "natural" type.
+    natural_type <- .get_sparse_matrix_natural_type(filepath, group, subdata)
 
     ## Get matrix dimensions.
     dim <- .get_sparse_matrix_dim(filepath, group, dim=dim)
@@ -405,8 +471,9 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
     indptr_ranges <- data.frame(start=indptr[-length(indptr)] + 1,
                                 width=as.integer(diff(indptr)))
 
-    new2(ans_class, filepath=filepath, group=group, subdata=subdata,
-                    dim=dim, indptr_ranges=indptr_ranges)
+    new2(ans_class, filepath=filepath, group=group, subdata=subdata, type=type,
+                    dim=dim, natural_type=natural_type,
+                    indptr_ranges=indptr_ranges)
 }
 
 
@@ -465,7 +532,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
             count <- x@indptr_ranges[j, "width"]
         }
         ans_data <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
-                                        start=start, count=count)
+                                        type(x), start=start, count=count)
         ans_row_indices <- .read_h5sparse_indices(x@filepath, x@group,
                                         start=start, count=count)
         ans <- SparseArray:::make_SVT_SparseMatrix_from_CSC(ans_dim,
@@ -604,7 +671,7 @@ setMethod("show", "H5SparseMatrixSeed",
     count_per_col <- x@indptr_ranges[j12, "width"]
     count <- sum(count_per_col)
     ans_nzdata <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
-                                      start=start, count=count)
+                                      type(x), start=start, count=count)
     relist(ans_nzdata, PartitioningByWidth(count_per_col))
 }
 
@@ -639,7 +706,8 @@ setMethod("show", "H5SparseMatrixSeed",
 {
     data_indices <- .get_data_indices_by_col(x, j)
     idx2 <- unlist(data_indices, use.names=FALSE)
-    data <- .read_h5sparse_data(x@filepath, x@group, x@subdata, start=idx2)
+    data <- .read_h5sparse_data(x@filepath, x@group, x@subdata,
+                                type(x), start=idx2)
     relist(data, data_indices)
 }
 

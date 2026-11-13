@@ -214,11 +214,7 @@ setMethod("group", "HDF5ArraySeed",
 ### type() getter
 ###
 
-### The default type() method (defined in the S4Arrays package) would do
-### the job but it's based on S4Arrays:::extract_empty_array() which calls
-### h5mread::h5mread() to access the HDF5 file even if there's no data to read.
-### This is not particularly efficient. So we override it with a method that
-### does NOT access the HDF5 file.
+### Does NOT access the HDF5 file.
 setMethod("type", "HDF5ArraySeed",
     function(x)
     {
@@ -263,7 +259,7 @@ setMethod("dimnames", "HDF5ArraySeed",
     ## an SVT_SparseArray object when 'as.sparse=TRUE'.
     ans <- h5mread(filepath, name, starts=index,
                    as.vector=FALSE, as.integer=as_int, as.sparse=as.sparse)
-    if (typeof(ans) != desired_type)
+    if (type(ans) != desired_type)
         type(ans) <- desired_type
     ans
 }
@@ -342,11 +338,8 @@ HDF5ArraySeed <- function(filepath, name, as.sparse=FALSE, type=NA)
         stop(wmsg("'type' must be a single string or NA"))
     if (is.na(type)) {
         type <- as.character(type)
-    } else if (type != "list") {
-        tmp <- try(vector(type), silent=TRUE)
-        if (inherits(tmp, "try-error") || !is.atomic(tmp))
-            stop(wmsg("'type' must be an R atomic type ",
-                      "(e.g. \"integer\") or \"list\""))
+    } else {
+        type <- S4Arrays:::normarg_array_type(type)
     }
 
     dim <- h5dim(filepath, name)
