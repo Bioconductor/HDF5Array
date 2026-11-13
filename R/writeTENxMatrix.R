@@ -76,37 +76,6 @@
     h5append(filepath, name, 0)
 }
 
-### The current length of 'indptr' is the "current 1-based column index"
-### i.e. the nb of columns written so far + 1.
-.get_current_col_index <- function(filepath, group)
-{
-    h5length(filepath, paste0(group, "/indptr"))
-}
-
-.append_data <- function(filepath, group, data)
-{
-    name <- paste0(group, "/data")
-    h5append(filepath, name, data)
-}
-
-.append_row_indices <- function(filepath, group, row_indices)
-{
-    name <- paste0(group, "/indices")
-    h5append(filepath, name, row_indices)
-}
-
-### Return the last value in the extended "indptr" dataset.
-.append_indptr <- function(filepath, group, block_indptr)
-{
-    name <- paste0(group, "/indptr")
-    old_len <- h5length(filepath, name)
-    old_data_len <- h5mread(filepath, name, starts=list(old_len),
-                            as.vector=TRUE)
-    indptr <- as.double(old_data_len) + block_indptr
-    new_len <- h5append(filepath, name, indptr)
-    h5mread(filepath, name, starts=list(new_len), as.vector=TRUE)
-}
-
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### TENxRealizationSink objects
@@ -143,13 +112,10 @@ setMethod("type", "TENxRealizationSink", function(x) x@type)
 TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
                                 filepath=NULL, group=NULL, level=NULL)
 {
-    if (!is.integer(dim))
-        stop(wmsg("'dim' must be an integer vector"))
+    dim <- S4Arrays:::normarg_dim(dim)
     if (length(dim) != 2L)
         stop(wmsg("TENxMatrix backend only supports ",
                   "realization of matrix-like objects"))
-    if (S4Vectors:::anyMissingOrOutside(dim, 0L))
-        stop(wmsg("'dim' cannot contain NAs or negative values"))
     if (is.null(dimnames)) {
         dimnames <- vector("list", length(dim))
     } else {
@@ -203,48 +169,88 @@ setMethod("chunkdim", "TENxRealizationSink",
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### Writing data to a TENxRealizationSink object
+### write_block() and close() methods for TENxRealizationSink objects
 ###
+
+### The current length of 'indptr' is the "current 1-based column index"
+### i.e. the nb of columns written so far + 1.
+.get_current_col_index <- function(filepath, group)
+{
+    h5length(filepath, paste0(group, "/indptr"))
+}
 
 .check_viewport <- function(viewport, sink)
 {
-    if (!identical(nrow(viewport), nrow(sink)))
-        stop(wmsg("The \"write_block\" method for ", class(sink), " objects ",
+    if (!identical(nrow(viewport), nrow(sink))) {
+        s <- S4Arrays:::make_string_from_ArrayViewport(viewport,
+                                                       with.brackets=TRUE)
+        stop(wmsg("Invalid viewport passed to write_block(): ", s),
+             "\n\n  ",
+             wmsg("The write_block() method for ", class(sink), " objects ",
                   "can only be used to write a block to a viewport that ",
-                  "spans full columns i.e. to a viewport such that ",
-                  "'nrow(viewport) == nrow(sink)'."))
-
+                  "spans full columns, that is, to a viewport for which ",
+                  "'nrow(viewport)' is equal to 'nrow(sink)'."))
+    }
     current_col_idx <- .get_current_col_index(sink@filepath, sink@group)
-    if (!identical(start(viewport)[[2L]], current_col_idx))
-        stop(wmsg("The block to write is not adjacent to the last ",
-                  "written block.\n\n",
-                  "The \"write_block\" method for ", class(sink), " objects ",
-                  "can only be used in \"appending mode\", that is, each ",
-                  "block must be written to a viewport that is adjacent to ",
-                  "the viewport where the previous block was written (with ",
-                  "the exception of the 1st written block which must be ",
-                  "written to a viewport that starts at the beginning of ",
-                  "the sink)."))
+    if (!identical(start(viewport)[[2L]], current_col_idx)) {
+        s <- S4Arrays:::make_string_from_ArrayViewport(viewport,
+                                                       with.brackets=TRUE)
+        stop(wmsg("Invalid viewport passed to write_block(): ", s),
+             "\n\n  ",
+             wmsg("The block to write must start at the beginning of the ",
+                  "sink or be adjacent to the previously written block."),
+             "\n\n  ",
+             wmsg("The write_block() method for ", class(sink), " objects ",
+                  "can only be used in \"append block mode\", that is, the ",
+                  "first block written to the sink must be written at the ",
+                  "beginning of the sink and any subsequent block must be ",
+                  "written to a viewport that is adjacent to the viewport ",
+                  "where the previous block was written."))
+    }
 }
 
-### Support "appending mode" only.
+.append_data <- function(filepath, group, data)
+{
+    name <- paste0(group, "/data")
+    h5append(filepath, name, data)
+}
+
+.append_row_indices <- function(filepath, group, row_indices)
+{
+    name <- paste0(group, "/indices")
+    h5append(filepath, name, row_indices)
+}
+
+### Returns the last value in the updated "indptr" dataset.
+.append_indptr <- function(filepath, group, block_indptr)
+{
+    name <- paste0(group, "/indptr")
+    old_len <- h5length(filepath, name)
+    old_data_len <- h5mread(filepath, name, starts=list(old_len),
+                            as.vector=TRUE)
+    indptr <- as.double(old_data_len) + block_indptr
+    h5append(filepath, name, indptr)
+    indptr[[length(indptr)]]
+}
+
+### Supports "append block mode" only.
 setMethod("write_block", "TENxRealizationSink",
     function(sink, viewport, block)
     {
         .check_viewport(viewport, sink)
-        if (!is(block, "COO_SparseArray"))
-            block <- as(block, "COO_SparseArray")
+        nzdata <- nzvals(block)
+        Mindex <- nzwhich(block, arr.ind=TRUE)
 
         ## Append the nonzero data.
-        new_data_len1 <- .append_data(sink@filepath, sink@group, block@nzdata)
+        new_data_len1 <- .append_data(sink@filepath, sink@group, nzdata)
 
         ## Append the 0-based row indices of the nonzero data.
         new_data_len2 <- .append_row_indices(sink@filepath, sink@group,
-                                             block@nzcoo[ , 1L] - 1L)
+                                             Mindex[ , 1L] - 1L)
         stopifnot(new_data_len2 == new_data_len1)  # sanity check
 
         ## Append the "indptr" values.
-        partitioning <- PartitioningByEnd(block@nzcoo[ , 2L], NG=ncol(block))
+        partitioning <- PartitioningByEnd(Mindex[ , 2L], NG=ncol(block))
         block_indptr <- end(partitioning)  # sorted integer vector
         new_data_len3 <- .append_indptr(sink@filepath, sink@group, block_indptr)
         stopifnot(new_data_len3 == new_data_len1)  # sanity check
@@ -288,7 +294,7 @@ setAs("TENxRealizationSink", "DelayedArray",
 
 ### Write the dataset to the current dump if 'filepath' and 'group' are not
 ### specified.
-### Return a TENxMatrix object pointing to the newly written HDF5-based
+### Returns a TENxMatrix object pointing to the newly written HDF5-based
 ### sparse matrix on disk.
 writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
                                level=NULL, verbose=NA)

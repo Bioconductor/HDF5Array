@@ -36,8 +36,9 @@ HDF5Array(filepath, name, as.sparse=FALSE, type=NA)
 
 \arguments{
   \item{filepath}{
-    The path (as a single string or \link[h5mread]{H5File} object) to the
-    HDF5 file (\code{.h5} or \code{.h5ad}) where the dataset is located.
+    The path (as a single string) to the HDF5 file (\code{.h5} or \code{.h5ad})
+    where the dataset is located.
+    Can also be an \link[h5mread]{H5File} object.
 
     Note that you must create and use an \link[h5mread]{H5File} object if
     the HDF5 file to access is stored in an Amazon S3 bucket.

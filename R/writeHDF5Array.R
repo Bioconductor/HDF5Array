@@ -85,6 +85,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
                                 H5type=NULL, size=NULL,
                                 chunkdim=NULL, level=NULL)
 {
+    dim <- S4Arrays:::normarg_dim(dim)
     if (!isTRUEorFALSE(as.sparse))
         stop(wmsg("'as.sparse' must be TRUE or FALSE"))
     if (is.null(filepath)) {

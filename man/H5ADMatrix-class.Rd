@@ -38,6 +38,15 @@ H5ADMatrix(filepath, layer=NULL)
 \arguments{
   \item{filepath}{
     The path (as a single string) to the \code{h5ad} file.
+    Can also be an \link[h5mread]{H5File} object.
+
+    Note that you must create and use an \link[h5mread]{H5File} object if
+    the HDF5 file to access is stored in an Amazon S3 bucket.
+    See \code{?\link[h5mread]{H5File}} in the \pkg{h5mread} package for
+    how to do this.
+
+    Also please note that \link[h5mread]{H5File} objects must NOT be used
+    in the context of parallel evaluation at the moment.
   }
   \item{layer}{
     \code{NULL} (the default) or the name of a matrix in the \code{/layers}

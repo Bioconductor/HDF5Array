@@ -8,21 +8,24 @@ setClass("H5SparseMatrixSeed",
     representation(
         "VIRTUAL",
 
-    ## --------------------- user supplied slots ---------------------
+      ## --------------------- user supplied slots ---------------------
 
-        ## Absolute path to the HDF5 file so the object won't break when
-        ## the user changes the working directory (e.g. with 'setwd()').
-        filepath="character",
+        ## **Absolute** path to a local HDF5 file so the object won't break
+        ## when the user changes the working directory (e.g. with setwd()).
+        ## The path must also be in its canonical form so comparing paths
+        ## from different objects is meaningful.
+        ## Can also be an H5File object.
+        filepath="character_OR_H5File",
 
-        ## Name of the group in the HDF5 file where the sparse matrix is
-        ## stored.
+        ## The name of the group in the HDF5 file where the sparse matrix
+        ## is stored.
         group="character",
 
-        ## If 'paste0(group, "/data")' is a group, name of a dataset in
-        ## that group. Otherwise, must be set to NULL.
+        ## If 'paste0(group, "/data")' is a group, then 'subdata' is the
+        ## name of a dataset in that group. Otherwise, must be set to NULL.
         subdata="character_OR_NULL",
 
-    ## ---------------- automatically populated slots ----------------
+      ## ---------------- automatically populated slots ----------------
 
         dim="integer",
 
@@ -37,7 +40,7 @@ setClass("H5SparseMatrixSeed",
         ## from the file. Slot added in HDF5Array (FILL OUT VERSION HERE!).
         type="character",
 
-    ## ------------- populated by specialized subclasses -------------
+      ## ------------- populated by specialized subclasses -------------
 
         dimnames="list"
     ),
@@ -90,8 +93,16 @@ setMethod("t", "CSR_H5SparseMatrixSeed", t.CSR_H5SparseMatrixSeed)
 ### path() getter/setter
 ###
 
-### Does NOT access the file.
-setMethod("path", "H5SparseMatrixSeed", function(object) object@filepath)
+### Does NOT access the HDF5 file.
+setMethod("path", "H5SparseMatrixSeed",
+    function(object)
+    {
+        filepath <- object@filepath
+        if (is(filepath, "H5File"))
+            filepath <- path(filepath)
+        filepath
+    }
+)
 
 ### Just a placeholder for now. Doesn't actually allow changing the path of
 ### the object yet.
@@ -164,7 +175,7 @@ setMethod("type", "H5SparseMatrixSeed",
 ### chunkdim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("chunkdim", "CSC_H5SparseMatrixSeed",
     function(x) c(nrow(x), min(ncol(x), 1L))
 )
@@ -212,7 +223,7 @@ read_h5sparse_component <- function(filepath, group, name,
         return(read_h5sparse_component(filepath, group, "shape"))
     }
     ## h5ad format
-    h5attrs <- h5readAttributes(filepath, group)
+    h5attrs <- h5readattribs(filepath, group)
     shape <- h5attrs$shape
     if (is.null(shape))
         shape <- h5attrs$h5sparse_shape
@@ -233,7 +244,7 @@ read_h5sparse_component <- function(filepath, group, name,
         return("csr")
     }
     ## h5ad format
-    h5attrs <- h5readAttributes(filepath, group)
+    h5attrs <- h5readattribs(filepath, group)
     h5sparse_layout <- h5attrs[["encoding-type"]]
     if (is.null(h5sparse_layout))
         h5sparse_layout <- h5attrs[["h5sparse_format"]]
@@ -333,7 +344,10 @@ read_h5sparse_component <- function(filepath, group, name,
     if (is.null(dim)) {
         dim <- .read_h5sparse_dim(filepath, group)
         stopifnot(length(dim) == 2L)
-        return(dim_as_integer(dim, filepath, group, what="sparse matrix"))
+        stop_if_big_h5_dimensions(dim, filepath, group,
+                            of_what="HDF5 sparse matrix",
+                            about_what="HDF5 sparse matrix stored in group")
+        return(as.integer(dim))
     }
     ## Check user-supplied 'dim'.
     if (!is.numeric(dim) || length(dim) != 2L || anyNA(dim))
@@ -376,8 +390,9 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
                                dim=NULL, sparse.layout=NULL)
 {
     ## Check 'filepath', 'group', and 'subdata'.
-    filepath <- h5mread:::normarg_h5_filepath(filepath,
-                                  what2="the sparse matrix")
+    if (!is(filepath, "H5File"))
+        filepath <- h5mread:::normarg_h5_filepath(filepath,
+                                         what2="the sparse matrix")
     group <- h5mread:::normarg_h5_name(group,
                                   what1="'group'",
                                   what2="the name of the group",
@@ -534,6 +549,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
 ### extract_sparse_array() and extract_array() methods
 ###
 
+### Returns an SVT_SparseMatrix object.
 .extract_sparse_array_from_CSC_H5SparseMatrixSeed <- function(x, index)
 {
     j <- index[[2L]]
@@ -550,7 +566,7 @@ H5SparseMatrixSeed <- function(filepath, group, subdata=NULL,
     index2 <- list(index[[1L]], NULL)
     if (!is.null(j) && sort_j)
         index2[[2L]] <- match(j0, j)
-    extract_sparse_array(svt, index2)
+    extract_sparse_array(svt, index2)  # SVT_SparseMatrix object
 }
 
 setMethod("extract_sparse_array", "CSC_H5SparseMatrixSeed",

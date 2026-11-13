@@ -23,7 +23,7 @@ setClass("ReshapedHDF5ArraySeed",
 ### dim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("dim", "ReshapedHDF5ArraySeed", function(x) x@reshaped_dim)
 
 
@@ -46,7 +46,7 @@ setMethod("extract_array", "ReshapedHDF5ArraySeed",
 ### chunkdim() getter
 ###
 
-### Does NOT access the file.
+### Does NOT access the HDF5 file.
 setMethod("chunkdim", "ReshapedHDF5ArraySeed", function(x) x@reshaped_chunkdim)
 
 
