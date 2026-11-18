@@ -170,12 +170,12 @@ setAs("HDF5RealizationSink", "DelayedArray",
 ### writeHDF5Array()
 ###
 
-### If 'filepath' and 'name' are NULL (the default), write the dataset to
+### If 'filepath' and 'name' are NULL (the default), writes the dataset to
 ### the current dump.
 ### If 'chunkdim' is NULL, an automatic chunk geometry will be used.
 ### To write "unchunked data" (a.k.a. contiguous data), 'chunkdim' must be
 ### set to 0.
-### Return an HDF5Array object pointing to the newly written HDF5 dataset
+### Returns an HDF5Array object pointing to the newly written HDF5 dataset
 ### on disk.
 writeHDF5Array <- function(x, filepath=NULL, name=NULL,
                               H5type=NULL, chunkdim=NULL, level=NULL,

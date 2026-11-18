@@ -36,7 +36,8 @@
 }
 
 \usage{
-writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
+writeTENxMatrix(x, filepath=NULL, group=NULL,
+                   H5type=NULL, level=NULL, verbose=NA)
 }
 
 \arguments{
@@ -61,6 +62,14 @@ writeTENxMatrix(x, filepath=NULL, group=NULL, level=NULL, verbose=NA)
     \code{NULL} or the name of the HDF5 group where to write the data.
     If \code{NULL}, then the name returned by \code{\link{getHDF5DumpName}}
     will be used.
+  }
+  \item{H5type}{
+    The H5 datatype to use to store the matrix data on disk is automatically
+    inferred from the type of \code{x} (\code{type(x)}). Advanced users can
+    override this by specifying the H5 datatype they want via the \code{H5type}     argument.
+
+    See \code{?\link{writeHDF5Array}} for more information about this
+    argument.
   }
   \item{level}{
     The compression level to use for writing the data to disk.

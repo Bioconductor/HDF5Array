@@ -55,10 +55,10 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
     will be used.
   }
   \item{H5type}{
-    The H5 datatype to use for the HDF5 dataset to be written to the HDF5
-    file is automatically inferred from the type of \code{x} (\code{type(x)}).
-    Advanced users can override this by specifying the H5 datatype they want
-    via the \code{H5type} argument.
+    The H5 datatype to use to store the matrix data on disk is automatically
+    inferred from the type of \code{x} (\code{type(x)}). Advanced users can
+    override this by specifying the H5 datatype they want via the \code{H5type}
+    argument.
 
     See \code{rhdf5::h5const("H5T")} for a list of available H5 datatypes.
     See References section below for the link to the HDF Group's Support
@@ -66,13 +66,22 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
 
     A typical use case is to use a datatype that is smaller than the
     automatic one in order to reduce the size of the dataset on disk.
+
     For example you could use \code{"H5T_IEEE_F32LE"} when \code{type(x)}
-    is \code{"double"} and you don't care about preserving the precision
+    is \code{"double"} and when you don't care about preserving the precision
     of 64-bit floating-point numbers (the automatic H5 datatype used for
     \code{"double"} is \code{"H5T_IEEE_F64LE"}).
+
     Another example is to use \code{"H5T_STD_U16LE"} when \code{x} contains
     small non-negative integer values like counts (the automatic H5
     datatype used for \code{"integer"} is \code{"H5T_STD_I32LE"}).
+
+    Finally, another example is to use \code{"H5T_NATIVE_UINT32"} when
+    \code{x} contains non-negative integer values that can be greater than
+    \code{.Machine$integer.max} (i.e. >= 2^31) while still remaining lower
+    than 2^32. In this case, \code{x} must be of type \code{"double"} but
+    it makes sense to use an unsigned integer type to store the matrix
+    values on disk.
   }
   \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.

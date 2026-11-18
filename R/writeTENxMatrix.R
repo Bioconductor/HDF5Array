@@ -49,11 +49,12 @@
                           chunk.length=4096L)
 }
 
-.create_empty_data <- function(filepath, group, maxlen, type, level)
+.create_empty_data <- function(filepath, group, maxlen, type, H5type, level)
 {
     name <- paste0(group, "/data")
     create_and_log_HDF5_dataset(filepath, name, dim=0L, maxdim=maxlen,
-                                type=type, chunkdim=16384L, level=level)
+                                type=type, H5type=H5type,
+                                chunkdim=16384L, level=level)
 }
 
 .create_empty_row_indices <- function(filepath, group, maxlen, level)
@@ -110,7 +111,8 @@ setMethod("dimnames", "TENxRealizationSink",
 setMethod("type", "TENxRealizationSink", function(x) x@type)
 
 TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
-                                filepath=NULL, group=NULL, level=NULL)
+                                filepath=NULL, group=NULL,
+                                H5type=NULL, level=NULL)
 {
     dim <- S4Arrays:::normarg_dim(dim)
     if (length(dim) != 2L)
@@ -152,7 +154,7 @@ TENxRealizationSink <- function(dim, dimnames=NULL, type="double",
         if (!is.null(colnames))
             .write_barcodes(filepath, group, colnames)
     }
-    .create_empty_data(filepath, group, prod(dim), type, level)
+    .create_empty_data(filepath, group, prod(dim), type, H5type, level)
     .create_empty_row_indices(filepath, group, prod(dim), level)
     .create_empty_indptr(filepath, group, dim[[2L]])
     new2("TENxRealizationSink", dim=dim, dimnames=dimnames, type=type,
@@ -292,16 +294,17 @@ setAs("TENxRealizationSink", "DelayedArray",
 ### writeTENxMatrix()
 ###
 
-### Write the dataset to the current dump if 'filepath' and 'group' are not
-### specified.
+### If 'filepath' and 'group' are NULL (the default), writes the dataset to
+### the current dump.
 ### Returns a TENxMatrix object pointing to the newly written HDF5-based
 ### sparse matrix on disk.
 writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
-                               level=NULL, verbose=NA)
+                               H5type=NULL, level=NULL, verbose=NA)
 {
     verbose <- DelayedArray:::normarg_verbose(verbose)
     sink <- TENxRealizationSink(dim(x), dimnames(x), type(x),
-                                filepath=filepath, group=group, level=level)
+                                filepath=filepath, group=group,
+                                H5type=H5type, level=level)
     sink <- BLOCK_write_to_sink(sink, x, verbose=verbose)
     ans <- as(sink, "TENxMatrix")
     if (verbose)
