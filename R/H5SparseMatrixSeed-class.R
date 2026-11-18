@@ -289,8 +289,9 @@ read_h5sparse_component <- function(filepath, group, name,
     function(filepath, group, subdata, desired_type, start=NULL, count=NULL)
 {
     name <- .get_data_name(subdata)
+    as_int <- desired_type == "integer"
     ans <- read_h5sparse_component(filepath, group, name,
-                                   start=start, count=count)
+                                   start=start, count=count, as.integer=as_int)
     if (type(ans) != desired_type)
         type(ans) <- desired_type
     ans
