@@ -176,39 +176,17 @@ setMethod("chunkdim", "TENxRealizationSink",
 
 ### The current length of 'indptr' is the "current 1-based column index"
 ### i.e. the nb of columns written so far + 1.
-.get_current_col_index <- function(filepath, group)
+.get_current_col_idx <- function(filepath, group)
 {
     h5length(filepath, paste0(group, "/indptr"))
 }
 
 .check_viewport <- function(viewport, sink)
 {
-    if (!identical(nrow(viewport), nrow(sink))) {
-        s <- S4Arrays:::make_string_from_ArrayViewport(viewport,
-                                                       with.brackets=TRUE)
-        stop(wmsg("Invalid viewport passed to write_block(): ", s),
-             "\n\n  ",
-             wmsg("The write_block() method for ", class(sink), " objects ",
-                  "can only be used to write a block to a viewport that ",
-                  "spans full columns, that is, to a viewport for which ",
-                  "'nrow(viewport)' is equal to 'nrow(sink)'."))
-    }
-    current_col_idx <- .get_current_col_index(sink@filepath, sink@group)
-    if (!identical(start(viewport)[[2L]], current_col_idx)) {
-        s <- S4Arrays:::make_string_from_ArrayViewport(viewport,
-                                                       with.brackets=TRUE)
-        stop(wmsg("Invalid viewport passed to write_block(): ", s),
-             "\n\n  ",
-             wmsg("The block to write must start at the beginning of the ",
-                  "sink or be adjacent to the previously written block."),
-             "\n\n  ",
-             wmsg("The write_block() method for ", class(sink), " objects ",
-                  "can only be used in \"append block mode\", that is, the ",
-                  "first block written to the sink must be written at the ",
-                  "beginning of the sink and any subsequent block must be ",
-                  "written to a viewport that is adjacent to the viewport ",
-                  "where the previous block was written."))
-    }
+    S4Arrays:::stop_if_viewport_on_2D_sink_is_not_full_height(sink, viewport)
+    current_col_idx <- .get_current_col_idx(sink@filepath, sink@group)
+    S4Arrays:::stop_if_viewport_on_2D_sink_is_not_adj_to_prev(sink, viewport,
+                                                              current_col_idx)
 }
 
 .append_data <- function(filepath, group, data)
@@ -264,10 +242,10 @@ setMethod("write_block", "TENxRealizationSink",
 setMethod("close", "TENxRealizationSink",
     function(con)
     {
-        current_col_idx <- .get_current_col_index(con@filepath, con@group)
+        current_col_idx <- .get_current_col_idx(con@filepath, con@group)
         if (current_col_idx <= ncol(con))
             stop(wmsg("cannot close ", class(con), " object before ",
-                      "writing all data to it"))
+                      "writing all data blocks to it"))
         stopifnot(current_col_idx == ncol(con) + 1L)  # should never happen
     }
 )
@@ -277,8 +255,14 @@ setMethod("close", "TENxRealizationSink",
 ### Coercing a TENxRealizationSink object
 ###
 
+### Calls close() on the TENxRealizationSink object before turning it
+### into a TENxMatrixSeed object.
 setAs("TENxRealizationSink", "TENxMatrixSeed",
-    function(from) TENxMatrixSeed(from@filepath, from@group)
+    function(from)
+    {
+        close(from)
+        TENxMatrixSeed(from@filepath, from@group, type=type(from))
+    }
 )
 
 setAs("TENxRealizationSink", "TENxMatrix",
@@ -306,7 +290,7 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
                                 filepath=filepath, group=group,
                                 H5type=H5type, level=level)
     sink <- BLOCK_write_to_sink(sink, x, verbose=verbose)
-    ans <- as(sink, "TENxMatrix")
+    ans <- as(sink, "TENxMatrix")  # will call close() on 'sink'
     if (verbose)
         message("sparsity: ", round(sparsity(ans), digits=2))
     ans
@@ -316,14 +300,16 @@ writeTENxMatrix <- function(x, filepath=NULL, group=NULL,
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Coercion to TENxMatrix
 ###
-### The methods below write the object to disk. Note that coercion from
-### TENxRealizationSink to TENxMatrix is already taken care of by the specific
-### method above and doesn't write anything to disk. So coercing to TENxMatrix
-### in general writes the object to disk *except* when the object to coerce is
-### a TENxRealizationSink object.
+### The methods below realize any matrix-like object to disk as a
+### TENxMatrix object.
+### Note that coercion from TENxRealizationSink to TENxMatrix is already
+### taken care of by the specific method above and it doesn't write anything
+### to disk. So coercing to TENxMatrix in general writes the matrix data to
+### disk (and will use block-processing if needed) *except* when the object
+### to coerce is a TENxRealizationSink object.
 ###
 
-### Write to current dump.
+### Writes to current dump.
 .as_TENxMatrix <- function(from) writeTENxMatrix(from)
 
 setAs("ANY", "TENxMatrix", .as_TENxMatrix)

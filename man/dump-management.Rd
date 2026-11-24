@@ -13,6 +13,8 @@
 \alias{setHDF5DumpName}
 \alias{getHDF5DumpName}
 
+\alias{setHDF5DumpChunkSize}
+\alias{getHDF5DumpChunkSize}
 \alias{setHDF5DumpChunkLength}
 \alias{getHDF5DumpChunkLength}
 \alias{setHDF5DumpChunkShape}
@@ -36,14 +38,15 @@
 setHDF5DumpDir(dir)
 setHDF5DumpFile(filepath)
 setHDF5DumpName(name)
-setHDF5DumpChunkLength(length=1000000L)
+setHDF5DumpChunkSize(size=1000000L)
 setHDF5DumpChunkShape(shape="scale")
 setHDF5DumpCompressionLevel(level=6L)
 
 getHDF5DumpDir()
 getHDF5DumpFile()
 getHDF5DumpName(for.use=FALSE)
-getHDF5DumpChunkLength()
+getHDF5DumpChunkSize()
+getHDF5DumpChunkLength(type)
 getHDF5DumpChunkShape()
 getHDF5DumpCompressionLevel()
 
@@ -52,7 +55,7 @@ lsHDF5DumpFile()
 showHDF5DumpLog()
 
 ## For developers:
-getHDF5DumpChunkDim(dim)
+getHDF5DumpChunkDim(dim, type)
 appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
                                    chunkdim, level)
 }
@@ -86,9 +89,10 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     For \code{appendDatasetCreationToHDF5DumpLog}:
     See the Note TO DEVELOPERS below.
   }
-  \item{length}{
-    The maximum length of the physical chunks of the \emph{next automatic
-    HDF5 dataset} to be written to the current \emph{HDF5 dump file}.
+  \item{size}{
+    The maximum size (in bytes, before compression) of the physical chunks
+    of the \emph{next automatic HDF5 dataset} to be written to the current
+    \emph{HDF5 dump file}.
   }
   \item{shape}{
     A string specifying the shape of the physical chunks of the \emph{next
@@ -111,21 +115,21 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     Whether the returned dataset name is for use by the caller or not.
     See below for the details.
   }
+  \item{type}{
+    The type (a.k.a. storage mode) of the data to be written to disk. Can be
+    obtained with \code{\link[S4Arrays]{type}()} on an array-like object
+    (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
+    ordinary array). This is typically what an application writing datasets
+    to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
+    of its call to \code{rhdf5::\link[rhdf5]{h5createDataset}}.
+    See the Note TO DEVELOPERS below for more information.
+  }
   \item{dim}{
     The dimensions of the HDF5 dataset to be written to disk, that is,
     an integer vector of length one or more giving the maximal indices in each
     dimension.
     See the \code{dims} argument in \code{?rhdf5::\link[rhdf5]{h5createDataset}}
     (in the \pkg{rhdf5} package) for more information about this.
-  }
-  \item{type}{
-    The type (a.k.a. storage mode) of the data to be written to disk. Can be
-    obtained with \code{\link[DelayedArray]{type}()} on an array-like object
-    (which is equivalent to \code{storage.mode()} or \code{typeof()} on an
-    ordinary array). This is typically what an application writing datasets
-    to the \emph{HDF5 dump} should pass to the \code{storage.mode} argument
-    of its call to \code{rhdf5::\link[rhdf5]{h5createDataset}}.
-    See the Note TO DEVELOPERS below for more information.
   }
   \item{chunkdim}{
     The dimensions of the chunks.
@@ -177,9 +181,9 @@ appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
     \item Get a file/dataset name combination by calling
           \code{getHDF5DumpFile()} and \code{getHDF5DumpName(for.use=TRUE)}.
 
-    \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim)} to get reasonable
-          chunk dimensions to use for writing the dataset to disk. Or choose
-          your own chunk dimensions.
+    \item [OPTIONAL] Call \code{getHDF5DumpChunkDim(dim, type)} to get
+          reasonable chunk dimensions to use for writing the dataset to disk.
+          Or choose your own chunk dimensions.
 
     \item Add an entry to the dump log by calling
           \code{appendDatasetCreationToHDF5DumpLog}.

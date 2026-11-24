@@ -1,3 +1,94 @@
+
+test_HDF5RealizationSink <- function()
+{
+    checkTrue(extends("HDF5RealizationSink", "RealizationSink"))
+
+    ## --- Some edge cases (0 columns or 0 rows) ---
+
+    for (type in c("integer", "logical", "double", "raw", "character")) {
+        sink <- HDF5RealizationSink(c(20, 0),  # 0 columns
+                                    type=type, chunkdim=c(12, 0))
+        checkTrue(is(sink, "HDF5RealizationSink"))
+        checkIdentical(dim(sink), c(20L, 0L))
+        checkIdentical(chunkdim(sink), c(12L, 0L))
+        checkIdentical(type(sink), type)
+
+        seed <- as(sink, "HDF5ArraySeed")
+        checkTrue(is(seed, "HDF5ArraySeed"))
+        checkIdentical(dim(seed), dim(sink))
+        checkIdentical(chunkdim(seed), chunkdim(sink))
+        checkIdentical(type(seed), type(sink))
+
+        sink <- HDF5RealizationSink(c(0, 15),  # 0 rows
+                                    type=type, chunkdim=c(0, 6))
+        checkTrue(is(sink, "HDF5RealizationSink"))
+        checkIdentical(dim(sink), c(0L, 15L))
+        checkIdentical(chunkdim(sink), c(0L, 6L))
+        checkIdentical(type(sink), type)
+
+        seed <- as(sink, "HDF5ArraySeed")
+        checkTrue(is(seed, "HDF5ArraySeed"))
+        checkIdentical(dim(seed), dim(sink))
+        checkIdentical(chunkdim(seed), chunkdim(sink))
+        checkIdentical(type(seed), type(sink))
+    }
+
+    ## --- Create a HDF5RealizationSink and write a few blocks ---
+    ## ---                    of data to it                    ---
+
+    sink_dim <- c(9L, 15L, 2L)
+    viewports <- list(
+        ArrayViewport(sink_dim, IRanges(c(1, 11, 1), c(5, 15, 2))),
+        ArrayViewport(sink_dim, IRanges(c(8, 1, 2), c(9, 2, 2))),
+        ArrayViewport(sink_dim, IRanges(c(4, 3, 1), c(8, 12, 2))),
+        ArrayViewport(sink_dim, IRanges(c(9, 5, 1), c(9, 6, 2))),
+        ArrayViewport(sink_dim, IRanges(c(1, 8, 1), c(9, 11, 2))),
+        ArrayViewport(sink_dim, IRanges(c(8, 2, 1), c(9, 3, 1))),
+        ArrayViewport(sink_dim, IRanges(c(1, 1, 1), c(4, 3, 2)))
+    )
+
+    for (type in c("integer", "double")) {
+        for (chunkdim in list(c(5L, 6L, 1L), c(2L, 10L, 2L))) {
+            sink <- HDF5RealizationSink(sink_dim, type=type, chunkdim=chunkdim)
+            checkTrue(is(sink, "HDF5RealizationSink"))
+            checkIdentical(dim(sink), sink_dim)
+            checkIdentical(chunkdim(sink), chunkdim)
+            checkIdentical(type(sink), type)
+            expected <- array(vector(type, length=1), sink_dim)
+            checkIdentical(as.array(as(sink, "HDF5ArraySeed")), expected)
+            ## Write a few blocks of data to 'sink'.
+            for (i in seq_along(viewports)) {
+                viewport <- viewports[[i]]
+                data <- 100L*i + seq_along(viewport) + vector(type, length=1)
+                block <- array(data, dim(viewport))
+                sink <- write_block(sink, viewport, block)
+                seed <- as(sink, "HDF5ArraySeed")
+                checkIdentical(read_block(seed, viewport), block)
+                expected <- write_block(expected, viewport, block)
+                checkIdentical(as.array(seed), expected)
+            }
+        }
+    }
+}
+
+test_from_HDF5RealizationSink_to_HDF5ArraySeed <- function()
+{
+    for (type in c("integer", "logical", "double", "raw")) {
+        for (H5type in c("H5T_NATIVE_UINT8", "H5T_NATIVE_UINT32")) {
+            sink <- HDF5RealizationSink(c(20, 10), type=type, H5type=H5type)
+            checkTrue(is(sink, "HDF5RealizationSink"))
+            checkIdentical(dim(sink), c(20L, 10L))
+            checkIdentical(type(sink), type)
+
+            seed <- as(sink, "HDF5ArraySeed")
+            checkTrue(is(seed, "HDF5ArraySeed"))
+            checkIdentical(dim(seed), dim(sink))
+            checkIdentical(chunkdim(seed), chunkdim(sink))
+            checkIdentical(type(seed), type(sink))
+        }
+    }
+}
+
 ## 'a0' should be an ordinary matrix or array, or a dgCMatrix object.
 .basic_checks <- function(A, a0)
 {
@@ -38,7 +129,7 @@ test_writeHDF5Array_2D <- function()
     M4 <- writeHDF5Array(M3, with.dimnames=FALSE)
     .basic_checks(M4, unname(m0))
     checkTrue(class(M4) == "HDF5Matrix")
-    checkEquals(chunkdim(M4), dim(m0))
+    checkEquals(chunkdim(M4), chunkdim(M3))
     checkTrue(is_sparse(M4))
 
     set.seed(2009L)
@@ -71,16 +162,16 @@ test_writeHDF5Array_4D <- function()
     checkEquals(chunkdim(A2), c(2, 5, 2, 5))
     checkTrue(!is_sparse(A2))
 
-    A3 <- writeHDF5Array(A2, chunkdim=c(3, 5, 4, 2), as.sparse=TRUE)
+    A3 <- writeHDF5Array(A2, as.sparse=TRUE)
     .basic_checks(A3, a0)
     checkTrue(class(A3) == "HDF5Array")
-    checkEquals(chunkdim(A3), c(3, 5, 4, 2))
+    checkEquals(chunkdim(A3), chunkdim(A2))
     checkTrue(is_sparse(A3))
 
     A4 <- writeHDF5Array(A3, with.dimnames=FALSE)
     .basic_checks(A4, unname(a0))
     checkTrue(class(A4) == "HDF5Array")
-    checkEquals(chunkdim(A4), dim(a0))
+    checkEquals(chunkdim(A4), chunkdim(A3))
     checkTrue(is_sparse(A4))
 }
 

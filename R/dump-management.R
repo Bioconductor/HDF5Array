@@ -351,18 +351,49 @@ getHDF5DumpName <- function(for.use=FALSE)
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### set/getHDF5DumpChunkLength() and set/getHDF5DumpChunkShape()
+### set/getHDF5DumpChunkSize() and set/getHDF5DumpChunkShape()
 ###
 
-### Called by .onLoad() hook (see zzz.R file).
-setHDF5DumpChunkLength <- function(length=1000000L)
+### Chunk size is in bytes.
+### Called in .onLoad() hook (see zzz.R file).
+setHDF5DumpChunkSize <- function(size=1000000L)
 {
-    .set_HDF5Array_global_option("dump.chunk.length", length)
+    .set_HDF5Array_global_option("dump.chunk.size", size)
 }
 
-getHDF5DumpChunkLength <- function()
+getHDF5DumpChunkSize <- function()
 {
-    .get_HDF5Array_global_option("dump.chunk.length")
+    .get_HDF5Array_global_option("dump.chunk.size")
+}
+
+setHDF5DumpChunkLength <- function(length=250000L)
+{
+    msg <- c("setHDF5DumpChunkLength() is deprecated, do not use anymore. ",
+             "Please use setHDF5DumpChunkSize() instead to specify the ",
+             "maximum size (in bytes, before compression) of the physical ",
+             "chunks to write to disk.")
+    .Deprecated(msg=wmsg(msg))
+    ## We arbitrarily assume that the type() of the array data is "integer".
+    type_size <- get_type_size("integer")[[1L]]
+    setHDF5DumpChunkSize(length * type_size)
+}
+
+getHDF5DumpChunkLength <- function(type)
+{
+    if (missing(type))
+        stop(wmsg("Please specify the type() of the array data. ",
+                  "See '?getHDF5DumpChunkLength'."))
+    if (!isSingleString(type))
+        stop(wmsg("'type' must be a single string"))
+    type_size <- get_type_size(type)
+    chunk_size <- getHDF5DumpChunkSize()
+    ans <- chunk_size / type_size
+    if (ans > .Machine$integer.max)
+        stop(wmsg("Automatic chunk length is too big. Chunks of ",
+                  "length > .Machine$integer.max are not supported. ",
+                  "Please reduce the automatic chunk length by reducing ",
+                  "the automatic chunk size with setHDF5DumpChunkSize()."))
+    max(as.integer(ans), 1L)
 }
 
 ### Called by .onLoad() hook (see zzz.R file).
@@ -376,12 +407,12 @@ getHDF5DumpChunkShape <- function()
     .get_HDF5Array_global_option("dump.chunk.shape")
 }
 
-### TODO: Replace 'dim' argument with 'x'. This will allow the default
-### **write** chunk dim to be set to the **read** chunk dim (i.e. to
-### 'chunkdim(x)') if this is known (i.e. if 'chunkdim(x)' is not NULL).
-getHDF5DumpChunkDim <- function(dim)
+getHDF5DumpChunkDim <- function(dim, type)
 {
-    chunk_len <- getHDF5DumpChunkLength()
+    chunk_len <- getHDF5DumpChunkLength(type)
+    block_len <- getAutoBlockLength(type)
+    if (chunk_len > block_len)
+        chunk_len <- block_len
     chunk_shape <- getHDF5DumpChunkShape()
     makeCappedVolumeBox(chunk_len, dim, chunk_shape)
 }
