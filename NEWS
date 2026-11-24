@@ -1,3 +1,63 @@
+CHANGES IN VERSION 1.42.0
+-------------------------
+
+NEW FEATURES
+
+    o Add group() methods for HDF5ArraySeed and H5SparseMatrixSeed objects.
+
+    o As per rhdf5's recommendation (starting with version 2.57.10),
+      writeHDF5Array() and writeTENxMatrix() now use a variable-length
+      string dataset instead of a fixed-size string dataset when the
+      array- or matrix-like object to write is of type() character.
+
+    o Add support for H5SparseMatrix objects on S3 buckets.
+      Constructors H5SparseMatrix(), TENxMatrix(), H5ADMatrix(), (and
+      corresponding seed constructors H5SparseMatrixSeed(), TENxMatrixSeed(),
+      and H5ADMatrixSeed()) now accept an H5File object in addition to
+      the path to a local HDF5 file. This allows access to an HDF5 file
+      stored in an Amazon S3 bucket. See '?H5SparseMatrix', '?TENxMatrix',
+      and '?H5ADMatrix' for more information.
+
+    o Add 'type' argument to H5SparseMatrixSeed() constructor.
+      The new optional 'type' argument lets the user specify the desired type()
+      of the object to construct. Its default value is NA, in which case the
+      type() of the returned object will be inferred from the H5 datatype of
+      the HDF5 dataset.
+      All the other matrix-oriented constructors, that is, H5SparseMatrix(),
+      TENxMatrixSeed(), TENxMatrix(), H5ADMatrixSeed(), and H5ADMatrix(), also
+      get the new 'type' argument.
+
+    o Add 'H5type' argument to writeTENxMatrix().
+
+    o Internal helper .load_h5ad_dimnames() can now find rownames and colnames
+      that are tucked deep in the h5ad file i.e. in '/var/_index/values' (for
+      the rownames) and in '/obs/_index/values' (for the colnames).
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+    o Significant speedup of the type() getter for HDF5ArraySeed and
+      H5SparseMatrixSeed objects. Thanks to Robert Castelo for reporting
+      the inefficiency for H5SparseMatrixSeed objects and for proposing
+      a fix. See #71.
+
+    o Add 'type' argument to getHDF5DumpChunkLength() and getHDF5DumpChunkDim().
+
+    o writeHDF5Array(x) now propagates chunkdim(x) if it's not NULL.
+
+DEPRECATED AND DEFUNCT
+
+    o Deprecate setHDF5DumpChunkLength() in favor of setHDF5DumpChunkSize().
+
+BUG FIXES
+
+    o Fix bug in coercion from HDF5RealizationSink to HDF5ArraySeed where it
+      would not propagate type() under certain circumstances.
+
+    o Fix bug in H5SparseMatrixSeed() where the 'subdata' argument was not
+      passed to new2() so was not recorded in the returned H5SparseMatrixSeed
+      object. Thanks to Robert Castelo for reporting this.
+
+
 CHANGES IN VERSION 1.40.0
 -------------------------
 
