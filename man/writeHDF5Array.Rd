@@ -86,7 +86,8 @@ writeHDF5Array(x, filepath=NULL, name=NULL,
   \item{chunkdim}{
     The dimensions of the chunks to use for writing the data to disk.
     By default (i.e. when \code{chunkdim} is set to \code{NULL}),
-    \code{getHDF5DumpChunkDim(dim(x))} will be used.
+    \code{chunkdim(x)} will be used if it's not \code{NULL},
+    otherwise \code{getHDF5DumpChunkDim(dim(x), type(x))} will be used.
     See \code{?\link{getHDF5DumpChunkDim}} for more information.
 
     Set \code{chunkdim} to 0 to write \emph{unchunked data} (a.k.a.

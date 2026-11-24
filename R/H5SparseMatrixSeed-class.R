@@ -282,9 +282,11 @@ read_h5sparse_component <- function(filepath, group, name,
     ans
 }
 
+### Used in unit tests!
 .read_h5sparse_indptr <- function(filepath, group)
     read_h5sparse_component(filepath, group, "indptr")
 
+### Used in unit tests!
 .read_h5sparse_data <-
     function(filepath, group, subdata, desired_type, start=NULL, count=NULL)
 {
@@ -297,6 +299,7 @@ read_h5sparse_component <- function(filepath, group, name,
     ans
 }
 
+### Used in unit tests!
 ### The row (or column) indices stored in HDF5 dataset "indices" are 0-based
 ### and we return them as such.
 .read_h5sparse_indices <- function(filepath, group, start=NULL, count=NULL)

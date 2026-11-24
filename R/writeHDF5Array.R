@@ -99,10 +99,7 @@ HDF5RealizationSink <- function(dim, dimnames=NULL, type="double",
         name <- normalize_dump_name(name)
     }
     if (is.null(chunkdim)) {
-        ## TODO: Pass 'x' instead of 'dim' to getHDF5DumpChunkDim() and modify
-        ## getHDF5DumpChunkDim() to return 'chunkdim(x)' if it's not NULL.
-        ## See TODO comment in dump-management.R
-        chunkdim <- getHDF5DumpChunkDim(dim)
+        chunkdim <- getHDF5DumpChunkDim(dim, type)
     } else if (isSingleNumber(chunkdim) && chunkdim == 0) {
         chunkdim <- NULL  # no chunking
     } else {
@@ -153,8 +150,11 @@ setMethod("write_block", "HDF5RealizationSink",
 ###
 
 setAs("HDF5RealizationSink", "HDF5ArraySeed",
-    function(from) HDF5ArraySeed(from@filepath, from@name,
-                                 as.sparse=from@as_sparse)
+    function(from)
+    {
+        HDF5ArraySeed(from@filepath, from@name,
+                      as.sparse=from@as_sparse, type=type(from))
+    }
 )
 
 setAs("HDF5RealizationSink", "HDF5Array",
@@ -187,6 +187,8 @@ writeHDF5Array <- function(x, filepath=NULL, name=NULL,
     if (!isTRUEorFALSE(with.dimnames))
         stop("'with.dimnames' must be TRUE or FALSE")
     verbose <- DelayedArray:::normarg_verbose(verbose)
+    if (is.null(chunkdim))
+        chunkdim <- chunkdim(x)
 
     if (is.na(as.sparse))
         as.sparse <- is_sparse(x)
