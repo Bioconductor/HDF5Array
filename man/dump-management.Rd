@@ -46,7 +46,7 @@ getHDF5DumpDir()
 getHDF5DumpFile()
 getHDF5DumpName(for.use=FALSE)
 getHDF5DumpChunkSize()
-getHDF5DumpChunkLength(type)
+getHDF5DumpChunkLength(type="integer")
 getHDF5DumpChunkShape()
 getHDF5DumpCompressionLevel()
 
@@ -55,7 +55,7 @@ lsHDF5DumpFile()
 showHDF5DumpLog()
 
 ## For developers:
-getHDF5DumpChunkDim(dim, type)
+getHDF5DumpChunkDim(dim, type="integer")
 appendDatasetCreationToHDF5DumpLog(filepath, name, dim, type,
                                    chunkdim, level)
 }

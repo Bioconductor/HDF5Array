@@ -378,11 +378,8 @@ setHDF5DumpChunkLength <- function(length=250000L)
     setHDF5DumpChunkSize(length * type_size)
 }
 
-getHDF5DumpChunkLength <- function(type)
+getHDF5DumpChunkLength <- function(type="integer")
 {
-    if (missing(type))
-        stop(wmsg("Please specify the type() of the array data. ",
-                  "See '?getHDF5DumpChunkLength'."))
     if (!isSingleString(type))
         stop(wmsg("'type' must be a single string"))
     type_size <- get_type_size(type)
@@ -407,7 +404,7 @@ getHDF5DumpChunkShape <- function()
     .get_HDF5Array_global_option("dump.chunk.shape")
 }
 
-getHDF5DumpChunkDim <- function(dim, type)
+getHDF5DumpChunkDim <- function(dim, type="integer")
 {
     chunk_len <- getHDF5DumpChunkLength(type)
     block_len <- getAutoBlockLength(type)
